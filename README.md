@@ -11,32 +11,19 @@ The supported way to play is the itch.io page:
 ## What this repository is
 
 This is a read-only snapshot mirror of the private development repository. Every push to the
-private repository's `main` branch becomes one squashed commit here, and each commit message
-carries a `Source-Commit:` trailer naming the private commit it came from. There are no other
-branches, and history here is never rewritten.
+private repository's `main` branch becomes one squashed commit here.
 
-Pull requests are not accepted — sole authorship of the private repository is kept so its licence
-can change later without needing every contributor's consent. Issues are welcome.
+Not accepting PRs or issues at the moment, if you have problems send them to the channels on the itch.io page.
 
-## What is missing and why
+## What's missing
 
 These folders are excluded from the mirror and do not exist here:
 
-- `assets/bg`, `assets/bg_thumbs` — the shipped backgrounds and their thumbnails.
-- `assets/characters` — the shipped cast's art, part of which is adult imagery that GitHub does
-  not host.
-- `assets/sound` — the shipped music and sound effects, whose redistribution rights outside the
-  original release are unverified.
-- `assets/pose/skeletons` — the openpose skeleton images ComfyUI renders against.
-- `build/itch-page` — marketing screenshots and captures for the store page.
+- `assets/bg`, `assets/bg_thumbs` — shipped backgrounds/thumbs
+- `assets/characters` — character sprites since some of them contain NSFW imagery (breaches github's rules)
+- `assets/sound` — music/sfx that I don't have permission to redistribute
+- `assets/pose/skeletons` — the openpose skeleton images ComfyUI renders against. Please note that image gen will fail without these
 - `.github/` — the private repository's CI configuration.
-
-Together the excluded art and audio come to about 2 GB, far more than a source repository should
-carry.
-
-Kept from `assets/`: `assets/quickstart.json`, `assets/workflows/*.json` (the ComfyUI API-format
-graphs the app runs), `assets/pose/pose.json` (the pose manifest, without the skeleton images),
-and the PNGs at the assets root (logos, the map).
 
 ## Quirks of running from this repository
 
@@ -44,8 +31,6 @@ and the PNGs at the assets root (logos, the map).
   pose skeletons. Quickstart and the shipped characters are unavailable, and character generation
   cannot run: every ComfyUI graph the app builds loads a skeleton image from
   `assets/pose/skeletons`, which is not here.
-- The game writes everything — settings, saves, generated characters — to a `data/` folder beside
-  the running executable.
 - A Gemini API key is required to play. It is stored in `data/settings.json`, encrypted at rest
   with Windows DPAPI (Electron's `safeStorage`); where DPAPI is unavailable it falls back to
   storing the key as plain text in the same file.
@@ -68,25 +53,6 @@ npm run dev
 
 `npm run build` succeeds without any of the missing art: the renderer's background loader
 tolerates an empty `assets/bg`, and nothing else is bundled at build time.
-
-## Audit map
-
-Where the app touches the outside world and the disk:
-
-| Concern | Where |
-| --- | --- |
-| Gemini API requests | `src/shared/llm/geminiAdapter.ts` |
-| ComfyUI (local HTTP, spawned and owned by the app) | `src/main/services/comfyService.ts` |
-| Setup downloads (ComfyUI runtime, custom nodes and model files, from GitHub and Hugging Face) | `src/shared/setupManifest.ts` names every URL, tag, commit and hash; `src/main/services/downloadService.ts` fetches them |
-| The IPC surface the renderer can call | `src/preload/api.d.ts` (the bridge's types), `src/preload/index.ts` (what it exposes) |
-| Where files are written on disk | `src/main/paths.ts` |
-| API key storage | `src/main/services/settingsService.ts` |
-| Auto-update or telemetry | None. The app does not check for updates or send usage data anywhere. |
-
-Civitai is not a network peer of the running app: the credits screen
-(`src/renderer/views/CreditsModal.tsx`) links to civitai.com pages to attribute two of the image
-models, but the models themselves are downloaded from Hugging Face mirrors named in
-`setupManifest.ts`.
 
 ## Verifying a release
 
