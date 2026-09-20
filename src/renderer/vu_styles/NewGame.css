@@ -1,0 +1,169 @@
+/* The New Game roster's own layout. Only the decoration is placed absolutely — it
+   anchors to the stage, which is 1080 tall at every window size; everything the player reads
+   is ordinary flex and grid.
+
+   The screen names no `z-index`: an absolutely positioned layer paints over static content,
+   so every content block is `position: relative` and written after the backdrop, and tree
+   order does the rest. */
+
+.vu-newgame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+  padding: 44px 80px 58px;
+  /* Clips the archway's flight and the ripple that follows it — both leave the stage. */
+  overflow: hidden;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* ---- the decoration, and the ripple it leaves ------------------------------ */
+
+.vu-newgame-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* One geometry, worn by the archway and by the two layers that duplicate it. **The box and
+   the shape are two elements**, because the doorway breathes where it stands and swells when
+   the pointer lands on Start, and both of those are `scale`: the box wears the idle and the
+   arch inside it wears the gesture, which is the wrapper the Start button already takes for
+   the same reason. The two share an anchor and the
+   arch fills its box, so the two origins are the same point and a breath about it leaves the
+   silhouette exactly where the corner put it.
+
+   `transform-origin` is the bottom of the box, so the doorway grows *upward* out of its
+   corner with its foot pinned and the ripple spreads from the same point. It moves the CSS
+   `rotate`'s pivot too — turning about the foot rather than the middle lands the arch 139px
+   left and 22px low — so `right` and `bottom` carry that shift back out. Change the origin
+   and those two numbers change with it. */
+.vu-newgame-decor {
+  position: absolute;
+  right: -319px;
+  bottom: -358px;
+  width: 640px;
+  height: 900px;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+/* The corner arch, mirrored to the other side with its tilt reversed, filling whatever
+   box it is given. It is not `.vu-newgame-arch` — that is the archway on a roster card, and a
+   card's is the one this screen names without a qualifier. */
+.vu-newgame-decor-arch {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px 999px 0 0;
+  background: var(--vu-highlight);
+  rotate: -18deg;
+  transform-origin: 50% 100%;
+}
+
+/* The wave spreads from the Start button, not from the doorway's own corner: it is the
+   button the player is answering. Same box and same bottom-centre origin, moved so that
+   origin lands on the middle of the doubled button — which is anchored to the right edge
+   like this is, so the two agree at every stage width. The doorway stands over that spot
+   and hides the moment the wave is born. */
+.vu-newgame-ripple {
+  right: -44px;
+  bottom: 89px;
+}
+
+/* The chaser: the screen's own ground, so the moment it has covered the stage there is
+   nothing left to see and both layers can go. */
+.vu-newgame-decor-arch--ground {
+  background: var(--vu-ground);
+}
+
+/* ---- the header ------------------------------------------------------------ */
+
+.vu-newgame-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.vu-newgame-back {
+  flex: none;
+}
+
+/* What the roster is out of, in the bookkeeping voice: flat, since a count is not an
+   answer, and on the tint the title sits on. */
+.vu-newgame-count {
+  flex: none;
+  padding: 10px 20px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+  font: 700 16px var(--font-mono);
+}
+
+/* The one action that is not the screen's primary, at the far end of the row. */
+.vu-newgame-fill {
+  gap: 10px;
+  margin-left: auto;
+  font-size: 17px;
+}
+
+/* ---- the grid -------------------------------------------------------------- */
+
+/* Six across and two down: all twelve are on screen from the first frame, so the cap is
+   legible before the first pick and nothing here ever scrolls. */
+.vu-newgame-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Half again as close as the grid's own crop: the roster is the largest a card ever gets,
+   and a face the player is choosing between is worth the frame. */
+.vu-newgame-arch {
+  --card-zoom: 1.95;
+  height: 286px;
+}
+
+/* Both cards of a shared first name, since the pair is the problem and neither one is.
+   On the crop, which covers the face pseudo, never through `--paper-border`. */
+.vu-newgame-card--duplicate .vu-card-crop {
+  border: 3px solid var(--vu-danger);
+}
+
+.vu-newgame-plus {
+  color: var(--vu-border);
+  font: 400 52px var(--font-display);
+}
+
+.vu-newgame-card--empty .vu-card-name {
+  color: var(--vu-text-muted);
+}
+
+/* ---- the foot -------------------------------------------------------------- */
+
+/* One control, and the room its doubled state paints into: a transform changes nothing in
+   layout, so the height the button reaches has to be reserved here — 51px at rest, 102
+   doubled, and the lean about its own corner drops the far end some 27px below the box,
+   with the paper shadow under that again. The screen's own bottom padding is what keeps
+   the pair off the stage edge. */
+.vu-newgame-foot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  min-height: 132px;
+  margin-top: auto;
+}
+
+/* The wrapper is what the state scales and leans, so the button inside keeps its own hover
+   and press; it grows into the screen from the corner it already sits in. */
+.vu-newgame-start {
+  transform-origin: 100% 100%;
+}

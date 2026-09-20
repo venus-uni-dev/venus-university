@@ -1,0 +1,370 @@
+/* The game stage: the ground both chromes draw over — the background crossfade, the portrait
+   row, the CG layer, the click-to-advance surface, the climax flare and the game-over layer.
+   The one screen file that writes `@keyframes` and a `transition`: each ends on `animationend`,
+   which is state — `onAnimationEnd` drops the outgoing half of a sprite change, a CG or a
+   leaving slot. No `vw`/`vh`: the stage is 1080 units tall in every band. */
+
+.vu-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vu-ground);
+}
+
+/* A game over plays over a completely black screen, painted explicitly rather than left to a
+   role: black here is the absence of the game, the way `--vu-curtain` is at the other end of the
+   app, and not another surface of it. */
+.vu-stage--ending {
+  background: #000;
+}
+
+.vu-stage-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+/* The incoming half of a background change, once its picture has loaded — a change that landed
+   under the cover instead draws it plain, with no animation, so the curtain rises on the new
+   picture rather than opening on a fade already underway. Both layers sit at z-index 0, so the
+   crossfade costs the layering contract below nothing. */
+.vu-stage-bg--in {
+  animation: vu-stage-bgfade 700ms ease-out;
+}
+
+/* The incoming half before its picture has loaded: held invisible rather than fading an empty
+   element in, so a slow fetch never paints the picture in whole once it lands. */
+.vu-stage-bg--pending {
+  opacity: 0;
+}
+
+@keyframes vu-stage-bgfade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The graduation picture, on the stage's tier: it is the last screen of the game and the
+   only thing on it, so it takes the whole frame. */
+.vu-stage-art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  animation: vu-stage-bgfade 700ms ease-out;
+}
+
+/* Sits on the picture rather than beside it, and fades in with it. **The two literals here are
+   the picture's, not the theme's**: `#fff` and the shadow under it sit on an arbitrary
+   image nobody chose, and a role would follow a screen this word is not on. */
+.vu-stage-fin {
+  position: absolute;
+  right: 58px;
+  bottom: 32px;
+  z-index: 1;
+  pointer-events: none;
+  color: #fff;
+  font: 400 32px var(--font-display);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+  animation: vu-stage-bgfade 700ms ease-out;
+}
+
+/* z-index is the one layout rule this file enforces, because click-to-advance depends on it:
+   background 0, the row 1, the advance surface 2, and every chrome and the climax flare at 3. */
+.vu-stage-row {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Sprites are far wider than their share of the row and deliberately spill out of it on both
+     sides; clipping here would cut them vertically. */
+  overflow: hidden;
+  /* How far a sprite stands off its slot's centre line — small enough that the spill above
+     absorbs the travel and no portrait leaves the row. */
+  --stage-sprite-x: 9px;
+}
+
+/* Every slot is the whole stage and centres its sprite in it; where the sprite actually stands is
+   `--stage-slot-x`, a share of the stage width off its centre line, computed per render from the
+   row's contents. */
+.vu-stage-slot {
+  position: absolute;
+  inset: 0;
+  /* Grid rather than flex so both halves of a change share one cell and overlap without being
+     taken out of flow — absolute positioning *here* would cost the bottom-edge anchoring the
+     ground plane depends on. */
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  transform: translateX(var(--stage-slot-x, 0));
+  /* Paired with the arrival and departure fades below: the row closes up around a character
+     exactly as long as she takes to fade. */
+  transition: transform 300ms ease-out;
+}
+
+/* Glyphs rising off a girl the reader just gave something to: a layer the size of the row,
+   moved to her slot exactly as the slot is, so what it throws leaves her and not the stage. */
+.vu-stage-burst {
+  position: absolute;
+  inset: 0;
+  transform: translateX(var(--stage-slot-x, 0));
+  pointer-events: none;
+}
+
+/* The point the glyphs leave from: her torso, at the stage's own height. */
+.vu-stage-burst .vu-burst {
+  top: 42%;
+}
+
+/* An arrival that waits out a background change takes the row's slide with it (`--enterAfterBg`
+   below, the same 700ms) so the stage rearranges in one beat once the shot is established, rather
+   than opening a gap for nobody. */
+.vu-stage-row--slideAfterBg .vu-stage-slot {
+  transition-delay: 700ms;
+}
+
+/* The layer every standing sprite breathes on. It is an element of its own because the three
+   around it each already carry a transform — the slot's place on the row, a half's weight shift,
+   the image's mirror — and it sits above both halves of a change so the two breathe as one. The
+   grid it repeats is the slot's: the halves share its single cell. */
+.vu-stage-breath {
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  min-width: 0;
+  /* The bottom of the frame is the ground she stands on: scaled about it, she rises at the
+     head and her feet stay where they were. */
+  transform-origin: bottom center;
+  /* A sprite is a bitmap most of the stage tall, and one re-rasterized every frame is a crawl
+     rather than a breath. The one CSS property that lives
+     in motion's territory: it moves nothing and names no duration. */
+  will-change: transform;
+}
+
+/* One half of a sprite change. */
+.vu-stage-sprite {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+}
+
+.vu-stage-sprite--posLeft {
+  transform: translateX(calc(-1 * var(--stage-sprite-x)));
+}
+
+.vu-stage-sprite--posRight {
+  transform: translateX(var(--stage-sprite-x));
+}
+
+.vu-stage-sprite--in.vu-stage-sprite--posLeft {
+  animation: vu-stage-in-left 400ms ease-out;
+}
+
+.vu-stage-sprite--in.vu-stage-sprite--posRight {
+  animation: vu-stage-in-right 400ms ease-out;
+}
+
+/* The outgoing half travels the same way as the incoming one, so the two read as a single sprite
+   gliding across — but it never fades: it stays opaque underneath while the incoming one fades in
+   on top, and is dropped when the incoming one's animation ends; `forwards` parks it at the
+   far offset until then. */
+.vu-stage-sprite--out {
+  pointer-events: none;
+}
+
+.vu-stage-sprite--in {
+  position: relative;
+  z-index: 1;
+}
+
+.vu-stage-sprite--out.vu-stage-sprite--posLeft {
+  animation: vu-stage-out-left 400ms ease-out forwards;
+}
+
+.vu-stage-sprite--out.vu-stage-sprite--posRight {
+  animation: vu-stage-out-right 400ms ease-out forwards;
+}
+
+@keyframes vu-stage-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(var(--stage-sprite-x));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(calc(-1 * var(--stage-sprite-x)));
+  }
+}
+
+@keyframes vu-stage-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--stage-sprite-x)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(var(--stage-sprite-x));
+  }
+}
+
+@keyframes vu-stage-out-left {
+  from {
+    transform: translateX(calc(-1 * var(--stage-sprite-x)));
+  }
+  to {
+    transform: translateX(var(--stage-sprite-x));
+  }
+}
+
+@keyframes vu-stage-out-right {
+  from {
+    transform: translateX(var(--stage-sprite-x));
+  }
+  to {
+    transform: translateX(calc(-1 * var(--stage-sprite-x)));
+  }
+}
+
+/* Arriving and leaving the stage. */
+@keyframes vu-stage-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes vu-stage-fadeout {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.vu-stage-sprite--enter {
+  animation: vu-stage-fadein 300ms ease-out backwards;
+}
+
+/* A character shown on a line that also moves the camera waits out the background's own fade
+   (700ms, `vu-stage-bgfade` above — the two durations are a pair, though the fade's own clock
+   starts at its picture's load rather than at this element's mount) so the shot is established
+   before she walks into it. */
+.vu-stage-sprite--enterAfterBg {
+  animation: vu-stage-fadein 300ms ease-out 700ms backwards;
+}
+
+.vu-stage-slot--leaving {
+  animation: vu-stage-fadeout 300ms ease-out forwards;
+  pointer-events: none;
+}
+
+/* Set when a character is shown beside someone standing in the same pose. It stays a class
+   rather than joining the dim in motion: motion writes the `filter` on this element and one
+   element gets one writer per property, and this is a transform. */
+.vu-stage-portrait--flipped {
+  transform: scaleX(-1);
+}
+
+/* The CG's own layer: it covers the row rather than joining it, which is what lets one fade out
+   over the portraits that have already returned. */
+.vu-stage-cg-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  /* A CG is a picture most of the stage wide, and one re-rasterized every frame of its breath is
+     a crawl rather than a breath. The one CSS property that lives in motion's territory: it moves
+     nothing and names no duration. */
+  will-change: transform;
+}
+
+/* A CG is a 1216x832 landscape image shown whole: it covers the portrait row on the same layer,
+   and shares none of the thigh-up crop above. */
+.vu-stage-cg {
+  position: absolute;
+  height: 972px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  margin-bottom: 60px
+}
+
+/* A CG dissolves in and out rather than cutting, the same grammar as a background change — whose
+   keyframes the arrival reuses. */
+.vu-stage-cg--in {
+  animation: vu-stage-bgfade 700ms ease-out;
+}
+
+.vu-stage-cg--out {
+  animation: vu-stage-cgfadeout 700ms ease-out forwards;
+}
+
+@keyframes vu-stage-cgfadeout {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* The click-to-advance surface: covers everything below the chrome tier, so a click on the
+   background, a portrait or beside the dialogue box all advance it. */
+.vu-stage-advance {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* The climax: white coming in off the edges and thinning to nothing at the centre, over the
+   chromes and answering no pointer, for as long as the sound under it runs (`climaxFlare`).
+   White is a literal for the ending's black's reason — it is light rather than a surface, and it
+   is white by night too. */
+.vu-stage-flare {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0) 30%, #fff 100%);
+}
+
+/* ---- the endings' chrome -------------------------------------------------- */
+
+/* What the three game overs are read on: the app's own dialogue box over a cleared stage, with
+   no chips, speaker or rail. Sits where the landing does — `.vu-box`'s own `bottom` seat. */
+.vu-ending {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The hangout launch lock: a transparent layer over absolutely everything — the modal veils
+   included — so nothing can be clicked while a texted plan is turning into a scene. The 200
+   is a literal for `.vu-veil`'s own reason: the two are the app's tiers, not a screen's layers,
+   and this one is the tier above every veil. */
+.vu-stage-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: transparent;
+}

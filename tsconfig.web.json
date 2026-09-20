@@ -1,0 +1,17 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/**/*",
+    "src/web/**/*",
+    "src/preload/api.d.ts",
+    "src/shared/**/*"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    // The @electron-toolkit base turns this off despite `strict`; on.
+    "noImplicitAny": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    }
+  }
+}

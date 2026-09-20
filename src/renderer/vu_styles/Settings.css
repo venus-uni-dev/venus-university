@@ -1,0 +1,120 @@
+/* The Settings modal: its panel and the two columns inside it. Imported from the
+   view module, never from index.css.
+
+   The veil, the fields, the checkbox and the foot are base.css's; what is here is the panel,
+   the two columns, and the note a content toggle carries. */
+
+/* The widest of the half-pill panels, its round left end negative space on purpose: the
+   content is inset past it rather than curved around it. A long panel relaxes its tilt to
+   -1.2°. No `overflow` — the title tab overhangs the top edge, and the paper layer's shadow
+   is a pseudo-element this box would clip. */
+.vu-settings {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  gap: 56px;
+  width: min(1460px, 100% - 60px);
+  padding: 60px 80px 52px 300px;
+  border-radius: 400px 0 0 400px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The first-run content question wears the same panel with the writer's column absent: it
+   hugs the one column it holds rather than keeping the width of two, and its intro is the
+   whole of what the app promises about either setting, said at rest and in full. */
+.vu-settings--content {
+  width: min(810px, 100% - 60px);
+}
+
+.vu-settings-intro {
+  margin: 0;
+  color: var(--vu-text-body);
+  font: 500 16px/1.5 var(--font-body);
+}
+
+/* What a column of settings is about, over it: one size up from a field's own label. */
+.vu-settings-heading {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ---- the left column: who writes ------------------------------------------ */
+
+.vu-settings-writer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 17px;
+  min-width: 0;
+}
+
+/* What the second model writes: a heading and three boxes, tucked under the select they
+   answer for and inset from it, so the group reads as that field's own rather than as three
+   more settings in the column. Tight, because each row is a label and a short aside — not the
+   content toggles' paragraph. */
+.vu-settings-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: -4px;
+  padding-left: 14px;
+  border-left: 3px solid var(--vu-tint);
+}
+
+.vu-settings-kinds-head {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* The key is the last thing in the column and the only field the player types a secret
+   into; the space above it separates it from the four pickers. */
+.vu-settings-key {
+  margin-top: 4px;
+}
+
+/* ---- the right column: what is shown -------------------------------------- */
+
+.vu-settings-content {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 18px;
+  width: 430px;
+}
+
+/* The sliders and the two data copies are each a set rather than a run of settings, so they
+   sit tighter than the column's own rhythm and the heading over each keeps the column's
+   spacing to the paragraph above. */
+.vu-settings-sound-heading,
+.vu-settings-data-heading {
+  margin-top: 6px;
+}
+
+.vu-settings-sound {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The two copies of the player's data, and the line under them saying why they are here. */
+.vu-settings-data {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vu-settings-data-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* The answers sit at the foot of the column, whatever the toggles above them come to. */
+.vu-settings-foot {
+  margin-top: auto;
+}

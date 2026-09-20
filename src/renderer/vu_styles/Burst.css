@@ -1,0 +1,41 @@
+/* A burst of particles off the thing it rides: a splash of dots
+   off a word, or glyphs rising off a girl. Layout only — every clock is `views/motion.ts`'s.
+   Imported from the component, never from index.css. */
+
+/* A point, not a box: it sits at the centre of whatever it is a child of and takes no room and
+   no pointer, so the particles are thrown from the thing rather than from beside it. */
+.vu-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.vu-burst-bit {
+  position: absolute;
+  display: block;
+  will-change: transform, opacity;
+}
+
+/* A dot in the ink of the word it left: the mark's own colour, so a Brain word throws Brain. */
+.vu-burst--splash .vu-burst-bit {
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* A glyph rising off a sprite. They start spread across her rather than on one point —
+   `--i` is the particle's own index, and the spread is a share of the stage written as px. */
+.vu-burst--float .vu-burst-bit {
+  top: 0;
+  left: calc(-22px + (var(--i, 0) - 3) * 44px);
+  font-size: 44px;
+  line-height: 1;
+}

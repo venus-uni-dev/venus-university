@@ -1,0 +1,1005 @@
+/* The Bunnyboard: the campus messaging app, its three tabs and the phone they are read on.
+   The veil, row, tile, buttons and fields are base.css's. The panel is the app's own mark at
+   stage scale — a half-pill body under two half-pill ears, mirrored to the flat every other
+   surface wears. */
+
+/* The rail and the phone, side by side and centred on the stage: the width caps rather than
+   fixes, so the pair reflows with the phone giving up the space, not the rail. */
+.vu-bb {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  width: min(1490px, 100% - 44px);
+  height: min(872px, 100%);
+}
+
+/* ---- the rail ------------------------------------------------------------- */
+
+/* The way out on top, then the three destinations, stepping down a diagonal that follows the
+   -2° the tiles are tilted at. **There is no fourth tile**: the landing already draws the
+   reader's money and stats, and a phone that reported them again would be one screen saying
+   the same thing twice. */
+.vu-bb-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+  width: 116px;
+}
+
+/* The step itself, which is an index rather than a state: each seat sits 10px left of the one
+   above it, so the column runs down the -2° the tiles are tilted at. */
+.vu-bb-rail > :nth-child(1) {
+  margin-left: 30px;
+}
+
+.vu-bb-rail > :nth-child(2) {
+  margin-left: 20px;
+}
+
+.vu-bb-rail > :nth-child(3) {
+  margin-left: 10px;
+}
+
+.vu-bb-tile {
+  --tile-radius: 28px;
+  gap: 7px;
+  width: 86px;
+  height: 86px;
+  rotate: -2deg;
+}
+
+.vu-bb-tile svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+
+.vu-bb-tile-word {
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* The tab being read: an accent fill, which is a *state* rather than a colour of its own — so
+   its hover is a scale and never a tint (`toggleLift`). */
+.vu-bb-tile--on {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  color: var(--vu-accent-ink);
+}
+
+.vu-bb-tile--on .vu-bb-tile-word {
+  color: var(--vu-accent-ink);
+}
+
+/* ---- the phone ------------------------------------------------------------ */
+
+.vu-bb-phone {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* The ear is the shadow layer continued upward, not its own surface — drawn in `--vu-shadow`
+   with no paper layer, so there is no seam where it meets the panel. It is written before the
+   panel in markup: two `position: absolute` siblings at `z-index: auto` paint in tree order. */
+.vu-bb-ear {
+  position: absolute;
+  width: 104px;
+  border-radius: 999px 999px 0 0;
+  background: var(--vu-shadow);
+  transform-origin: bottom center;
+  pointer-events: none;
+}
+
+/* The near ear stands taller than the far one so the pair reads as a fork rather than a
+   symmetric pair. Heights are measured off the slab, not the panel. */
+.vu-bb-ear--near {
+  top: -90px;
+  left: 156px;
+  height: 152px;
+}
+
+.vu-bb-ear--far {
+  top: -76px;
+  left: 292px;
+  height: 134px;
+}
+
+/* The panel's own slab: larger than its face and turned clockwise, so it shows on all four
+   sides. It takes `--vu-shadow`, not `--vu-panel-shadow` — the app's mark, not a modal. */
+.vu-bb-panel {
+  --paper-offset: 0px 4px;
+  --paper-tilt: 1.2deg;
+  position: relative;
+  height: 100%;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+.vu-bb-panel::before {
+  inset: -10px -30px;
+  border-radius: 150px 0 0 150px;
+}
+
+.vu-bb-body {
+  display: flex;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* ---- the tabs' own furniture ---------------------------------------------- */
+
+/* A tab's title, over the tint blob every screen name in the app sits on. It is `.vu-title`
+   at panel size: the blob leans, the word never does. **It hugs its word** — the primitive's blob
+   is drawn on the element's own box, and a block in a flex column would stretch it to the column
+   and read as a bar rather than as a mark behind a name. */
+.vu-bb-title {
+  align-self: flex-start;
+  flex: none;
+  margin-left: 6px;
+  margin-bottom: 12px;
+}
+
+.vu-bb-title .vu-title-text {
+  font-size: 34px;
+}
+
+/* One section of a list, in the bookkeeping voice. A section with nothing in it is absent
+   rather than empty, so this never labels a blank. */
+.vu-bb-section {
+  margin-top: 6px;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* A handle is the bookkeeping voice too: it is an address, not a name. */
+.vu-bb-handle {
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-mono);
+}
+
+.vu-bb-name {
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 16px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Which of the three bots a thread belongs to, said beside the name rather than under it. */
+.vu-bb-kind {
+  flex: none;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+/* A face is an archway, and one in a list is quiet — no paper layer, lifted onto the
+   surface tone so a column of them does not read as one shape (Load Game's cast strip). */
+.vu-bb-face {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  background: var(--vu-surface);
+}
+
+/* Four sizes serve every list in the app, said as classes rather than as a style prop: what a
+   face is drawn at is the layout's business, and layout lives in CSS. */
+.vu-bb-face--sm {
+  width: 40px;
+  height: 47px;
+}
+
+.vu-bb-face--md {
+  width: 50px;
+  height: 59px;
+}
+
+.vu-bb-face--lg {
+  width: 56px;
+  height: 66px;
+}
+
+/* A person's face is ringed in the accent wherever it is listed — never a bot's, a boss's
+   or the random student's, none of whom is somebody he can go and see. The border is on the
+   archway itself and the crop inside it clips to the box within, so the ring is unbroken. */
+.vu-bb-face--ring {
+  border: 2.5px solid var(--vu-accent);
+}
+
+/* A bot has a mark where a sprite would be, in the same frame so the list stays one column: the
+   two app bots draw the university's letters and the app's own bunny, an employer his emoji. */
+.vu-bb-face--bot {
+  display: grid;
+  place-items: center;
+  background: var(--vu-recessed);
+  font-size: 22px;
+}
+
+/* The letters are a bitmap, so the only handle a theme has on them is a filter (the wordmark
+   rule); this one *fills* rather than turns, since the file is black and the mark is the accent.
+   The filter itself is `components/LettersMark.tsx`'s; this names it and says what to flood. */
+.vu-bb-letters {
+  width: 58%;
+  height: auto;
+  filter: url('#vu-bb-letters');
+}
+
+.vu-bb-letters-ink {
+  flood-color: var(--vu-accent);
+}
+
+/* The app's own mark, filled: the bunny the crossing waits under, at an archway's size. It is
+   drawn larger than the letters beside it because it has to be — the shape is two ears and a
+   body, and under about 34px the three read as one blob. */
+.vu-bb-face--bot svg {
+  display: block;
+  width: 76%;
+  height: auto;
+  color: var(--vu-accent);
+}
+
+/* Where she is right now, as a lamp rather than a sentence: green when she is free, amber while
+   a class or a shift has her. It is never the only thing said — the words beside it place her —
+   so nothing here is carried by colour alone. */
+.vu-bb-led {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--vu-good);
+}
+
+.vu-bb-led--busy {
+  background: var(--vu-warn);
+}
+
+/* What the reader calls her. A key rather than a state, so the pairs are set on a data
+   attribute the way a course's group is; it leans the shallow lean a sticker takes, under the
+   -2° the paper layer is tilted at, so the two read as a label stuck onto a row. */
+.vu-bb-tag {
+  flex: none;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--vu-tint);
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  rotate: -3deg;
+}
+
+.vu-bb-tag[data-tag='friend'] {
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+}
+
+.vu-bb-tag[data-tag='best-friend'],
+.vu-bb-tag[data-tag='bff'],
+.vu-bb-tag[data-tag='lover'] {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-bb-tag[data-tag='enemies'] {
+  background: var(--vu-danger-tint);
+  color: var(--vu-danger);
+}
+
+/* ---- Chats (D1) ----------------------------------------------------------- */
+
+/* The list column, one tone below the panel's own face so the rows on it read as sheets. Its
+   left padding is what clears the panel's 120px round end: at the title's own height the curve
+   still reaches some 30px in, and a row's round cap has to start clear of it. */
+.vu-bb-chats {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  width: 384px;
+  padding: 32px 20px 30px 46px;
+  background: var(--vu-ground);
+}
+
+/* Scrolls `hidden auto`. Kept on the compositor with `will-change: transform` so it stays in
+   sync with the panel's own promoted sprite — scrolled on the main thread, it would lag a frame
+   behind the leaning tags on the cards under it. */
+.vu-bb-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  margin: -6px -8px;
+  padding: 6px 8px 16px;
+  overflow: hidden auto;
+  will-change: transform;
+}
+
+/* A conversation row: `.vu-row`'s half-pill flat right, lifted to the surface tone. The border
+   is on every row and transparent on most, so opening a thread moves no layout. Two controls,
+   not one — her face is a sibling of the hit target, not a button nested inside it. */
+/* The card gives its own padding to its two children, so every pixel of it belongs to one
+   control or the other and none of it can be clicked without opening something. */
+.vu-bb-chat {
+  gap: 0;
+  padding: 0;
+  border: 2.5px solid transparent;
+  background: var(--vu-surface);
+}
+
+/* Her face and the left inset it sits in, plus half the gap to the words beside it. */
+.vu-bb-chat > .vu-bb-face-btn {
+  align-self: stretch;
+  align-items: center;
+  padding: 12px 7px 12px 28px;
+}
+
+/* Everything on the card that is not her face, as one target: it carries the row's own layout,
+   so the card reads as a single button. */
+.vu-bb-chat-hit {
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px 18px 12px 7px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* A bot has no page to open, so this target is the whole card and takes the whole inset. */
+.vu-bb-chat-hit--whole {
+  padding-left: 28px;
+}
+
+.vu-bb-chat--on {
+  border-color: var(--vu-accent);
+}
+
+.vu-bb-chat-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vu-bb-chat-top {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.vu-bb-preview {
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What the row is owed, or when it last spoke — never both. */
+.vu-bb-unread {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-bb-stamp {
+  flex: none;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- the thread ----------------------------------------------------------- */
+
+.vu-bb-thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vu-bb-thread-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 34px;
+  border-bottom: 2.5px solid var(--vu-recessed);
+}
+
+.vu-bb-thread-who {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.vu-bb-thread-name {
+  color: var(--vu-text);
+  font: 700 20px var(--font-body);
+}
+
+/* Her handle, a lamp for whether the hour has her, and where the app is willing to say she is —
+   the map's own question, so the thread can never place her somewhere the map would not.
+   **Not a relationship tag**: a thread is a conversation, and what
+   she is to the reader belongs on the page that is about her. */
+.vu-bb-thread-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-mono);
+}
+
+.vu-bb-thread-dot {
+  color: var(--vu-border);
+}
+
+/* The messages. */
+.vu-bb-msgs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 22px 34px;
+  overflow: hidden auto;
+}
+
+/* Time is a divider row and never a stamp on a bubble, so a run of texts reads as one
+   moment. The words are the same two `formatChatDivider` is built from — the function itself is
+   what decides where a divider goes and what RITA is told, and it is not re-rendered here. */
+.vu-bb-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 6px 0;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vu-bb-divider::before,
+.vu-bb-divider::after {
+  content: '—';
+  opacity: 0.55;
+}
+
+/* A bubble is **a pill with one corner squared off**, and the sharp corner is the whole of how
+   the shape says who is speaking: hers points down-left, his down-right.
+
+   The radius is fixed at half a one-line bubble's height, so a one-liner is a true stadium and a
+   four-liner keeps that same cap: the curve beside the squared corner is the same on every
+   height, and one padding serves every one of them. */
+.vu-bb-bubble {
+  max-width: 440px;
+  padding: 10px 18px;
+  border-radius: calc(0.5lh + 10px);
+  font: 500 15.5px/1.45 var(--font-body);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.vu-bb-bubble--theirs {
+  align-self: flex-start;
+  border-bottom-left-radius: 0;
+  background: var(--vu-recessed);
+  color: var(--vu-text);
+}
+
+.vu-bb-bubble--mine {
+  align-self: flex-end;
+  border-bottom-right-radius: 0;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+/* What the app says about the conversation rather than anything either of them said: centred,
+   in the bookkeeping voice, and carrying no tail — nobody spoke it. */
+.vu-bb-bubble--system {
+  align-self: center;
+  max-width: 560px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-mono);
+  text-align: center;
+}
+
+.vu-bb-bubble--error {
+  background: var(--vu-danger-tint);
+  color: var(--vu-danger);
+}
+
+/* Exactly "her queue is not empty" — never that a call is running. */
+.vu-bb-bubble--typing {
+  display: flex;
+  gap: 7px;
+  padding: 17px 22px;
+}
+
+.vu-bb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--vu-text-muted);
+}
+
+/* ---- what sits under the thread ------------------------------------------- */
+
+.vu-bb-foot {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 34px 26px;
+}
+
+/* The field and its answer read left to right and end on Send: the well opens on a round cap
+   where the words start and runs flat into the button, which faces back at it across the row —
+   the scene's own arrangement one screen along. Send stays put at the well's foot as it grows
+   upward, so the row anchors to the bottom rather than the middle. */
+.vu-bb-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.vu-bb-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 24px;
+  border-radius: 999px 0 0 999px;
+  font-size: 15px;
+}
+
+/* The well grows upward as the messages above it move out of the way, up to four lines, instead
+   of scrolling sideways. `field-sizing: content` sizes it with nothing manually measured; 33px is
+   `.vu-bb-input`'s 14px padding and `.vu-input`'s 2.5px border, doubled. */
+.vu-bb-input--multiline.vu-input {
+  display: block;
+  max-height: calc(4lh + 33px);
+  overflow: hidden auto;
+  field-sizing: content;
+  resize: none;
+}
+
+/* One tap each, and present and dead exactly when the field is. */
+.vu-bb-emoji {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vu-bb-emoji-btn {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--vu-recessed);
+  font: 400 20px var(--font-body);
+  line-height: 1.2;
+}
+
+/* What the thread offers instead of a composer: an invitation, a retry, or a bot's two buttons —
+   one card, whichever it is holding, drawn as a well rather than a recessed row. */
+.vu-bb-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 22px;
+  border-radius: 26px;
+  background: var(--vu-tint);
+}
+
+.vu-bb-answers-text {
+  color: var(--vu-text-body);
+  font: 600 14.5px var(--font-body);
+  text-align: center;
+}
+
+/* **A modal footer's gap and a modal footer's pivot**, and for the same two reasons: a
+   `.vu-btn` turns about its flat left edge, so a hover sends the whole of its tenth rightward
+   into whatever is beside it, and 12px of it was spent before the swell had finished. The
+   answers here are the loud shape as well, which is a wider box to throw. */
+.vu-bb-answers-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+
+.vu-bb-answers-row > button {
+  transform-origin: center;
+}
+
+/* The answer that backs out, on a well one step of the same colour as a quiet control's own
+   recessed fill — which is why it takes a surface face and the accent's ink instead, and why its
+   hover tints to the highlight rather than to the card it is standing on (`views/motion.ts`'s
+   `cancelLift`). It reads in both themes; a quiet pill here read in neither. */
+.vu-bb-btn--cancel {
+  background: var(--vu-surface);
+  color: var(--vu-accent);
+}
+
+/* Moving the hour is the third answer and only ever a warning's worth of loud: an outline
+   in the warn tone, which is the one place that role is a control's rather than a count's. */
+.vu-bb-btn--warn {
+  --paper-border: 3.5px solid var(--vu-warn);
+  color: var(--vu-warn);
+}
+
+/* An agreed hangout retires the composer for one button, which is the whole footer. */
+.vu-bb-begin {
+  margin:auto;
+  justify-content: center;
+  width: 66%;
+  transform-origin: center;
+}
+
+/* ---- Friends (D2) and Updates --------------------------------------------- */
+
+/* A tab that is one column rather than two: the whole panel, with the same clearance off the
+   round end the chat list takes. */
+.vu-bb-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 34px 34px 30px 96px;
+}
+
+/* Room for the bar, which would otherwise be drawn over the square right end of every row —
+   and, on the sides, for what a hovered card grows into: a `cardSwell` on a half-width card is
+   some 9px each way. A transform is not layout, so every pixel of it is reserved by hand,
+   and the negative margin gives the room back so the first column still lines up with the title
+   above it. */
+.vu-bb-page .vu-bb-scroll {
+  margin: -16px;
+  padding: 16px 20px 20px 16px;
+}
+
+/* Sections in priority order — the things that expire sit on top. */
+.vu-bb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* **A request is an action item, so it is flat on the LEFT** — the shape an answer wears,
+   where every other row on the tab is a surface flat on the right. It sits on the tint a title's
+   own blob is drawn in, which is the loudest a row gets without becoming a control itself. */
+.vu-bb-request {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px 14px 18px;
+  border-radius: 0 999px 999px 0;
+  background: var(--vu-highlight);
+}
+
+.vu-bb-request-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vu-bb-request-line {
+  color: var(--vu-text-body);
+  font: 500 14px var(--font-body);
+}
+
+/* Three half-pill cards across, her face filling the round end at full card height. A grid,
+   not `flex: 1`, so an empty slot still reserves its column — a thin week's cards stay the
+   same size a full week's are, rather than growing to fill the row. */
+.vu-bb-discover {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.vu-bb-suggest {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  height: 148px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+/* Clips its own picture safely since it is quiet, with no shadow of its own to lose. Sized so
+   clipping never cuts the answer button's own shadow sitting inside it. */
+.vu-bb-crop {
+  display: block;
+  flex: none;
+  width: 104px;
+  height: 100%;
+  border-radius: 999px 0 0 999px;
+  overflow: hidden;
+}
+
+/* The face fills the round end, so the button around it is the card's own height — and the
+   crop's `height: 100%` needs a definite one to resolve against, which is why both cards state
+   a height rather than a floor. */
+.vu-bb-suggest > .vu-bb-face-btn {
+  height: 100%;
+}
+
+.vu-bb-suggest-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 18px;
+}
+
+/* Her name, the address, then the one thing he can do about her — an ordinary primary at panel
+   size, the same control the request row's Accept and her own page's Add Friend use. */
+.vu-bb-suggest-name {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--vu-text);
+  font: 700 16px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The contacts, two across: a person he knows is worth a card rather than a line, and it is the
+   suggestion card's own shape at another weight — her face in the round end at the card's full
+   height, four readings beside it, and what he calls her at the end.
+
+   Two columns and not three: four rows of text need the width, and a tab of half-width cards
+   still lists eight people without scrolling. */
+.vu-bb-contacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* Quiet, like every other row on the tab, and it may clip its own picture for the same reason.
+   **It expands under the cursor** rather than only tinting (`cardSwell`), which is
+   what the card's own clip turns into the picture leaning into its frame. */
+.vu-bb-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 128px;
+  padding: 0 20px 0 0;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+
+.vu-bb-card-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* The FRIEND tag sits on `--vu-tint` rather than `--vu-recessed`, since those two collide into
+   one colour at night; the tag's ink carries the accent regardless of its ground. */
+.vu-bb-card .vu-bb-tag[data-tag='friend'] {
+  background: var(--vu-tint);
+}
+
+/* What she is reading for, in the bookkeeping voice: a year and a major are a record. */
+.vu-bb-card-line {
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 500 12px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Where the map would put her, and nowhere else — or, where it will not say, that she is
+   on the app and no more than that. */
+.vu-bb-where {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 500 13.5px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nothing picked yet: the column says so and offers nothing, the list beside it being the whole
+   of what there is to do here. */
+.vu-bb-thread--blank {
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- Updates -------------------------------------------------------------- */
+
+/* The feed's pages, stacked on the rows' own gap so the seam between two of them reads as one
+   more row rather than a break. */
+.vu-bb-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Where the slot has put somebody, derived at render and never stored. The half-pill's own
+   round end says it is a claim about now, rather than a coloured left border. */
+.vu-bb-checkin {
+  gap: 12px;
+  padding: 11px 20px 11px 16px;
+  color: var(--vu-text-body);
+  font: 600 14px var(--font-body);
+}
+
+.vu-bb-checkin svg {
+  flex: none;
+  color: var(--vu-accent);
+}
+
+/* The day two of them became friends, on the check-in's own row: it is the same kind of
+   object — one line about somebody else's hour — so it takes that shape rather than a post's
+   card. **Two faces rather than a mark**, because the news is about a pair, and each of them
+   opens her own page like every other face in this app. The faces overlap by a third, which is
+   what says "these two" rather than "these two things". */
+.vu-bb-made {
+  gap: 12px;
+}
+
+.vu-bb-made .vu-bb-face-btn + .vu-bb-face-btn {
+  margin-left: -16px;
+}
+
+/* One post, wherever it is drawn: the feed, and a contact's own page. */
+.vu-bb-post {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 24px 16px 28px;
+  border: 2.5px solid transparent;
+  border-radius: 44px 0 0 44px;
+  background: var(--vu-recessed);
+}
+
+/* A fresh like is worth something to her and an old one is not, but the heart fills either way —
+   so what the ring says is "liked", never "counted". */
+.vu-bb-post--liked {
+  border-color: color-mix(in srgb, var(--vu-accent) 40%, transparent);
+}
+
+/* One of the four thousand people the roster is not: ambient, and her face opens nothing. */
+.vu-bb-post--random {
+  opacity: 0.85;
+}
+
+.vu-bb-post-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* A face that opens her page, wherever one is listed: the feed's posts, a conversation card,
+   a thread's header, a suggestion. It is the archway and nothing else — no padding of its own,
+   so the picture is the hit target and the row's spacing is unchanged by its being a button. */
+.vu-bb-face-btn {
+  display: flex;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.vu-bb-post-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.vu-bb-post-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+}
+
+/* A handle is an address and keeps its own case; the stamp beside it is a reading and takes
+   the bookkeeping voice's capitals. */
+.vu-bb-post-meta {
+  display: flex;
+  gap: 7px;
+  color: var(--vu-text-muted);
+  font: 500 12px var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.vu-bb-post-when {
+  text-transform: uppercase;
+}
+
+.vu-bb-post-text {
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 15px/1.5 var(--font-body);
+}
+
+/* Every post carries one, in both of its states. */
+.vu-bb-like {
+  display: flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+}
+
+.vu-bb-like svg {
+  width: 17px;
+  height: 17px;
+}
+
+.vu-bb-like--on {
+  color: var(--vu-accent);
+}
+
+.vu-bb-like--on svg {
+  fill: currentColor;
+}
+
+/* The rest of the feed, asked for: an answer's shape on a tab of readings, flat on the left
+   like the request row above, and quiet enough that it may clip. */
+.vu-bb-more {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 13px 22px 13px 26px;
+  border: 0;
+  border-radius: 0 999px 999px 0;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 700 14px var(--font-body);
+  text-align: left;
+}

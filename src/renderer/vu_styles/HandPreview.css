@@ -1,0 +1,75 @@
+/* What the hand fix rendered, before any of it is written. Derived from the repair that
+   opens it — the same panel, narrowed to the one thing it is asking about. Imported from the
+   view module, never from index.css, for `WardrobeFix.css`'s reason. */
+
+/* No `overflow` — the title tab overhangs the top edge. */
+.vu-hands {
+  --paper-offset: 11px 10px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(760px, 100% - 60px);
+  padding: 46px 50px 34px;
+  border-radius: 90px 0 0 90px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* A picture is a rounded rectangle and the cell is quiet: the weight here belongs to the
+   image (the gallery grammar). It holds its height through all three phases, so the panel does
+   not resize under the player between the spinner and the answer. */
+.vu-hands-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--cell, 600px);
+  padding: 16px;
+  border-radius: 30px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+.vu-hands-shot {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+}
+
+.vu-hands-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+/* Waiting its turn, and with no count to show for it: the queue is serial and a render is
+   minutes, so what moves is the ring and what changes is the word under it. */
+.vu-hands-ring {
+  width: 46px;
+  height: 46px;
+  border: 4px dotted var(--vu-accent);
+}
+
+.vu-hands-step {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vu-hands-empty {
+  max-width: 420px;
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 500 15px var(--font-body);
+  text-align: center;
+}
+
+/* Said at rest and in full, like every other instruction. */
+.vu-hands-hint {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 500 14px var(--font-body);
+}

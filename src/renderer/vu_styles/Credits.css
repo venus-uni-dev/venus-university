@@ -1,0 +1,61 @@
+/* The Credits modal: a panel of lists, and the scroller they live in.
+   Derived from the shape grammar and from the panels already built. Imported from the view module,
+   never from index.css.
+
+   The veil, the row, the buttons and the foot are base.css's. */
+
+.vu-credits-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+.vu-credits-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-credits-title {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 24px var(--font-display);
+}
+
+.vu-credits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row wraps rather than squeezes: the note, where there is one, takes the second line. */
+.vu-credits-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.vu-credits-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+}
+
+.vu-credits-by {
+  color: var(--vu-text-muted);
+  font: 500 14px var(--font-body);
+}
+
+/* The terms the entry is offered under, in the bookkeeping voice, held to the right end. */
+.vu-credits-license {
+  margin-left: auto;
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+}

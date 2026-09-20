@@ -1,0 +1,15 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  // Only the tests are listed: TypeScript pulls in whatever they import, so this
+  // checks the suite against the real source without a third copy of the app's
+  // include lists. `api.d.ts` is what declares `window.api` for the stores.
+  "include": ["test/**/*", "vitest.config.ts", "src/preload/api.d.ts"],
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    // The @electron-toolkit base turns this off despite `strict`; on.
+    "noImplicitAny": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    }
+  }
+}

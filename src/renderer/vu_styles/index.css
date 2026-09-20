@@ -1,0 +1,7 @@
+/* The Venus University design. Imported once from
+   main.tsx; every screen adds only its own file beside these five. */
+@import './fonts.css';
+@import './tokens.css';
+@import './base.css';
+@import './stage.css';
+@import './window.css';

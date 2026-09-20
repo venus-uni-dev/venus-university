@@ -1,0 +1,51 @@
+/* The chat log: the scene so far, as the player read it. No mock — Credits' chassis, a
+   panel of rows in a scroller, with a row built for a line rather than a credit. Imported
+   from the view module, never from index.css.
+
+   The veil, the row, the buttons and the foot are base.css's. */
+
+.vu-chatlog-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+  /* The second well in the app that opts back into selection, after the error's: a line
+     worth reading twice is a line worth pasting. */
+  user-select: text;
+}
+
+/* The speaker over the line, a stack rather than the row's own single line. */
+.vu-chatlog-line {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* The reader's own words, set apart on a tint face rather than the row's own recessed one. */
+.vu-chatlog-line--reader {
+  background: var(--vu-tint);
+}
+
+.vu-chatlog-speaker {
+  color: var(--vu-text-muted);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding-left:20px
+}
+
+/* The log reads at the box's own size — the words she said are the same size read twice
+   (`Dialogue.css`'s `.vu-box-line`). */
+.vu-chatlog-text {
+  color: var(--vu-text-body);
+  font: 500 26px/1.5 var(--font-body);
+  white-space: pre-wrap;
+  padding-left:30px
+}
+
+/* The log's empty line is read at the log's own size. */
+.vu-chatlog-empty {
+  font-size: 22px;
+}

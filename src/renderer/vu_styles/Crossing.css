@@ -1,0 +1,141 @@
+/* The crossing: the two sheets that cross the stage between screens, and the bunny that waits
+   on the opaque one. Layout only — every clock is
+   `views/motion.ts`'s and every rule about when is `stores/crossingStore.ts`'s. */
+
+/* `absolute`, not `fixed`: a fixed layer covers the window, and past 16:9 that is the
+   letterbox too. `#root` is the containing block (`stage.css`), so this box is the stage
+   exactly. The `100` is the modal tier as a literal, as `.vu-veil` writes it;
+   `#modal-root` is later in the tree, so a modal at that tier still opens over the curtain —
+   and Load Game, the one modal the curtain is raised *on*, drops a step below it (LoadGame.css). */
+.vu-crossing {
+  /* How far every sheet runs past the stage's edges, on every side, for this box's own
+     overflow to cut back: a sheet edge that lands exactly on the stage's is rasterized
+     half-covered wherever the window is not 16:9, and the ground behind it reads as a
+     hairline. The round-ended shape spends half of it on its own radius. */
+  --overshoot: 4px;
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  container-type: size;
+}
+
+/* The sheet is wider than the stage by its own cap and by the overshoot, taller than it by the
+   overshoot above and below, and rests entirely off the left edge, so the first frame is right
+   before anything has been measured. The `left` takes the overshoot too: at rest the right edge
+   is still 0, the tip tangent to the stage, and once the sheet has crossed, its left edge is past
+   the stage's, so the integer rounding of the measured travel cannot leave a sub-pixel at that
+   end either. The radius clamps to half the height, which is what makes the leading edge a true
+   archway rather than a rounded corner. */
+.vu-crossing-sheet {
+  position: absolute;
+  top: calc(-1 * var(--overshoot));
+  left: calc(-100cqw - 50cqh - var(--overshoot));
+  width: calc(100cqw + 50cqh + var(--overshoot));
+  height: calc(100cqh + 2 * var(--overshoot));
+  border-radius: 0 999px 999px 0;
+  overflow: hidden;
+}
+
+.vu-crossing-sheet--scrim {
+  background: color-mix(in srgb, var(--vu-accent) 60%, transparent);
+}
+
+.vu-crossing-sheet--curtain {
+  background: var(--vu-curtain);
+}
+
+/* Opening, the same box carries the shape's negative: an archway bitten out of the left edge,
+   travelling the same way. A hole cannot be a `border-radius`, which is why this is the first
+   `clip-path` in `vu_styles`. The arc is written between the stage's own top and bottom rather
+   than the box's, so the archway keeps its geometry while the box runs past the stage on every
+   side: at rest the visible part is the stage plus the overshoot, which the layer's overflow
+   cuts back. */
+.vu-crossing-sheet--cut {
+  left: calc(-50cqh - var(--overshoot));
+  width: calc(100cqw + 50cqh + 2 * var(--overshoot));
+  border-radius: 0;
+  overflow: visible;
+  clip-path: shape(
+    from 0 var(--overshoot),
+    arc to 0 calc(100cqh + var(--overshoot)) of 50cqh cw,
+    line to 0 100%,
+    line to 100% 100%,
+    line to 100% 0,
+    line to 0 0,
+    close
+  );
+}
+
+/* Reduced motion: the sheets are the stage and fade, so nothing crosses it. */
+.vu-crossing-sheet--still {
+  left: calc(-1 * var(--overshoot));
+  width: calc(100cqw + 2 * var(--overshoot));
+  border-radius: 0;
+  overflow: hidden;
+  clip-path: none;
+}
+
+/* The polarity being crossed while the sheet is opaque: the destination's own curtain colour,
+   faded in over the origin's. It carries its own `data-theme`, which is what makes it the other
+   end of the range rather than another value of this one. The sheet it fills is already the
+   stage in every shape, the overshoot included, so `inset: 0` is the whole of its geometry. */
+.vu-crossing-cross {
+  position: absolute;
+  inset: 0;
+  background: var(--vu-curtain);
+}
+
+/* What the wait is drawn as, and it hangs inside the curtain, which is the whole point: the
+   sheet's own edge is what reveals and hides it, so it arrives with the wait and leaves with it.
+
+   Where it sits is the sheet's rest offset plus its place on the stage, every offset taken from
+   a far edge carrying the overshoot the sheet runs past it by, so that the component has only to
+   counter-translate the sheet's own `x` — no measurement reaches it, and the two shapes rest at
+   different offsets, which is the whole of the difference below.
+
+   **It is a row and not just the mark**: the caption sits to the left of the bunny and the two
+   are held on the stage by one translate, so the words are anchored to the corner exactly as the
+   mark has always been. The row is anchored by its *right* edge, since that is the end that does
+   not move when a longer sentence is written into it. */
+.vu-crossing-stand {
+  position: absolute;
+  bottom: calc(56px + var(--overshoot));
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.vu-crossing-stand--out {
+  right: calc(56px - 100cqw);
+}
+
+/* The last two agree: both of those sheets overhang the stage's right edge by the overshoot, and
+   only the shape that rests off to the left, whose right edge is the stage's left one, has to
+   reach back for it. */
+.vu-crossing-stand--cut,
+.vu-crossing-stand--still {
+  right: calc(56px + var(--overshoot));
+}
+
+/* The mark itself, which is the only thing here that moves: the hop and the leap are its own. */
+.vu-crossing-bunny {
+  width: 140px;
+  color: var(--vu-accent);
+}
+
+.vu-crossing-bunny svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* What the wait is for, in the app's own voice for a state: mono, uppercase and quiet, since
+   the mark beside it is what says there *is* a wait and this only says what kind. */
+.vu-crossing-reason {
+  color: var(--vu-text-muted);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

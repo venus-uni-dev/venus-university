@@ -1,0 +1,269 @@
+/* The BunnyMap: the drawing of Veridan with one bubble standing over each place somebody is
+   at this hour. The frame is a rounded box that clips, the sheet inside it is sized off its own
+   height, and every anchor is a share of the picture, so a pin keeps its landmark while the
+   stage reflows. Where a bubble fits is `views/mapLayout.ts`'s, written as two custom
+   properties. The veil, the tab, the archway pair, the buttons and the foot are base.css's. */
+.vu-map {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  /* The frame's height, and so the sheet's smallest width: the picture is 2752×1536, and a sheet
+     narrower than that ratio would leave the frame's corners empty. */
+  --map-h: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(1780px, 100% - 60px);
+  padding: 34px 46px 28px 90px;
+  border-radius: 110px 0 0 110px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* ---- the legend ----------------------------------------------------------- */
+/* What the mark on a portrait means, said at rest — nothing here is behind a hover. The row
+   is left-aligned and ends where the tab's own corner begins. */
+
+.vu-map-legend {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--vu-text-muted);
+  font: 400 14px var(--font-mono);
+}
+
+/* ---- the map itself ------------------------------------------------------- */
+
+/* The frame. It clips, so it carries no paper layer — a `.vu-paper` element may not
+   clip — and the pins inside it are the sheets. */
+.vu-map-clip {
+  position: relative;
+  flex: none;
+  height: var(--map-h);
+  border-radius: 40px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+/* The picture, centred and covering: as wide as the frame, or as wide as its own ratio needs to
+   fill that height, whichever is more. At 16:9 the frame crops its top and bottom; at 4:3 it
+   shows the whole drawing. Either way a share of the sheet is the same place on the map. */
+.vu-map-sheet {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, calc(var(--map-h) * 2752 / 1536));
+  aspect-ratio: 2752 / 1536;
+  translate: -50% -50%;
+}
+
+.vu-map-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- a pin ---------------------------------------------------------------- */
+
+/* The seat is where the layout put the bubble, in the sheet's own pixels. `translate` is a
+   property of its own, so motion's `transform` — the arrival's throw — composes on top of it
+   rather than overwriting it, which is the fan rule's arrangement one screen along. The throw
+   grows about the bubble's own foot. */
+.vu-map-seat {
+  position: absolute;
+  top: 0;
+  left: 0;
+  translate: var(--x, 0) var(--y, 0);
+  transform-origin: 50% 100%;
+}
+
+/* The bubble. **A rounded rectangle rather than a half-pill**: it is a container holding a grid
+   the calendar cell's own case, and a pill at this height would curve into the first face.
+   **The pins themselves stand still**: the seat carries only the arrival, so the Go button
+   inside is never a moving target — the map's idle is the faces', not the bubble's. */
+.vu-map-pin {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 7px 6px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: max-content;
+  padding: 11px 14px 12px 15px;
+  border-radius: 26px;
+}
+
+/* The place over the people, and the one answer the screen offers beside it. */
+.vu-map-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.vu-map-place {
+  overflow: hidden;
+  max-width: 236px;
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+/* The panel primary at a pin's size: a caller says only how big its own is. */
+.vu-map-go {
+  --paper-offset: 5px 4px;
+  flex: none;
+  padding: 5px 15px 5px 12px;
+  font-size: 14px;
+  transform-origin: center;
+}
+
+/* Up to three across in one row, then two rows: `--cols` is the view's count, never a measurement
+   (the lineup's argument — how many read well is a count, not a fit). */
+.vu-map-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1), 66px);
+  gap: 10px 8px;
+  justify-items: center;
+}
+
+/* A face and her name, one column. She is dealt onto the bubble from her feet, the same anchor
+   she breathes on, so she rises into the row rather than swelling out of the middle of it. */
+.vu-map-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 66px;
+  min-width: 0;
+  transform-origin: bottom center;
+}
+
+/* A person is an archway at every size; here she is quiet, the bubble being the sheet she is
+   printed on — three faces each carrying a shadow would be three sheets on one. It positions
+   so the badge can ride its corner; the crop inside is what clips the picture. */
+.vu-map-face {
+  position: relative;
+  flex: none;
+  width: 58px;
+  height: 70px;
+}
+
+/* The map's idle is hers: the picture breathes inside the arch, scaled about her feet so she
+   rises at the head, and it is promoted for the stage's own reason — a bitmap re-rasterized
+   every frame is a crawl rather than a breath. */
+.vu-map-face .vu-crop {
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
+/* Seen here before, not confirmed — the same mark in the legend above and on a corner
+   here, where it wears the count badge's cutout ring so it reads over a sprite. */
+.vu-map-guess {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 2.5px solid var(--vu-surface);
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-map-face .vu-map-guess {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+}
+
+/* Her name under her face, the card caption's first row at a pin's size. */
+.vu-map-name {
+  overflow: hidden;
+  max-width: 66px;
+  color: var(--vu-text-body);
+  font: 700 10px var(--font-mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+/* ---- the Go's card -------------------------------------------------------- */
+
+/* The one line about a place, raised over its bubble while the pointer is on its Go. It stands at
+   the panel's level rather than inside the pin: the frame clips, and a bubble dealt after it or
+   the tab would paint over a card that lived in one. Where it stands is the view's, written as two
+   custom properties — centred on the Go, kept over the frame's width, and always directly above
+   the Go, standing over the legend or past the panel's top when the bubble is high. It takes no
+   pointer, so it cannot end the hover that raised it, and it does not clip, a paper element never
+   doing. */
+.vu-map-tip {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 5px 4px;
+  position: absolute;
+  z-index: 20; /* forward of the tab's 10 while it is up */
+  top: var(--tip-y, 0);
+  left: var(--tip-x, 0);
+  width: max-content;
+  max-width: 300px;
+  padding: 11px 15px;
+  border-radius: 18px;
+  color: var(--vu-text);
+  font: 500 15px/1.4 var(--font-body);
+  pointer-events: none;
+}
+
+/* The capital is display: the blurb itself stays the lowercase line the prompts read. */
+.vu-map-tip::first-letter {
+  text-transform: uppercase;
+}
+
+/* ---- the foot ------------------------------------------------------------- */
+/* Everybody the map cannot draw, accounted for beside the one answer: the group takes the
+   left end, so the line that is there sits where the eye starts whether or not the other is. */
+
+.vu-map-absent {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.vu-map-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--vu-text-muted);
+  font: 400 14px var(--font-mono);
+}
+
+.vu-map-line .vu-map-guess {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  font-size: 11px;
+}
+
+.vu-map-names {
+  color: var(--vu-text-body);
+  font-weight: 700;
+}
+
+/* Nobody at all: the one italic line every empty state in the app is written in. */
+.vu-map-none {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 400 15px var(--font-mono);
+}
+
+.vu-map .vu-foot {
+  flex: none;
+}

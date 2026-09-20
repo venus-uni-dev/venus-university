@@ -1,0 +1,1074 @@
+{
+  "chars": [
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6",
+    "d215de4d-7f92-4f59-954f-1f2461144f2c",
+    "89ff5e67-3917-4027-ac77-46683ef94a8e",
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f",
+    "c27e108a-8a18-4649-a239-e8438af4109f",
+    "f4a99abb-66c4-4040-ac21-ab7249a142af",
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3",
+    "4b994943-17e0-4853-b67e-4754d5e698e5",
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b",
+    "ad254d3c-1118-4763-aaac-7640a5172639",
+    "d28276a0-b509-4f82-9a13-4d1158436074"
+  ],
+  "classes": {
+    "COM 315": {
+      "code": "COM 315",
+      "name": "Public Relations Campaign Design",
+      "description": "A project-based workshop centered on formulating crisis communication blueprints and drafting professional press collateral.",
+      "kind": "project",
+      "category": "major",
+      "major": "Communications",
+      "professor": {
+        "lastName": "Williams",
+        "gender": "man",
+        "age": "older",
+        "temperament": "sarcastic"
+      },
+      "difficulty": "medium",
+      "slot": 6
+    },
+    "LIT 330": {
+      "code": "LIT 330",
+      "name": "Studies in Classical Drama and Tragedy",
+      "description": "A deep textual lecture exploring catharsis, fate, and dramatic irony in Greek tragedies and Elizabethan theatrical adaptations.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Literature",
+      "professor": {
+        "lastName": "Ito",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "theatrical"
+      },
+      "difficulty": "hard",
+      "slot": 4
+    },
+    "ART 120": {
+      "code": "ART 120",
+      "name": "Pastel Lolita Fashion Design and Millinery",
+      "description": "A garment construction atelier dedicated to ruffle draping, lace drafting, and hyper-feminine historicized couture tailoring.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Parker",
+        "gender": "man",
+        "age": "older",
+        "temperament": "warm"
+      },
+      "difficulty": "easy",
+      "slot": 8
+    },
+    "ART 190": {
+      "code": "ART 190",
+      "name": "Pastel Painting and Visual Luminescence",
+      "description": "A tactile painting studio utilizing soft pastels to explore delicate pigment blending, surface light diffusion, and whimsical color palettes.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Dang",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "absent-minded"
+      },
+      "difficulty": "hard",
+      "slot": 0
+    },
+    "BOT 230": {
+      "code": "BOT 230",
+      "name": "Field Ethnobotany and Plant Systems",
+      "description": "A field survey investigating the historical integration of indigenous flora into human medicine, shelter, and sustenance.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Botany",
+      "professor": {
+        "lastName": "Johnson",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "dry"
+      },
+      "difficulty": "medium",
+      "slot": 5
+    },
+    "ARH 101": {
+      "code": "ARH 101",
+      "name": "Global Survey of Art History: Antiquity to Renaissance",
+      "description": "An introductory lecture examining monumental architecture, visual style, and religious iconography across classical civilizations.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Art History",
+      "professor": {
+        "lastName": "Johnson",
+        "gender": "man",
+        "age": "older",
+        "temperament": "gruff"
+      },
+      "difficulty": "hard",
+      "slot": 2
+    },
+    "KIN 130": {
+      "code": "KIN 130",
+      "name": "Biomechanical Sprinting Optimization",
+      "description": "An advanced laboratory investigation into ground reaction forces, stride mechanics, and neuromuscular sprint acceleration.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Richardson",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "strict"
+      },
+      "difficulty": "hard",
+      "slot": 8
+    },
+    "ARH 320": {
+      "code": "ARH 320",
+      "name": "Nineteenth-Century European Romanticism",
+      "description": "A seminar evaluating artistic rebellions against Enlightenment rationalism through the sublime, emotional turmoil, and nationalist allegory.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Art History",
+      "professor": {
+        "lastName": "Roberts",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "theatrical"
+      },
+      "difficulty": "easy",
+      "slot": 7
+    },
+    "LIT 240": {
+      "code": "LIT 240",
+      "name": "Narrative Worldbuilding in Speculative Fiction",
+      "description": "A creative writing studio dedicated to constructing internally consistent secondary worlds, mythologies, and serialized prose.",
+      "kind": "project",
+      "category": "major",
+      "major": "Literature",
+      "professor": {
+        "lastName": "Campos",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "dry"
+      },
+      "difficulty": "hard",
+      "slot": 9
+    },
+    "COM 140": {
+      "code": "COM 140",
+      "name": "Live Broadcast Production",
+      "description": "A practical studio course covering multicamera mobile streaming, viewer engagement mechanics, and real-time community moderation.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Nakamura",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "warm"
+      },
+      "difficulty": "hard",
+      "slot": 9
+    },
+    "KIN 250": {
+      "code": "KIN 250",
+      "name": "Athletic Training and Injury Rehabilitation",
+      "description": "A hands-on clinical workshop teaching taping techniques, soft tissue recovery modalities, and orthopedic injury assessments.",
+      "kind": "project",
+      "category": "major",
+      "major": "Kinesiology",
+      "professor": {
+        "lastName": "Mehta",
+        "gender": "man",
+        "age": "older",
+        "temperament": "eccentric"
+      },
+      "difficulty": "medium",
+      "slot": 4
+    },
+    "PED 140": {
+      "code": "PED 140",
+      "name": "Self-Defense and Combative Arts",
+      "description": "A practical defense class emphasizing situational awareness, escape maneuvers, and basic striking fundamentals.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Orlov",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "sarcastic"
+      },
+      "slot": 0
+    },
+    "MSC 112": {
+      "code": "MSC 112",
+      "name": "Fermentation Science and Mixology Basics",
+      "description": "An introduction to the chemical principles of beverage fermentation, flavor pairing profiles, and distillation safety.",
+      "kind": "lecture",
+      "category": "interest",
+      "professor": {
+        "lastName": "Ivanov",
+        "gender": "man",
+        "age": "older",
+        "temperament": "funny"
+      },
+      "difficulty": "hard",
+      "slot": 7
+    },
+    "MSC 175": {
+      "code": "MSC 175",
+      "name": "Artisanal Coffee and Tea Preparation",
+      "description": "A sensory workshop detailing origin varietals, extraction physics, water chemistry, and microfoam latte crafting techniques.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Gomez",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "eccentric"
+      },
+      "difficulty": "medium",
+      "slot": 1
+    },
+    "PED 135": {
+      "code": "PED 135",
+      "name": "Pilates Mat Work and Core Stability",
+      "description": "A whole-body conditioning course emphasizing pelvic stability, spine articulation, and controlled muscular endurance.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Everhart",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "absent-minded"
+      },
+      "slot": 3
+    },
+    "MUS 340": {
+      "code": "MUS 340",
+      "name": "Songwriting Workshop and Portfolio",
+      "description": "A creative studio where students compose, workshop, and record an original extended-play collection of lyrical pieces.",
+      "kind": "project",
+      "category": "major",
+      "major": "Music",
+      "professor": {
+        "lastName": "Greco",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "warm"
+      },
+      "difficulty": "medium",
+      "slot": 4
+    },
+    "BOT 160": {
+      "code": "BOT 160",
+      "name": "Aromatherapeutic Botany and Distillates",
+      "description": "A studio lab focused on harvesting medicinal botanicals, creating herbal salves, and formulating organic plant-based tinctures.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Diaz",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "funny"
+      },
+      "difficulty": "hard",
+      "slot": 9
+    },
+    "PED 145": {
+      "code": "PED 145",
+      "name": "Team Basketball and Tactical Play",
+      "description": "A court sport class covering offensive spacing, defensive footwork, and structured full-court scrimmage execution.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Kang",
+        "gender": "man",
+        "age": "older",
+        "temperament": "eccentric"
+      },
+      "slot": 8
+    },
+    "ART 285": {
+      "code": "ART 285",
+      "name": "The History of Erotic Iconography",
+      "description": "A lecture seminar charting visual expressions of desire, subversive taboo, and human carnal instincts from Antiquity onward.",
+      "kind": "lecture",
+      "category": "interest",
+      "professor": {
+        "lastName": "Gupta",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "funny"
+      },
+      "difficulty": "hard",
+      "slot": 5
+    },
+    "MSC 160": {
+      "code": "MSC 160",
+      "name": "Advanced Textile Preservation and Stitching",
+      "description": "A practical conservation laboratory teaching hand-repair methods, delicate silk maintenance, and fiber degradation mitigation.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Pemberton",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "strict"
+      },
+      "difficulty": "easy",
+      "slot": 9
+    },
+    "PED 125": {
+      "code": "PED 125",
+      "name": "Indoor Rock Climbing and Belaying",
+      "description": "An introductory climbing course teaching top-rope belay safety, footwork technique, and dynamic wall movement.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Inoue",
+        "gender": "man",
+        "age": "older",
+        "temperament": "passionate"
+      },
+      "slot": 3
+    },
+    "ARH 230": {
+      "code": "ARH 230",
+      "name": "Museum Curatorial Practices and Archiving",
+      "description": "A project workshop covering archival exhibition planning, provenance cataloging, and museum installation stewardship.",
+      "kind": "project",
+      "category": "major",
+      "major": "Art History",
+      "professor": {
+        "lastName": "Hwang",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "absent-minded"
+      },
+      "difficulty": "easy",
+      "slot": 0
+    },
+    "COM 101": {
+      "code": "COM 101",
+      "name": "Mass Communication and Modern Society",
+      "description": "A survey lecture examining the societal influence, industrial evolution, and regulatory ethics of global broadcast media.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Communications",
+      "professor": {
+        "lastName": "Scott",
+        "gender": "man",
+        "age": "older",
+        "temperament": "passionate"
+      },
+      "difficulty": "medium",
+      "slot": 2
+    },
+    "COM 210": {
+      "code": "COM 210",
+      "name": "Strategic Social Media Analytics",
+      "description": "A hands-on project course evaluating audience retention metrics, algorithmic feed trends, and viral marketing campaign assets.",
+      "kind": "project",
+      "category": "major",
+      "major": "Communications",
+      "professor": {
+        "lastName": "Pham",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "easygoing"
+      },
+      "difficulty": "medium",
+      "slot": 1
+    },
+    "MUS 225": {
+      "code": "MUS 225",
+      "name": "Survey of Western Music History",
+      "description": "A comprehensive lecture documenting stylistic shifts from Renaissance polyphony through twentieth-century avant-garde serialism.",
+      "kind": "lecture",
+      "category": "major",
+      "major": "Music",
+      "professor": {
+        "lastName": "Liu",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "absent-minded"
+      },
+      "difficulty": "hard",
+      "slot": 5
+    },
+    "HUM 240": {
+      "code": "HUM 240",
+      "name": "Thanatology and Death Studies",
+      "description": "A multidisciplinary examination of mortality, mourning rituals, and cultural conceptualizations of the afterlife throughout history.",
+      "kind": "lecture",
+      "category": "interest",
+      "professor": {
+        "lastName": "Radcliffe",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "eccentric"
+      },
+      "difficulty": "easy",
+      "slot": 0
+    },
+    "MUS 180": {
+      "code": "MUS 180",
+      "name": "Foundations of Percussive Grooves",
+      "description": "An exploratory workshop examining polyrhythmic timing and syncopated drumming patterns across street performance traditions.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Novikov",
+        "gender": "woman",
+        "age": "younger",
+        "temperament": "passionate"
+      },
+      "difficulty": "medium",
+      "slot": 6
+    },
+    "KIN 310": {
+      "code": "KIN 310",
+      "name": "Strength and Conditioning Program Design",
+      "description": "An applied coaching practicum requiring students to create periodized athletic performance regimens for elite competitors.",
+      "kind": "project",
+      "category": "major",
+      "major": "Kinesiology",
+      "professor": {
+        "lastName": "Belmont",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "sarcastic"
+      },
+      "difficulty": "easy",
+      "slot": 5
+    },
+    "PED 101": {
+      "code": "PED 101",
+      "name": "Introductory Swimming and Aquatic Safety",
+      "description": "A fundamental instructional class focused on water comfort, stroke mechanics, and essential water safety practices.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Ibarra",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "gruff"
+      },
+      "slot": 7
+    },
+    "BOT 320": {
+      "code": "BOT 320",
+      "name": "Mycology and Fungal Ecosystems",
+      "description": "A specialized laboratory course examining subterranean mycelial networks, fungal taxonomy, and saprophytic decomposition.",
+      "kind": "project",
+      "category": "major",
+      "major": "Botany",
+      "professor": {
+        "lastName": "Kaminski",
+        "gender": "man",
+        "age": "older",
+        "temperament": "sarcastic"
+      },
+      "difficulty": "medium",
+      "slot": 4
+    },
+    "ART 150": {
+      "code": "ART 150",
+      "name": "Tabletop Worldbuilding and Cartography",
+      "description": "A design studio where students create comprehensive fantasy campaign setting bibles complete with hand-drafted regional maps.",
+      "kind": "project",
+      "category": "interest",
+      "professor": {
+        "lastName": "Bui",
+        "gender": "woman",
+        "age": "older",
+        "temperament": "strict"
+      },
+      "difficulty": "medium",
+      "slot": 3
+    },
+    "SWIM 102": {
+      "code": "SWIM 102",
+      "name": "Fitness Swimming",
+      "description": "Stroke technique, endurance and water safety in the university pool, from freestyle fundamentals to open turns.",
+      "category": "pe",
+      "instructor": {
+        "lastName": "Taylor",
+        "gender": "man",
+        "age": "younger",
+        "temperament": "passionate"
+      },
+      "slot": 5
+    }
+  },
+  "perChar": {
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "year": 3,
+      "dorm": "lowrise_3",
+      "major": "Communications",
+      "schedule": {
+        "3": "PED 125",
+        "6": "COM 315",
+        "7": "MSC 112"
+      }
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "year": 2,
+      "dorm": "lowrise_1",
+      "major": "Communications",
+      "schedule": {
+        "1": "MSC 175",
+        "2": "COM 101",
+        "3": "PED 125",
+        "6": "COM 315"
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "year": 2,
+      "dorm": "lowrise_3",
+      "major": "Kinesiology",
+      "schedule": {
+        "3": "PED 135",
+        "4": "KIN 250",
+        "5": "KIN 310",
+        "8": "KIN 130"
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "year": 4,
+      "dorm": "elysium",
+      "major": "Kinesiology",
+      "schedule": {
+        "3": "PED 135",
+        "4": "KIN 250",
+        "5": "KIN 310",
+        "7": "MSC 112",
+        "8": "ART 120"
+      }
+    },
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "year": 3,
+      "dorm": "lowrise_1",
+      "major": "Music",
+      "schedule": {
+        "4": "MUS 340",
+        "5": "MUS 225",
+        "6": "MUS 180",
+        "7": "PED 101"
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+      "year": 1,
+      "dorm": "lowrise_2",
+      "major": "Literature",
+      "schedule": {
+        "3": "ART 150",
+        "4": "LIT 330",
+        "7": "PED 101",
+        "9": "LIT 240"
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "year": 1,
+      "dorm": "lowrise_4",
+      "major": "Art History",
+      "schedule": {
+        "0": "ART 190",
+        "2": "ARH 101",
+        "6": "MUS 180",
+        "8": "PED 145"
+      }
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "year": 2,
+      "dorm": "lowrise_2",
+      "major": "Communications",
+      "schedule": {
+        "1": "COM 210",
+        "2": "COM 101",
+        "8": "PED 145",
+        "9": "COM 140"
+      }
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074": {
+      "year": 4,
+      "dorm": "elysium",
+      "major": "Art History",
+      "schedule": {
+        "0": "PED 140",
+        "2": "ARH 101",
+        "5": "ART 285",
+        "7": "ARH 320"
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "year": 2,
+      "dorm": "lowrise_4",
+      "major": "Botany",
+      "schedule": {
+        "0": "PED 140",
+        "4": "BOT 320",
+        "5": "BOT 230",
+        "9": "BOT 160"
+      }
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f": {
+      "year": 1,
+      "dorm": "lowrise_5",
+      "major": "Literature",
+      "schedule": {
+        "0": "HUM 240",
+        "4": "LIT 330",
+        "5": "SWIM 102",
+        "9": "LIT 240"
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639": {
+      "year": 3,
+      "dorm": "elysium",
+      "major": "Art History",
+      "schedule": {
+        "0": "ARH 230",
+        "1": "MSC 175",
+        "5": "SWIM 102",
+        "7": "ARH 320",
+        "9": "MSC 160"
+      }
+    }
+  },
+  "jobs": {
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "jobId": "club_apogee",
+      "count": 2
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "jobId": "cutetea",
+      "count": 2
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "jobId": "springmart",
+      "count": 2
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f": {
+      "jobId": "kendall_library",
+      "count": 1
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "jobId": "kendall_library",
+      "count": 1
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+      "jobId": "fast_eats",
+      "count": 1
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "jobId": "palaestra",
+      "count": 2
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "jobId": "agora_tutoring",
+      "count": 2
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639": {
+      "jobId": "lumiere",
+      "count": 2
+    }
+  },
+  "haunts": {
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "homeSlots": 1,
+      "study": "reserve_bank_cafe",
+      "fun": [
+        "stalestein_bar",
+        "cutetea"
+      ],
+      "activity": {
+        "location": "thorne_auditorium",
+        "doing": "recording guitar tracks at the basement studio in the music_hall at Thorne Auditorium"
+      },
+      "meal": "bobbys_diner"
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "homeSlots": 2,
+      "study": "reserve_bank_cafe",
+      "fun": [
+        "cutetea",
+        "apogee_club"
+      ],
+      "activity": {
+        "location": "venus_quad",
+        "doing": "filming dance clips in front of the fountain at the quad"
+      },
+      "meal": "fast_eats"
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "homeSlots": 1,
+      "study": "bobbys_diner",
+      "fun": [
+        "apogee_club",
+        "stalestein_bar"
+      ],
+      "activity": null,
+      "meal": "bobbys_diner"
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "homeSlots": 3,
+      "study": "agora",
+      "fun": [
+        "cutetea"
+      ],
+      "activity": {
+        "location": "whitman_greenhouse",
+        "doing": "tending herbs and seedlings at the greenhouse"
+      },
+      "meal": "agora"
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f": {
+      "homeSlots": 3,
+      "study": "kendall_library",
+      "fun": [
+        "stalestein_bar"
+      ],
+      "activity": {
+        "location": "freights_books",
+        "doing": "browsing vintage occult paperbacks at the freights"
+      },
+      "meal": "bobbys_diner"
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "homeSlots": 2,
+      "study": "reserve_bank_cafe",
+      "fun": [
+        "pino_cola_lounge",
+        "cutetea"
+      ],
+      "activity": null,
+      "meal": "eastern_buffet"
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+      "homeSlots": 3,
+      "study": "kendall_library",
+      "fun": [
+        "btb_arcade"
+      ],
+      "activity": {
+        "location": "freights_books",
+        "doing": "digging for rare fantasy sourcebooks at the freights"
+      },
+      "meal": "fast_eats"
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "homeSlots": 2,
+      "study": "agora",
+      "fun": [
+        "btb_arcade"
+      ],
+      "activity": {
+        "location": "palaestra_stadium",
+        "doing": "running interval sprints on the track at the stadium"
+      },
+      "meal": "eastern_buffet"
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "homeSlots": 2,
+      "study": "reserve_bank_cafe",
+      "fun": [
+        "cutetea",
+        "apogee_club"
+      ],
+      "activity": null,
+      "meal": "lumiere_fusion"
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "homeSlots": 2,
+      "study": "kendall_library",
+      "fun": [],
+      "activity": {
+        "location": "green_hill_park",
+        "doing": "walking along the quiet cobbled trails in the park"
+      },
+      "meal": "agora"
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639": {
+      "homeSlots": 2,
+      "study": "kendall_library",
+      "fun": [
+        "stalestein_bar"
+      ],
+      "activity": null,
+      "meal": "lumiere_fusion"
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074": {
+      "homeSlots": 2,
+      "study": "reserve_bank_cafe",
+      "fun": [
+        "apogee_club",
+        "stalestein_bar"
+      ],
+      "activity": {
+        "location": "whitman_greenhouse",
+        "doing": "sketching neoclassical statuary at the greenhouse"
+      },
+      "meal": "lumiere_fusion"
+    }
+  },
+  "feeds": {
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "handle": "ami.holloway",
+      "winterPosts": [
+        "slept 14 hours straight don't call me",
+        "messing with some bass riffs on the floor"
+      ]
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "handle": "lili_milderose",
+      "winterPosts": [
+        "omg new lip tint review is live!",
+        "sub count went up while i was asleep 😭✨"
+      ]
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "handle": "valentine_april",
+      "winterPosts": [
+        "whose idea was four rounds of tequila",
+        "i need three gallons of water and a new brain"
+      ]
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "handle": "livvie_t",
+      "winterPosts": [
+        "baked cinnamon scones for the neighbors 🌸",
+        "my windowsill lavender is finally blooming!"
+      ]
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f": {
+      "handle": "morgana_notte",
+      "winterPosts": []
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "handle": "marina.lewis",
+      "winterPosts": [
+        "hot cocoa and snowy walks ☕",
+        "rewatching cozy romcoms in fuzzy socks"
+      ]
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+      "handle": "ingrid_gingham",
+      "winterPosts": []
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "handle": "gwen.haewon",
+      "winterPosts": [
+        "six miles in freezing rain done",
+        "don't slack off just because it's break"
+      ]
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "handle": "celest_moro",
+      "winterPosts": []
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "handle": "winter.yang",
+      "winterPosts": [
+        "reading ahead for honors seminar",
+        "the silence of snow is comforting"
+      ]
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639": {
+      "handle": "florentine_chastain",
+      "winterPosts": [
+        "working through break as usual",
+        "perfection demands endless revision"
+      ]
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074": {
+      "handle": "isabelle_carmen",
+      "winterPosts": [
+        "museum galas are so dreadfully tedious",
+        "a vintage bordeaux cures almost everything"
+      ]
+    }
+  },
+  "springBreakPlans": {
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": "Take a solo road trip up the rocky coast with an acoustic guitar.",
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": "Fly to Los Angeles to attend an influencer brand convention.",
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": "Party at an all-inclusive beach resort in Cabo.",
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": "Visit a family-run strawberry farm in the countryside.",
+    "c27e108a-8a18-4649-a239-e8438af4109f": "Take a solitary train ride to explore an abandoned cemetery in Maine.",
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": "Spend a quiet week at her grandmother's lakeside cottage.",
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": "Stay at a remote mountain cabin to binge tabletop campaign guides.",
+    "4b994943-17e0-4853-b67e-4754d5e698e5": "Attend a high-altitude endurance training camp in Colorado.",
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": "Fly home to Moscow to spend the week shopping with her sister.",
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": "Retreat to a quiet seaside bed and breakfast to finish her thesis.",
+    "ad254d3c-1118-4763-aaac-7640a5172639": "Fly to Paris to inspect historical archives at the national library.",
+    "d28276a0-b509-4f82-9a13-4d1158436074": "Tour private art galleries and attend private auctions in Florence."
+  },
+  "occasions": [
+    {
+      "id": "gala",
+      "title": "The Horizon Gala",
+      "description": "The SEB takes over the rooftop terrace of the Riverside Mall for two nights of champagne fountains and skyline vistas. Dressed in full evening formalwear, students lean against glass railings under string lights while an orchestral quartet shares the stage with guest DJs.",
+      "startDate": 82,
+      "endDate": 83,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "dance",
+      "title": "Sunspot Stomp",
+      "description": "Hosted by the SEB inside the Agora, this midwinter dance features retro pop playlists and glittering gold-leaf face paint applied by CAPC volunteers. Students dress in semi-formal party clothes and gather near the indoor waterfalls under warm amber uplighting.",
+      "startDate": 12,
+      "endDate": 12,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "career-fair",
+      "title": "The Veridan Expo",
+      "description": "Palaestra Stadium's indoor turf fills with display booths and folding tables as regional textile firms, Thorne Philanthropies, and Promenade retail conglomerates recruit undergraduates. Clad in ill-fitting suits, students line up with printed resumes to collect tote bags and branded stylus pens.",
+      "startDate": 15,
+      "endDate": 16,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "concert",
+      "title": "Thorne Acoustic Sessions: Civic Heart",
+      "description": "Folk-rock ensemble Civic Heart performs soaring, harmony-driven anthems inside Thorne Auditorium, preceded by a set from a student string trio. Audiences pack the wood-paneled hall to hear lush acoustic arrangements and earnest lyricism echo beneath the auditorium's seashell ceiling.",
+      "startDate": 39,
+      "endDate": 39,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-0",
+      "title": "Dawn Chorus Walk",
+      "description": "Early-rising students gather at the Whitman Botanical Greenhouse for a guided morning walk led by campus horticulturists. Participants sip herbal tea while spotting escaped songbirds that nest in the climate-controlled canopy.",
+      "startDate": 1,
+      "endDate": 1,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-3",
+      "title": "Relic Hunting Pop-Up",
+      "description": "Downtown merchants set up folding tables outside Lotterdale Market to appraise antique mill tools and curious stone carvings found along the riverbanks. Curious undergraduates browse trays of mineral oddities and vintage coins while enjoying fresh cider.",
+      "startDate": 21,
+      "endDate": 21,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-4",
+      "title": "Midnight Sundae Social",
+      "description": "Pastel Palace rolls a mobile cart into the Pino-Cola Lounge, offering warm dulce de leche and caramel soft-serve to late-night study groups. Students leave their game consoles and textbooks to crowd the counter for limited-batch seasonal waffle cones.",
+      "startDate": 31,
+      "endDate": 31,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-8",
+      "title": "The Overpass Battle of the Bands",
+      "description": "The Stalestein hosts a chaotic open-stage competition under Stanchion Street's highway overpass, featuring five amateur student punk groups. Spectators cram onto the grimy floor amidst deafening feedback, lantern glow, and flying cardboard flyers.",
+      "startDate": 60,
+      "endDate": 60,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-9",
+      "title": "Night Sky Lantern Watch",
+      "description": "Stargazers and casual loungers sprawl across the grassy knolls of Green Hill Park, releasing tethered LED balloons to drift in the evening breeze. Coupes and picnic blankets dot the lawn as the distant Promenade skyline glimmers below.",
+      "startDate": 63,
+      "endDate": 63,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-10",
+      "title": "Agora Soda Lab",
+      "description": "Pino-Cola sponsors an experimental tasting booth on the ground floor of the Agora, letting students mix unreleased citrus syrups with carbonated botanicals. Curious crowds queue up to vote on the campus brand's next exclusive vending flavor.",
+      "startDate": 73,
+      "endDate": 73,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-12",
+      "title": "Jellyfish Glow Hour",
+      "description": "The Aquarium at Riverside opens its dark, illuminated jellyfish room for half-price student admission during the afternoon lull. Undergraduates whisper among the softly pulsing blue tanks and occupy the secluded bench nooks to read quietly.",
+      "startDate": 86,
+      "endDate": 86,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-13",
+      "title": "Silk Lore Book Swap",
+      "description": "Freights Books & Records hosts a courtyard book exchange on Stanchion Street, encouraging locals and students to trade river folk tales and secondhand regional poetry. Stacks of yellowed paperbacks and damp cardboard boxes line the gravel path beside the warehouse entrance.",
+      "startDate": 95,
+      "endDate": 95,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-15",
+      "title": "Ferris Wheel Nightcap",
+      "description": "Pier 44 stays open late for seniors, bathing the wooden boardwalk in the warm electric glow of the antique amusement wheel. Students share paper cones of funnel cake while riding high above the dark bend of the Silk River.",
+      "startDate": 107,
+      "endDate": 107,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-break-0",
+      "title": "Silk River Stroll",
+      "description": "Downtown locals and students staying over break gather at Selkie Beach for a low-key boardwalk walk and sand-castle contest. Cold river breezes whip across the imported white dunes as vendor carts sell hot pretzels.",
+      "startDate": 49,
+      "endDate": 49,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-break-1",
+      "title": "Retro Pinball Jam",
+      "description": "Stanchion Street's BTB Arcade organizes a weeknight tournament for casual gamers on their classic 1980s machines. A small crowd of break-stayers drinks canned soda and trades quarters while electronic chimes echo through the cavernous room.",
+      "startDate": 50,
+      "endDate": 50,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-break-2",
+      "title": "Harbor Lights Ferry Tour",
+      "description": "A flat-bottomed wooden tour boat departs from the Promenade docks, taking a dozen quiet sightseers beneath the illuminated stone bridges of the Silk River. Passengers wrap themselves in woolen blankets and watch the water reflect city towers in the night air.",
+      "startDate": 52,
+      "endDate": 52,
+      "time": 1,
+      "cancelsClasses": false,
+      "kind": "campus"
+    },
+    {
+      "id": "filler-break-3",
+      "title": "Vault Cupping Flight",
+      "description": "Baristas at the Reserve Bank Cafe host an intimate tasting session inside the old bank vault, sampling single-origin roasts from ceramic demitasse cups. The few students left in Silktown pull up metal stools to learn brewing techniques away from the usual morning rush.",
+      "startDate": 53,
+      "endDate": 53,
+      "time": 0,
+      "cancelsClasses": false,
+      "kind": "campus"
+    }
+  ]
+}

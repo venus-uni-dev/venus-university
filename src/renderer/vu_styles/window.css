@@ -1,0 +1,53 @@
+/* The app is a window and not a web page: an image does not tear off under the pointer, and text
+   outside a field does not highlight. Tab and the Alt menu bar are the same sentence said where
+   CSS cannot reach — `main.tsx` and `main/index.ts`. Unscoped where base.css's interaction block
+   carries `[data-theme]`, and on purpose: that attribute is what lets a day element sit
+   inside a night one, and it is what the state rules key on. */
+
+/* The anchor is in here with the picture: a drag on an `<img>` inside one takes the LINK, so
+   naming the image alone would leave the Credits list draggable by its own rows. */
+img,
+a {
+  -webkit-user-drag: none;
+}
+
+body {
+  user-select: none;
+}
+
+/* `user-select` inherits, and an input under a `none` loses its caret with its selection, so a
+   field says what it is on its own. The error's detail well (`Dialog.css`) is the only other
+   thing that opts back in — it exists to be pasted into a bug report. */
+input,
+textarea {
+  user-select: text;
+}
+
+/* A picture that would draw the browser's broken-image mark draws nothing instead. **It keeps
+   its box** — `visibility` rather than `display` — so the arch or the cell around it is the
+   shape that was always going to be there, showing its own face rather than collapsing and
+   moving everything beside it. The flag is set and cleared in `main.tsx`, which is where the
+   whole of the reasoning is; this is the half CSS can say. */
+img[data-broken] {
+  visibility: hidden;
+}
+
+/* Draws the app's own cursor image: `components/Cursor.tsx` publishes `--vu-cursor`, and
+   `inherit` on the second rule resolves it once at the root rather than once per element.
+   Gated on the attribute the component sets only while actually drawing. */
+html[data-cursor-drawn] {
+  cursor: var(--vu-cursor, default) !important;
+}
+
+html[data-cursor-drawn] * {
+  cursor: inherit !important;
+}
+
+/* **And no focus is drawn anywhere** — nothing walks this
+   window, so a ring marks only what the player is already looking at. Unscoped like
+   everything else in this file,
+   because Chromium rings a clicked field whatever the design says. Focus itself is untouched. */
+:focus,
+:focus-visible {
+  outline: none;
+}

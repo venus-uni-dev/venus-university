@@ -1,0 +1,38 @@
+/* The mid-semester add/drop editor: the registrar's own form on a panel, opened
+   from a thread rather than walked to. Almost nothing here is its own — the week, the rules,
+   the tally and the complaint are `CourseSchedule.css`'s, which this modal imports beside
+   this file — so what is left is the panel it all stands on and the line the head reads on.
+
+   Nothing is positioned: the veil centres the panel and the tab hangs off it (`base.css`). */
+
+/* A surface is a half-pill flat right, at the radius its own size asks for, and it gives
+   back the 50px each end that the title tab's overhang and the paper layer need. It is wide
+   enough to print seven columns of a week with a course's whole name on a tile, which is also
+   why it relaxes the shared tilt to
+   the angle a very wide panel takes: at 1240px a -2° swing stops reading as a tilt. No
+   `overflow` — the tab hangs off the corner and the panel's own shadow would be clipped
+   with it. */
+.vu-classes {
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 11px 10px;
+  --paper-tilt: -0.8deg;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  width: min(1500px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 44px 50px 32px 116px;
+  border-radius: 90px 0 0 90px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* What the form asks for, and how far he has got: the guidelines on the left and the tally
+   on the right end, which is where the tally's own flat-right shape wants to sit. It clears
+   the tab by the panel's padding rather than by a rule of its own. */
+.vu-classes-head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 40px;
+}

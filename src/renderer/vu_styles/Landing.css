@@ -1,0 +1,511 @@
+/* The decision landing: the hour between two scenes, where the reader is told where he stands
+   and asked what he wants to do about it. The stage under it is `GameStage.css`'s; the dialogue
+   box is `Dialogue.css`'s. The graduation epilogue's goodbye menu reuses this screen's question
+   column, one row per goodbye with her face on it. Layout only — every clock is motion.ts's. */
+
+/* The chrome's own tier, and the scene's arrangement exactly: **it answers no pointer and each
+   control takes its own back**, so a click on the ground between two things falls through to the
+   advance surface underneath rather than being eaten by an invisible sheet. */
+.vu-landing {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+  pointer-events: none;
+}
+
+/* ---- the two accents ------------------------------------------------------ */
+
+/* The corner archways, carrying the shape grammar into empty space: two, breathing in opposite
+   phase (`views/motion.ts`) so the pair never reads as one thing pulsing. The box carries the
+   breath and the arch inside it none, so scaling about a fixed point never moves the arch off
+   its corner. */
+.vu-landing-accent {
+  position: absolute;
+  pointer-events: none;
+}
+
+.vu-landing-arch {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px 999px 0 0;
+  background: var(--vu-highlight);
+  opacity: 0.55;
+}
+
+/* Off the top-left corner, behind the banner and the question: the column the reader reads. */
+.vu-landing-accent--left {
+  left: -190px;
+  top: -240px;
+  width: 700px;
+  height: 1080px;
+  rotate: 14deg;
+  transform-origin: 50% 70%;
+}
+
+/* And off the bottom-right, under the apps: the column he acts in. */
+.vu-landing-accent--right {
+  right: -300px;
+  bottom: -420px;
+  width: 760px;
+  height: 1180px;
+  rotate: -18deg;
+  transform-origin: 50% 80%;
+}
+
+.vu-landing-accent--right .vu-landing-arch {
+  opacity: 0.4;
+}
+
+/* ---- the date banner ------------------------------------------------------ */
+
+/* The hour, top left: takes the date stamp's own roles rather than the accent's (`tokens.css`),
+   so it reads as the same clock the scene's own corner shows. */
+.vu-landing-banner {
+  position: absolute;
+  left: 56px;
+  top: 46px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 20px 54px 20px 22px;
+  border-radius: 999px 0 0 999px;
+  isolation: isolate;
+  rotate: -2deg;
+  transform-origin: left center;
+}
+
+.vu-landing-bannerface {
+  --paper-face: var(--vu-stamp);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 10px 9px;
+  --paper-tilt: -1.6deg;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: -1;
+  border-radius: inherit;
+}
+
+.vu-landing-bannerink {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+/* The half's mark in the round cap, on the ground the arch's own crown gives it. */
+.vu-landing-mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vu-stamp-ink) 14%, transparent);
+  color: var(--vu-stamp-sub);
+}
+
+/* The mark turns, so it is a box of its own: one element gets one transform, and this one is the
+   turn's. The sun spins and the crescent swings, a moon having a direction it hangs in — the
+   scene's stamp's idle at the landing's own size. */
+.vu-landing-turn {
+  display: block;
+  line-height: 0;
+}
+
+.vu-landing-mark svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.vu-landing-date {
+  color: var(--vu-stamp-ink);
+  font: 400 44px/1.1 var(--font-display);
+}
+
+/* **`Morning` and `Evening`, where the data says day and night** — the splash the player has just
+   read says the same two words, and a slot is named once. It is a display word and nothing else:
+   `TimeSlot` is still 0 and 1 everywhere behind this line. */
+.vu-landing-meta {
+  margin-top: 6px;
+  color: var(--vu-stamp-sub);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+/* ---- the stats ------------------------------------------------------------ */
+
+/* The three readings as one half-pill surface, flat right. A paper element that may not clip:
+   the balance card and the three badges all ride its edges. */
+.vu-landing-stats {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-shadow);
+  --paper-offset: 10px 9px;
+  --paper-tilt: -1.2deg;
+  position: absolute;
+  right: 60px;
+  top: 44px;
+  width: 500px;
+  height: 360px;
+  border-radius: 90px 0 0 90px;
+  rotate: 2.4deg;
+  pointer-events: auto;
+}
+
+/* The balance card hangs off the panel rather than sitting on it — what the card is, is
+   `MoneyCard.css`'s. `translate` applies before `rotate` here, so the overlap holds by
+   percentage and the two compose without either needing a wrapper. */
+.vu-landing-money {
+  position: absolute;
+  left: 0;
+  top: 140px;
+  translate: -90% 0;
+  rotate: -1.2deg;
+}
+
+/* Where the shape goes: the chart is `components/StatRadar.tsx`, and what a caller owns is its
+   seat. It fills the panel, so `StatRadar.css`'s own badge offsets still land correctly. */
+.vu-landing-radar {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- the apps ------------------------------------------------------------- */
+
+/* Two columns, anchored by `bottom`: Bunnyboard and Calendar sit in row 2 always, so they hold
+   their seats as Shop and Map's row above fills in only once each is unlocked. */
+.vu-landing-apps {
+  position: absolute;
+  right: 56px;
+  bottom: 166px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  grid-template-rows: repeat(2, auto);
+  gap: 30px 40px;
+  pointer-events: none;
+}
+
+.vu-landing-app--shop {
+  grid-area: 1 / 1;
+}
+
+.vu-landing-app--map {
+  grid-area: 1 / 2;
+}
+
+.vu-landing-app--board {
+  grid-area: 2 / 1;
+}
+
+.vu-landing-app--calendar {
+  grid-area: 2 / 2;
+}
+
+/* The four places the reader goes when the hour is his, sized to their contents plus a margin;
+   the shape is `base.css`'s `.vu-tile`. The lean is `rotate` and the arrival's scale is motion's
+   `transform` — `rotate` applies first, and `transform-origin` puts both on the flat edge. */
+.vu-landing-app {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-shadow);
+  gap: 12px;
+  width: 200px;
+  height: 190px;
+  padding: 0 14px;
+  font: 700 21px var(--font-body);
+  text-align: center;
+  pointer-events: auto;
+  rotate: 2.5deg;
+}
+
+/* The honeycomb: the left column hangs half a step below the right, so the tiles read as a cluster
+   rather than as a grid. It is the two left-hand **seats** that carry the drop and not every other
+   child, an `nth-child` meaning a different column each time an app is handed over. */
+.vu-landing-app--shop,
+.vu-landing-app--board {
+  translate: 0 20px;
+}
+
+.vu-landing-app svg {
+  display: block;
+  flex: none;
+  width: 64px;
+  height: 64px;
+}
+
+/* ---- the question and what it offers -------------------------------------- */
+
+/* The left column: the question, the commitments the hour has, and other places to go — a
+   share of the stage, so `min-width: 0` lets a long row ellipsize rather than push the column.
+   Anchored by its foot, not its head, so the question always sits directly above the answers. */
+.vu-landing-ask {
+  position: absolute;
+  left: 90px;
+  bottom: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  width: 46%;
+  min-width: 0;
+  /* The column measures itself, for the one rule below that has to know which band it is in. */
+  container-type: inline-size;
+}
+
+/* The deck of them under the question, and one row in it. The row is three elements deep because
+   three things write a transform on it — the deal in, the wave's bounce, and the button's own
+   gesture — and one element gets one writer. */
+.vu-landing-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.vu-landing-slot,
+.vu-landing-bounce {
+  min-width: 0;
+}
+
+/* Two more gaps above the row: the way out stands apart from the goodbyes it comes after. */
+.vu-landing-slot--apart {
+  margin-top: 28px;
+}
+
+.vu-landing-bounce {
+  display: flex;
+}
+
+/* The column fans toward the turn: `base.css`'s dealt-hand rule with the far end pinned, so a
+   four-row and a one-row slot land at different angles off the same constant step. `rotate`
+   rather than `transform`, so motion's own deal, wave and button gestures compose on top. */
+.vu-landing-ask {
+  --ask-fan: -2.6deg;
+}
+
+.vu-landing-list > .vu-landing-slot {
+  rotate: calc(var(--ask-fan) * (sibling-count() - sibling-index()) / sibling-count());
+  transform-origin: left center;
+}
+
+/* A column too long to grow upward (the epilogue's goodbye menu) takes a definite height
+   instead, between the banner's own band and the turn below it, and the deck inside it scrolls. */
+.vu-landing-ask--long {
+  height: 780px;
+}
+
+/* In the narrow band the column's right edge would cross the balance card's left one; the
+   title is the one element that reaches it there, so a container query caps it only there. */
+@container (max-width: 720px) {
+  .vu-landing-ask--long .vu-landing-title {
+    max-width: 590px;
+  }
+}
+
+.vu-landing-ask--long .vu-landing-list {
+  flex: 1;
+  min-height: 0;
+  width: calc(100% + 96px);
+  margin: -16px -96px -16px 0;
+  padding: 16px 96px 16px 0;
+  overflow: hidden auto;
+}
+
+/* The question, on the tint blob every screen's title sits on: an element rather than
+   `.vu-title`'s own pseudo, since it grows as the words slide in and motion cannot animate a
+   pseudo-element. It leans furthest of the fan, as the column's own head. */
+.vu-landing-title {
+  position: relative;
+  isolation: isolate;
+  margin: 0 0 12px;
+  color: var(--vu-text);
+  font: 400 50px/1.15 var(--font-display);
+  rotate: var(--ask-fan);
+  transform-origin: left center;
+}
+
+.vu-landing-blob {
+  position: absolute;
+  left: -26px;
+  right: -30px;
+  top: -14px;
+  bottom: -12px;
+  z-index: -1;
+  border-radius: 999px;
+  background: var(--vu-highlight);
+  rotate: -2deg;
+}
+
+/* One commitment: a half-pill flat left, which is what an action is, filled in the colour of
+   the claim the hour has on him. The chip says which kind, the words say which one, and the
+   chevron says it goes somewhere — a typographic `▸` glyph is overruled for the app's own
+   SVG mark instead. */
+.vu-landing-do {
+  --paper-offset: 9px 8px;
+  --paper-tilt: -1.2deg;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  padding: 14px 26px 14px 18px;
+  border: 0;
+  border-radius: 0 999px 999px 0;
+  background: none;
+  color: var(--vu-cat-ink);
+  font: 700 25px var(--font-body);
+  text-align: left;
+  pointer-events: auto;
+  transform-origin: left center;
+}
+
+.vu-landing-do--class {
+  --paper-face: var(--vu-cat-class);
+  --paper-shadow: var(--vu-cat-class-shadow);
+  --vu-cat-ink: var(--vu-cat-class-ink);
+}
+
+.vu-landing-do--work {
+  --paper-face: var(--vu-cat-work);
+  --paper-shadow: var(--vu-cat-work-shadow);
+  --vu-cat-ink: var(--vu-cat-work-ink);
+}
+
+.vu-landing-do--plans {
+  --paper-face: var(--vu-cat-plans);
+  --paper-shadow: var(--vu-cat-plans-shadow);
+  --vu-cat-ink: var(--vu-cat-plans-ink);
+}
+
+/* Who the row is about, where it is about somebody — the epilogue's goodbyes, and nothing else on
+   this screen. A face in a list is **quiet**: it carries no paper layer of its own,
+   the row it rides being the sheet, and it is a sibling of the chip rather than anything riding
+   it. It takes the surface rather than `.vu-arch`'s recessed default, since the ground behind it
+   here is a category fill and not a panel. */
+.vu-arch.vu-landing-face {
+  flex: none;
+  width: 34px;
+  height: 41px;
+  background: var(--vu-surface);
+}
+
+/* Which kind of claim it is, in a pill outlined in the ink it is written in: the row is already
+   the colour, so the chip names it rather than repeating it. */
+.vu-landing-kind {
+  flex: none;
+  padding: 5px 15px;
+  border: 2.5px solid color-mix(in srgb, var(--vu-cat-ink) 55%, transparent);
+  border-radius: 999px;
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+/* The words, which are also exactly what the button submits — so they may be trimmed
+   on screen but never rewritten. */
+.vu-landing-doword {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vu-landing-do svg {
+  display: block;
+  flex: none;
+  opacity: 0.75;
+}
+
+/* The wait that stands in the chevron's place while this row's call is out: the mark's own
+   size and the mark's own tone, so nothing else in the row moves when the two swap. */
+.vu-landing-do .vu-ring {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  opacity: 0.75;
+}
+
+/* Somewhere to go, where the hour has nothing already in it: **quiet**, because a suggestion is
+   not a commitment — an outline on a translucent surface, no fill and no paper layer, so the
+   three commitments above it stay the loud things in the column. */
+/* **`block` and not `flex`, and it is load-bearing.** The stat word inside is its own element so
+   it can take its own colour, which makes the words either side of it anonymous flex items in a
+   flex box — and a flex container strips the leading and trailing whitespace of every item, so
+   the sentence rendered as `ImproveHeartby joining…`. In a block box the three are one inline
+   flow and the spaces are the text's own. */
+/* Flat on the left like every other action, so it grows from the edge the commitments and the
+   well below it also start on, into the column's empty half. */
+.vu-landing-idle {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  padding: 11px 26px 11px 22px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--vu-surface) 82%, transparent);
+  color: var(--vu-text-body);
+  font: 500 20px var(--font-body);
+  text-align: left;
+  pointer-events: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform-origin: left center;
+}
+
+/* The stat the suggestion is about, in its own identity hue — the icon-and-stat-word rule
+   with no icon to put it on. */
+.vu-landing-idle b {
+  color: var(--stat);
+  font-weight: 700;
+}
+
+/* ---- the turn, and the two controls beside it ----------------------------- */
+
+/* **Two thirds of the stage, anchored left**, where the scene centres its row on the box: the
+   landing has a column of its own on the right and the question is asked on the left, so the
+   answer is given where the question was. */
+.vu-landing-row {
+  left: 90px;
+  right: 33.4%;
+  bottom: 32px;
+}
+
+/* The way out and the way back, in the corner the row leaves empty. The gear is the scene rail's
+   own seat in the same place, so the two screens' way into settings is one habit. */
+.vu-landing-tools {
+  position: absolute;
+  right: 56px;
+  bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vu-landing-tool {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px 13px 17px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--vu-surface) 92%, transparent);
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+  transform-origin: left center;
+}
+
+.vu-landing-tool svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  color: var(--vu-accent);
+}

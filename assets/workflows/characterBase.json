@@ -1,0 +1,363 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "CheckpointLoaderSimple"
+    },
+    "inputs": {
+      "ckpt_name": "novaAnimeXL_ilV190.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoraLoader"
+    },
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "clip": [
+        "1",
+        1
+      ],
+      "lora_name": "usnrStyle.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Base Positive Prompt"
+    },
+    "inputs": {
+      "clip": [
+        "3",
+        1
+      ],
+      "text": "masterpiece, best quality, very aesthetic, 1girl, solo, aged up, full body, standing, simple background, white background,\n\nblue_eyes, brown_hair, long_hair, swept_bangs, big_breasts,\n\ndenim_shorts, white_crop_top, black_boots, bare_legs,\n\nhand_on_own_hip, arm_at_side"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    },
+    "inputs": {
+      "clip": [
+        "3",
+        1
+      ],
+      "text": "worst quality, bad quality, lowres, backlighting"
+    }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    },
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "positive": [
+        "11",
+        0
+      ],
+      "negative": [
+        "11",
+        1
+      ],
+      "latent_image": [
+        "15",
+        0
+      ],
+      "seed": [
+        "14",
+        0
+      ],
+      "steps": 16,
+      "cfg": 4,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "sgm_uniform",
+      "denoise": 1
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAEDecode"
+    },
+    "inputs": {
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    }
+  },
+  "11": {
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "ControlNetApplyAdvanced"
+    },
+    "inputs": {
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "control_net": [
+        "12",
+        0
+      ],
+      "image": [
+        "39",
+        0
+      ],
+      "strength": 1,
+      "start_percent": 0,
+      "end_percent": 0.5
+    }
+  },
+  "12": {
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "ControlNetLoader"
+    },
+    "inputs": {
+      "control_net_name": "illustriousOpenpose.safetensors"
+    }
+  },
+  "14": {
+    "class_type": "SeedNode",
+    "_meta": {
+      "title": "Character Seed"
+    },
+    "inputs": {
+      "seed": 858377684401448
+    }
+  },
+  "15": {
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "EmptyLatentImage"
+    },
+    "inputs": {
+      "width": 832,
+      "height": 1216,
+      "batch_size": 1
+    }
+  },
+  "16": {
+    "class_type": "ImageUpscaleWithModel",
+    "_meta": {
+      "title": "ImageUpscaleWithModel"
+    },
+    "inputs": {
+      "upscale_model": [
+        "17",
+        0
+      ],
+      "image": [
+        "8",
+        0
+      ]
+    }
+  },
+  "17": {
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "UpscaleModelLoader"
+    },
+    "inputs": {
+      "model_name": "RealESRGAN_x4plus_anime_6B.pth"
+    }
+  },
+  "19": {
+    "class_type": "ImageScaleBy",
+    "_meta": {
+      "title": "ImageScaleBy"
+    },
+    "inputs": {
+      "image": [
+        "16",
+        0
+      ],
+      "upscale_method": "nearest-exact",
+      "scale_by": 0.35
+    }
+  },
+  "20": {
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Hand Detailer"
+    },
+    "inputs": {
+      "image": [
+        "26",
+        0
+      ],
+      "model": [
+        "3",
+        0
+      ],
+      "clip": [
+        "3",
+        1
+      ],
+      "vae": [
+        "1",
+        2
+      ],
+      "positive": [
+        "11",
+        0
+      ],
+      "negative": [
+        "11",
+        1
+      ],
+      "bbox_detector": [
+        "29",
+        0
+      ],
+      "guide_size": 512,
+      "guide_size_for": true,
+      "max_size": 1024,
+      "seed": [
+        "14",
+        0
+      ],
+      "steps": 12,
+      "cfg": 4,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.3,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 6,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "23": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    },
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "positive": [
+        "11",
+        0
+      ],
+      "negative": [
+        "11",
+        1
+      ],
+      "latent_image": [
+        "25",
+        0
+      ],
+      "seed": [
+        "14",
+        0
+      ],
+      "steps": 12,
+      "cfg": 4,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "simple",
+      "denoise": 0.3
+    }
+  },
+  "25": {
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAEEncode"
+    },
+    "inputs": {
+      "pixels": [
+        "19",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    }
+  },
+  "26": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAEDecode"
+    },
+    "inputs": {
+      "samples": [
+        "23",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    }
+  },
+  "29": {
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    },
+    "inputs": {
+      "model_name": "bbox/hand_yolov9c.pt"
+    }
+  },
+  "39": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Pose Skeleton"
+    },
+    "inputs": {
+      "image": "hand_on_hip.png"
+    }
+  },
+  "41": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Base"
+    },
+    "inputs": {
+      "images": [
+        "20",
+        0
+      ],
+      "filename_prefix": "venus-university/expression_base"
+    }
+  }
+}

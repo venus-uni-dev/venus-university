@@ -1,0 +1,159 @@
+/* The Load Game modal: both of its levels, which are the same list of rows twice over.
+   Derived from the shape grammar and the panels already built. Imported from the view module,
+   never from index.css.
+
+   The veil, the row, the ✕, the buttons and the foot are base.css's. */
+
+/* The one veil the curtain goes over: `.vu-crossing` sits at the same tier and earlier in the
+   tree, so one step below it is enough. Every other veil in the app opens above the curtain. */
+.vu-veil--under-curtain {
+  z-index: 99;
+}
+
+
+/* `flex: 1 1 auto`: the basis lets the list ask for its full height and clip only once the panel
+   hits its cap. The grow keeps the scroller filling a panel held taller than its content while a
+   folder tweens to the next one, so the foot stays on the bottom edge throughout. */
+.vu-load-scroll {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Room for what a hover lifts past the box, which the scroller clips in both axes — and, at
+     the top, for the sticker the first row wears over its own edge: 9px of overhang and ~3.5px
+     more where its -3° lean lifts the left end. The negative margin gives every one of those
+     back, so the list still starts where the panel's padding puts it and the fade at this
+     wrapper's foot lands on the scroller's own edge. */
+  margin: -16px -6px -4px;
+}
+
+.vu-load-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px 6px 34px;
+  /* `overflow: hidden auto`, not `overflow-y` alone: a transform counts as scrollable overflow,
+     so a row swelling past this padding box for a moment never grows a horizontal bar. */
+  overflow: hidden auto;
+}
+
+/* Mid-resize the panel is shorter than its rows for as long as the tween takes, and a scroller
+   squeezed that way draws its bar — an accent thumb the full height of the body — over rows
+   that are still invisible. It clips until the panel is the size of what is in it. */
+.vu-load[data-resizing] .vu-load-body {
+  overflow: hidden;
+}
+
+/* The row is the positioning context its ✕ hangs in. */
+.vu-load-row {
+  position: relative;
+}
+
+/* The whole row is the way in, so it is one button — with the ✕'s corner kept clear, since
+   the two are siblings and the ✕ paints over this box. */
+.vu-load-face {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding-right: 64px;
+}
+
+/* A playthrough's row is the positioning context for the label over its corner, and gives
+   the label room to sit above the first line. */
+.vu-load-face--cast {
+  position: relative;
+  padding-top: 26px;
+  padding-left: 64px;
+}
+
+/* Shoulder to shoulder, in the order the save holds them: a band of faces between the date
+   above and the count below. */
+.vu-load-cast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+/* An archway is a person and this one is a face: her `profile.png`, the square crop the
+   render already made. Quiet — no paper layer — but lifted off the recessed row onto the
+   surface, or twelve of them read as one shape. */
+.vu-load-arch {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 56px;
+  height: 68px;
+  background: var(--vu-surface);
+}
+
+/* The folder's own name, worn over the row's top-left corner like a sticker on a box: quiet
+   and unaccented, since it names the row rather than answering anything, and leaning the
+   shallow lean a chip takes — the row under it does not rotate. */
+.vu-load-sticker {
+  position: absolute;
+  top: -9px;
+  left: 20px;
+  padding: 4px 16px 4px 12px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  rotate: -3deg;
+}
+
+/* A row that cannot be opened is not a button and takes no gesture — it is still listed, and
+   still deletable, which is the whole reason it is on screen. */
+.vu-load-face--dead {
+  border: 2.5px solid var(--vu-danger);
+}
+
+/* Where the save is in the semester — the first thing the player is choosing between. */
+.vu-load-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--vu-text);
+  font: 700 18px var(--font-body);
+}
+
+/* Which of the two an autosave is, and which playthrough a folder is: a fact about the file,
+   so it is drawn in the bookkeeping voice. Quiet — a chip in a row carries no weight. */
+.vu-load-tag {
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--vu-tint);
+  color: var(--vu-text-body);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+/* A scene the player is in the middle of, said the way a flavour line is. */
+.vu-load-midscene {
+  color: var(--vu-text-muted);
+  font: italic 500 14px var(--font-body);
+}
+
+.vu-load-meta {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* Why this one cannot be opened. One of the component library's four approved disable notices: what
+   is wrong is the file on disk, which nothing on the screen could otherwise tell the player. */
+.vu-load-reason {
+  color: var(--vu-danger);
+  font: italic 500 13px var(--font-body);
+}
+
+/* Centred on the row, where the eye ends up after reading it. */
+.vu-load-x {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  translate: 0 -50%;
+}

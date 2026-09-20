@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Every way the renderer can put an image on screen is named in img-src.
+         `blob:` is the graduation picture, the one image shown from bytes the
+         renderer already holds rather than through charimg://.
+         In script-src, `blob:` is the pitch-shift worklet the stretch library registers from
+         an in-memory module, and 'wasm-unsafe-eval' is its WebAssembly, which Chromium
+         refuses under a policy that does not name it. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' charimg: data: blob:"
+    />
+    <title>Venus University</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

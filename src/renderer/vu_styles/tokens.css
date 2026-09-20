@@ -1,0 +1,243 @@
+/* The palette, in two layers.
+
+   `--vu-*` are ROLES; everything below this file uses only those, so night is
+   derived in exactly one place. The named hues underneath are the guide's own
+   values, kept so a token reads as the colour the guide calls it. */
+:root {
+  /* day — wine owns the day */
+  --wine: #9b2e52;
+  --wine-shadow: #4a2536; /* "plum": the layer behind wine fills */
+  --rose: #d0688f;
+  --rose-tint: #f3d3de;
+  --day-ground: #f7f0e3;
+  --day-surface: #fffbf2;
+  --day-recessed: #f2e9d8;
+  --day-tint: #eee2cb;
+  --day-border: #e2d2b4;
+  --ink: #33222a;
+  --ink-body: #5d4a52;
+  --ink-muted: #8a7480;
+
+  /* night — the day's wine cooled into surfaces, glow taking the shadow's job */
+  --night-ground: #2a1c2c;
+  --night-surface: #3b2940;
+  --night-raised: #493550;
+  --night-border: #52405a;
+  --night-deep: #150e18;
+  --glow: #d795b4;
+  --night-text: #f7ecf3;
+  --night-body: #cdb8c6;
+  --night-muted: #a58ba0;
+
+  /* the three category hues that mark a state rather than a commitment */
+  --sage: #667c43;
+  --sage-tint: #e5ead2;
+  --amber: #b07c22;
+  --danger: #b3486f;
+  --danger-tint: #edc7d5;
+
+  /* the three stat identity hues */
+  --stat-brain: #4e79a8;
+  --stat-body: #667c43;
+  --stat-heart: #d0688f;
+
+  --font-display: 'Young Serif', serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+/* Declared on both :root and [data-theme='day'] so a day element nested inside a night one
+   still resolves to day — the attribute alone would leave it inheriting night's value. */
+:root,
+[data-theme='day'] {
+  /* roles — day */
+  --vu-ground: var(--day-ground);
+  --vu-surface: var(--day-surface);
+  --vu-recessed: var(--day-recessed);
+  --vu-tint: var(--day-tint);
+  --vu-border: var(--day-border);
+  --vu-text: var(--ink);
+  --vu-text-body: var(--ink-body);
+  --vu-text-muted: var(--ink-muted);
+  --vu-accent: var(--wine);
+  --vu-accent-ink: #fff4ea; /* text ON an accent fill */
+  --vu-shadow: var(--wine); /* the paper layer behind a surface */
+  --vu-accent-shadow: var(--wine-shadow); /* the layer behind an accent fill */
+  /* The layer behind a modal PANEL, which is neither: plum sits behind
+     every panel by day, and night turns every plum shadow to glow — where
+     `--vu-accent-shadow` has to stay near-black for the glow fills it sits under. */
+  --vu-panel-shadow: var(--wine-shadow);
+
+  /* the six roles beyond the accent: a state's colour, and the blob behind a title.
+     `--vu-danger` is text, border AND the paper layer behind a failed surface, which is
+     why night lightens it rather than keeping the day hue (the night shadow law). */
+  --vu-good: var(--sage);
+  --vu-good-tint: var(--sage-tint);
+  --vu-warn: var(--amber); /* short of what it should be: a partial set, an unsaved form */
+  --vu-warn-tint: #f2e4c4; /* the fill behind it, on the deadline that has not passed yet */
+  --vu-danger: var(--danger);
+  --vu-danger-tint: var(--danger-tint);
+  --vu-highlight: var(--rose-tint); /* the tint blob a title sits on */
+
+  /* Which half of the day a row of the week is, written across the days behind it. Dark
+     inks on the cream ground and light ones on the plum, so the word survives the low opacity
+     that keeps the tiles over it readable. The brown is a literal because the guide names no
+     brown, the way the category hues below are. */
+  --vu-daymark: var(--wine);
+  --vu-nightmark: #6f4a2b;
+
+  /* The date stamp: --vu-stamp is the arch, --vu-stamp-ink its figure, --vu-stamp-sub its
+     small print — a role rather than the accent since the pairing is by theme, not element. */
+  --vu-stamp: var(--wine);
+  --vu-stamp-ink: #fff4ea;
+  --vu-stamp-sub: #f3c6d6;
+
+  /* The name on the speaker label a scene wears, which takes the STAMP's argument and not
+     the accent's: day's label is the loud object over her portrait and night's goes quiet, which
+     is what no accent pair can say. The layer behind it is `--vu-panel-shadow` in
+     both halves — plum by day, glow by night — so only the face and its ink are named here. */
+  --vu-speaker: var(--wine);
+  --vu-speaker-ink: #fff4ea;
+
+  /* Colours a course's group chip by the stat it is graded through (lecture=Brain,
+     project=Heart, PE=Body) — a commitment rather than a state, so it never moves with a value. */
+  --vu-group-lecture: #3a5f87;
+  --vu-group-lecture-tint: #dce6f1;
+  --vu-group-project: #99365c;
+  --vu-group-project-tint: #f9dbe7;
+  --vu-group-pe: #4a5c2e;
+  --vu-group-pe-tint: var(--sage-tint);
+
+  /* The colour code for what an hour's row claims — class, work, or plans — each with a face,
+     the layer behind it, and a readable ink. A different axis from `--vu-group-*` above. */
+  --vu-cat-class: var(--sage);
+  --vu-cat-class-shadow: #354130;
+  --vu-cat-class-ink: #eef3e0;
+  --vu-cat-work: var(--amber);
+  --vu-cat-work-shadow: #4a3225;
+  --vu-cat-work-ink: #f8eed6;
+  --vu-cat-plans: var(--rose);
+  --vu-cat-plans-shadow: var(--wine-shadow);
+  --vu-cat-plans-ink: #fdeaf1;
+
+  /* The same kinds on a calendar chip, as a tint/tone pair following the state hues'
+     arrangement (`--vu-good` on `--vu-good-tint`). Occasion is a fourth kind, drawn only here. */
+  --vu-cat-class-tint: var(--sage-tint);
+  --vu-cat-class-tone: #4a5c2e;
+  --vu-cat-work-tint: #f2e4c4;
+  --vu-cat-work-tone: #7c561a;
+  --vu-cat-plans-tint: #f9dbe7;
+  --vu-cat-plans-tone: #99365c;
+  --vu-cat-occasion-tint: #e6dff2;
+  --vu-cat-occasion-tone: #584a7c;
+  /* The reader's three stats, which are identities rather than states: a stat is the same
+     stat whatever its tier, so these never move with a value the way `--vu-good` does.
+     The identity-colour rule puts them on the icon and the stat word ONLY — points, pips and tiers
+     stay in the accent, or three sub-accents would be loose in a palette that allows one. */
+  --vu-stat-brain: var(--stat-brain);
+  --vu-stat-body: var(--stat-body);
+  --vu-stat-heart: var(--stat-heart);
+
+  /* The wordmark is a bitmap, so a turn of its hue is the only handle the theme has on it —
+     and it is a role rather than a screen's filter, so night is still derived in this file
+     alone. Day is the hue it was painted at. */
+  --vu-wordmark-hue: 0deg;
+
+  /* The one role that is a polarity rather than a hue: the opaque layer a crossing holds a
+     loading screen on. White by day and black at night, where every other role turns
+     cream into plum — a curtain is the absence of the screen, not another surface of it. */
+  --vu-curtain: #fff;
+}
+
+/* Night flips polarity, never roles. Only the fifty-two roles are reassigned. */
+[data-theme='night'] {
+  --vu-ground: var(--night-ground);
+  --vu-surface: var(--night-surface);
+  --vu-recessed: var(--night-raised);
+  --vu-tint: var(--night-border);
+  --vu-border: var(--night-border);
+  --vu-text: var(--night-text);
+  --vu-text-body: var(--night-body);
+  --vu-text-muted: var(--night-muted);
+  --vu-accent: var(--glow);
+  --vu-accent-ink: #2a1424;
+  --vu-shadow: var(--glow);
+  --vu-accent-shadow: var(--night-deep);
+  --vu-panel-shadow: var(--glow);
+
+  /* All three state hues survive night as hues and flip polarity: the fill darkens into a
+     surface and the tone that reads on it lightens (the night rule for categories). */
+  --vu-good: #a3b581;
+  --vu-good-tint: #3a432d;
+  --vu-warn: #c9964f;
+  --vu-warn-tint: #4a3a22;
+  /* Lighter than the day hue so it can be the layer behind a failed surface, and
+     redder than `--glow` so a failed card still reads as failed beside a live one —
+     the two sit a few degrees apart, and at night the accent is pink already. */
+  --vu-danger: #e8688f;
+  --vu-danger-tint: #5a2a3f;
+  --vu-highlight: var(--night-raised);
+
+  /* The day's dark inks become light ones: the word has to sit above a plum ground here
+     exactly as it sits below a cream one by day, or the row it names is drawn out.
+     Neither is aliased to the accent it agrees with — a half of the day is not a state. */
+  --vu-daymark: var(--night-text);
+  --vu-nightmark: var(--glow);
+
+  /* Night's stamp goes quiet: the arch becomes a surface and the glow takes the small print,
+     which is the shadow law's own flip rather than a second accent in the corner. */
+  --vu-stamp: var(--night-surface);
+  --vu-stamp-ink: var(--night-text);
+  --vu-stamp-sub: var(--glow);
+
+  /* The label goes quiet with the stamp: the raised surface under the glow it already wears,
+     which is the shadow law lifting dark off dark. It does not dissolve into the box it
+     names for two reasons — it stands mostly above the box's own top edge, and a raised step
+     over a surface at 88% is exactly the separation that pair is for. */
+  --vu-speaker: var(--night-raised);
+  --vu-speaker-ink: var(--night-text);
+
+  /* Hue survives, the fill darkens into a surface and the tone that reads on it lightens —
+     the night rule for the group colours, which is the shadow law from the other side. Each ink
+     is its stat's own night value, as the three roles below it are. */
+  --vu-group-lecture: #8fb0d4;
+  --vu-group-lecture-tint: #2f3d51;
+  --vu-group-project: #e393b5;
+  --vu-group-project-tint: #5a2a3f;
+  --vu-group-pe: #a3b581;
+  --vu-group-pe-tint: #3a432d;
+
+  /* The commitment rows take the same night rule the groups do: the hue survives,
+     the fill darkens into a surface and the layer behind it becomes a *lighter* same-hue tone —
+     the shadow law flipped, so a filled row still lifts off a plum ground. The inks are the day's
+     and are not reassigned: each is a near-white already, and a near-white reads on both fills. */
+  --vu-cat-class: #3a432d;
+  --vu-cat-class-shadow: #7e8f66;
+  --vu-cat-work: #593f13;
+  --vu-cat-work-shadow: #a97d49;
+  --vu-cat-plans: #652940;
+  --vu-cat-plans-shadow: #c2789f;
+  /* The chip pairs take the group rule: the tint darkens into a surface and the tone lightens. */
+  --vu-cat-class-tint: #3a432d;
+  --vu-cat-class-tone: #a3b581;
+  --vu-cat-work-tint: #4a3a22;
+  --vu-cat-work-tone: #c9964f;
+  --vu-cat-plans-tint: #5a2a3f;
+  --vu-cat-plans-tone: #e393b5;
+  --vu-cat-occasion-tint: #3b3052;
+  --vu-cat-occasion-tone: #b9a9e0;
+  /* Each identity survives as its hue and lifts to read on a dark ground. Body's is
+     `--vu-good`'s night value by arithmetic and not by aliasing: a sage stat and a complete
+     set agree today by coincidence, and one of them may be retuned without the other. */
+  --vu-stat-brain: #8fb0d4;
+  --vu-stat-body: #a3b581;
+  --vu-stat-heart: #e393b5;
+
+  /* Wine is at 338° and the night surfaces sit at 283–292°: the turn takes the script to the
+     cool end the rest of the screen has already gone to, rather than leaving one warm crimson
+     object on a violet ground. */
+  --vu-wordmark-hue: -40deg;
+
+  /* Night's curtain is the other pole, not a dark surface. */
+  --vu-curtain: #000;
+}

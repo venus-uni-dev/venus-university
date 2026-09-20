@@ -1,0 +1,321 @@
+/* Manage Characters' own layout. Only the decor blob is placed absolutely
+   against the stage; everything else is flex and grid with `gap`. The card lives
+   here too rather than beside its component, because a screen owns its layout and
+   `CharacterJobCard` is this screen's card and nothing else's.
+
+   Imported from the view module, never from index.css: a screen's file must load
+   after base.css or its overrides of a primitive lose at equal specificity. */
+.vu-manage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  height: 100%;
+  padding: 56px 80px;
+  overflow: hidden;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* An archway the size of the corner it hangs off, at the one aggressive angle
+   decoration is allowed. It is behind everything and takes no pointer.
+
+   Translucent rather than filled: night's ground is dark enough that any opaque
+   tint at this size stops reading as decoration and starts reading as a panel. */
+.vu-manage-decor {
+  position: absolute;
+  top: -320px;
+  right: -160px;
+  width: 620px;
+  height: 900px;
+  border-radius: 999px 999px 0 0;
+  background: color-mix(in srgb, var(--vu-tint) 60%, transparent);
+  rotate: -32deg;
+  pointer-events: none;
+}
+
+/* ---- header --------------------------------------------------------------- */
+
+/* Four standing actions and a title do not fit one line once the stage narrows to 4:3, so
+   the actions drop below the title rather than breaking their own words in half.
+
+   It is the screen's forward layer, and it is owed one: the grid below reaches 14px up into
+   the gap (its negative margin is the room its shadows and hovers need), the title's blob dips
+   some 23px down under its -4° lean, and with both at `auto` the scrolled cards painted over
+   the blob by tree order. A screen's own layers count from 1; the modal tab's 10 is a panel's
+   (base.css). */
+.vu-manage-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 26px;
+}
+
+/* The shapes are `.vu-circle` and `.vu-pill`; what belongs to this header row is that neither
+   of them stretches. */
+.vu-manage-back,
+.vu-manage-install {
+  flex: none;
+}
+
+/* ComfyUI's state, in the bookkeeping voice: a quiet chip, so no paper layer. */
+.vu-manage-comfy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+}
+
+.vu-manage-comfy--ready {
+  background: var(--vu-good-tint);
+  color: var(--vu-good);
+}
+
+.vu-manage-comfy--error {
+  background: var(--vu-danger-tint);
+  color: var(--vu-danger);
+}
+
+/* The reason, beside the state that has one — never in place of it. */
+.vu-manage-comfy-note {
+  font: italic 500 13px var(--font-body);
+  color: var(--vu-text-muted);
+}
+
+.vu-manage-actions {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;
+}
+
+/* The shape is `.vu-pill`; what this screen adds is the one sweep that destroys
+   something, drawn in the danger tone rather than as a second primary. */
+.vu-manage-pill--danger {
+  border-color: var(--vu-danger-tint);
+  color: var(--vu-danger);
+}
+
+/* ---- the grid ------------------------------------------------------------- */
+
+.vu-manage-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* `auto-fill` at this minimum gives seven columns on a 1920 stage and
+   five on a 1440 one, which is the reflow the stage asks for rather than seven
+   squeezed columns. The padding is what the shadows and the hover's 4% need to
+   not be clipped by `overflow`, and what the note the leading slot raises needs
+   to not be clipped on its left; the negative margin puts the first column
+   back under the header. */
+.vu-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 26px;
+  align-content: start;
+  height: 100%;
+  margin: -14px -28px -28px -44px;
+  padding: 14px 28px 28px 44px;
+  overflow: hidden auto;
+  list-style: none;
+}
+
+/* The scroll has an end and the ground says so, rather than a row half-cut. */
+.vu-manage-fade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--vu-ground));
+  pointer-events: none;
+}
+
+.vu-manage-loading {
+  margin: 0;
+  align-self: center;
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+}
+
+/* ---- one tile ------------------------------------------------------------- */
+
+/* `.vu-card` is the tile; this screen says how tall its arch is and what its seven
+   states add to the face underneath. */
+.vu-manage-arch {
+  height: 300px;
+}
+
+.vu-manage-card--failed .vu-manage-arch {
+  --paper-shadow: var(--vu-danger);
+}
+
+.vu-manage-card--failed .vu-card-crop {
+  border: 3px solid var(--vu-danger);
+}
+
+.vu-manage-card--unwritten .vu-card-crop,
+.vu-manage-card--unfinished .vu-card-crop {
+  border: 3px dashed var(--vu-danger);
+}
+
+.vu-manage-card--failed .vu-card-sprite,
+.vu-manage-card--unwritten .vu-card-sprite,
+.vu-manage-card--unfinished .vu-card-sprite {
+  filter: saturate(0.65) brightness(0.92);
+}
+
+/* Progress overlays the art rather than replacing it: the moment her neutral
+   sprite lands it takes the card, whatever is still rendering. */
+.vu-manage-strip {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 14px 12px;
+  background: color-mix(in srgb, var(--vu-surface) 94%, transparent);
+  text-align: left;
+}
+
+/* Room under the words for the Retry button that rides this strip. The band is below
+   rather than beside them: a card is 220px wide, and a column of text sharing that
+   with a button leaves neither enough to read. */
+.vu-manage-strip--retry {
+  padding-bottom: 52px;
+}
+
+.vu-manage-strip-label {
+  color: var(--vu-accent);
+  font: 700 11.5px/1.35 var(--font-mono);
+}
+
+.vu-manage-strip-label--danger {
+  color: var(--vu-danger);
+}
+
+/* The reason a run failed, in as many words as two lines hold; the card is not
+   where it is read in full, but it is where it is not lost. */
+.vu-manage-strip-reason {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 500 12.5px/1.35 var(--font-body);
+}
+
+/* ---- what a card says while it has no picture ------------------------------ */
+
+/* The shared ring at the size a card's empty face wants, in the tone a card that is
+   only waiting wears. */
+.vu-manage-ring {
+  width: 56px;
+  height: 56px;
+  border: 4px dotted var(--vu-text-muted);
+}
+
+.vu-manage-state {
+  color: var(--vu-text-muted);
+  font: 700 14px/1.35 var(--font-mono);
+  text-align: center;
+}
+
+.vu-manage-state--accent {
+  color: var(--vu-accent);
+}
+
+/* Her shape where her picture would be: the archway says a person is missing. */
+.vu-manage-ghost {
+  width: 70px;
+  height: 86px;
+  border-radius: 999px 999px 0 0;
+  background: var(--vu-border);
+  opacity: 0.7;
+}
+
+/* The shipped cast's tag, over the foot of the arch: a quiet chip on a surface, since it
+   sits on the sprite. A strip in the same place is later in the DOM and paints over it. */
+.vu-manage-tag {
+  position: absolute;
+  bottom: 12px;
+  padding: 3px 10px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+/* ---- the caption ---------------------------------------------------------- */
+
+/* `.vu-card-caption` is the band and its two rows; a card that is not finished says so
+   in the name's colour. */
+.vu-manage-card:not(.vu-manage-card--ready) .vu-card-name {
+  color: var(--vu-text-body);
+}
+
+/* ---- the corner controls -------------------------------------------------- */
+
+/* Sits in the right end of the strip offering it, whose own padding leaves it the room
+   (`--retry` above) — the strip's height is the reason it is anchored to the strip's
+   bottom padding rather than centred in a box whose height the message decides. */
+.vu-manage-retry {
+  position: absolute;
+  right: 14px;
+  bottom: calc(var(--caption-h) + var(--card-gap) + 13px);
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 14px;
+}
+
+/* ---- the leading slot ------------------------------------------------------ */
+
+/* `.vu-card-crop--empty` draws the dash; the slot only widens the gap under its "+". */
+.vu-manage-new .vu-card-crop {
+  gap: 12px;
+}
+
+/* The tile leads a grid that clips in both axes, and above it there is only the header, so its
+   note hangs over the foot of the arch — where a shipped card wears its tag — instead. */
+.vu-manage-new .vu-deadnote-pill {
+  bottom: calc(var(--caption-h) + var(--card-gap) + 12px);
+  margin-bottom: 0;
+}
+
+.vu-manage-plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  padding-bottom: 6px;
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  font: 400 40px var(--font-display);
+
+  /* `breatheMark` swells a 40px glyph by 6%, and a transform that Chromium declines to
+     composite is re-rasterized and snapped to the pixel grid on every frame of it — a crawl
+     rather than a breath. Nothing else in the app needs this: the wordmark's 1.8% never
+     crosses the grid and the corner archways are soft-edged shapes. Promoted, the circle is drawn
+     once and the compositor stretches it. It is not the stage zoom being bent — the property moves
+     nothing, it only says how what motion moves is painted. */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.vu-manage-new-label {
+  color: var(--vu-text-body);
+  font: 700 16px var(--font-body);
+}

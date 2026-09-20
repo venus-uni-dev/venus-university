@@ -1,0 +1,465 @@
+/* The calendar: a month on the left and the day being read on the right, at one
+   size. The grid is six rows whatever the month, the months either side filling them out, so
+   neither the panel nor a cell moves under the arrows. Imported from the view module, never
+   from index.css.
+
+   The veil, the tab, the square, the archway trio, the buttons and the foot are base.css's.
+
+   **Every pill here is a half-pill**: a chip on
+   a day, a key in the legend and the marks that say TODAY and SELECTED are readings of the
+   screen rather than answers it offers, so each is flat right like a count and a sticker are.
+   The two answers on it — the month's arrows and Close — are base.css's own shapes. */
+.vu-cal {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  gap: 34px;
+  width: min(1800px, 100% - 60px);
+  height: calc(100% - 100px);
+  padding: 36px 46px 36px 110px;
+  border-radius: 110px 0 0 110px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* ---- the month ------------------------------------------------------------ */
+
+.vu-cal-month {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.vu-cal-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The month's arrows are the lineup's stepper: two squares either side of a reading held at one
+   width, so the arrows never slide as the player walks the semester ("The reader's name"). An
+   end-stop is dead and says nothing. */
+.vu-cal-step--back svg {
+  rotate: 180deg;
+}
+
+.vu-cal-name {
+  min-width: 190px;
+  color: var(--vu-text);
+  font: 700 19px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* What the four colours mean, said at rest — nothing hides information behind a hover. */
+.vu-cal-legend {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.vu-cal-key {
+  padding: 5px 12px 5px 15px;
+  border-radius: 999px 0 0 999px;
+  background: var(--cat-tint);
+  color: var(--cat-tone);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The four kinds of thing a day can hold, as the pair each is drawn in. Set on the attribute
+   alone (the registrar's `[data-group]`), so a chip, a key and a card read one declaration. */
+[data-cat='class'] {
+  --cat-tint: var(--vu-cat-class-tint);
+  --cat-tone: var(--vu-cat-class-tone);
+}
+
+[data-cat='work'] {
+  --cat-tint: var(--vu-cat-work-tint);
+  --cat-tone: var(--vu-cat-work-tone);
+}
+
+[data-cat='plans'] {
+  --cat-tint: var(--vu-cat-plans-tint);
+  --cat-tone: var(--vu-cat-plans-tone);
+}
+
+[data-cat='occasion'] {
+  --cat-tint: var(--vu-cat-occasion-tint);
+  --cat-tone: var(--vu-cat-occasion-tone);
+}
+
+.vu-cal-days {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vu-cal-dayname {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Six rows sharing the height the grid has under a panel whose height is fixed: a month is
+   four rows or six, and drawing every one as six is what keeps a cell the same size from
+   January to May. `minmax(0, …)` on both axes for the reschedule grid's reason: a bare
+   `1fr` floors at min-content, and one long title would push the week past the panel. */
+.vu-cal-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
+}
+
+/* A day is a container holding a stack: quiet, and clipped — it carries no paper layer, so
+   it may. The border is on every cell and transparent on most; today and the day being read
+   each colour it, and neither moves any layout. */
+.vu-cal-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 7px;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+
+/* Today and the day being read are two marks, shown apart on purpose: today rings
+   itself in the accent and the pick in the ink, so the two never agree — and when they are the
+   same day, today is the one that is said. */
+.vu-cal-cell--today {
+  border-color: var(--vu-accent);
+}
+
+.vu-cal-cell--on {
+  border-color: var(--vu-text);
+}
+
+/* A day already played still opens its summary: dimmed, not dead. */
+.vu-cal-cell--past {
+  opacity: 0.6;
+}
+
+/* A day of the month beside this one filling the row out, or one of this month's the semester
+   does not reach: a number and nothing else, and not a control. */
+.vu-cal-cell--out {
+  opacity: 0.38;
+}
+
+/* The day's number and what rides beside it. It wraps, and the row gap is nothing: on the
+   narrowest stage today's cell carries a sticker and a week's forecast at once, and the
+   forecast dropping under the number costs a cell less than either reading being cut. */
+.vu-cal-num {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-cal-cell--today .vu-cal-num {
+  color: var(--vu-accent);
+}
+
+.vu-cal-cell--on .vu-cal-num {
+  color: var(--vu-text);
+}
+
+/* The mark beside the number: a sticker's shape at a chip's size, in the ring's own colour. */
+.vu-cal-mark {
+  padding: 2px 7px 2px 8px;
+  border-radius: 999px 0 0 999px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.vu-cal-mark--today {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-cal-mark--on {
+  background: var(--vu-text);
+  color: var(--vu-surface);
+}
+
+.vu-cal-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+}
+
+/* One thing on the day: a half-pill flat right in its kind's tint — a reading of the day
+   and not an answer, like the count beside a title. The border is on every chip so the dashed
+   one below moves nothing; the label ellipsizes and the pane carries the full words. */
+.vu-cal-chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 7px 2px 8px;
+  border: 2px solid transparent;
+  border-radius: 999px 0 0 999px;
+  background: var(--cat-tint);
+  color: var(--cat-tone);
+  font: 700 10.5px var(--font-mono);
+  line-height: 1.25;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vu-cal-chip-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Which half it is, as the mark and not a glyph pushed into the label (on a
+   chip): the stamp's sun or crescent at eleven pixels, in the chip's own tone. */
+.vu-cal-chip svg {
+  display: block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+
+.vu-cal-chip-faces {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+/* A person is an archway at every size; on a chip she is thirteen pixels wide. */
+.vu-cal-face {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 13px;
+  height: 16px;
+  background: var(--vu-surface);
+}
+
+/* A plan filed since the last visit: the same chip on the surface behind a dashed edge in
+   its own tone, and NEW written on its round end — the unseen-plan marker, for this one visit. */
+.vu-cal-chip--new {
+  border-color: var(--cat-tone);
+  border-style: dashed;
+  background: var(--vu-surface);
+}
+
+.vu-cal-new {
+  flex: none;
+  margin-left: -4px;
+  padding: 1px 6px;
+  border-radius: 999px 0 0 999px;
+  background: var(--cat-tone);
+  color: var(--vu-surface);
+  font: 700 9px/1.3 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- the day ------------------------------------------------------------ */
+
+/* The day being read: a rounded rectangle, since what it holds is a list, recessed a step
+   off the panel so the cards on it lift. It is the panel's full height, with the title under the
+   tab's corner and the one answer on its foot. */
+.vu-cal-day {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 16px;
+  width: 410px;
+  min-height: 0;
+  padding: 28px 32px 26px;
+  border-radius: 34px;
+  background: var(--vu-recessed);
+}
+
+.vu-cal-daytitle {
+  flex: none;
+  margin: 0;
+  font: 400 30px var(--font-display);
+}
+
+/* The day's entries scroll under the foot rather than growing the pane: a basis of `auto` and
+   the free space, and `hidden auto` like every scroller. */
+.vu-cal-daybody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+.vu-cal-half {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The cards under a head, keyed on the day so a pick deals them in while the head stays. */
+.vu-cal-cards {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-cal-half-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The half's mark, in the two roles the registrar writes its halves in, on the wrapper the idle
+   turns: the sun spins and the crescent swings, the stamp's own pair at a label's size. */
+.vu-cal-half-mark {
+  display: block;
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.vu-cal-half-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The two roles the registrar writes its halves in, worn by the pane's mark and the grid's
+   forecast alike: the colour says which half it is whatever the sky over it is doing. */
+.vu-cal-half-mark--day,
+.vu-cal-forecast-mark--day {
+  color: var(--vu-daymark);
+}
+
+.vu-cal-half-mark--night,
+.vu-cal-forecast-mark--night {
+  color: var(--vu-nightmark);
+}
+
+/* The week's sky on a day of the grid, pushed to the end of the day's own number row. */
+.vu-cal-forecast {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  margin-left: auto;
+}
+
+/* One half's sky in that row: the chips' own eleven pixels, in the half's colour. */
+.vu-cal-forecast-mark {
+  display: block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+
+/* One entry: a half-pill flat right, a surface rather than a control, with its radius scaled
+   to a card's height rather than run to 999px — at three lines that would curve into the first
+   word. Filled in its kind's tint, since the chip on the grid already taught the colour. */
+.vu-cal-card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 20px 12px 28px;
+  border-radius: 30px 0 0 30px;
+  background: var(--cat-tint, var(--vu-surface));
+}
+
+/* Nothing in a half, or the past read back: the surface, and nobody's tint. */
+.vu-cal-card--quiet {
+  color: var(--vu-text-body);
+  font: 500 14px/1.5 var(--font-body);
+}
+
+.vu-cal-card--empty {
+  color: var(--vu-text-muted);
+  font-style: italic;
+}
+
+.vu-cal-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vu-text);
+  font: 700 16px var(--font-body);
+}
+
+.vu-cal-card-name {
+  min-width: 0;
+}
+
+.vu-cal-card-code {
+  flex: none;
+  color: var(--cat-tone);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-cal-card-text {
+  margin: 0;
+  color: var(--vu-text-body);
+  font: 500 13.5px/1.5 var(--font-body);
+}
+
+/* A closure is the day's own news, in the occasion's tone. */
+.vu-cal-card-note {
+  margin: 0;
+  color: var(--cat-tone);
+  font: italic 600 13px var(--font-body);
+}
+
+.vu-cal-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 4px;
+}
+
+.vu-cal-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vu-text-body);
+  font: 600 13px var(--font-body);
+}
+
+.vu-cal-who .vu-cal-face {
+  width: 22px;
+  height: 26px;
+}
+
+.vu-cal-day .vu-foot {
+  flex: none;
+}

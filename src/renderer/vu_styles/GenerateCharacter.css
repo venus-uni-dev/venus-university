@@ -1,0 +1,131 @@
+/* The New Character modal: its panel and the two columns inside it. The veil, the fields
+   and the checkboxes are base.css's. */
+
+/* ---- the panel ------------------------------------------------------------ */
+
+/* Half-pill flat right, and the round left end is negative space on purpose: the
+   content is inset past it rather than curved around it. A long panel relaxes its tilt to
+   -1.2°, and its shadow is the panel role — plum by day, glow by night.
+
+   No `overflow` here, ever: the title tab overhangs the top edge and the paper layer's own
+   shadow is a pseudo-element this box would clip. */
+.vu-generate {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  gap: 50px;
+  width: min(1240px, 100% - 60px);
+  padding: 56px 70px 50px 250px;
+  border-radius: 330px 0 0 330px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* ---- the left column: who she is ------------------------------------------ */
+
+.vu-generate-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.vu-generate-names {
+  display: flex;
+  gap: 14px;
+}
+
+/* The dice sits beside the field, not inside it, so the well keeps its own shape. */
+.vu-generate-name {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vu-generate-name > .vu-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The description is where the player actually writes, so it takes the height the
+   reference picker gives up. */
+.vu-generate-brief .vu-input {
+  min-height: 250px;
+  resize: none;
+}
+
+/* One row rather than a dropzone: the picker is optional and only one control wide, and a
+   box drawn around it would promise a drop this modal does not take. */
+.vu-generate-ref {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+}
+
+.vu-generate-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 9px 18px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 14px var(--font-mono);
+}
+
+.vu-generate-thumb {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--vu-tint);
+  object-fit: cover;
+}
+
+.vu-generate-filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 13px var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vu-generate-hint {
+  flex: 1;
+  color: var(--vu-text-muted);
+  font: 500 14px/1.4 var(--font-body);
+}
+
+/* A rejected file says so where the promise was. */
+.vu-generate-hint--error {
+  color: var(--vu-danger);
+}
+
+/* Driven by the pill beside it, so the picker matches every other control and is not a
+   second tab stop for the same job. */
+.vu-generate-file {
+  display: none;
+}
+
+/* ---- the right column: what else to render -------------------------------- */
+
+.vu-generate-sets {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  width: 360px;
+}
+
+/* The answers sit at the foot of the column, whatever the fields above them come to. */
+.vu-generate-footer {
+  margin-top: auto;
+}

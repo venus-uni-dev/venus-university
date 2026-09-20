@@ -1,0 +1,646 @@
+/* The registrar's own page: the timetable the player enrolls from, drawn as a web page inside a
+   browser. Three components share this file — the screen, the week grid (`views/CourseWeek.tsx`,
+   also used by the add/drop editor), and the picker either of them opens. The picker's veil is
+   `absolute` against the stage rather than `fixed`; portalled from the editor it takes the shared
+   `.vu-veil` instead. */
+
+.vu-courses {
+  /* The chrome's height, read twice: by the bar itself and by the veil that starts under it. */
+  --chrome-h: 56px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* ---- the browser chrome ---------------------------------------------------- */
+
+/* The frame the page is read inside. It arrives first and alone, so it is the one part of
+   this screen that is drawn before there is anything to draw. */
+.vu-courses-chrome {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 20px;
+  height: var(--chrome-h);
+  padding: 0 20px;
+  background: var(--vu-recessed);
+}
+
+.vu-courses-dots {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* Three dots that do nothing, so they wear no state colour: what is loud on this screen is
+   the accent and what a course is, and a window control is neither. */
+.vu-courses-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--vu-border);
+}
+
+.vu-courses-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 18px;
+  color: var(--vu-text-muted);
+  /* Neither arrow has anywhere to go, and the pair says so the way a dead control does
+     — at the same 45% as every other, rather than in a colour of its own. */
+  opacity: 0.45;
+}
+
+.vu-courses-url {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-muted);
+  font: 400 15px var(--font-mono);
+}
+
+.vu-courses-url svg {
+  flex: none;
+  color: var(--vu-text-muted);
+}
+
+/* The address types one character at a time as one string, so the two halves are spans inside
+   it rather than two separate boxes. */
+.vu-courses-domain {
+  color: var(--vu-text);
+  font-weight: 700;
+}
+
+/* Where the next character will land. It stands still: a blink would be a keyframe, and
+   anything that moves on a screen is motion's. */
+.vu-courses-caret {
+  width: 2px;
+  height: 17px;
+  background: var(--vu-text);
+}
+
+/* ---- the registrar's band -------------------------------------------------- */
+
+.vu-courses-band {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 20px;
+  height: 84px;
+  padding: 0 60px;
+  border-bottom: 3px solid var(--vu-accent);
+  background: var(--vu-surface);
+}
+
+/* The monogram is a bitmap, so the theme's only handle on it is a turn of its hue — the
+   wordmark's own rule, and the reason that turn is a role. */
+.vu-courses-mark {
+  flex: none;
+  height: 42px;
+  filter: hue-rotate(var(--vu-wordmark-hue));
+}
+
+.vu-courses-rule {
+  flex: none;
+  width: 1px;
+  height: 44px;
+  background: var(--vu-border);
+}
+
+.vu-courses-office {
+  color: var(--vu-accent);
+  font: 400 25px var(--font-display);
+}
+
+/* Who is signed in, in the bookkeeping voice. Nothing here is a control. */
+.vu-courses-user {
+  margin-left: auto;
+  color: var(--vu-text-muted);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* ---- the page -------------------------------------------------------------- */
+
+.vu-courses-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 0;
+  padding: 40px 60px 36px;
+}
+
+/* The beat between the address landing and the page arriving. */
+.vu-courses-wait {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: var(--vu-accent);
+}
+
+.vu-courses-wait .vu-ring {
+  width: 46px;
+  height: 46px;
+  border-width: 4px;
+}
+
+.vu-courses-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 22px;
+}
+
+/* The deadline, where there is one to keep: a warning that has not happened yet, which is
+   the whole of what `--vu-warn` says. */
+.vu-courses-deadline {
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--vu-warn-tint);
+  color: var(--vu-warn);
+  font: 700 14px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* How many are enrolled, drawn in what it is saying about itself: sage
+   while the schedule would go through, amber while something still stands in the way. */
+.vu-courses-count {
+  margin-left: auto;
+  padding: 10px 20px;
+  border-radius: 999px 0 0 999px;
+  background: var(--count-fill);
+  color: var(--count-ink);
+  font: 700 16px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vu-courses-count--ok {
+  --count-ink: var(--vu-good);
+  --count-fill: var(--vu-good-tint);
+}
+
+.vu-courses-count--short {
+  --count-ink: var(--vu-warn);
+  --count-fill: var(--vu-warn-tint);
+}
+
+/* ---- the week -------------------------------------------------------------- */
+
+/* Seven days, Sunday first, over a day and a night row, each named by the word behind it rather
+   than beside it. `isolation` keeps the word's `z-index: -1` from sinking past the page. */
+.vu-courses-grid {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: 24px 252px 252px;
+  gap: 14px;
+}
+
+/* The same week inside a modal, where the panel has a fraction of the page's height to spare:
+   the rows lose what the page could afford and nothing else about the grid changes. */
+.vu-courses-grid--compact {
+  grid-template-rows: 24px 212px 212px;
+}
+
+/* A compact tile is narrower as well as shorter, and a course's name is one word as often as
+   three: the name steps down a size and hyphenates before it breaks anywhere, and the tile
+   spends less on its own padding, so a name three lines long and the faces under it still
+   fit inside the card rather than past its foot. */
+.vu-courses-grid--compact .vu-courses-tile {
+  gap: 5px;
+  padding: 12px 14px;
+}
+
+.vu-courses-grid--compact .vu-courses-name {
+  font-size: 15px;
+  hyphens: auto;
+}
+
+.vu-courses-day {
+  align-self: center;
+  color: var(--vu-text-body);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.vu-courses-day--off {
+  color: var(--vu-text-muted);
+}
+
+/* Which half of the day the row is, written across the weekdays as their ground. `absolute`
+   keeps it out of auto-placement, and width/height are stated outright: an `svg` is a replaced
+   element, so an unset `bottom` falls back to its own viewBox ratio instead of stretching. */
+.vu-courses-half {
+  position: absolute;
+  z-index: -1;
+  grid-column: 2 / 7;
+  width: 100%;
+  height: 100%;
+}
+
+/* The one number that decides the word's shape: `textLength` fits it across whatever the
+   stage is wide, so this only says how much of the row's height it stands in. */
+.vu-courses-half text {
+  font: 400 104px var(--font-display);
+}
+
+/* Both edges of the row are named: an `auto` end line on an absolutely positioned grid child
+   resolves to the container's own padding edge, not to one track, so `grid-row: 2` alone hands
+   the day's word the night's row as well. */
+.vu-courses-half--day {
+  grid-row: 2 / 3;
+  fill: var(--vu-daymark);
+}
+
+.vu-courses-half--night {
+  grid-row: 3 / 4;
+  fill: var(--vu-nightmark);
+}
+
+/* The weekend: no class meets, and nothing here is offered. The two of them are the ends of
+   the week, so they round its outer corners and the five days between them stay square — the
+   row reads as one segmented pill rather than seven loose cells. */
+.vu-courses-off {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--vu-recessed) 0 14px,
+    var(--vu-tint) 14px 28px
+  );
+}
+
+.vu-courses-off--start {
+  display: grid;
+  place-items: center;
+  border-radius: 999px 0 0 999px;
+}
+
+.vu-courses-off--end {
+  border-radius: 0 999px 999px 0;
+}
+
+/* A mark on the block the week opens on, mirroring the word across the weekdays. Height is a
+   percentage of the row, and `width: auto` lets the square viewBox size itself. */
+.vu-courses-half-mark {
+  margin-left: 40px;
+  width: auto;
+  height: 50%;
+  color: var(--vu-surface);
+}
+
+/* The hover target and the ✕'s anchor: the tile itself is the paper face inside it, and the
+   ✕ is that face's sibling rather than its child. */
+.vu-courses-cell {
+  position: relative;
+}
+
+.vu-courses-tile {
+  /* A tile is wide for its height, so it relaxes the shared tilt the way a long row does. */
+  --paper-offset: 6px 5px;
+  --paper-tilt: -1.2deg;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  height: 100%;
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+/* The one row that reaches the corner the ✕ rides, so it is the one that gives it room. */
+.vu-courses-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding-right: 42px;
+}
+
+.vu-courses-name {
+  overflow-wrap: anywhere;
+  color: var(--vu-text);
+  font: 700 18px/1.2 var(--font-body);
+}
+
+/* Who else is in the room, along the foot of the tile: they are quiet, since a face that
+   opens nothing is a reading and not a control. `margin-top: auto` puts them on the
+   bottom edge whatever the name above them wrapped to. */
+.vu-courses-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: auto;
+}
+
+/* A person is an archway at every size; beside a course she is forty-six pixels tall,
+   at the 5:6 a profile is cut to. It keeps `.vu-arch`'s own recessed ground, which is what
+   shows for the beat before the picture decodes. */
+.vu-courses-face {
+  flex: none;
+  width: 38px;
+  height: 46px;
+}
+
+/* Nobody he can name is in the room yet, drawn as the gap it is: the archway's own shape in
+   a dashed outline, with a question in place of a face. */
+.vu-courses-face--unknown {
+  display: grid;
+  place-items: center;
+  border: 2.5px dashed var(--vu-border);
+  border-radius: 999px 999px 0 0;
+  background: none;
+  color: var(--vu-text-muted);
+  font: 700 20px var(--font-mono);
+}
+
+/* Who teaches it, on its own line under the code and above the title. A long surname
+   wraps rather than spilling past the tile's edge. */
+.vu-courses-teacher {
+  overflow-wrap: anywhere;
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-body);
+}
+
+/* `.vu-x` is a surface circle, which is exactly what the tile under it is: on a card it
+   rides a sprite and reads, here it would be the same colour as its own ground. */
+.vu-courses-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--vu-recessed);
+}
+
+/* An hour with nothing in it: dashed, weightless, and tinting on hover rather than swelling. The
+   + is drawn a step louder than the outline so it survives the hover fill. */
+.vu-courses-empty {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 3px dashed var(--vu-border);
+  border-radius: 20px;
+  background: none;
+  color: var(--vu-text-muted);
+  font: 400 34px var(--font-display);
+}
+
+/* An hour a shift already holds. It offers nothing, so it is dead at 45% with
+   what holds it written on it — which is why the tile beneath needs no line explaining
+   itself, and why the empty tile's dashed outline is the shape it borrows: the hour is the
+   same kind of hour, and the only difference is that it is spoken for. */
+.vu-courses-blocked {
+  display: grid;
+  place-items: center;
+  padding: 10px 12px;
+  border: 3px dashed var(--vu-border);
+  border-radius: 20px;
+  color: var(--vu-text-muted);
+  font: 700 12px/1.3 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  opacity: 0.45;
+}
+
+/* ---- the foot -------------------------------------------------------------- */
+
+.vu-courses-foot {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 40px;
+  margin-top: auto;
+}
+
+.vu-courses-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-courses-rules-label {
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.vu-courses-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--vu-text-body);
+  font: 500 15px/1.5 var(--font-body);
+}
+
+.vu-courses-rules-list li::before {
+  content: '–';
+  margin-right: 8px;
+  color: var(--vu-text-muted);
+}
+
+/* The answers, and the one thing standing in their way above them. */
+.vu-courses-answers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* Why Finalize is dead — one condition at a time, in the order `scheduleComplaint` names
+   them. It is the reason a dead control owes, so it is worded as the rule and not as
+   a rebuke. */
+.vu-courses-complaint {
+  color: var(--vu-danger);
+  font: 700 15px var(--font-body);
+  text-align: right;
+}
+
+/* ---- the picker ------------------------------------------------------------ */
+
+/* Dims the page, not the browser it is read in, so it starts under the address bar. It is
+   `absolute` against the screen rather than `fixed`, which would measure the window past 16:9. */
+.vu-courses-veil {
+  position: absolute;
+  inset: var(--chrome-h) 0 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: 22px;
+  background: color-mix(in srgb, var(--vu-accent-shadow) 28%, transparent);
+}
+
+/* A surface is a half-pill flat right, at the radius its own size asks for. It gives
+   back what its tab overhangs by, and carries no `overflow` — the tab hangs off the corner
+   and the panel's own shadow pseudo would be clipped with it. */
+.vu-pickcourse {
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 11px 10px;
+  --paper-tilt: -1.2deg;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(880px, 100%);
+  max-height: calc(100% - 100px);
+  padding: 46px 44px 32px 84px;
+  border-radius: 70px 0 0 70px;
+}
+
+/* Whatever sits under the tab's corner owes it clearance, the tab's own shadow included. */
+.vu-pickcourse-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Which hour is being filled, carried over from the tile that was clicked. */
+.vu-pickcourse-slot {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* `overflow-y` alone leaves the horizontal axis computing `visible` while Chromium still
+   draws a bar for a frame a row swells in. */
+.vu-pickcourse-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+.vu-pickcourse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0 10px 0 0;
+  list-style: none;
+}
+
+/* `.vu-row` is the entry; a course is two lines rather than one, so it stacks them. */
+.vu-pickcourse-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 13px 24px 13px 48px;
+}
+
+.vu-pickcourse-headline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* A course he has already dropped. It stays in the hour so the list does not renumber under the
+   hand mid-pick, and taking it out would say less than leaving it: the dead-control dim is the
+   whole of what a row that is not a control has to say, and the tag is the one word for the
+   state. */
+.vu-pickcourse-row--dropped {
+  opacity: 0.45;
+}
+
+.vu-pickcourse-tag {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 700 11.5px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The title takes whatever the teacher's own width leaves, the group having moved off this
+   row; `min-width: 0` is what lets a long one wrap rather than pushing the teacher out. */
+.vu-pickcourse-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--vu-text);
+  font: 700 17px var(--font-body);
+}
+
+/* Which group the course is offered in and how hard it is, in the bookkeeping voice — the one
+   place the group is spelled out, so the chip's colour reads without a key on the screen. */
+.vu-pickcourse-meta {
+  color: var(--group-ink);
+  font: 500 12.5px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vu-pickcourse-teacher {
+  margin-left: auto;
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-body);
+  white-space: nowrap;
+}
+
+.vu-pickcourse-desc {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 500 13.5px/1.45 var(--font-body);
+  text-align: left;
+}
+
+/* On a row the faces follow the description rather than dropping to a tile's bottom edge, so
+   the gap they sit on replaces the `margin-top: auto` they carry. */
+.vu-pickcourse-row .vu-courses-faces {
+  margin-top: 6px;
+}
+
+/* ---- the group's colour ---------------------------------------------------- */
+
+/* The pair a class's group is drawn in, keyed by a `data-group` attribute rather than a state:
+   both the chip and the group's own line read off it, so it is set here and not on `.vu-code`. */
+[data-group='lecture'] {
+  --group-ink: var(--vu-group-lecture);
+  --group-fill: var(--vu-group-lecture-tint);
+}
+
+[data-group='project'] {
+  --group-ink: var(--vu-group-project);
+  --group-fill: var(--vu-group-project-tint);
+}
+
+[data-group='pe'] {
+  --group-ink: var(--vu-group-pe);
+  --group-fill: var(--vu-group-pe-tint);
+}
+
+/* A course's code, tinted by the group it is offered in — the tile's only colour and the picker
+   row's first mark, so the two read as the same thing in two sizes. */
+.vu-code {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--group-fill);
+  color: var(--group-ink);
+  font: 700 11.5px var(--font-mono);
+  white-space: nowrap;
+}

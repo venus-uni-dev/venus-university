@@ -1,0 +1,30 @@
+/* The stage. Main zooms the page so the renderer
+   always lays out against 1080 CSS px of height — or 1440 of width below 4:3 — and these
+   three rules do the rest: `#root` is the stage, `html` is the letterbox behind it.
+
+   The bands fall out of the two caps. At 16:9 the stage fills the viewport; wider, the
+   1920 cap leaves black at the sides; between 4:3 and 16:9 the viewport is 1440-1920 wide
+   and the stage follows it, so those screens reflow rather than crop; narrower than 4:3 the
+   zoom fits the width and the 1080 cap leaves black above and below. */
+html {
+  background: #000;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+/* `position` sizes nothing and makes no stacking context: it is here so the crossing layer
+   (`Crossing.css`) can be `absolute` and cover the STAGE. A `fixed` layer covers the window,
+   which in the wider-than-16:9 band is the letterbox too — a dim can afford that, an opaque
+   curtain cannot. */
+#root {
+  position: relative;
+  width: min(100%, 1920px);
+  height: min(100%, 1080px);
+  overflow: hidden;
+  /* The ground goes on the stage and not on `body`: outside it is the letterbox, which
+     nothing may paint over. */
+  background: var(--vu-ground);
+}

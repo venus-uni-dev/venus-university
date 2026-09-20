@@ -1,0 +1,27 @@
+node_modules
+out
+dist
+dist-electron
+release
+
+# build products of scripts/packCharacters.mjs and the WebP cache
+/build/web-assets
+/build/desktop-assets
+/build/.asset-cache
+
+# the store page pictures the encoder reads and rewrites: the 2560x1440 captures and the
+# recorded screencast frames. The stills and the GIFs encoded from them are kept.
+/build/itch-page/shots/masters
+/build/itch-page/gifs/frames
+
+# runtime data (getDataPath()) — see src/main/paths.ts
+/data
+
+# editor/OS cruft
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+
+# TS incremental build info
+*.tsbuildinfo

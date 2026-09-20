@@ -1,0 +1,93 @@
+/* The balance card, shared by the landing and the scene. Imported from the component,
+   never from index.css.
+
+   **Surface and not an accent fill.** A card is a thing with printing on it, and the printing
+   is what carries the colour here — the word and the strip under it are the accent, the figure
+   is the text ramp, and the danger pair takes all three of them the moment the balance is a
+   debt. Where it hangs and how it leans is the caller's; nothing here positions it. */
+/* **The rows space themselves rather than sharing a `gap`**: the change under the figure is a
+   fourth child that spends most of its life at zero height, and a gap is spent whether or not a
+   child has any — so the card would jump the whole of one before the row had grown a pixel.
+   Three margins say the same thing and nothing moves until the row does. */
+.vu-money {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-shadow);
+  --paper-offset: 8px 7px;
+  --card-ink: var(--vu-accent);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  min-width: 196px;
+  padding: 15px 22px 16px 30px;
+  border-radius: 999px 0 0 999px;
+}
+
+.vu-money-stripe,
+.vu-money-amount {
+  margin-top: 7px;
+}
+
+.vu-money--debt {
+  --card-ink: var(--vu-danger);
+}
+
+/* The word over the strip, top left: what the figure under it is a reading of. */
+.vu-money-balance {
+  color: var(--card-ink);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.18em;
+}
+
+/* The strip a card is recognised by. It is a rule rather than a border so it can keep its own
+   weight and its own tone while the two rows either side of it stay plain text. */
+.vu-money-stripe {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--card-ink);
+}
+
+/* And the figure, hard against the flat edge — the strip runs the width of the card and the
+   number is read off its right end, which is the way a balance is printed. **Tabular figures**,
+   which is what stops a counting card jittering as the digits change under each other. */
+.vu-money-amount {
+  align-self: flex-end;
+  color: var(--vu-text);
+  font: 700 32px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.vu-money--debt .vu-money-amount {
+  color: var(--card-ink);
+}
+
+/* The change under the figure, against the same right edge — which, with the card's tabular
+   figures, is what puts the two readings' digits in the same columns.
+
+   **It animates its own height and the card follows in normal flow**: a `layout` prop on the card
+   would scale its box, distorting a 170px radius and both paper pseudos with it. It carries the
+   `overflow` because a `.vu-paper` element may not, and it carries **no padding of its own** —
+   under `box-sizing: border-box` a padded box cannot shrink to nothing, so the spacing lives on
+   the figure inside it and is grown along with everything else. */
+.vu-money-delta {
+  display: block;
+  align-self: flex-end;
+  overflow: hidden;
+}
+
+/* Read at the figure's own size: units under units in one monospaced column. Its two tones are
+   the status line's own (`Dialogue.css`) — what the app says about money moving, said once. */
+.vu-money-change {
+  display: block;
+  padding-top: 7px;
+  font: 700 32px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.vu-money-change[data-tone='gain'] {
+  color: var(--vu-good);
+}
+
+.vu-money-change[data-tone='loss'] {
+  color: var(--vu-danger);
+}

@@ -1,0 +1,868 @@
+/* The BunnyShop: a browser with five tabs, one shelf behind each, and the reader's balance
+   hanging over whichever shelf he is standing at. The shell — the way out, the sign, the tab
+   strip and the balance — is the app's; a shop owns everything from the top of its pane down:
+   its field, its masthead, and the colour of its own tab. */
+
+/* The screen fills the stage. It is **not** a paper element — there is nothing behind it to lift
+   off — so it may clip, which is what keeps the pane's decoration inside the pane. */
+.vu-shop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 44px 80px;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* ---- the shell ------------------------------------------------------------ */
+
+/* The way out, the sign, and the one thing the header offers — in that order, left to right,
+   since "My stuff" is what the sign is offering and not a control parked in the far corner. Its
+   own layer, above the pane and the strip: a screen's layers count from 1 and never reach the
+   tab's 10. */
+.vu-shop-header {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 26px;
+}
+
+.vu-shop-title {
+  margin-right:120px
+}
+
+/* ---- the balance ---------------------------------------------------------- */
+
+/* `components/MoneyCard.tsx`, positioned as a sibling of the pane and straddling its top edge
+   on purpose. */
+.vu-shop-money {
+  position: absolute;
+  z-index: 3;
+  top: 126px;
+  right: 60px;
+  rotate: -1.2deg;
+}
+
+/* A balance is read at the size the screen is about. The floor is eight monospaced characters
+   plus the card's own padding — `-$99,999` — so a comma arriving mid-count never widens the
+   card under the figure it is counting; past that it grows rather than clipping. */
+.vu-shop-money .vu-money {
+  min-width: 340px;
+  padding: 20px 28px 22px 40px;
+}
+
+.vu-shop-money .vu-money-balance {
+  font-size: 15px;
+}
+
+.vu-shop-money .vu-money-stripe {
+  height: 6px;
+}
+
+/* The two readings at one size, which is what puts their digits in the same columns. The card
+   owns the arrangement that lets the change grow from nothing (`MoneyCard.css`); this is only
+   the step up to the size a whole screen is about. */
+.vu-shop-money .vu-money-amount,
+.vu-shop-money .vu-money-change {
+  font-size: 60px;
+}
+
+.vu-shop-money .vu-money-stripe,
+.vu-shop-money .vu-money-amount {
+  margin-top: 9px;
+}
+
+.vu-shop-money .vu-money-change {
+  padding-top: 9px;
+}
+
+/* ---- the tab strip -------------------------------------------------------- */
+
+/* The tabs of a browser: rounded on top, square at the foot, sitting under the pane so it
+   covers every tab's bottom corners. The indent clears the pane's own corner radius. */
+.vu-shop-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: -12px;
+  padding-left: 48px;
+}
+
+/* A tab at rest is bookkeeping: mono, uppercase, and quiet enough that the shelf below is what
+   the eye lands on. The bottom padding is the part that hides behind the pane. */
+.vu-shop-tab {
+  flex: none;
+  padding: 14px 26px 24px;
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--vu-tint);
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The shelf he is standing at, wearing **whatever that shop's page begins with**: its field, or
+   the band its masthead is drawn on where it has one, so the tab and the top of the page read as
+   one sheet. That is the whole of why a band may never be a gradient — the tab is a flat fill,
+   and the join shows the moment the two disagree. Its fill is a *state*, so its hover may never
+   touch it — it rises instead (`tabRaise`). */
+.vu-shop-tab--on {
+  padding: 20px 34px 26px;
+  border-radius: 26px 26px 0 0;
+  background: var(--shop-mast);
+  color: var(--shop-mast-ink);
+  font-size: 17px;
+}
+
+/* ---- the shelf ------------------------------------------------------------ */
+
+/* One merchant's page, with no paper layer: the pane clips its own decoration bleeding off two
+   corners. The radius stays uniform rather than squaring to the open tab's corner; the tab
+   carries the join instead. */
+.vu-shop-pane {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 30px;
+  min-height: 0;
+  padding: 44px 60px 30px;
+  border-radius: 36px;
+  background: var(--shop-field);
+  color: var(--shop-ink);
+  overflow: hidden;
+  /* Measured against the shelf rather than the window, so the masthead's type can stand down
+     where there is less of it. */
+  container-type: inline-size;
+}
+
+/* Three cards across at 16:9 and two at 4:3, the columns working it out for themselves.
+   Positioned, ahead of the shapes behind the goods, so the shelf's own scrollbar paints over the
+   decoration instead of under it. */
+.vu-shop-grid {
+  position: relative;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  align-content: start;
+  /* `max-content`, not `auto`: the row is named outright as the tallest card in it, and the
+     rest stretch level. */
+  grid-auto-rows: max-content;
+  gap: 26px;
+  min-height: 0;
+  margin: -12px -22px -22px;
+  padding: 12px 22px 22px;
+  overflow: hidden auto;
+}
+
+/* The shelf's own bar, in the merchant's colours where `base.css`'s trio is the app's: a
+   shop is a website and its scrollbar is part of the page, not part of the frame around it.
+   **The `[data-theme]` is not decoration** — the base rule carries one, so a bare class here
+   would only tie with it and win by load order. */
+[data-theme] .vu-shop-grid::-webkit-scrollbar-track {
+  background: var(--shop-decor);
+}
+
+[data-theme] .vu-shop-grid::-webkit-scrollbar-thumb {
+  background: var(--shop-accent);
+}
+
+/* The shelf running out at the bottom edge, in the merchant's own colour: layout, so it is the
+   screen's rather than the scroller's. */
+.vu-shop-fade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--shop-field));
+  pointer-events: none;
+}
+
+/* ---- the masthead --------------------------------------------------------- */
+
+/* The shop's name, what it sells, and its own patter, in a fixed JSX order that each shop's own
+   grid re-lands — presentation changes between shelves, never reading order. Each shop picks one
+   of three shapes: a band, a plate, or nothing at all, and every masthead keeps the pane's right
+   340px clear for the balance. */
+.vu-shop-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: none;
+}
+
+/* **The one thing a merchant's own face reaches** — with its masthead's two beside it. Nothing
+   else on the screen (the tabs, the cards, the balance) leaves the app's three, or a shop would
+   be redecorating the goods rather than the shelf. */
+.vu-shop-name {
+  grid-area: name;
+  color: var(--shop-mast-ink);
+  font: 400 58px/1 var(--shop-title-font);
+  letter-spacing: var(--shop-title-tracking, 0);
+  white-space: nowrap;
+}
+
+.vu-shop-blurb {
+  grid-area: blurb;
+  min-width: 0;
+  margin: 0;
+  color: var(--shop-mast-muted);
+  font: 500 16px/1.5 var(--shop-blurb-font);
+}
+
+/* The shop's own boast. **Its device is the shop's** — a pennant, a barcode, a bubble, a
+   dateline, a stub — and no two of them are the same object, which is most of what stops five
+   shelves reading as one template in five palettes. */
+.vu-shop-kicker {
+  grid-area: kicker;
+  color: var(--shop-kicker-ink);
+  font-family: var(--shop-kicker-font);
+}
+
+/* ---- the five merchants --------------------------------------------------- */
+
+/* Merchant colours are literal keys rather than `--vu-*` roles, read through a fallback so the
+   identical card renders inside a panel that declares no shop; they do not follow the clock. */
+.vu-shop {
+  --shop-field: var(--vu-recessed);
+  --shop-decor: var(--vu-tint);
+  --shop-accent: var(--vu-accent);
+  --shop-accent-ink: var(--vu-accent-ink);
+  --shop-accent-shadow: var(--vu-accent-shadow);
+  --shop-ink: var(--vu-text);
+  --shop-muted: var(--vu-text-muted);
+  --shop-card: var(--vu-surface);
+  --shop-card-shadow: var(--vu-shadow);
+  --shop-quiet: var(--vu-recessed);
+  --shop-quiet-lift: var(--vu-tint);
+  --shop-mast: var(--shop-field);
+  --shop-mast-ink: var(--shop-ink);
+  --shop-mast-muted: var(--shop-muted);
+  --shop-rule: var(--shop-accent);
+  --shop-kicker-fill: var(--shop-card);
+  --shop-kicker-ink: var(--shop-accent);
+  --shop-title-font: var(--font-display);
+  --shop-blurb-font: var(--font-body);
+  --shop-kicker-font: var(--font-mono);
+}
+
+/* The university's own shop, in the university's own colours and a collegiate face. */
+.vu-shop[data-shop='vu_campus_store'] {
+  --shop-field: #efe6d3;
+  --shop-decor: #e2d2b4;
+  --shop-accent: #9b2e52;
+  --shop-accent-ink: #fff4ea;
+  --shop-accent-shadow: #6d1f3a;
+  --shop-ink: #43303a;
+  --shop-muted: #7d6a72;
+  --shop-card: #fffbf2;
+  --shop-card-shadow: #9b2e52;
+  --shop-quiet: #f2ead9;
+  --shop-quiet-lift: #e8dcc6;
+  --shop-mast: #7c2340;
+  --shop-mast-ink: #fdf3e3;
+  --shop-mast-muted: #f0d9cd;
+  --shop-rule: #a85570;
+  --shop-kicker-fill: #d8a83c;
+  --shop-kicker-ink: #4a1526;
+  --shop-title-font: 'Graduate', serif;
+  --shop-title-tracking: 0.04em;
+  --shop-blurb-font: 'Libre Baskerville', serif;
+  --shop-kicker-font: 'Alfa Slab One', serif;
+}
+
+/* A delivery firm: signage condensed, and the warm amber of a crate on a doorstep. */
+.vu-shop[data-shop='veridan_delivery'] {
+  --shop-field: #fdebc8;
+  --shop-decor: #f7d99a;
+  --shop-accent: #b07c22;
+  --shop-accent-ink: #fffaf0;
+  --shop-accent-shadow: #7a5417;
+  --shop-ink: #4d3a17;
+  --shop-muted: #8a7345;
+  --shop-card: #fffbf2;
+  --shop-card-shadow: #7a5417;
+  --shop-quiet: #f6ecd8;
+  --shop-quiet-lift: #eddfc2;
+  --shop-rule: #cbb489;
+  --shop-kicker-ink: #3a2c11;
+  --shop-title-font: 'Bebas Neue', sans-serif;
+  --shop-title-tracking: 0.06em;
+  --shop-blurb-font: 'Archivo', sans-serif;
+  --shop-kicker-font: 'Roboto Mono', monospace;
+}
+
+/* girltime's own blush field, and a face with the sticker energy it asks for. */
+.vu-shop[data-shop='girltime'] {
+  --shop-field: #f9e0ec;
+  --shop-decor: #f6cfe0;
+  --shop-accent: #d76a93;
+  --shop-accent-ink: #fff2f6;
+  --shop-accent-shadow: #9b2e52;
+  --shop-ink: #99365c;
+  --shop-muted: #b13e6d;
+  --shop-card: #fffbf2;
+  --shop-card-shadow: #9b2e52;
+  --shop-quiet: #f7e6ee;
+  --shop-quiet-lift: #f1d7e3;
+  --shop-kicker-fill: #fff2f6;
+  --shop-kicker-ink: #b13e6d;
+  --shop-title-font: 'Pacifico', cursive;
+  --shop-blurb-font: 'Quicksand', sans-serif;
+  --shop-kicker-font: 'Baloo 2', cursive;
+}
+
+/* luxurynow's opposite temperament: **the night shadow law inside one pane** — dark cards
+   lifted by pale gold, where every other shelf lifts cream off a colour. */
+.vu-shop[data-shop='luxurynow'] {
+  --shop-field: #2b2027;
+  --shop-decor: #352831;
+  --shop-accent: #d9c49a;
+  --shop-accent-ink: #2b2027;
+  --shop-accent-shadow: #a8916a;
+  --shop-ink: #f2e6d5;
+  --shop-muted: #a89489;
+  --shop-card: #352831;
+  --shop-card-shadow: #d9c49a;
+  --shop-quiet: #453541;
+  --shop-quiet-lift: #54414f;
+  /* The one shelf whose muted tone is stepped up for its masthead: the standfirst is set in a
+     400-weight geometric, which the shipped `--shop-muted` does not carry at this size. */
+  --shop-mast-muted: #bcaa9d;
+  --shop-rule: #7b6558;
+  --shop-kicker-ink: #d9c49a;
+  --shop-title-font: 'Cormorant Garamond', serif;
+  --shop-title-tracking: 0.14em;
+  --shop-blurb-font: 'Jost', sans-serif;
+  --shop-kicker-font: 'Italiana', serif;
+}
+
+/* Merch, loud, in one heavy poster face. */
+.vu-shop[data-shop='merchmogul'] {
+  --shop-field: #e6e0f7;
+  --shop-decor: #d3c8f0;
+  --shop-accent: #5b3fa6;
+  --shop-accent-ink: #f6f2ff;
+  --shop-accent-shadow: #3d2a75;
+  --shop-ink: #33255e;
+  --shop-muted: #6a5f8c;
+  --shop-card: #fffbf5;
+  --shop-card-shadow: #3d2a75;
+  --shop-quiet: #f2ecfb;
+  --shop-quiet-lift: #e6dcf6;
+  --shop-mast: #5b3fa6;
+  --shop-mast-ink: #f6f2ff;
+  --shop-mast-muted: #cbbdf5;
+  --shop-kicker-fill: #fffbf5;
+  --shop-kicker-ink: #33255e;
+  --shop-title-font: 'Bungee', sans-serif;
+  --shop-title-tracking: 0.02em;
+  --shop-blurb-font: 'Chivo', sans-serif;
+  --shop-kicker-font: 'Anton', sans-serif;
+}
+
+/* ---- VU Campus Store: a crest bar with a pennant hung off it --------------- */
+
+/* The university's bar *is* the top of the page, so it is a band and the open tab goes wine with
+   it. Name and blurb read across it in one line, divided by a rule. */
+.vu-shop[data-shop='vu_campus_store'] .vu-shop-head {
+  grid-template-areas: 'name blurb';
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 34px;
+  min-height: 132px;
+  margin: -44px -60px 0;
+  padding: 30px 340px 30px 60px;
+  background: var(--shop-mast);
+}
+
+.vu-shop[data-shop='vu_campus_store'] .vu-shop-name {
+  font-size: 52px;
+}
+
+.vu-shop[data-shop='vu_campus_store'] .vu-shop-blurb {
+  max-width: 430px;
+  padding-left: 34px;
+  border-left: 3px solid var(--shop-rule);
+  font: 400 15.5px/1.55 var(--shop-blurb-font);
+}
+
+/* The pennant, hung off the bar's foot onto the field below it. The deep bottom padding is what
+   the swallowtail eats, so the words sit clear of the notch. */
+.vu-shop[data-shop='vu_campus_store'] .vu-shop-kicker {
+  position: absolute;
+  bottom: -34px;
+  left: 60px;
+  padding: 11px 24px 22px;
+  background: var(--shop-kicker-fill);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* The university's letters, filled in the shelf's own decor tone through `LettersMark`'s filter
+   and breathing on the pane's one clock. A bitmap this size is re-rasterized every frame unless
+   it is promoted, which reads as a crawl rather than a breath. */
+.vu-shop-letters {
+  position: absolute;
+  bottom: -280px;
+  left: -150px;
+  width: 62%;
+  height: auto;
+  filter: url('#vu-shop-letters');
+  rotate: -8deg;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.vu-shop-letters-ink {
+  flood-color: var(--shop-decor);
+}
+
+/* ---- Veridan Delivery: a waybill pasted on the crate ----------------------- */
+
+/* A label is an object stuck onto the field rather than the field's own top, so this one is a
+   plate — the only masthead carrying a paper layer, and the reason the tape behind it shows
+   around its edges. The width cap is how it clears the balance: it simply ends first. */
+.vu-shop[data-shop='veridan_delivery'] .vu-shop-head {
+  --paper-face: var(--shop-card);
+  --paper-shadow: var(--shop-card-shadow);
+  --paper-offset: 8px 7px;
+  --paper-tilt: -0.8deg;
+  grid-template-areas: 'name code' 'blurb code';
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 34px;
+  width: min(780px, 100% - 340px);
+  padding: 22px 30px 20px;
+  border-radius: 22px;
+}
+
+.vu-shop[data-shop='veridan_delivery'] .vu-shop-name {
+  align-self: end;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--shop-rule);
+  color: var(--shop-ink);
+  font-size: 46px;
+}
+
+.vu-shop[data-shop='veridan_delivery'] .vu-shop-blurb {
+  align-self: start;
+  max-width: 440px;
+  color: var(--shop-muted);
+  font: 500 15px/1.45 var(--shop-blurb-font);
+}
+
+/* The bars are the device and the words are its caption — a code read off a parcel, not a label
+   stuck on the shop. */
+.vu-shop[data-shop='veridan_delivery'] .vu-shop-kicker {
+  grid-area: code;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.vu-shop[data-shop='veridan_delivery'] .vu-shop-kicker::before {
+  content: '';
+  width: 190px;
+  height: 48px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--shop-ink) 0 3px,
+    transparent 3px 6px,
+    var(--shop-ink) 6px 8px,
+    transparent 8px 13px
+  );
+}
+
+/* Two runs of packing tape across the crate, bleeding off opposite corners. */
+.vu-shop-tape {
+  position: absolute;
+  width: 140%;
+  height: 250px;
+  background: repeating-linear-gradient(90deg, var(--shop-decor) 0 46px, transparent 46px 58px);
+  rotate: -14deg;
+  pointer-events: none;
+}
+
+.vu-shop-tape--a {
+  top: -70px;
+  right: -20%;
+}
+
+.vu-shop-tape--b {
+  bottom: -90px;
+  left: -20%;
+}
+
+/* ---- GirlTime: a sticker sheet, and the shop speaks first ------------------ */
+
+/* No band and no plate: the field's dots *are* the decoration and a plate would cover them. The
+   boast comes first and the name signs under it, which is the order a sticker is read in. The
+   blurb sits beside the name rather than under it, so the head loses a row; the charms scattered
+   over it (`ShopModal.tsx`) take no cell of their own, which is why the head is `relative`. */
+.vu-shop[data-shop='girltime'] .vu-shop-head {
+  grid-template-areas: 'kicker kicker' 'name blurb';
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 10px 26px;
+  position: relative;
+  padding-right: 340px;
+}
+
+.vu-shop[data-shop='girltime'] .vu-shop-name {
+  font-size: 60px;
+}
+
+.vu-shop[data-shop='girltime'] .vu-shop-blurb {
+  max-width: 460px;
+  font: 600 17px/1.5 var(--shop-blurb-font);
+}
+
+/* **The one masthead in the app that leans**, and it takes the shallow lean a sticker does.
+   Its tail is two triangles, the fill one riding higher so a rim of the border shows around it. */
+.vu-shop[data-shop='girltime'] .vu-shop-kicker {
+  position: relative;
+  margin-bottom: 10px;
+  padding: 10px 22px;
+  border: 3px solid var(--shop-accent);
+  border-radius: 999px;
+  background: var(--shop-kicker-fill);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  rotate: -3deg;
+}
+
+.vu-shop[data-shop='girltime'] .vu-shop-kicker::before,
+.vu-shop[data-shop='girltime'] .vu-shop-kicker::after {
+  content: '';
+  position: absolute;
+  left: 34px;
+  clip-path: polygon(100% 0, 0 100%, 100% 100%);
+}
+
+.vu-shop[data-shop='girltime'] .vu-shop-kicker::before {
+  bottom: -19px;
+  width: 26px;
+  height: 20px;
+  background: var(--shop-accent);
+}
+
+.vu-shop[data-shop='girltime'] .vu-shop-kicker::after {
+  bottom: -12px;
+  width: 20px;
+  height: 15px;
+  background: var(--shop-kicker-fill);
+}
+
+/* The dot field: static, unlike every other piece of decoration in the app. The two bubbles over
+   it carry the shelf's breath instead. */
+.vu-shop-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--shop-decor) 13px, transparent 14px);
+  background-size: 92px 92px;
+  pointer-events: none;
+}
+
+.vu-shop-bubble {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--shop-decor);
+  pointer-events: none;
+}
+
+.vu-shop-bubble--a {
+  top: -150px;
+  right: -120px;
+  width: 420px;
+  height: 420px;
+}
+
+.vu-shop-bubble--b {
+  bottom: -140px;
+  left: -90px;
+  width: 300px;
+  height: 300px;
+}
+
+/* Decoration on the sticker sheet: each charm a glyph at its own lean, placed off the head's
+   own top-left corner. */
+.vu-shop[data-shop='girltime'] .vu-shop-charm {
+  position: absolute;
+  left: var(--cx);
+  top: var(--cy);
+  font-size: var(--cs);
+  line-height: 1;
+  rotate: var(--cl);
+  pointer-events: none;
+}
+
+/* ---- LUXURYNOW: an engraved dateline over an editorial masthead ------------ */
+
+/* Rules and nothing else: no band, no plate, no fill. The column is centred inside the width the
+   balance leaves rather than inside the pane. */
+.vu-shop[data-shop='luxurynow'] .vu-shop-head {
+  grid-template-areas: 'kicker' 'name' 'blurb' 'rule';
+  justify-items: center;
+  gap: 18px;
+  width: calc(100% - 340px);
+  padding: 14px 0 4px;
+  text-align: center;
+}
+
+.vu-shop[data-shop='luxurynow'] .vu-shop-name {
+  font-size: 72px;
+}
+
+.vu-shop[data-shop='luxurynow'] .vu-shop-blurb {
+  max-width: 520px;
+  font: 400 15.5px/1.7 var(--shop-blurb-font);
+  letter-spacing: 0.04em;
+}
+
+/* The dateline: the words with a rule running out to each end of the column. */
+.vu-shop[data-shop='luxurynow'] .vu-shop-kicker {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  font-size: 15px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+
+.vu-shop[data-shop='luxurynow'] .vu-shop-kicker::before,
+.vu-shop[data-shop='luxurynow'] .vu-shop-kicker::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--shop-rule);
+}
+
+/* The rule that closes the masthead, and **this shelf's whole idle**: the one shop with nothing
+   behind its goods fades this instead (`shopRule`, an opacity, so it runs under reduced motion). */
+.vu-shop-underline {
+  grid-area: rule;
+  width: 100%;
+  height: 2px;
+  background: var(--shop-rule);
+}
+
+/* ---- MerchMogul: a drop marquee with the stub torn off --------------------- */
+
+/* A band again, and the layout is the campus bar's opposite: a stack, with the small line above
+   the name instead of a column beside it. */
+.vu-shop[data-shop='merchmogul'] .vu-shop-head {
+  grid-template-areas: 'blurb stub' 'name stub';
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 34px;
+  min-height: 168px;
+  margin: -44px -60px 0;
+  padding: 26px 340px 26px 60px;
+  background: var(--shop-mast);
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-name {
+  align-self: start;
+  font-size: 62px;
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-blurb {
+  align-self: end;
+  max-width: 520px;
+  font: 600 14px/1.4 var(--shop-blurb-font);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The stub: a notch bitten out of each end, drawn in the band's own colour, which is what makes
+   it read as torn from the marquee rather than laid on it. It grows past the marquee's own case,
+   leaning the shallow clockwise lean a torn ticket takes off a printed sheet. */
+.vu-shop[data-shop='merchmogul'] .vu-shop-kicker {
+  grid-area: stub;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 32px;
+  border-radius: 8px;
+  background: var(--shop-kicker-fill);
+  font-size: 19px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  rotate: 2deg;
+  transform-origin: center;
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-kicker::before,
+.vu-shop[data-shop='merchmogul'] .vu-shop-kicker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--shop-mast);
+  translate: 0 -50%;
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-kicker::before {
+  left: -11px;
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-kicker::after {
+  right: -11px;
+}
+
+/* The perforation, between the two words rather than through them: the first half carries it on
+   its own right edge, and the gap either side is what makes it read as a tear line. */
+.vu-shop[data-shop='merchmogul'] .vu-shop-stub-a {
+  padding-right: 26px;
+  background: repeating-linear-gradient(var(--shop-mast) 0 6px, transparent 6px 12px) right 0 / 3px
+    100% no-repeat;
+}
+
+.vu-shop[data-shop='merchmogul'] .vu-shop-stub-b {
+  padding-left: 26px;
+}
+
+/* A poster's rays off one corner and a ring off the other. The rays are a conic gradient with a
+   hard edge every six degrees, so the shape is promoted for the letters' reason. */
+.vu-shop-rays {
+  position: absolute;
+  bottom: -900px;
+  left: -560px;
+  width: 1500px;
+  height: 1500px;
+  border-radius: 999px;
+  background: conic-gradient(var(--shop-decor) 0 6deg, transparent 6deg 12deg);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.vu-shop-ring {
+  position: absolute;
+  top: -220px;
+  right: -180px;
+  width: 560px;
+  height: 560px;
+  border: 44px solid var(--shop-decor);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* ---- the narrow band ------------------------------------------------------ */
+
+/* At 4:3 the shelf narrows but the balance keeps its size, anchored to the stage's right edge, so
+   the masthead gives with smaller type rather than a new layout. */
+@container (max-width: 1240px) {
+  .vu-shop[data-shop='vu_campus_store'] .vu-shop-head {
+    min-height: 112px;
+    padding-block: 22px;
+  }
+
+  .vu-shop[data-shop='vu_campus_store'] .vu-shop-name {
+    font-size: 38px;
+  }
+
+  .vu-shop[data-shop='vu_campus_store'] .vu-shop-blurb {
+    max-width: 280px;
+    padding-left: 24px;
+    font-size: 13.5px;
+  }
+
+  .vu-shop[data-shop='vu_campus_store'] .vu-shop-kicker {
+    padding: 9px 18px 20px;
+    font-size: 13px;
+  }
+
+  .vu-shop[data-shop='veridan_delivery'] .vu-shop-name {
+    font-size: 36px;
+  }
+
+  .vu-shop[data-shop='veridan_delivery'] .vu-shop-blurb {
+    max-width: 330px;
+    font-size: 13.5px;
+  }
+
+  .vu-shop[data-shop='veridan_delivery'] .vu-shop-kicker {
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .vu-shop[data-shop='veridan_delivery'] .vu-shop-kicker::before {
+    width: 150px;
+    height: 34px;
+  }
+
+  .vu-shop[data-shop='girltime'] .vu-shop-name {
+    font-size: 44px;
+  }
+
+  .vu-shop[data-shop='girltime'] .vu-shop-blurb {
+    max-width: 320px;
+    font-size: 15px;
+  }
+
+  .vu-shop[data-shop='girltime'] .vu-shop-kicker {
+    font-size: 13px;
+  }
+
+  .vu-shop[data-shop='luxurynow'] .vu-shop-name {
+    font-size: 52px;
+    letter-spacing: 0.1em;
+  }
+
+  .vu-shop[data-shop='luxurynow'] .vu-shop-blurb {
+    max-width: 400px;
+    font-size: 14px;
+  }
+
+  .vu-shop[data-shop='luxurynow'] .vu-shop-kicker {
+    gap: 16px;
+    font-size: 13px;
+    letter-spacing: 0.26em;
+  }
+
+  .vu-shop[data-shop='merchmogul'] .vu-shop-head {
+    min-height: 140px;
+  }
+
+  .vu-shop[data-shop='merchmogul'] .vu-shop-name {
+    font-size: 46px;
+  }
+
+  .vu-shop[data-shop='merchmogul'] .vu-shop-blurb {
+    max-width: 330px;
+    font-size: 12.5px;
+    letter-spacing: 0.1em;
+  }
+
+  .vu-shop[data-shop='merchmogul'] .vu-shop-kicker {
+    padding: 10px 26px;
+    font-size: 15px;
+  }
+}

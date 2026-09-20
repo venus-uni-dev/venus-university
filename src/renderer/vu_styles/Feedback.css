@@ -1,0 +1,14 @@
+/* The Feedback modal: the Main Menu's Feedback chip and the Game menu's Report a bug both
+   open it. Prose and one address on a line of its own, then a foot whose primary hands the
+   player a copy of the app log. Imported from the view module, never from index.css.
+
+   The panel, the text and the foot are base.css's `.vu-note`; the veil, the tab, the link and
+   the buttons are base.css's too. */
+
+/* On its own line and hugging its own words, so the address reads as the thing to copy.
+   `anywhere` because it is one unbroken run the panel's width cannot be trusted to hold. */
+.vu-feedback-address {
+  align-self: flex-start;
+  font: 700 17px/1.4 var(--font-body);
+  overflow-wrap: anywhere;
+}

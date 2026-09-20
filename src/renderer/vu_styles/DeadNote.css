@@ -1,0 +1,45 @@
+/* The label a hover raises over a control: a quiet mono pill hung over it or under it, and the
+   wrapper that hears the pointer for it. */
+
+/* Layout-transparent — a block that neither grows nor shrinks — so it can go around any
+   control without moving the row that control stands in. */
+.vu-deadnote {
+  position: relative;
+  flex: none;
+}
+
+/* It takes no pointer, so the hover it answers to cannot end under it. Outlined, so it reads on
+   a surface it is raised over as well as over a picture, and forward of a positioned scroller a
+   control may sit over. */
+.vu-deadnote-pill {
+  position: absolute;
+  z-index: 1;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 12px;
+  padding: 8px 16px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* `translate` rather than `transform`: motion writes `transform` for the rise, and the
+   independent property composes underneath it. */
+.vu-deadnote-pill--center {
+  left: 50%;
+  translate: -50%;
+}
+
+/* Under the control rather than over it, where the corner above is a panel's tab. */
+.vu-deadnote-pill--below {
+  top: 100%;
+  bottom: auto;
+  margin-top: 12px;
+  margin-bottom: 0;
+}

@@ -1,0 +1,126 @@
+/* The three stats as one shape, and the badge beside each point. The component's own file
+   rather than a screen's, `Dialogue.css`'s argument: the landing and the self-improvement screen
+   draw the same object, and each says only where it sits. Layout only — every clock is
+   `views/motion.ts`'s. */
+
+/* The box the chart and its badges are placed inside; a caller gives it its size and its seat. */
+.vu-radar {
+  position: relative;
+}
+
+/* The chart itself, centred across the box. The `viewBox` is centred on the triangle's own
+   centroid, which is what lets the plot grow out of the middle it is measured from. */
+.vu-radar-chart {
+  position: absolute;
+  left: 50%;
+  top: 92px;
+  width: 250px;
+  height: 250px;
+  translate: -50% 0;
+  overflow: visible;
+}
+
+.vu-radar-grid {
+  fill: none;
+  stroke: var(--vu-border);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+/* The reading. It is drawn and never transformed — the vertices themselves are what the arrival
+   animates (`components/StatRadar.tsx`). */
+.vu-radar-plot {
+  fill: color-mix(in srgb, var(--vu-accent) 28%, transparent);
+  stroke: var(--vu-accent);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+/* One stat's **seat** beside its own point of the triangle, and the pill that sits in it. They are
+   two elements because two things animate here and both of them are a `scale`: the seat carries
+   the arrival — and, where the stat crossed a tier, the swell it keeps — while the pill inside
+   beats (`views/motion.ts`). Each seat leans a little, the sticker's shallow lean rather than the
+   paper tilt it is not wearing. */
+.vu-radar-seat {
+  position: absolute;
+}
+
+/* **Quiet — no paper layer**: they sit on a surface, and three sheets of paper on one sheet is a
+   pile. */
+.vu-radar-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px 9px 14px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+}
+
+.vu-radar-badge svg {
+  display: block;
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+
+/* Brain above the apex, and the other two beside the feet of the flat edge. */
+.vu-radar-seat--brain {
+  left: 50%;
+  top: 30px;
+  translate: -50% 0;
+  rotate: -2deg;
+}
+
+/* Far enough in to clear a round cap the box may have under this corner: on the landing the
+   panel's left edge curves away here, and a badge set against the flat right edge's inset would
+   have hung over the arc. */
+.vu-radar-seat--heart {
+  left: 30px;
+  bottom: 22px;
+  rotate: -3deg;
+}
+
+.vu-radar-seat--body {
+  right: 14px;
+  bottom: 22px;
+  rotate: 2.5deg;
+}
+
+/* **The tier and the stat are what the badge is for; the points are the small print.** The mock
+   drew the figure loudest of the three, which is exactly backwards — a tier is the language the
+   game speaks and the number is only where inside it he stands. The identity hue lives on
+   the icon and the stat word and nowhere else. */
+.vu-radar-badge-word {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.vu-radar-stat {
+  color: var(--stat);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.vu-radar-tier {
+  color: var(--vu-text);
+  font: 700 19px/1 var(--font-body);
+}
+
+.vu-radar-points {
+  align-self: center;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+}
+
+/* The two readings a badge carries where its stat just crossed a tier: stacked in **one grid
+   cell**, so the cell is as wide and as tall as the wider of them and the swap moves nothing on
+   the pill. Both are left-aligned, which is where a single reading sits. */
+.vu-radar-swap {
+  display: grid;
+  justify-items: start;
+}
+
+.vu-radar-swap > * {
+  grid-area: 1 / 1;
+}

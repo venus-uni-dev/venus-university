@@ -1,0 +1,69 @@
+/* The New Game picker: the cast the player may still add to the roster, drawn as the
+   roster's own tiles at picker size. No mock — derived from B4, which is the screen this
+   modal fills a slot on, so what he clicks in here looks like what lands out there.
+   Imported from the view module, never from index.css.
+
+   The veil, the card, the archway, the buttons and the foot are base.css's. */
+
+/* The basis is `auto` and it does not grow: this panel is only ever the size of its own
+   grid — nothing here is held at a height while something is read (Load Game's is), so the
+   free space that would collect under the foot never exists.
+
+   The floor is for the one moment the body is empty, the local folder read that draws
+   nothing: this modal tweens no size, so the panel cannot collapse onto an empty body
+   and spring back open a frame later — it has to be honest at once. The floor counts the
+   margin below, since the box it clamps is the scroller's own.
+
+   A grid that scrolls clips in both axes, so it pays for everything living outside a tile's
+   box: the paper shadow and `cardLift`'s 4%. The negative margin hands every one of those
+   back, so the first column still lines up with the tab above it and the fade at this
+   wrapper's foot lands on the scroller's own edge. */
+.vu-pick-scroll {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  min-height: 250px;
+  margin: -14px -14px -4px;
+}
+
+/* `hidden auto`, never `overflow-y` alone: that leaves `overflow-x` *using* `auto` while
+   still computing `visible`, and a card swelling past this padding box for a frame would
+   grow a horizontal bar — an accent thumb the width of the body. */
+.vu-pick-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 14px 14px 34px;
+  overflow: hidden auto;
+}
+
+/* Five across rather than the roster's six: the panel is narrower than the stage, and a
+   card the player is choosing from may as well be the larger of the two. */
+.vu-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The roster's own crop at picker size, so the pick and the slot it lands in are the same
+   picture. */
+.vu-pick-arch {
+  --card-zoom: 1.95;
+  height: 190px;
+}
+
+/* Already on the roster: still listed, because a cast that shrinks as it is picked from
+   would move every card under the cursor — and dead, because she cannot be added twice.
+   Quiet, like every card that is not the player's to act on: the arch keeps no paper
+   layer, so `.vu-arch:not(.vu-paper)` paints its own recessed face. */
+.vu-pick-card--taken .vu-card-sprite {
+  opacity: 0.45;
+}
+
+.vu-pick-card--taken .vu-card-name,
+.vu-pick-card--taken .vu-card-surname {
+  color: var(--vu-text-muted);
+}

@@ -1,0 +1,74 @@
+/* Everything the reader is carrying: the panel behind "My stuff", and the same panel in
+   gift mode, which is what the scene's Gift button opens. **It is a file of its own and not the
+   shop's**, because a modal belongs to the screen that opens it only when nothing else does —
+   this one has two openers, so it is a slice of its own.
+
+   The panel is the app's own surface throughout: a merchant dresses its shelf, and what the
+   reader owns is his rather than any shop's, so no `--shop-*` key is named anywhere in here. */
+.vu-inv {
+  --paper-tilt: -0.8deg;
+  --paper-offset: 12px 11px;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  /* The cap gives back the 40px the title tab hangs above the panel plus the lean that lifts
+     its far corner, and the paper layer below — a panel filling the veil has its tab clipped. */
+  width: min(1240px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 44px 46px 28px 90px;
+  border-radius: 110px 0 0 110px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* What he is carrying, as a count rather than a sentence — a reading of the panel. */
+.vu-inv-count {
+  flex: none;
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.18em;
+}
+
+/* Two columns of the same card the shelf draws, so an item is the same object in both places.
+   `hidden auto`, never `overflow-y` alone: that leaves the horizontal axis *using* `auto` while
+   computing `visible`, and a button swelling past the padding box for a frame grows a bar the
+   width of the panel. The basis is `auto` and it grows nothing — nothing holds this box at a
+   height, so the list asks for the whole of itself and gives it back at the panel's own cap. */
+.vu-inv-grid {
+  display: grid;
+  flex: 0 1 auto;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  align-content: start;
+  /* **`max-content` and not the `auto` a row would take by default.** A card is a grid inside a
+     grid, and Chromium measures an `auto` row's contribution from such an item at its pocket
+     column alone — 200px cards with 260px of copy hanging out of the bottom of every one of
+     them. Named outright, the row is the tallest card in it and the rest stretch level. */
+  grid-auto-rows: max-content;
+  gap: 26px;
+  /* Every pixel a card wears outside its own box — its paper shadow, its lean, and the swell
+     of the button on it — reserved by hand and given back, so the first column still starts
+     where the panel's padding puts it. A transform is not layout. */
+  margin: -12px -22px -22px;
+  padding: 12px 22px 22px;
+  overflow: hidden auto;
+}
+
+/* **A card needs a ground that is not the panel.** On a shelf the card is cream on the
+   merchant's field and reads for free; here the panel is the app's own surface and so is the
+   card's own fallback, which drew each one as nothing but its shadow. A step down is what a
+   list inside a panel sits on everywhere else in the app (`.vu-row`), and the card keeps its
+   paper layer: it is a card the reader can act on, not a row. */
+.vu-inv .vu-item {
+  --paper-face: var(--vu-recessed);
+}
+
+/* Nothing to carry, in the app's one voice for it. */
+.vu-inv-empty {
+  flex: none;
+  margin: 0;
+  padding: 30px 0 18px;
+  color: var(--vu-text-muted);
+  font: italic 500 18px var(--font-body);
+}

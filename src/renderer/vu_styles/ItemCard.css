@@ -1,0 +1,122 @@
+/* One thing a shop sells, or one thing the reader is carrying. Imported from the component,
+   never from index.css. A half-pill flat right, its round end left empty as the pocket the item
+   sits in; every merchant colour is read through a role fallback, so the identical card stands
+   on a themed pane or inside a panel that declares none of them. */
+/* As tall as what is written on it, with a `min-height` floor rather than a fixed height, so a
+   short card still reads as a card. `999px` on the left corners is a true half-pill at any
+   height: overlapping radii scale to fit the box, whatever it turns out to be. */
+.vu-item {
+  --item-pocket: 140px;
+  --paper-face: var(--shop-card, var(--vu-surface));
+  --paper-shadow: var(--shop-card-shadow, var(--vu-shadow));
+  display: grid;
+  grid-template-columns: var(--item-pocket) minmax(0, 1fr);
+  min-height: 200px;
+  padding: 22px 28px 20px 0;
+  border-radius: 999px 0 0 999px;
+}
+
+/* The mark in the round end. It answers no pointer and says nothing a reader needs — the
+   name beside it is the item — so it is `aria-hidden` in the JSX and centred here. */
+.vu-item-pocket {
+  display: grid;
+  place-items: center;
+  font-size: 62px;
+  line-height: 1;
+}
+
+.vu-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vu-item-name {
+  color: var(--shop-ink, var(--vu-text));
+  font: 700 21px var(--font-body);
+}
+
+/* The shop's own copy, and the whole of what the card sells (never the categories). **It
+   is not clamped**: what a merchant says about a thing is what the card is for, and the card is
+   as tall as the sentence rather than the sentence as short as the card. */
+.vu-item-desc {
+  flex: none;
+  margin: 0;
+  color: var(--shop-muted, var(--vu-text-muted));
+  font: 500 14.5px/1.5 var(--font-body);
+}
+
+/* The foot's two faces share one grid cell, so the card is the same height whichever is showing.
+   `min-height` states its own height, since `mode="wait"` leaves the cell briefly empty and an
+   empty foot would collapse the row. */
+.vu-item-foot {
+  display: grid;
+  flex: none;
+  align-items: end;
+  min-height: 42px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.vu-item-answers {
+  display: flex;
+  grid-area: 1 / 1;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The figure, in the merchant's own accent — **and it keeps that accent when it flips
+   negative**. A shop does not print its own prices in the app's danger red; the minus is what
+   says which way the money is going, and the red belongs to the balance outside the pane,
+   which is the app's own reading rather than the merchant's. */
+.vu-item-price {
+  flex: none;
+  color: var(--shop-accent, var(--vu-accent));
+  font: 700 22px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The question itself, between the debit and the two answers to it. */
+.vu-item-ask {
+  margin-left: auto;
+  color: var(--shop-ink, var(--vu-text));
+  font: 800 16px var(--font-body);
+}
+
+/* The one answer a card offers at rest, at card size, wearing the merchant's fill. Its shadow is
+   the accent's own darker tone, never the card's, since some shops lift cards with that colour. */
+.vu-item-btn {
+  --paper-offset: 6px 5px;
+  --paper-face: var(--shop-accent, var(--vu-accent));
+  --paper-shadow: var(--shop-accent-shadow, var(--vu-accent-shadow));
+  margin-left: auto;
+  padding: 10px 24px 10px 18px;
+  color: var(--shop-accent-ink, var(--vu-accent-ink));
+  font: 800 16px var(--font-body);
+}
+
+/* `Yes` follows the offer it is confirming, and gives up the auto margin: the row it sits in
+   is already pushed right by the question above it. */
+.vu-item-yes {
+  margin-left: 0;
+}
+
+/* And `No`, which is the app's quiet fill said in the merchant's own tone: no paper layer at
+   all, because the shadow is what marks weight and the answer beside it is the one with any.
+   It is what every Cancel in the app already is — what the pane supplies is the step off
+   the card, darker on a light shelf and lighter on a dark one, since a role may not appear
+   inside a merchant's pane (`shopQuietLift`). */
+.vu-item-no {
+  padding: 10px 20px 10px 16px;
+  background: var(--shop-quiet, var(--vu-recessed));
+  color: var(--shop-ink, var(--vu-text-body));
+  font: 800 16px var(--font-body);
+}
+
+/* What the reader is carrying, in the price's seat: a count is a reading and not an answer. */
+.vu-item-count {
+  flex: none;
+  color: var(--shop-muted, var(--vu-text-muted));
+  font: 700 18px var(--font-mono);
+}

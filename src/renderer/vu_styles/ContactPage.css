@@ -1,0 +1,495 @@
+/* A contact's page: the character is the screen, so it takes `base.css`'s bare veil and the
+   archway she stands in bleeds off two edges. Everything is anchored in shares of the stage or
+   in fixed px past its edges, never in `vw`/`vh`. */
+
+.vu-contact {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+.vu-contact-gone {
+  margin: 0;
+  padding: 80px;
+  color: var(--vu-text-muted);
+  font: italic 500 18px var(--font-body);
+}
+
+/* Top left, over everything: the way back to the list she was opened from. */
+.vu-contact-back {
+  position: absolute;
+  top: 44px;
+  left: 44px;
+  z-index: 3;
+}
+
+/* ---- her half ------------------------------------------------------------- */
+
+/* One box for the two archways, her sprite and the band, so the four arrive as one movement and
+   the wrapper's slide composes with the back arch's own breath. It answers no pointer: the
+   switcher below is a sibling, so that its chips can. */
+.vu-contact-her {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 46%;
+  pointer-events: none;
+}
+
+/* An archway is a person, and this is the same shape the app's corner decoration wears at
+   the size where it *is* the subject. Both bleed past two edges of the stage; their widths are a
+   share of it, so she keeps her proportions when the stage narrows to 1440. */
+.vu-contact-arch {
+  position: absolute;
+  border-radius: 999px 999px 0 0;
+}
+
+.vu-contact-arch--back {
+  top: -120px;
+  left: 5%;
+  width: 92%;
+  height: 1500px;
+  background: var(--vu-accent);
+  rotate: -9deg;
+  transform-origin: bottom center;
+}
+
+.vu-contact-arch--front {
+  top: -60px;
+  left: -3%;
+  width: 84%;
+  height: 1440px;
+  background: var(--vu-highlight);
+  rotate: -4deg;
+}
+
+/* Featured, so she takes the hard offset copy the paper layer allows a sprite — the
+   paper law as a filter.
+
+   **Sized across rather than down**, which is the one thing on this screen that had to be: the
+   stage is 1080 tall in every band and 1440–1920 wide, so a height in pixels would keep her the
+   same size while the room beside her shrank by a quarter. A share of the box narrows her with
+   the stage, and the band below closes whatever crop that leaves. */
+.vu-contact-sprite {
+  position: absolute;
+  top: -40px;
+  left: -28%;
+  width: 140%;
+  height: auto;
+  filter: drop-shadow(20px 16px 0 var(--vu-panel-shadow));
+}
+
+/* The diagonal that closes her leg crop, fills the corner and seats the switcher — one shape
+   doing three jobs (D4). A full pill rather than a bar: nothing in this design has a straight
+   end. It stops short of the cards, which are painted under it and would otherwise be crossed. */
+.vu-contact-band {
+  position: absolute;
+  bottom: -140px;
+  left: -18%;
+  width: 108%;
+  height: 300px;
+  border-radius: 999px;
+  background: var(--vu-accent);
+  rotate: 4deg;
+}
+
+/* The wardrobes she has been seen in, over the band and answering the pointer where the band
+   itself does not. Anchored to the stage's own corner rather than to the band, whose geometry is
+   a rotation and would have to be undone to place anything on it. */
+.vu-contact-switch {
+  position: absolute;
+  bottom: 46px;
+  left: 62px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 34%;
+}
+
+.vu-contact-outfit {
+  padding: 12px 26px;
+  border: 2.5px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vu-accent-ink) 22%, transparent);
+  color: var(--vu-accent-ink);
+  font: 700 14px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* The one in force. A fill that is a *state*, so its hover is a scale and never a tint. */
+.vu-contact-outfit--on {
+  background: var(--vu-accent-ink);
+  color: var(--vu-accent);
+}
+
+/* A wardrobe no scene has put her in yet. **Undiscovered is drawn rather than hidden** (D4):
+   the slot says what is missing, and it is not a control — there is nothing behind it to press. */
+.vu-contact-outfit--locked {
+  border-color: color-mix(in srgb, var(--vu-accent-ink) 55%, transparent);
+  border-style: dashed;
+  background: none;
+}
+
+/* ---- the reading beside her ----------------------------------------------- */
+
+/* The reading begins where she ends, which is a *share* of the stage because she is: the whole
+   left half is sized in percentages, so the two move together between 1440 and 1920 and neither
+   band has to be tuned on its own. Only the profile card reaches back under her, below. */
+.vu-contact-side {
+  position: absolute;
+  inset: 46px 56px 34px 44%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vu-contact-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 26px;
+}
+
+.vu-contact-lockup {
+  flex: none;
+}
+
+.vu-contact-title .vu-title-text {
+  font-size: 86px;
+  line-height: 1;
+}
+
+.vu-contact-title::before {
+  inset: -6px -18px -4px 6px;
+  border-radius: 999px;
+}
+
+/* The surname as a letterspaced mono strip — the card caption's anatomy at page size, which is
+   what lets a name as long as "Florentine Chastain" sit in one lockup.
+
+   **`position: relative` is load-bearing**: `.vu-title` isolates, which makes it a stacking
+   context, and a stacking context paints over a *non*-positioned sibling whatever the order —
+   so the blob was drawn over these letters until they were positioned too. */
+.vu-contact-surname {
+  position: relative;
+  margin-top: 8px;
+  padding-left: 8px;
+  color: var(--vu-accent);
+  font: 700 19px var(--font-mono);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.vu-contact-facts {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 16px;
+}
+
+.vu-contact-handle {
+  color: var(--vu-accent);
+  font: 700 16px var(--font-mono);
+}
+
+.vu-contact-line {
+  color: var(--vu-text-muted);
+  font: 700 13.5px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The tag rides the top corner and does *not* lean here: a page is the record, where a row in a
+   list is a card with a label stuck on it. Two classes deep on purpose — `.vu-bb-tag` carries
+   the lean and loads after this file, so an equal-specificity override would lose. */
+.vu-contact .vu-contact-tag {
+  flex: none;
+  padding: 8px 22px;
+  font-size: 15px;
+  rotate: none;
+}
+
+/* ---- the three cards ------------------------------------------------------ */
+
+/* Profile down the left over both rows, feed and memories stacked beside it. Each scrolls on its
+   own, so twenty memories and a long feed can never push anything off the page (D4). */
+.vu-contact-cards {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1.15fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 18px;
+  min-height: 0;
+}
+
+/* Every section is a half-pill flat right, which is what a surface is, never a rounded
+   panel. Quiet: three sheets of paper stacked on a screen that
+   is already one big shape is a pile. */
+.vu-contact-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 70px 0 0 70px;
+  background: var(--vu-surface);
+  overflow: hidden;
+}
+
+/* The one that runs on behind her. Its round end is under the picture, so what the negative
+   space at a surface's left end holds here is the character herself.
+
+   **The two numbers move together and their difference is the whole point**: the card reaches
+   300px further left than the column it is laid into, and its scroller gives all 300 back plus
+   the padding every other card has — so the words begin exactly where the grid says they do,
+   in every band, and only the sheet under them travels. */
+.vu-contact-card--profile {
+  grid-row: 1 / 3;
+  margin-left: -420px;
+}
+
+.vu-contact-card--profile .vu-contact-scroll {
+  padding-left: 440px;
+}
+
+.vu-contact-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px 26px 34px 40px;
+  overflow: hidden auto;
+}
+
+.vu-contact-label {
+  margin: 0;
+  color: var(--vu-accent);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---- what a card holds ---------------------------------------------------- */
+
+.vu-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-contact-sub {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vu-contact-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vu-contact-chip {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text);
+  font: 600 14.5px var(--font-body);
+}
+
+.vu-contact-chip--deep {
+  background: var(--vu-tint);
+  color: var(--vu-text-body);
+}
+
+.vu-contact-chip--accent {
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+}
+
+.vu-contact-chip--mono {
+  font: 700 12.5px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vu-contact-text {
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 14.5px/1.55 var(--font-body);
+}
+
+.vu-contact-empty {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 14px var(--font-body);
+}
+
+/* A gap in what he knows, drawn as a gap with its own condition named. Dashed and recessed —
+   the wardrobe's `NOT GENERATED` cell one screen along, saying the same kind of thing. */
+.vu-contact-locked {
+  margin: 0;
+  padding: 11px 18px;
+  border: 2.5px dashed var(--vu-border);
+  border-radius: 18px;
+  color: var(--vu-text-muted);
+  font: 600 14px var(--font-mono);
+}
+
+.vu-contact-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Her face on a pill beside the name, and the way to that girl's own page: a quiet control,
+   so it carries no paper layer and takes the recessed fill. */
+.vu-contact-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 16px 5px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text);
+  font: 600 13.5px var(--font-body);
+}
+
+.vu-contact-face--bad {
+  background: var(--vu-danger-tint);
+  color: var(--vu-danger);
+}
+
+.vu-contact-facepic {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 28px;
+  height: 34px;
+  background: var(--vu-surface);
+}
+
+/* One timetable, her classes and her shifts together, in the bookkeeping voice: a published
+   schedule is a record. The day and the half's mark line up in their own column. */
+.vu-contact-week {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 12px 18px;
+  border-radius: 18px;
+  background: var(--vu-recessed);
+  color: var(--vu-text);
+  font: 600 13px var(--font-mono);
+}
+
+.vu-contact-when {
+  color: var(--vu-text-muted);
+}
+
+.vu-contact-week .vu-contact-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vu-contact-half-mark {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.vu-contact-withyou {
+  color: var(--vu-accent);
+}
+
+/* Her feed, condensed to the line and its own suffix: the page is about her, and the Updates
+   tab is where a post is a card with a face on it. */
+.vu-contact-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--vu-text);
+  font: 500 14px/1.5 var(--font-body);
+  list-style: none;
+}
+
+.vu-contact-feed > li {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--vu-recessed);
+}
+
+.vu-contact-feed > li:last-child {
+  border-bottom: 0;
+}
+
+/* The day she made a friend, among what she posted. **Quieter than a post**, because it
+   is the app saying something about her rather than something she said — and it carries the
+   date (`.vu-contact-when`, the week list's own) where a post carries its like, there being
+   nothing here to answer. */
+.vu-contact-made {
+  color: var(--vu-text-body);
+  font-style: italic;
+}
+
+.vu-contact-made .vu-contact-when {
+  font: 500 12px var(--font-mono);
+  font-style: normal;
+}
+
+/* The date and the count are one control: every post carries a like wherever it is drawn. */
+.vu-contact-like {
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vu-contact-like--on {
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+}
+
+/* Newest at the top, and the date is a column of its own rather than a suffix: read down, the
+   list is the order the two of them happened in, and every date starts at the same place. */
+.vu-contact-memories {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 12px 14px;
+  margin: 0;
+  padding: 0;
+  color: var(--vu-text-body);
+  font: italic 500 14px/1.5 var(--font-body);
+}
+
+.vu-contact-memories .vu-contact-when {
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The leave and the answer at the end of the row, neither wider than its own words. */
+.vu-contact-foot {
+  flex: none;
+}

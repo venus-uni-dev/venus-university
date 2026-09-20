@@ -1,0 +1,109 @@
+/* Moving a plan: the coming fortnight, and every hour neither the reader nor his company
+   can make drawn dead and named. No mock — Load Game's chassis with a grid in it.
+
+   The one week grid in the app that is not Sunday-first: it prints a forward
+   run of fourteen days rather than a calendar, so the columns are dates in the order they
+   happen, and a Sunday-first reorder would put a later day left of an earlier one. */
+.vu-resched {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(1420px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 56px 70px 50px 170px;
+  border-radius: 230px 0 0 230px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* What is being moved, and who is expecting him at it. */
+.vu-resched-plan {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 24px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+}
+
+.vu-resched-plan-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.vu-resched-plan-title {
+  color: var(--vu-text);
+  font: 700 18px var(--font-body);
+}
+
+.vu-resched-plan-desc {
+  color: var(--vu-text-muted);
+  font: 500 14px var(--font-body);
+}
+
+.vu-resched-faces {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* An archway is a person, quiet and lifted onto the surface off the recessed row. */
+.vu-resched-face {
+  --paper-face: var(--vu-surface);
+  width: 34px;
+  height: 41px;
+  background: var(--vu-surface);
+}
+
+.vu-resched-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* **`minmax(0, 1fr)` and not `1fr`**: a bare `1fr` floors at min-content, and a tile naming a
+   course the reader cannot make ("Florentine — Renaissance Art and Architecture") pushed all
+   seven columns past the panel's own width. */
+.vu-resched-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* `display: contents` on the row, so both halves of a day stay cells in their own column. */
+.vu-resched-row {
+  display: contents;
+}
+
+.vu-resched-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.vu-resched-day {
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vu-resched-date {
+  color: var(--vu-text-muted);
+  font: 500 11px var(--font-mono);
+}
+
+/* A weekend is not a dead day here — a plan may be made on one (the timetable's grid is the other
+   case). */
+.vu-resched-head--off .vu-resched-day {
+  color: var(--vu-text-muted);
+}

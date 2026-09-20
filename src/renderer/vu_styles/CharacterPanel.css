@@ -1,0 +1,51 @@
+/* The read-only character panel: the Edit modal's frame with the controls taken out,
+   so the view imports `EditCharacter.css` and this file adds only what a record needs that
+   a form does not — prose where there were fields, and the duplicate-name warning.
+
+   Imported from the view module after `EditCharacter.css`, for the reason every screen file
+   loads late: an override of a primitive must not lose at equal specificity. */
+
+/* Two readings on one row, with room between them. */
+.vu-view-pair {
+  display: flex;
+  gap: 48px;
+}
+
+/* A written value is read, not edited: no well, no border, no field around it. */
+.vu-view-prose {
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 14px/1.55 var(--font-body);
+}
+
+/* One entry per line, as they were typed — the list input's shape without the input. */
+.vu-view-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  color: var(--vu-text);
+  font: 500 14px/1.55 var(--font-body);
+  list-style: none;
+}
+
+.vu-view-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The picker's chip with nothing to remove: `.vu-chip-tag`'s padding is lopsided to seat
+   an ✕ that is not here. */
+.vu-view-chips > .vu-chip-tag {
+  padding: 4px 12px;
+}
+
+/* A roster cannot hold two of the same name, so the panel says which one it is. */
+.vu-view-title--duplicate .vu-edit-given {
+  color: var(--vu-danger);
+}

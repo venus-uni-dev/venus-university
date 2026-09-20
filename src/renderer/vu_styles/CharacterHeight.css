@@ -1,0 +1,274 @@
+/* The height lineup, in its two modes: a whole roster on one floor with a cluster
+   apiece beneath it — her face, her label and two steps — or one girl among a ruler with a
+   slider and its reading. Imported from the view module, never from index.css — a screen's
+   file must load after base.css or its overrides lose at equal specificity. */
+
+/* No `overflow` here: the title tab overhangs the panel's top edge, and the paper layer's
+   own shadow is a pseudo-element this box would clip with it. */
+.vu-heights {
+  --paper-offset: 11px 10px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1500px, 100% - 60px);
+  padding: 44px 50px 34px 130px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+  border-radius: 110px 0 0 110px;
+}
+
+/* Her hair's colour, and the one place in this screen a colour is written out. These are
+   keys rather than palette colours — blonde is blonde at midnight, and a label that followed
+   the theme would stop naming the same girl — so they are not among the twenty roles and do
+   not flip at night, exactly as the repairs' chroma green does not (WardrobeFix.css). The
+   shade prefix is dropped upstream (`hairColorOf`), so two blues share one key. */
+[data-hair='aqua'] {
+  --label-fill: #35a8a4;
+  --label-ink: #052624;
+}
+[data-hair='black'] {
+  --label-fill: #24222a;
+  --label-ink: #efe9f2;
+}
+[data-hair='blonde'] {
+  --label-fill: #e6c15a;
+  --label-ink: #3d2b08;
+}
+[data-hair='blue'] {
+  --label-fill: #3862c8;
+  --label-ink: #eef3ff;
+}
+[data-hair='brown'] {
+  --label-fill: #7a4b2a;
+  --label-ink: #f7e9dc;
+}
+[data-hair='green'] {
+  --label-fill: #6fa84f;
+  --label-ink: #10260a;
+}
+[data-hair='grey'] {
+  --label-fill: #8d8f96;
+  --label-ink: #16151a;
+}
+[data-hair='orange'] {
+  --label-fill: #e07a2a;
+  --label-ink: #3a1a02;
+}
+[data-hair='pink'] {
+  --label-fill: #e88bb0;
+  --label-ink: #4a1230;
+}
+[data-hair='purple'] {
+  --label-fill: #7c4fb8;
+  --label-ink: #f3ecff;
+}
+[data-hair='red'] {
+  --label-fill: #c8352f;
+  --label-ink: #fff0ec;
+}
+/* A cool silver rather than a white: it has to part from the cream ground by hue, since it
+   cannot part from it by lightness. */
+[data-hair='white'] {
+  --label-fill: #dde2e8;
+  --label-ink: #2e2b33;
+}
+
+/* They stand on one floor, which is the whole of what a lineup is: a height means nothing
+   except beside another one. `container-type: size` is what lets the sprites be sized in
+   `cqh` below — the stage's own crop, in units of this box rather than the window. */
+.vu-heights-strip {
+  container-type: size;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 520px;
+  border-bottom: 3px solid var(--vu-border);
+  border-radius: 30px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+/* A roster of twelve spends its height on the rows instead. */
+.vu-heights-strip--roster {
+  height: 380px;
+}
+
+.vu-heights-slot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Whoever the lineup is about stands in front of the overlap. */
+.vu-heights-slot--front {
+  z-index: 1;
+}
+
+/* The stage's own crop, in container units: the sprite is 165% of the strip's height and
+   hangs 65% below it, as it is 165vh and -65vh in game. That is what makes a height
+   set here read the same way in a scene. */
+.vu-heights-sprite {
+  flex: none;
+  width: auto;
+  max-width: none;
+  height: calc(165cqh * var(--char-scale, 1));
+  margin-bottom: -65cqh;
+  object-fit: cover;
+  object-position: top center;
+}
+
+/* Her label: the one chip that names her, worn at her feet on the floor above and beside
+   her face in the cluster below, so the two read as the same girl. It takes her hair's
+   colour where one was read, and the surface otherwise (the focus lineup, whose ruler is
+   named rather than coloured). */
+.vu-heights-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--label-fill, var(--vu-surface));
+  color: var(--label-ink, var(--vu-text-body));
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* On the floor it hangs at her feet; in a cluster it sits in flow above her steps. */
+.vu-heights-slot > .vu-heights-name {
+  position: absolute;
+  bottom: 12px;
+}
+
+/* The one being sized, told from the company she is measured against. */
+.vu-heights-name--focus {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-heights-given {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The ruler, named: the shortest and tallest of the shipped cast, the same two on every
+   install. */
+.vu-heights-ruler {
+  color: var(--vu-accent);
+}
+
+.vu-heights-name--focus .vu-heights-ruler {
+  color: var(--vu-accent-ink);
+  opacity: 0.75;
+}
+
+/* Room for what a hover lifts past the box, which the scroller would otherwise clip. */
+.vu-heights-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 24px;
+  max-height: 300px;
+  margin: -6px;
+  padding: 6px;
+  overflow: hidden auto;
+}
+
+/* Clusters across, and column-first, so a roster too wide for one row reads 1 3 5 over
+   2 4 6 rather than wrapping. Implicit columns share the width (`1fr`), so the grid cannot
+   actually overflow — which is what makes the switch below a count rather than a measurement:
+   at the narrowest stage six clusters have 179px apiece and seven have 151, where a long name
+   would start ellipsizing. A count also answers the same way in every band, which a container
+   query or a ResizeObserver could not promise. */
+.vu-heights-list--roster {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-template-rows: auto;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 14px 16px;
+  justify-items: center;
+}
+
+.vu-heights-list--roster:has(> :nth-child(n + 7)) {
+  grid-template-rows: repeat(2, auto);
+}
+
+/* Her face, her label and her steps, close enough to read as one thing and centred in the
+   column the grid gives them. The right column is a chip over the pair — 22 + 6 + 40 — which
+   is the archway's own 68, so the two sit level with nothing measured. */
+.vu-heights-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* An archway is a person and this one is a face. It is a label rather than a control —
+   it opens nothing — so it takes no gesture; what it carries is her colour, as the layer
+   under it. No `overflow` here: a paper element may not clip, and `.vu-crop` does it. */
+.vu-heights-arch {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--label-fill, var(--vu-shadow));
+  --paper-offset: 6px 5px;
+  flex: none;
+  width: 56px;
+  height: 68px;
+}
+
+.vu-heights-side {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vu-heights-steps {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* The focus lineup's one row, and half the panel is all it needs: five cells for one girl
+   across 1200px left the slider a stride wide and the row reading as a rule under the floor.
+   Halved and centred, it sits under the girl it is about. The name is capped rather than
+   given a share, or two words would take half of what is left. */
+.vu-heights-row {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) 46px minmax(120px, 1fr) 46px 56px;
+  align-items: center;
+  gap: 12px;
+  width: 50%;
+  justify-self: center;
+}
+
+.vu-heights-label {
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 14px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Beside the slider and never under it: a value under the thumb is the value the hand
+   covers. A roster carries no reading at all — a height there is judged against the girl
+   next to her, and the floor above is where that is read. */
+.vu-heights-value {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  text-align: right;
+}
+

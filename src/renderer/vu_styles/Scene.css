@@ -1,0 +1,339 @@
+/* The scene view's chrome. Layout only:
+   every clock is `views/motion.ts`'s and which of them runs is `views/SceneChrome.tsx`'s.
+
+   The stage under it — the background, the portraits, the CG layer and the click-to-advance
+   surface — is `vu_styles/GameStage.css`'s, and this layer is drawn over it: one of the
+   stage's two chromes, the landing being the other, alongside the stage's own ending. */
+
+/* The chrome's top tier over `vu_styles/GameStage.css`'s stage. `pointer-events: none` lets a
+   click fall through to the advance surface underneath, keeping click-to-advance handler-free. */
+.vu-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+  pointer-events: none;
+}
+
+/* The gradient at the foot of the stage: what makes cream chrome read over a sprite in a
+   white shirt. Night's is the heavier of the two, its own ground being darker to begin with. */
+.vu-scene-wash {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 400px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--vu-accent-shadow) 26%, transparent) 100%
+  );
+}
+
+/* ---- the date stamp ------------------------------------------------------- */
+
+/* An archway rising off the bottom edge, carrying a reading. No `overflow`, so the date figure
+   can overhang both sides without clipping its own shadow. `left: 60px` keeps even the widest
+   date clear of the stage edge and the box's gutter. */
+.vu-scene-stamp {
+  --paper-face: var(--vu-stamp);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 9px 8px;
+  position: absolute;
+  left: 5%;
+  bottom: 0;
+  width: 128px;
+  height: 330px;
+  border-radius: 999px 999px 0 0;
+}
+
+/* The week, ghosted into the crown of the arch: a reading the player checks rather than reads. */
+.vu-scene-week {
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  color: var(--vu-stamp-ink);
+  font: 700 44px/0.95 var(--font-mono);
+  text-align: center;
+  opacity: 0.5;
+}
+
+.vu-scene-week span {
+  font-size: 66px;
+}
+
+/* The date as a figure, centred on the arch and wider than it. A line wider than its box
+   start-aligns regardless of `text-align`, so the box is shrunk to the text (`width: max-content`)
+   and centred with `translate` instead. */
+.vu-scene-figure {
+  position: absolute;
+  top: 115px;
+  left: 50%;
+  width: max-content;
+  translate: -50% 0;
+  color: var(--vu-stamp-ink);
+  font: 700 90px var(--font-mono);
+  white-space: nowrap;
+  text-shadow: 0 6px 0 var(--vu-stamp);
+}
+
+.vu-scene-weekday {
+  position: absolute;
+  top: 232px;
+  left: 42px;
+  color: var(--vu-stamp-sub);
+  font: 700 26px var(--font-mono);
+}
+
+/* Which half of the day it is, at the foot of the arch. */
+.vu-scene-half {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--vu-stamp-ink);
+  font: 700 26px var(--font-mono);
+}
+
+.vu-scene-half--night {
+  font-size: 22px;
+}
+
+/* The mark turns, so it is a box of its own: one element gets one transform, and this one is
+   the turn's. `line-height: 0` keeps the box the mark's own size inside the flex row. */
+.vu-scene-turn {
+  display: block;
+  line-height: 0;
+  color: var(--vu-stamp-sub);
+}
+
+.vu-scene-mark {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+
+/* ---- the rail ------------------------------------------------------------- */
+
+/* Three buttons, bottom right. **BunnyMap and BunnyShop are not here**: a scene is not where
+   either is opened — the landing keeps them. */
+.vu-scene-rail {
+  position: absolute;
+  right: 56px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Action = half-pill flat left, icon-only, and its own paper layer. It keeps `.vu-paper`'s
+   own `8px 7px` offset so `press` lands it exactly flat on its shadow. */
+.vu-scene-seat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 16px 30px 16px 22px;
+  border: 0;
+  border-radius: 0 999px 999px 0;
+  background: none;
+  color: var(--vu-accent);
+  pointer-events: auto;
+  transform-origin: left center;
+}
+
+.vu-scene-seat svg {
+  display: block;
+}
+
+/* A count riding the corner, and the ring around it is a cutout rather than a border: it is the
+   surface the button is drawn in, so the badge reads as a hole punched through the pill. */
+.vu-scene-badge {
+  position: absolute;
+  top: -12px;
+  right: -8px;
+  padding: 3px 10px;
+  border: 3.5px solid var(--vu-surface);
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  font: 700 13px var(--font-mono);
+}
+
+/* ---- the row -------------------------------------------------------------- */
+
+/* Under the box, on the box's own 17.2% gutters; it drops into the box's place when there is no
+   row. The 110px left clearance is this screen's own date stamp, filled by the tips mark. */
+/* **The row is aligned by its feet**, because the well is the only thing in it that changes
+   height: growing upward, it must not carry Go and the gift up with it — a control level with
+   the field's middle at one line and floating beside its third at four is the row coming apart.
+   Their bottom edges are the line the row actually reads along. */
+.vu-scene-row {
+  left: 17.2%;
+  right: 17.2%;
+  bottom: 32px;
+  align-items: flex-end;
+}
+
+/* ---- the tips mark and its card ------------------------------------------- */
+
+/* The mark's seat: the stamp's clearance less the row's own gap, and as tall as a one-line well,
+   so the mark reads level with the question it explains and stays on that line as the well grows
+   upward past it. It hears the pointer for the mark, which takes none of its own. */
+.vu-scene-help {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 70px;
+}
+
+/* A glyph over its word, outlined in the surface so it reads on any scene background: it sits at
+   its lighter weight and goes full under the hand, the weight being motion's. It answers no
+   pointer, so the card cannot take the hover off the mark that raised it. */
+.vu-scene-help-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--vu-accent);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* The question mark, and the word under it. Each states its own stroke width, the property
+   inheriting and one width serving neither a 34px glyph nor 12px letters. */
+.vu-scene-help-glyph {
+  paint-order: stroke fill;
+  font: 700 34px var(--font-mono);
+  -webkit-text-stroke: 3px var(--vu-surface);
+}
+
+.vu-scene-help-word {
+  paint-order: stroke fill;
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.1em;
+  -webkit-text-stroke: 1.5px var(--vu-surface);
+}
+
+/* The card, standing over the box: it is a reading and answers no pointer, so the click under it
+   still falls through to the stage. **No `overflow`** — a paper element that clips loses its own
+   shadow. It hangs off the seat's left edge, which is the stage's own gutter, so the sheet runs
+   inward across the box rather than out toward the letterbox. */
+.vu-scene-tips {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-shadow);
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 0;
+  width: 620px;
+  padding: 22px 28px;
+  border-radius: 24px;
+  color: var(--vu-text);
+  pointer-events: none;
+}
+
+.vu-scene-tips-title {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* A real list with real markers: four readings rather than one paragraph. */
+.vu-scene-tips-list {
+  margin: 14px 0 0;
+  padding-left: 1.2em;
+  font: 500 20px/1.4 var(--font-body);
+  list-style: disc;
+}
+
+.vu-scene-tips-list li + li {
+  margin-top: 10px;
+}
+
+/* Follows the well as it grows: `--turn-h` is the row's own measured height, set onto this root
+   by `SceneChrome`. The landing's box does not move, since the landing's well does not grow. */
+.vu-scene .vu-box {
+  bottom: calc(var(--turn-h, 70px) + 56px);
+}
+
+/* The balance, top right — the same corner the landing hangs its own card off, so the reading
+   stays put between screens. `pointer-events: none`: it is a reading, not a control. */
+.vu-scene-money {
+  position: absolute;
+  right: 60px;
+  top: 44px;
+  rotate: 1.2deg;
+  pointer-events: none;
+}
+
+/* The divider and the gift, which is the turn's second answer. */
+.vu-scene-gift {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+/* The rule and the button are one row inside the wrapper that hears the pointer for the dead
+   Gift, so the note hangs off the pair rather than off the button alone. */
+.vu-scene-gift > .vu-deadnote {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.vu-scene-rule {
+  width: 3px;
+  height: 34px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--vu-surface) 70%, transparent);
+}
+
+/* Quiet: no paper layer beside a loud Go, and no word beside its own picture. */
+.vu-scene-giftbtn {
+  display: flex;
+  align-items: center;
+  padding: 15px 26px 15px 20px;
+  border: 0;
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--vu-surface) 92%, transparent);
+  color: var(--vu-accent);
+  transform-origin: left center;
+}
+
+.vu-scene-giftbtn svg {
+  display: block;
+}
+
+/* Sitting an exam: the four answers stacked in the row's place, and no gift. Each button holds
+   its letter and wraps as wide as it needs. The margin is the stamp's clearance, which the tips
+   mark stands in on every other turn. */
+.vu-scene-quiz {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-left: 110px;
+}
+
+.vu-scene-quizbtn {
+  justify-content: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 30px;
+  white-space: normal;
+  text-align: left;
+}
+
+.vu-scene-quizletter {
+  flex: none;
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.1em;
+}

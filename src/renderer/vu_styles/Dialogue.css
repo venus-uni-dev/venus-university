@@ -1,0 +1,346 @@
+/* The dialogue box and the turn under it, the two things a scene and the decision landing wear
+   identically. It is `views/Dialogue.tsx`'s file: the box that types a scene's lines is the same
+   object as the one typing a slot's opening narration. What is here is the box and the turn's
+   own parts; where the turn sits is the screen's (`Scene.css`, `Landing.css`). Layout only —
+   every clock is `views/motion.ts`'s. */
+
+/* ---- the dialogue box ----------------------------------------------------- */
+
+/* Dead centre across the stage, on percentage gutters measured against the stage rather than the
+   window. `isolation` keeps the face's `z-index: -1` from sinking through the stage. */
+.vu-box {
+  --glass: 75%;
+  --glass-shadow: 47%;
+  /* The column hung off the box's right edge: how wide it is, and how much of that width lies
+     on the box rather than out past it. The chips stretch to the first, so labels of two, three
+     and four characters read as one column; the line and the finished mark give back the second,
+     which is the half of a chip that is drawn over the box's own face. */
+  --chip-col: 100px;
+  --chip-hang: 50px;
+  position: absolute;
+  left: 17.2%;
+  right: 17.2%;
+  bottom: 126px;
+  isolation: isolate;
+}
+
+/* The face and its hard shadow, a layer of their own inside the box: the box carries the slide
+   and the glass, this one carries the wipe. `--glass` and `--glass-shadow` are percentage shares
+   of the surface and shadow roles. */
+.vu-box-face {
+  --paper-face: color-mix(in srgb, var(--vu-surface) var(--glass), transparent);
+  --paper-shadow: color-mix(in srgb, var(--vu-shadow) var(--glass-shadow), transparent);
+  --paper-offset: 10px 2px;
+  --paper-tilt: -1.0deg;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px 0 0 999px;
+}
+
+/* The box answering the pointer, which it does only where a click on it would do something —
+   the attribute is written by `Dialogue.tsx` and only then. The layer above it is
+   `pointer-events: none` and every control in it takes its own back; this is the box taking
+   its own, and it is what moves the hand off the whole stage and onto the box. */
+.vu-box-face[data-cursor],
+.vu-box-label[data-cursor] {
+  pointer-events: auto;
+}
+
+/* ---- the speaker label ---------------------------------------------------- */
+
+/* Straddling the box's top-left edge: the portrait over the corner and her
+   name beside it, both above the face they sit on. The landing's narration has no speaker, so
+   none of this is drawn there. */
+.vu-box-label {
+  position: absolute;
+  left: 64px;
+  top: -40px;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* An archway, and the one in the app that is a *label* rather than a card or a control. It
+   grows from its own corner, so the origin is the corner the box's edge is at. */
+.vu-box-portrait {
+  --paper-face: var(--vu-recessed);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 6px 5px;
+  position: relative;
+  z-index: 2;
+  width: 74px;
+  height: 88px;
+  transform-origin: left bottom;
+}
+
+/* Her name, isolated for the pill's own `z-index: -1`. `--tuck` sets how far the pill runs under
+   the portrait, and the ink's own padding is measured off the same variable. */
+.vu-box-name {
+  --tuck: 28px;
+  position: relative;
+  isolation: isolate;
+  margin-left: calc(-1 * var(--tuck));
+  margin-bottom: 14px;
+}
+
+.vu-box-namebox {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* Flat right, the box's own shape at label scale: **the flat edge is the wipe front** motion
+   drives, and the round cap it grows out of is the end the portrait stands over. The face is a
+   role of its own rather than the accent, night's label being a quiet surface (`tokens.css`). */
+.vu-box-namepill {
+  --paper-face: var(--vu-speaker);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 7px 6px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px 0 0 999px;
+}
+
+.vu-box-nameink {
+  display: block;
+  padding: 9px 28px 9px calc(var(--tuck) + 10px);
+  color: var(--vu-speaker-ink);
+  font: 400 26px var(--font-display);
+}
+
+/* ---- the line ------------------------------------------------------------- */
+
+/* The paragraph is its final size from the first character, its unsaid half hidden rather than
+   absent, so nothing reflows as the words arrive. The height is a `min-height`, a floor rather
+   than a ceiling, so a fourth line grows the box upward instead of spilling out of it. */
+.vu-box-text {
+  display: grid;
+  place-items: center;
+  min-height: 232px;
+  padding: 46px 60px;
+}
+
+/* The line gives back the half of the column that lies on the box, and **only on a box that has
+   chips**: the landing's narration and an ending's carry none, and a gutter reserved for
+   controls that are not there is a line pushed off its own centre for nothing. At the stage's
+   full width the line is already at its 960px cap with room to spare, so this costs it nothing
+   until the stage narrows. */
+.vu-box:has(> .vu-box-chips) .vu-box-text {
+  padding-right: calc(var(--chip-hang) + 22px);
+}
+
+/* The size the app speaks at, and **the turn's field below is set to match it**: the words the
+   player reads and the words he writes are one conversation. */
+.vu-box-line {
+  width: min(960px, 100%);
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 30px/1.5 var(--font-body);
+  white-space: pre-wrap;
+}
+
+/* The rest of the line, holding its own space and saying nothing. **`visibility` and not a
+   transparent ink**, which is what lets a marked run inside it keep its own colour without
+   showing through: a child cannot un-hide itself by setting one. */
+.vu-box-unsaid {
+  visibility: hidden;
+}
+
+/* A run inside the line, coloured for what it names — a stat, a balance change, how a verb was
+   taken — colour only, since the whole line's layout is fixed before a character is typed.
+   `position: relative` is what the splash's seat is placed against. */
+.vu-box-mark {
+  position: relative;
+}
+
+.vu-box-mark[data-tone='brain'] {
+  color: var(--vu-stat-brain);
+}
+
+.vu-box-mark[data-tone='body'] {
+  color: var(--vu-stat-body);
+}
+
+.vu-box-mark[data-tone='heart'] {
+  color: var(--vu-stat-heart);
+}
+
+.vu-box-mark[data-tone='gain'] {
+  color: var(--vu-good);
+}
+
+.vu-box-mark[data-tone='loss'] {
+  color: var(--vu-danger);
+}
+
+/* The splash's seat: a point at the centre of the marked run, mounted with the run rather than
+   with the burst, so the line's shaping never changes as the word lands. `Burst.css` draws the
+   particles off this point. */
+.vu-box-splash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Where the next character lands: an empty inline standing in the line, with no margin, padding
+   or border, so the words either side of it are shaped as one run and the line wraps the same
+   whatever has been said. The block is a spread shadow, which paints without asking the line for
+   room: the font size sets the empty box's height and the spread its width, sized to the block the
+   caret draws (about 17px by 25px, from just under the baseline to the cap line). */
+.vu-box-cursor {
+  font-size: 6px;
+  border-radius: 2px;
+  box-shadow: 0 -6.5px 0 8.5px var(--vu-accent);
+}
+
+/* A wait, at the size the thing waiting is. **It takes no colour of its own**: `.vu-ring` is
+   drawn in `currentColor`, and the two places one turns here read on opposite grounds — on the
+   box it is the accent, and inside the Go button it has to be the ink of an accent fill, or a
+   wine ring is drawn on a wine button and the wait is invisible. */
+.vu-box-ring {
+  width: 18px;
+  height: 18px;
+}
+
+.vu-box-text .vu-box-ring {
+  color: var(--vu-accent);
+}
+
+/* The mark that says the line is finished, on the box's own corner: the app's forward chevron
+   in the muted tone, at a size a mark on the edge of what is being read may take. The nudge it
+   rides is `views/motion.ts`'s; the two elements are one transform apiece. */
+.vu-box-hint {
+  position: absolute;
+  right: calc(var(--chip-hang) + 28px);
+  bottom: 20px;
+  display: flex;
+  color: var(--vu-text-muted);
+}
+
+.vu-box-nudge {
+  display: flex;
+}
+
+.vu-box-hint svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+/* ---- the chips ------------------------------------------------------------ */
+
+/* The screen controls, in a column half on the box's right edge and half out past it. Quiet —
+   no paper layer: they lie on a sheet of paper, and four sheets over one is a pile. Which of
+   them is drawn is the screen's: a scene offers four, the landing's narration none.
+
+   **The column answers no pointer and each chip takes its own back**: it is as tall as the box,
+   and a strip that size swallowing a click is the stage underneath losing an advance. */
+.vu-box-chips {
+  position: absolute;
+  left: calc(100% - var(--chip-hang));
+  top: 0;
+  bottom: 0;
+  width: var(--chip-col);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.vu-box-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px 8px 15px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--vu-surface) 95%, transparent);
+  color: var(--vu-text-body);
+  font: 700 12.5px var(--font-mono);
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+}
+
+.vu-box-chip svg {
+  display: block;
+  color: var(--vu-accent);
+}
+
+/* ---- the turn ------------------------------------------------------------- */
+
+/* The row the player answers in. **Where it sits is the screen's** — a scene centres it under
+   the box, the landing anchors it left — so this says only what a row is. */
+.vu-turn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.vu-turn > * {
+  pointer-events: auto;
+}
+
+/* The box the well is drawn in: it is what takes the row's share of the width, so the field
+   inside it may simply fill its box. Which margin, if any, it stands off is the screen's. */
+.vu-turn-inputbox {
+  position: relative;
+  flex: 1;
+}
+
+/* Overrides `.vu-input`'s full pill with a half-pill flat right, running into the answer beside
+   it. Set at `.vu-box-line`'s 30px, since what the player writes is the other half of the same
+   conversation. */
+.vu-turn-input.vu-input {
+  --well-glass: 92%;
+  width: 100%;
+  padding: 14px 34px;
+  border-radius: 999px 0 0 999px;
+  background: color-mix(in srgb, var(--vu-surface) var(--well-glass), transparent);
+  font-size: 30px;
+  line-height: 1.25;
+  /* The native caret, for when the field has the focus and is drawing its own. */
+  caret-color: var(--vu-accent);
+}
+
+/* The scene's well is the same pill, grown upward instead of scrolling sideways, up to the four
+   lines the box above it speaks in. `field-sizing: content` sizes it with no manual measuring. */
+.vu-turn-input--multiline.vu-input {
+  display: block;
+  max-height: calc(4lh + 33px);
+  overflow: hidden auto;
+  field-sizing: content;
+  resize: none;
+}
+
+/* Go rides two wrappers: the outer is the seat a screen's own arrival animates, the inner is the
+   tilt and the breath. Three transforms, three elements — on one the last writer would win. */
+.vu-turn-goslot {
+  flex: none;
+}
+
+.vu-turn-go {
+  display: flex;
+}
+
+/* Icon only — the half-pill already says where it is going, and the chevron is the mark New
+   Game's Start carries for the same reason. Square-ish padding, since there are no words, and
+   sized to stand level with the field beside it rather than to a button's own default. */
+.vu-turn-gobtn {
+  gap: 0;
+  padding: 22px 34px 22px 30px;
+}
+
+.vu-turn-gobtn svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}

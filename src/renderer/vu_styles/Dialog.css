@@ -1,0 +1,88 @@
+/* The A4 frame, worn by the two modals that ask and the one that reports: a confirm and an
+   error are the same panel with a different foot, so they share one file rather than two
+   near-copies. Imported from the component modules, never from index.css.
+
+   The veil, the buttons and the foot are base.css's; what is here is the panel, the badge
+   that fills its round end, and the error's two mono parts. */
+
+/* Half-pill flat right at dialog size. Small enough to keep the base -2° tilt, where a
+   long panel relaxes it. No `overflow` — the paper layer's shadow is a pseudo-element this
+   box would clip. */
+.vu-dialog {
+  --paper-offset: 12px 11px;
+  --paper-shadow: var(--vu-panel-shadow);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(900px, 100% - 60px);
+  padding: 52px 60px 46px 230px;
+  border-radius: 240px 0 0 240px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The round left end holds one badge on purpose: the archway `!` that is called the
+   error mark, and that a confirm wears for the same reason — both are the app stopping the
+   player. An accent fill, so it takes the accent's shadow rather than the panel's. */
+.vu-dialog-badge {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  --paper-offset: 7px 6px;
+  position: absolute;
+  top: 50%;
+  left: 78px;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 94px;
+  translate: 0 -58%;
+  color: var(--vu-accent-ink);
+  font: 400 46px var(--font-display);
+}
+
+/* The title and, where there is one, the code beside it; they wrap rather than squeeze. */
+.vu-dialog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+/* Inside the panel rather than on a tab: this modal has no corner to spare — the badge
+   already occupies the end a tab would hang over. */
+.vu-dialog-title {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 36px var(--font-display);
+}
+
+/* What the failure is called in the code, kept where a bug report can copy it. Quiet: it
+   states a fact, and the badge beside it is what marks the weight. */
+.vu-dialog-code {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+/* The detail at rest, not behind a disclosure: it exists to be pasted into a bug report,
+   and a line nobody can see is a line nobody sends. `anywhere` because the thing it holds
+   is a URL or a stack frame as often as a sentence. */
+.vu-dialog-detail {
+  margin: 0;
+  padding: 13px 18px;
+  border-radius: 16px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 400 13px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.vu-dialog-foot {
+  margin-top: 10px;
+}

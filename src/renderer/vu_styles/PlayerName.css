@@ -1,0 +1,94 @@
+/* The reader's own question: his name, and the three stats he starts the semester on.
+   No mock — derived from the form modals already built, which is what it is. Imported from
+   the view module, never from index.css.
+
+   The veil, the fields, the squares, the buttons and the foot are base.css's. */
+
+/* Shorter than the form chassis, because there is less in it: two fields and three rows.
+   At 980 the shadow still clears the top edge — the tilt lifts the far corner by half the
+   width times its sine, 17px at the base -2°, against the 11px the offset puts it down by —
+   so this panel keeps the shared angle rather than the long panel's relaxed one.
+
+   No `overflow`: the tab overhangs, and the panel's own shadow pseudo would go with it. */
+.vu-who {
+  --paper-offset: 12px 11px;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(980px, 100% - 60px);
+  padding: 56px 70px 50px 230px;
+  border-radius: 300px 0 0 300px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* Two equal columns: a first name and a last name are one question, not two. No dice
+   beside either — the reader is the one character in the app nobody rolls. */
+.vu-who-names {
+  display: flex;
+  gap: 14px;
+}
+
+.vu-who-names > .vu-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* What the modal promises about a blank field, and what it costs to answer. Said at rest
+   and in full: it is the whole of what the player needs to know before answering, and this
+   answer cannot be taken back (the tooltip rule). */
+.vu-who-whisper {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 14px/1.5 var(--font-body);
+}
+
+.vu-who-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Fixed columns, so the tier name stays where it is as the player steps through the scale
+   and the three rows read as one column of values rather than three centred phrases. The
+   row is capped rather than stretched: given the panel's whole width the two squares end up
+   a third of it apart, and a stepper only reads as one control with its value between them. */
+.vu-who-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 140px) 40px minmax(146px, 1fr) 40px;
+  align-items: center;
+  gap: 14px;
+  max-width: 430px;
+}
+
+/* The stat's identity, and the only place it is worn: the mark and the word. Points
+   and tiers stay in the text ramp — three sub-accents in a palette that allows one accent
+   would make every row shout its own colour. */
+.vu-who-stat-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 17px var(--font-body);
+}
+
+.vu-who-stat--brain .vu-who-stat-name {
+  color: var(--vu-stat-brain);
+}
+
+.vu-who-stat--body .vu-who-stat-name {
+  color: var(--vu-stat-body);
+}
+
+.vu-who-stat--heart .vu-who-stat-name {
+  color: var(--vu-stat-heart);
+}
+
+/* The tier by name and never by points: a number on screen is a number to grind. */
+.vu-who-stat-tier {
+  color: var(--vu-text);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+

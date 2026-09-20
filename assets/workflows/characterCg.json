@@ -1,0 +1,198 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "CheckpointLoaderSimple"
+    },
+    "inputs": {
+      "ckpt_name": "novaAnimeXL_ilV190.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoraLoader"
+    },
+    "inputs": {
+      "model": ["1", 0],
+      "clip": ["1", 1],
+      "lora_name": "usnrStyle.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Base Positive Prompt"
+    },
+    "inputs": {
+      "clip": ["3", 1],
+      "text": "masterpiece, best_quality, very_aesthetic, 1girl, mature_female"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    },
+    "inputs": {
+      "clip": ["3", 1],
+      "text": "worst_quality, bad_quality, lowres"
+    }
+  },
+  "14": {
+    "class_type": "SeedNode",
+    "_meta": {
+      "title": "Character Seed"
+    },
+    "inputs": {
+      "seed": 2042518575058481
+    }
+  },
+  "15": {
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "EmptyLatentImage"
+    },
+    "inputs": {
+      "width": 1216,
+      "height": 832,
+      "batch_size": 1
+    }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    },
+    "inputs": {
+      "model": ["3", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["15", 0],
+      "seed": ["14", 0],
+      "steps": 16,
+      "cfg": 4,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "sgm_uniform",
+      "denoise": 1
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAEDecode"
+    },
+    "inputs": {
+      "samples": ["7", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "33": {
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    },
+    "inputs": {
+      "model_name": "segm/Anzhc%20Face%20seg%20640%20v2%20y8n.pt"
+    }
+  },
+  "31": {
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Face Detailer"
+    },
+    "inputs": {
+      "image": ["8", 0],
+      "model": ["3", 0],
+      "clip": ["3", 1],
+      "vae": ["1", 2],
+      "positive": ["51", 0],
+      "negative": ["51", 1],
+      "bbox_detector": ["33", 0],
+      "segm_detector_opt": ["33", 1],
+      "guide_size": 512,
+      "guide_size_for": true,
+      "max_size": 1024,
+      "seed": ["14", 0],
+      "steps": 12,
+      "cfg": 4,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "simple",
+      "denoise": 0.5,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SaveImage"
+    },
+    "inputs": {
+      "images": ["31", 0],
+      "filename_prefix": "venus-university/cg"
+    }
+  },
+  "50": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Detailer Positive Prompt"
+    },
+    "inputs": {
+      "clip": ["3", 1],
+      "text": "masterpiece, best_quality, very_aesthetic, 1girl, mature_female"
+    }
+  },
+  "12": {
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "ControlNetLoader"
+    },
+    "inputs": {
+      "control_net_name": "illustriousOpenpose.safetensors"
+    }
+  },
+  "39": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Pose Skeleton"
+    },
+    "inputs": {
+      "image": "hand_on_hip.png"
+    }
+  },
+  "51": {
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Detailer ControlNet"
+    },
+    "inputs": {
+      "positive": ["50", 0],
+      "negative": ["5", 0],
+      "control_net": ["12", 0],
+      "image": ["39", 0],
+      "strength": 1,
+      "start_percent": 0,
+      "end_percent": 1
+    }
+  }
+}

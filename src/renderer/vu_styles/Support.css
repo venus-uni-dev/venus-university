@@ -1,0 +1,30 @@
+/* The Support Development modal: the Main Menu's Support Development chip opens it. Prose, an
+   example of the Bunnyboard post a donor's name may sign, and a foot whose primary leaves for
+   Ko-fi. Imported from the view module, never from index.css.
+
+   The panel, the text and the foot are base.css's `.vu-note`; the veil, the tab, the link and
+   the buttons are base.css's too. */
+
+/* Wider than a note's 760, so the example post reads at nearly its own size. */
+.vu-support {
+  width: min(820px, 100% - 60px);
+}
+
+/* The address would break at its own hyphen, `ko-` on one line and `fi.com` on the next; it
+   is short enough to move whole to the next line instead. */
+.vu-support-kofi {
+  white-space: nowrap;
+}
+
+/* A screenshot of a post, which carries its own ground: it takes a container's corners. */
+.vu-support-example {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 22px;
+}
+
+/* `.vu-btn`'s 18px gap is for a subline; a mark riding the words sits closer. */
+.vu-support-out {
+  margin-left: -6px;
+}

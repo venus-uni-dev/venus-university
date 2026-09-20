@@ -1,0 +1,8 @@
+/* The filter `components/LettersMark.tsx` carries. It is never seen: it holds a definition, and
+   a screen points at it by id from its own `filter: url(#…)`. Imported from the component,
+   never from index.css (`Dialogue.css`'s reason). */
+.vu-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}

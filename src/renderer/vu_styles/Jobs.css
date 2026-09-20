@@ -1,0 +1,315 @@
+/* The jobs board and the reader's own terms: one panel wearing two arrangements of
+   the same pair of panes — the list on the left, what it is offering on the right, and the
+   shift week under that. Imported from the view module, never from index.css.
+
+   The veil, the tab, the row, the count, the slot tiles, the buttons and the foot are
+   base.css's; the course chip on a blocked tile is `CourseSchedule.css`'s, which the view
+   imports beside this file so the mark reads the same in both places it is drawn.
+
+   The week is Sunday-first off `WEEK_COLUMNS` and the slot indices under it stay
+   Monday-zero, so only the order of the columns is this screen's. */
+.vu-jobs {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(1520px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 44px 60px 40px 140px;
+  border-radius: 160px 0 0 160px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The two panes take the height the foot leaves, and each one scrolls inside it: a basis of
+   `auto` so the panel is still sized by what is in it until it reaches its own cap ("The modal
+   shell"). The panel carries no `overflow` of its own — it is paper. */
+.vu-jobs-body {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 30px;
+  min-height: 0;
+}
+
+/* ---- the board ------------------------------------------------------------ */
+
+/* The openings. The list owns the gap; the padding is for the scrollbar to stand in rather
+   than over the round end of a row. */
+.vu-jobs-openings {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 400px;
+  min-height: 0;
+  padding-right: 6px;
+  overflow: hidden auto;
+}
+
+/* One opening: a `.vu-row` whose entry is a stack of lines rather than one, so it says only
+   its own direction. **Its fill is the same in every state** — the one he is reading is ringed
+   in the accent, not filled — so `rowLift`'s tint has no state class to fight. The
+   border is on every row and transparent on most, so picking one moves nothing. */
+.vu-jobs-open {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 14px 22px 15px 26px;
+  border: 2.5px solid transparent;
+}
+
+.vu-jobs-open--on {
+  border-color: var(--vu-accent);
+}
+
+.vu-jobs-open-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.vu-jobs-open-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--vu-text);
+  font: 700 17px var(--font-body);
+}
+
+.vu-jobs-open--on .vu-jobs-open-title {
+  color: var(--vu-accent);
+}
+
+/* Money is mono, wherever it is said. */
+.vu-jobs-open-pay {
+  flex: none;
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+}
+
+.vu-jobs-open-employer {
+  color: var(--vu-text-muted);
+  font: 500 13.5px var(--font-body);
+}
+
+.vu-jobs-reqs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+/* What the opening asks for, said in what it says about him: cleared, or still short. Ink over
+   the matching tint, which is the count's own pair on a fill — and a half-pill flat right,
+   since a requirement is a reading of the row and not an answer it offers. */
+.vu-jobs-req {
+  padding: 3px 9px 3px 11px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-good-tint);
+  color: var(--vu-good);
+  font: 700 10.5px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vu-jobs-req--short {
+  background: var(--vu-warn-tint);
+  color: var(--vu-warn);
+}
+
+/* ---- the listing, and the record --------------------------------------- */
+
+.vu-jobs-detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.vu-jobs-blurb {
+  flex: none;
+  margin: 0;
+  color: var(--vu-text);
+  font: italic 600 17px/1.4 var(--font-body);
+}
+
+/* The ad as the employer wrote it: a recessed well, in the face a printed notice is set in.
+   It takes the free space and gives it back once the panel is against its cap, which is where
+   scrolling should start. */
+.vu-jobs-ad {
+  flex: 1 1 auto;
+  min-height: 130px;
+  margin: 0;
+  padding: 18px 24px;
+  border-radius: 26px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 400 12.5px/1.7 var(--font-mono);
+  white-space: pre-wrap;
+  overflow: hidden auto;
+  overflow-wrap: anywhere;
+}
+
+/* Why Apply is dead, said above the week it grays. */
+.vu-jobs-short {
+  flex: none;
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: var(--vu-danger-tint);
+  color: var(--vu-danger);
+  font: 700 15px/1.4 var(--font-body);
+}
+
+.vu-jobs-shifts {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-jobs-head {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* What the grid cannot say for itself, said at rest rather than after a click. */
+.vu-jobs-note {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 13.5px/1.5 var(--font-body);
+}
+
+.vu-jobs-empty {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 15px/1.5 var(--font-body);
+}
+
+/* ---- the shift week ---------------------------------------------------- */
+
+/* `minmax(0, 1fr)` and not `1fr`, the reschedule grid's lesson: a bare `1fr` floors at
+   min-content, and one long course code would push all seven columns past the pane. */
+.vu-jobs-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.vu-jobs-day {
+  min-width: 0;
+  padding-bottom: 2px;
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* `display: contents` on the row, so both halves of a day stay cells in their own column. */
+.vu-jobs-halfrow {
+  display: contents;
+}
+
+/* The course holding the hour, at the size a tile has room for. A screen file loads after the
+   one it borrows, so this says only what it changes. */
+.vu-jobs-week .vu-code {
+  max-width: 100%;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- the terms he is on ------------------------------------------------ */
+
+.vu-jobs-terms {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 400px;
+  min-height: 0;
+  padding-right: 6px;
+  overflow: hidden auto;
+}
+
+.vu-jobs-post {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vu-jobs-post-title {
+  color: var(--vu-text);
+  font: 400 30px var(--font-display);
+}
+
+.vu-jobs-post-employer {
+  color: var(--vu-text-muted);
+  font: 500 14px var(--font-body);
+}
+
+.vu-jobs-rules {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* A rule is a sentence, so the row is a block: a flex row would make every phrase inside it —
+   the words either side of a `strong` — an item of its own and lay them out side by side. */
+.vu-jobs-rule {
+  display: block;
+  flex: none;
+  padding: 11px 20px 12px 24px;
+  color: var(--vu-text-body);
+  font: 500 13.5px/1.55 var(--font-body);
+}
+
+.vu-jobs-rule strong {
+  color: var(--vu-text);
+  font-weight: 800;
+}
+
+/* ---- his record -------------------------------------------------------- */
+
+.vu-jobs-record {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 22px;
+  border-radius: 30px;
+  background: var(--vu-recessed);
+}
+
+.vu-jobs-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* A reading is mono. **It names no colour**: three of the four are plain readings and inherit
+   the panel's, and the fourth is a `.vu-count` whose whole job is to say what he is short of —
+   a colour here would load after base.css and beat it. */
+.vu-jobs-fig-value {
+  font: 700 21px var(--font-mono);
+}
+
+.vu-jobs-fig-label {
+  color: var(--vu-text-muted);
+  font: 700 10.5px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

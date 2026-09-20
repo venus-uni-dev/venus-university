@@ -1,0 +1,76 @@
+/* Cast: who is in the scene, who is on screen, and the wardrobe locks over each of them.
+   No mock — Load Game's chassis (both are a scroller of rows in a capped panel) with a row
+   built for a person rather than a save. Imported from the view module, never from index.css.
+
+   The veil, the row, the pill, the buttons and the foot are base.css's. */
+
+.vu-cast-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+/* A stack of two lines rather than one, so the row takes a column of its own — the list owns
+   the gap between rows, the row owns only the space between what it holds. */
+.vu-cast-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.vu-cast-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Her face, lifted onto the surface off the row's own recessed ground — the row and the
+   archway's quiet fill are the same tone, and a face left at `.vu-arch`'s default would
+   vanish into the row it sits in. Sized as the Edit modal's own name-row portrait is. */
+.vu-cast-face {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 60px;
+  height: 72px;
+  background: var(--vu-surface);
+}
+
+.vu-cast-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vu-cast-name {
+  color: var(--vu-text);
+  font: 700 18px var(--font-body);
+}
+
+.vu-cast-state {
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The wardrobe locks, held under the name column rather than the face — what they are
+   locking is who she is, not her picture. */
+.vu-cast-outfits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-left: 76px;
+}
+
+/* The lock in force: a fill is a state, not a hue, so it takes the same pairing the week's
+   picked tile does — an accent border and its own tint underneath. */
+.vu-pill--on {
+  border-color: var(--vu-accent);
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+}

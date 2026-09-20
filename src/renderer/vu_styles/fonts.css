@@ -1,0 +1,45 @@
+/* The bundled OFL faces — the app never fetches a font at runtime.
+   Latin subsets only: one weight per file the design actually asks for. */
+@import '@fontsource/young-serif/latin-400.css';
+
+@import '@fontsource/plus-jakarta-sans/latin-500.css';
+@import '@fontsource/plus-jakarta-sans/latin-600.css';
+@import '@fontsource/plus-jakarta-sans/latin-700.css';
+@import '@fontsource/plus-jakarta-sans/latin-800.css';
+@import '@fontsource/plus-jakarta-sans/latin-400-italic.css';
+@import '@fontsource/plus-jakarta-sans/latin-600-italic.css';
+
+@import '@fontsource/space-mono/latin-400.css';
+@import '@fontsource/space-mono/latin-700.css';
+@import '@fontsource/space-mono/latin-400-italic.css';
+@import '@fontsource/space-mono/latin-700-italic.css';
+
+/* The fifteen a merchant is signed in — five signatures and, for each shop, the two
+   faces its own masthead is set in. Each reaches exactly one element on one shop's pane, so a
+   face is a brand's signature and never a voice the app speaks in: the tabs, the cards and
+   every word outside a masthead stay in the three faces above. */
+@import '@fontsource/graduate/latin-400.css';
+@import '@fontsource/bebas-neue/latin-400.css';
+@import '@fontsource/pacifico/latin-400.css';
+@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource/bungee/latin-400.css';
+
+/* VU Campus Store — the crest bar's blurb and the pennant hung under it. */
+@import '@fontsource/libre-baskerville/latin-400.css';
+@import '@fontsource/alfa-slab-one/latin-400.css';
+
+/* Veridan Delivery — the waybill's address block and the code under its barcode. */
+@import '@fontsource/archivo/latin-500.css';
+@import '@fontsource/roboto-mono/latin-700.css';
+
+/* GirlTime — what the shop says, and the bubble it says it in. */
+@import '@fontsource/quicksand/latin-600.css';
+@import '@fontsource/baloo-2/latin-800.css';
+
+/* LUXURYNOW — the standfirst under the name, and the dateline over it. */
+@import '@fontsource/jost/latin-400.css';
+@import '@fontsource/italiana/latin-400.css';
+
+/* MerchMogul — the line above the name, and the stub torn off the marquee. */
+@import '@fontsource/chivo/latin-600.css';
+@import '@fontsource/anton/latin-400.css';

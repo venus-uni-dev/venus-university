@@ -1,0 +1,140 @@
+/* Profile picture: the neutral sprite with the archway her portrait is cut out of laid
+   over it. The frame is dragged directly and does not go through motion. */
+
+/* The Edit modal's chassis, for the repair's reason: this is one of its pictures, opened — but
+   at half its size, since what is framed here is a head and not the whole of her. One column
+   rather than the repair's two: a head is all there is to look at here, so the picture takes
+   the panel and its two controls stack under it. It takes no width of its own — the window is
+   fixed, and the panel is that plus its padding. No `overflow` — the title tab overhangs the
+   top edge. */
+.vu-pic {
+  --paper-offset: 11px 10px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: calc(100% - 60px);
+  padding: 34px 44px 30px;
+  border-radius: 90px 0 0 90px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The box hugs the window rather than taking the panel's width: the window carries the arch's
+   own ratio, so the largest frame is the whole of it — and the padding is the room a handle
+   needs when the frame is against an edge, which is now where a frame commonly is. It clips
+   rather than scrolls: nothing here is off-screen to reach, and the arch's dimming is a shadow
+   the size of the room. */
+.vu-pic-stage-box {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  height: 528px;
+  padding: 16px;
+  border-radius: 30px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+/* Sized off the window's own aspect, written from React, so a percentage inside it is a share
+   of the window and the frame needs nothing measured to place itself. It does not clip: the
+   handles on an edge-to-edge frame hang over it. */
+.vu-pic-stage {
+  position: relative;
+  flex: none;
+  height: 100%;
+  aspect-ratio: var(--stage-w, 5) / var(--stage-h, 6);
+}
+
+/* What the window shows of the sprite. The clip is here rather than on the stage above it,
+   which the handles overhang. */
+.vu-pic-window {
+  position: absolute;
+  display: block;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* What will be kept. Positioned in shares of the sprite written from React, so a drag moves
+   one box and lays out nothing else. */
+.vu-pic-frame {
+  position: absolute;
+  left: var(--crop-x, 0%);
+  top: var(--crop-y, 0%);
+  width: var(--crop-w, 40%);
+  height: var(--crop-h, 40%);
+  touch-action: none;
+}
+
+/* The archway, and the dimming in one rule: a spread shadow the size of the panel paints
+   everything the arch is not, so the hole is exactly the shape of the picture. */
+.vu-pic-arch {
+  position: absolute;
+  inset: 0;
+  border: 2.5px solid var(--vu-accent);
+  border-radius: 999px 999px 0 0;
+  box-shadow: 0 0 0 4000px color-mix(in srgb, var(--vu-accent-shadow) 62%, transparent);
+  pointer-events: none;
+}
+
+/* Two tones so a corner reads over hair, skin and a background alike — the brush cursor's
+   trick. They sit on the frame's corners, half outside it, where the pointer expects. */
+.vu-pic-handle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--vu-accent);
+  border-radius: 7px;
+  background: var(--vu-surface);
+  outline: 1px solid var(--vu-accent-shadow);
+}
+
+.vu-pic-handle--nw {
+  left: -11px;
+  top: -11px;
+}
+
+.vu-pic-handle--ne {
+  right: -11px;
+  top: -11px;
+}
+
+.vu-pic-handle--sw {
+  left: -11px;
+  bottom: -11px;
+}
+
+.vu-pic-handle--se {
+  right: -11px;
+  bottom: -11px;
+}
+
+/* The window's box of the sprite, filling the element it is shown in: the sprite blown up
+   until the box's width fills the element, then shifted so the box's corner lands on the
+   element's. The three values are worked out where the pixels are — `calc()` cannot divide
+   by a percentage. */
+.vu-pic-fitted {
+  position: absolute;
+  left: var(--pv-x, 0%);
+  top: var(--pv-y, 0%);
+  width: var(--pv-w, 100%);
+  max-width: none;
+  height: auto;
+}
+
+/* Centred under the picture it resets, and the panel's only control that acts on the frame
+   rather than answering the modal. */
+.vu-pic-reset {
+  align-self: center;
+}
+
+/* A rule says which of the two the buttons under it are: what is above it moves the frame,
+   what is below it closes the modal — the line the Edit panel draws over its name actions. */
+.vu-pic-answers {
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--vu-border);
+}

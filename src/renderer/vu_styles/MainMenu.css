@@ -1,0 +1,182 @@
+/* The Main Menu's own layout. Only the four full-screen layers and the
+   link row are placed absolutely — they anchor to the stage, which is 1080 tall
+   at every window size; the rack's
+   contents are ordinary flex and gap. */
+.vu-menu {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The idle scene: one layer per background, the newest last in the DOM so
+   it paints over the one it replaces. The container clips what the slow zoom
+   and pan push past the frame. */
+.vu-menu-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.vu-menu-bg-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.vu-menu-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.9);
+}
+
+/* The ground washing in from the left, so the rack has something to sit on. */
+.vu-menu-wash {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--vu-ground) 75%, transparent),
+    color-mix(in srgb, var(--vu-ground) 35%, transparent) 44%,
+    transparent 68%
+  );
+}
+
+/* A tease, not a spoiler: her outline in the surface colour, on one hard shadow.
+
+   An SVG filter and not a CSS mask, though a mask is the obvious reach: a mask is fetched
+   under CORS, and `charimg://` is a privileged scheme without it (`charImageProtocol.ts`), so
+   the mask never loaded and the layer drew nothing at all. A filter reads the image the `img`
+   element already has. Nor a filter chain — `brightness(0) invert(1)` can only reach white,
+   and this has to be a colour role so it follows the hour.
+
+   `feFlood` + `feComposite in` is "her alpha, filled"; `feDropShadow` at `stdDeviation: 0` is
+   the shadow law's hard offset copy. The two colours are `flood-color` on the primitives,
+   which is a CSS property — so they are roles like everything else, resolved off the theme on
+   `.vu-menu` above them. `color-interpolation-filters` is sRGB because SVG's own default is
+   linearRGB, which would flood a different colour than the token names. */
+.vu-menu-silhouette {
+  position: absolute;
+  right: 60px;
+  bottom: -560px;
+  height: 1560px;
+  filter: url('#vu-silhouette');
+}
+
+/* The filter carries no picture and takes no room; it is the recolouring, kept in the DOM
+   under the theme it reads. */
+.vu-menu-silhouette-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.vu-menu-silhouette-ink {
+  flood-color: var(--vu-surface);
+}
+
+.vu-menu-silhouette-cast {
+  flood-color: var(--vu-shadow);
+}
+
+/* The rack is an archway passing through the top edge rather than sitting in
+   the frame: its flat top and left are off-screen, leaving one great arc. It
+   runs past the bottom edge too — the tilted shadow drops some 23px below the
+   face at the near corner, and neither may show an end. */
+.vu-menu-rack {
+  --paper-offset: 16px 14px;
+  position: absolute;
+  inset: -90px auto -60px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: 520px;
+  padding: 130px 64px 120px 56px;
+  border-radius: 0 385px 0 0;
+}
+
+/* Punches out past the arc on the right — the one thing allowed to. The
+   negative margins absorb the wordmark's own transparent border, so they scale
+   with the width.
+
+   The turn is how a bitmap follows the hour: the role is 0° by day and cools the warm crimson
+   script toward the night surfaces after dark (tokens.css). `breathe` animates `scale`, so
+   the two never contend for the same property. */
+.vu-menu-logo {
+  width: 800px;
+  margin: -32px 0 -27px -13px;
+  filter: hue-rotate(var(--vu-wordmark-hue));
+}
+
+.vu-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vu-menu-rule {
+  height: 3px;
+  margin: 0;
+  border: 0;
+  border-radius: 99px;
+  background: var(--vu-tint);
+}
+
+/* App admin, below the rule: quiet tags that hug their own words. */
+.vu-menu-admin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.vu-menu-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.vu-menu-setup {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vu-accent);
+  font: italic 600 15px var(--font-body);
+  text-decoration: underline;
+}
+
+.vu-menu-version {
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+}
+
+.vu-menu-links {
+  position: absolute;
+  right: 56px;
+  bottom: 44px;
+  display: flex;
+  gap: 14px;
+
+  /* One shared lean for the cluster, shallower than the paper tilt it sits on. */
+  > * {
+    rotate: -1deg;
+  }
+
+  /* The chip that is a real button: its face is the paper pseudo, which a UA background
+     and border would paint over. */
+  > button {
+    border: 0;
+    background: none;
+  }
+
+  /* The shared heart is drawn at 24 and sits here at the other marks' 16, its stroke handed
+     in by the caller. */
+  .vu-menu-heart {
+    width: 16px;
+    height: 16px;
+  }
+}

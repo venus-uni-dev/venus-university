@@ -1,0 +1,147 @@
+/* The self-improvement screen: an accent and a sheet rising out of the bottom of the stage,
+   the title over the sheet's crown, and the chart printed on it. Layout only — every clock is
+   `views/motion.ts`'s. */
+
+/* The veil gives up its centring and its padding for this one: every layer is placed against the
+   stage's own edges, and all of them run off the bottom of it. */
+.vu-rank {
+  overflow: hidden;
+}
+
+/* The shape both layers are: **a half-pill**, the app's own shape, whose foot runs below the
+   stage so it rises out of it rather than sitting on it. The crown is the shape's full 999px — two
+   quarter circles meeting over the middle — which is what a half-pill is, and the lean is the whole
+   of "angled towards the top right": a turn about a foot nobody can see reads as a tilt and not as
+   a rotation. */
+.vu-rank-scrim,
+.vu-rank-sheet {
+  position: absolute;
+  bottom: -80px;
+  border-radius: 999px 999px 0 0;
+  transform-origin: bottom center;
+}
+
+/* The announcement: the crossing's own accent at 60%, said again rather than shared — that is a
+   sheet crossing the stage and this one stands still on it. It sits **left of the sheet and a
+   little above it**, so what shows is one shoulder, which is what makes the pair read as two
+   layers rather than as a sheet with a coloured edge. It leans further than the sheet it is
+   under, so the two edges are read as two. */
+.vu-rank-scrim {
+  left: 11%;
+  right: 34%;
+  top: 196px;
+  background: color-mix(in srgb, var(--vu-accent) 60%, transparent);
+  rotate: 8deg;
+}
+
+/* And the surface everything is read on. It carries no `overflow`: nothing on it is clipped, and
+   a sheet that cropped itself would cut off the pills that ride its own shoulders. */
+.vu-rank-sheet {
+  left: 19%;
+  right: 19%;
+  top: 176px;
+  background: var(--vu-surface);
+  rotate: 4deg;
+}
+
+/* The title, a child of the veil rather than the sheet, so it grows in place on its own clock.
+   It tips counter-clockwise where the two sheets tip clockwise, and sits onto the crown so the
+   word crosses the sheet's own top edge rather than floating clear of it. */
+.vu-rank-title {
+  position: absolute;
+  left: 50%;
+  top: 75px;
+  translate: -52% 0;
+  rotate: -3deg;
+  transform-origin: center center;
+}
+
+/* Larger than a screen's own title: this one is the whole of what the screen is for, and it is
+   read across a sheet the size of the stage. */
+.vu-rank-title .vu-title-text {
+  font-size: 64px;
+}
+
+/* The chart, centred on the sheet it is printed on: a bigger box than the landing's rather than a
+   scaled one, since every badge offset in `StatRadar.css` is measured off its own corners. */
+/* **Its size is the pills' spacing and its seat is their clearance.** A pill that crossed a tier
+   stands half again as large and goes on beating there, so the box is wide enough that the Body
+   pill never reaches the Heart one, and high enough on the sheet that it never reaches the answer
+   in the corner below it — the two are clear in the vertical, which is what a box either side of
+   a band needs. */
+/* **Its width is a number capped by the sheet's**, and both halves are load-bearing. The number is
+   what places the pills where the eye wants them at 16:9 — a box grown to the whole sheet pushes
+   the two on the bottom row out onto its shoulders — and the cap is what keeps them on the paper
+   at 1440, where the stage narrows and the sheet narrows with it. */
+.vu-rank-radar {
+  position: absolute;
+  left: 50%;
+  top: 90px;
+  translate: -50% 0;
+  width: min(900px, calc(100% - 68px));
+  height: 600px;
+  rotate: -4deg;
+}
+
+/* What "read at reading distance" means for the parts inside it: the same shape, drawn larger.
+   The chart is an SVG and simply gets a bigger box; the pills get the type and the padding a
+   half-metre-wide sheet asks for. */
+.vu-rank-radar .vu-radar-chart {
+  top: 150px;
+  width: 400px;
+  height: 400px;
+}
+
+.vu-rank-radar .vu-radar-badge {
+  gap: 12px;
+  padding: 10px 22px 10px 16px;
+}
+
+.vu-rank-radar .vu-radar-badge svg {
+  width: 30px;
+  height: 30px;
+}
+
+.vu-rank-radar .vu-radar-stat {
+  font-size: 15px;
+}
+
+/* **Sized for three at once in the narrower band, not for one at 16:9.** A slot can cross every
+   tier it has, and all three pills stand half again as large at the same moment; this size is
+   what still leaves the two on the bottom row a gap between them when they do, on a 1440 stage,
+   with both of them reading `Unremarkable` — the widest word on the ladder, and the one a pill
+   holds all the way through the swap, its cell being as wide as the wider of the two readings. */
+.vu-rank-radar .vu-radar-tier {
+  font-size: 22px;
+}
+
+.vu-rank-radar .vu-radar-points {
+  font-size: 15px;
+}
+
+/* What the pill said, written down. It mirrors the answer on the sheet's other shoulder — the
+   sheet spans `left: 19%` to `right: 19%`, so this stands just inside its left edge — and it tips
+   counter-clockwise with the foot and the title against the surface it overlaps. One line per stat
+   that moved, in the mono a reading is said in. */
+.vu-rank-note {
+  position: absolute;
+  left: calc(19% + 60px);
+  bottom: 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--vu-text-muted);
+  font: 500 14px var(--font-mono);
+  letter-spacing: 0.04em;
+  rotate: -3deg;
+}
+
+/* A child of the veil, so it neither leans with the sheet nor rides its rise. Drawn over the
+   sheet's own right edge rather than the stage's corner, tipping counter-clockwise with the
+   title. */
+.vu-rank-foot {
+  position: absolute;
+  right: 200px;
+  bottom: 46px;
+  rotate: -3deg;
+}

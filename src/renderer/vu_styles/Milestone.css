@@ -1,0 +1,122 @@
+/* One girl's milestones: her standing over the sheet, what the scene reached said beside
+   her with its phrase marked, and the mark it is all read against. Layout only — every clock is
+   `views/motion.ts`'s. */
+
+/* The veil keeps its dimming and its padding; what it gives up is `overflow`, since the mark
+   behind the panel runs off three of the stage's edges on purpose. */
+.vu-mile-veil {
+  overflow: hidden;
+}
+
+/* The mark's size is a share of the stage written in px, since a percentage here would be a
+   share of the veil instead. It peeks past the panel's edges, reading as its ground. */
+.vu-mile-heart {
+  position: absolute;
+  left: -170px;
+  top: 50%;
+  width: 880px;
+  height: 880px;
+  translate: 0 -50%;
+  color: color-mix(in srgb, var(--vu-accent) 62%, transparent);
+  pointer-events: none;
+}
+
+/* A loss is drawn in the state colour, at the same weight: what changes is the shape and the
+   hue, never how loudly either is said. */
+.vu-mile-heart--broken {
+  color: color-mix(in srgb, var(--vu-danger) 62%, transparent);
+}
+
+.vu-mile-heart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* **It is filled as well as drawn**, and the fill is the fainter of the two: an outline alone
+   at this size is a wire over whatever the scene behind it happens to be, and the shape has to
+   read as a symbol standing behind the panel. `fill` is a presentation attribute on the mark
+   itself, which a rule here is allowed to overrule. */
+.vu-mile-heart svg path {
+  fill: color-mix(in srgb, currentColor 34%, transparent);
+}
+
+/* The panel: **a true half-pill**, flat on its right where the tab hangs off that corner —
+   so no `overflow` here either. Its left padding is the room she stands in: the text column
+   starts clear of her rather than being laid over her. */
+.vu-mile {
+  --paper-tilt: -1.1deg;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: min(1120px, 100%);
+  padding: 46px 54px 40px 430px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text);
+}
+
+/* Her, over the sheet, left of the panel's centre. `scale` is CSS, composing under motion's `x`,
+   for a zoom that stands a little closer than the stage does. `bottom` drops the stand by what
+   the zoom adds above the stage, so the tallest head stays clear of the veil's cut. */
+.vu-mile-stand {
+  position: absolute;
+  bottom: -118px;
+  left: calc(50% - 376px);
+  translate: -50% 0;
+  scale: 1.1;
+  transform-origin: bottom center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.vu-mile-said {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Her name over her lines: the sentences already say it, but the column is about one person and
+   a list of three that opens with her name three times reads as three people. */
+.vu-mile-name {
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vu-mile-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* One milestone, in the voice the dialogue box said it in: a sentence, not a chip. */
+.vu-mile-lines li {
+  padding-left: 22px;
+  border-left: 4px solid var(--vu-accent);
+  color: var(--vu-text);
+  font: 400 25px/1.35 var(--font-body);
+}
+
+/* The phrase the milestone is carried in, and the seat of the splash thrown off it when its row
+   lands. Ink and nothing else; a loss is drawn in the state
+   colour, which is the broken heart's own. */
+.vu-mile-mark {
+  position: relative;
+}
+
+.vu-mile-mark[data-tone='gain'] {
+  color: var(--vu-accent);
+}
+
+.vu-mile-mark[data-tone='loss'] {
+  color: var(--vu-danger);
+}

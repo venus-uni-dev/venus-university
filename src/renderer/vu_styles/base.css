@@ -1,0 +1,1100 @@
+/* Shapes and primitives every screen shares. Layout stays in the screen's own file.
+   `body` takes the ink and the font family once, with no size — a screen states its own
+   sizes on its own elements. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The paper layer: the element is transparent, `::after` its face and `::before` its shadow
+   behind it. A rotated element is a stacking context, so a negative-z pseudo paints above its
+   own background, not the page's. */
+.vu-paper {
+  --paper-offset: 8px 7px;
+  --paper-tilt: -2deg;
+  position: relative;
+  isolation: isolate;
+}
+
+.vu-paper::before,
+.vu-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--paper-face, var(--vu-surface));
+  border: var(--paper-border, 0);
+}
+
+.vu-paper::before {
+  z-index: -2;
+  background: var(--paper-shadow, var(--vu-shadow));
+  translate: var(--paper-offset);
+  rotate: var(--paper-tilt);
+}
+
+/* A vertical list of buttons fans like a dealt hand: the first leans
+   counter-clockwise and each one after it steps clockwise, pivoting on the
+   flat edge they share. Restarts inside every list that carries the class. */
+.vu-fan > * {
+  rotate: calc(var(--fan-start, -1.5deg) + (sibling-index() - 1) * var(--fan-step, 0.75deg));
+}
+
+/* Action = half-pill, flat left: the text sits toward the flat edge. */
+.vu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 38px 18px 30px;
+  border: 0;
+  border-radius: 0 999px 999px 0;
+  background: none;
+  color: var(--vu-accent);
+  font: 800 25px var(--font-body);
+  text-align: left;
+  transform-origin: left center;
+}
+
+.vu-btn--primary {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  padding-block: 22px;
+  color: var(--vu-accent-ink);
+  font-size: 28px;
+}
+
+/* **It names its own shadow for the primary's reason** — these properties inherit, and a panel
+   put its own under one by day. */
+.vu-btn--outline {
+  --paper-border: 3.5px solid var(--vu-accent);
+  --paper-shadow: var(--vu-shadow);
+}
+
+/* Quiet: no paper layer at all — the shadow is what marks weight. */
+.vu-btn--quiet {
+  padding: 11px 26px 11px 29px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 700 19px var(--font-body);
+}
+
+/* The bookkeeping half of a button: a subline, or the reason it is dead. */
+.vu-btn-sub {
+  font: italic 400 15px var(--font-mono);
+  opacity: 0.8;
+}
+
+/* A dead control keeps its face and loses its shadow. The layer goes outright rather
+   than by its fill alone: an outline's shadow is its `--paper-border`, and a transparent
+   background leaves that tilted rule standing behind the button. */
+.vu-paper:disabled::before {
+  display: none;
+}
+
+/* A modal panel's primary, at panel rather than menu size. The paper offset stays
+   `.vu-paper`'s, so `press` still lands the button flat on its shadow. */
+.vu-btn--panel {
+  flex: none;
+  padding: 14px 30px 14px 24px;
+  font-size: 19px;
+}
+
+/* The row of answers a modal ends in: the primary rightmost, quiet actions before it.
+   A panel that also has something to say about itself stacks that above this row. */
+.vu-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 30px;
+  justify-content: flex-end;
+}
+
+/* An answer in a foot swells in place rather than lunging at the one beside it. `.vu-btn`
+   pivots on its flat edge for the fan (below), which in a right-aligned row of answers sends
+   the whole of a hover's tenth into the gap on the right — 28px of it for a label as long as
+   "Back to character select", which is more than any gap worth leaving between two words. */
+.vu-foot > button {
+  transform-origin: center;
+}
+
+/* A note modal's panel: prose, whatever it shows, and a foot. The Feedback and Support
+   Development modals wear it.
+
+   No `overflow` here: the tab overhangs the panel's top edge, and the paper layer's own
+   shadow is a pseudo-element this box would clip with it. */
+.vu-note {
+  --paper-offset: 11px 10px;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(760px, 100% - 60px);
+  padding: 54px 64px 42px 96px;
+  border-radius: 140px 0 0 140px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+.vu-note-text {
+  margin: 0;
+  color: var(--vu-text-body);
+  font: 500 17px/1.6 var(--font-body);
+}
+
+.vu-note-foot {
+  margin-top: 10px;
+}
+
+/* The one line a list with nothing in it says, in the app's voice: an empty state, designed
+   rather than blank. */
+.vu-empty {
+  margin: 0;
+  padding: 22px 0;
+  color: var(--vu-text-muted);
+  font: italic 500 15px var(--font-body);
+}
+
+/* Where the panel around it already gives the gap its own padding. */
+.vu-empty--flush {
+  padding: 0;
+}
+
+/* A small square control beside a field or a value — the name dice, a stepper. Recessed
+   and flat: it is an adjustment, not an answer. */
+.vu-square {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--vu-recessed);
+  color: var(--vu-accent);
+  font: 700 22px var(--font-body);
+}
+
+/* A stepper's own size: a smaller square than the base one, beside a reading it walks. */
+.vu-square--step {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+}
+
+/* Neutral full pill: tags, links, small state chips. */
+.vu-chip {
+  --paper-offset: 6px 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  color: var(--vu-text);
+  font: 700 15px var(--font-mono);
+  text-decoration: none;
+}
+
+/* Icons are inline SVG drawn in currentColor, so one rule tints them. */
+.vu-chip svg {
+  color: var(--vu-accent);
+}
+
+/* The flat outline pill: a utility beside the thing it acts on, never the answer a screen or
+   a foot offers, which is a `.vu-btn`. Mono and un-accented, so a row reads as bookkeeping. */
+.vu-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 20px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 15px var(--font-mono);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Its mark is the accent, as a chip's is. */
+.vu-pill svg {
+  color: var(--vu-accent);
+}
+
+/* An outward link inside prose: underlined at rest, so it says it leaves the app
+   before the cursor is ever on it. */
+.vu-link {
+  color: var(--vu-accent);
+  text-decoration: underline;
+}
+
+/* A row in a list inside a panel: a credit, a save, a playthrough. Quiet — a list row
+   carries no paper layer, the shadow being what marks weight — and flat right, the
+   surface shape a checklist row wears. The list it sits in owns the gap between rows. */
+.vu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 22px 12px 26px;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* The column a panel's rows stand in; the list owns the gap between them. */
+.vu-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The ✕ that removes the thing it sits on — a card on the roster, a save in a list. A
+   surface circle with a danger mark, and always a sibling of whatever face it rides, never
+   inside it: a button in a button is invalid, and nesting is what would make a click on the
+   ✕ also open the thing. Its position is the caller's. */
+.vu-x {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-danger);
+}
+
+/* A set's count, drawn in what it is saying about itself: complete, short, or covered —
+   where the art is hidden it reports nothing, a `7/7` over a cover being a boast about
+   pictures the player cannot see. */
+.vu-count {
+  font: 700 13px var(--font-mono);
+}
+
+.vu-count--good {
+  color: var(--vu-good);
+}
+
+.vu-count--warn {
+  color: var(--vu-warn);
+}
+
+.vu-count--muted {
+  color: var(--vu-text-muted);
+}
+
+/* A bar with a count behind it: the share done, as a recessed pill with an accent fill that
+   grows under `FILL`. A caller states only its own height. */
+.vu-track {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--vu-tint);
+  overflow: hidden;
+}
+
+/* `display: block` on both — `.vu-crop`'s lesson again — since the pair has to be `span`s
+   inside a row whose body is phrasing content. */
+.vu-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--vu-accent);
+}
+
+/* Something waiting or working, turning under `spin`. Each caller states its own size and,
+   where it is not `currentColor`, its own tone. */
+.vu-ring {
+  width: 12px;
+  height: 12px;
+  border: 2.5px dotted currentColor;
+  border-radius: 999px;
+}
+
+/* Archway = people, and a card of one is two elements: the paper layer, and
+   the crop that clips the sprite — `overflow: hidden` on the paper element would
+   cut off its own shadow pseudo. The crop covers the face pseudo, so a state's
+   border goes on the crop and never through `--paper-border`. */
+.vu-arch {
+  --paper-face: var(--vu-recessed);
+  border-radius: 999px 999px 0 0;
+}
+
+/* Nothing in it yet: no paper layer, so the element paints its own face. */
+.vu-arch:not(.vu-paper) {
+  background: var(--vu-recessed);
+}
+
+/* `display: block` is load-bearing: inside a `<button>` the crop has to be a `span`, and an
+   inline box clips nothing — `overflow` and `height` do not apply to it, and the image
+   inside paints square over the arch. */
+.vu-crop {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* The picture that fills a face crop. An opt-in class rather than `.vu-crop img`, which would
+   out-specify `.vu-card-sprite`'s own crop inside a card. */
+.vu-crop-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+/* Sprites are full-body 1160x1696 but display thigh-up: the container shows the top of the
+   image, scaled so that at full size the visible portion fills the stage's own height. The PNG
+   itself is never modified — this is a CSS crop.
+
+   **The dim on whoever is not speaking is not here**: motion writes the `filter`
+   (`spriteLit`/`spriteDim`), so the stage keeps no transition of its own for it. */
+.vu-stage-portrait {
+  /* `flex: none` keeps the image at its natural size so it overflows its wrapper rather than
+     being squeezed into what is left of the screen. With the height anchored to the stage, that
+     is also what guarantees a sprite never shrinks as more characters join the row. */
+  flex: none;
+  height: calc(1782px * var(--stage-char-scale, 1)); /* 1080 visible at full size */
+  width: auto;
+  max-width: none;
+  object-fit: cover;
+  object-position: top center;
+  /* Constant, deliberately *not* scaled: it puts the image's bottom edge 702px below the frame,
+     and that edge is the ground everyone stands on. A shorter character is shorter at the
+     head — her feet do not rise. */
+  margin-bottom: -702px;
+}
+
+/* Back on a screen, and the eye that opens a gallery — never a modal's close, which
+   is a worded button. A row's eye resizes it and keeps everything else. */
+.vu-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-accent);
+}
+
+/* A card of one archway: the card is the hover target, so the arch, caption and corner
+   controls lift together. The paper knobs are declared here rather than on `.vu-paper` so
+   motion, which targets this element, reaches the arch's inherited shadow too. */
+.vu-card {
+  --paper-offset: 8px 7px;
+  --paper-tilt: -2deg;
+  --caption-h: 50px;
+  --card-gap: 12px;
+  position: relative;
+}
+
+/* The arch alone: a `.vu-btn.vu-paper` sharing the tile (Manage's Retry) keeps its own. */
+.vu-card .vu-arch.vu-paper {
+  --paper-offset: inherit;
+  --paper-tilt: inherit;
+}
+
+/* A real button when the card opens something, a plain div when it does not. */
+.vu-card-face {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+.vu-card-crop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 20px;
+}
+
+/* A slot with nobody in it: dashed, and quiet — the tile carries no paper layer either. */
+.vu-card-crop--empty {
+  border: 3.5px dashed var(--vu-border);
+  background: color-mix(in srgb, var(--vu-surface) 60%, transparent);
+}
+
+/* Sprites are full-body: the card shows the top of her so the face reads at this size,
+   cropping in CSS and never touching the PNG. How close the camera stands is
+   `--card-zoom`, so a screen that wants a nearer crop says only that. */
+.vu-card-sprite {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: calc(var(--card-zoom, 1.3) * 100%);
+  object-fit: cover;
+  object-position: top;
+}
+
+/* Two rows, and a fixed height whether or not the second one has anything in it, so every
+   caption in the grid occupies the same band and the rows stay aligned. */
+.vu-card-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: var(--caption-h);
+  max-width: 100%;
+}
+
+.vu-card-name {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--vu-text);
+  font: 700 17px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The surname as a letterspaced mono strip — the contact view's anatomy, which is
+   what lets a name as long as "Florentine Chastain" sit in a 220px card. */
+.vu-card-surname {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* `.vu-x` is the circle; this says only where it sits on a card. */
+.vu-card-x {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+}
+
+/* A place the reader goes, drawn as a tile: flat left like every action shape, with a screen
+   setting its own size, lean and face. The paper knobs are declared here since motion animates
+   them, and an undeclared custom property reads as 0 under a hover. */
+.vu-tile {
+  --paper-offset: 9px 8px;
+  --paper-tilt: -2deg;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0 var(--tile-radius, 64px) var(--tile-radius, 64px) 0;
+  background: none;
+  color: var(--vu-accent);
+  transform-origin: left center;
+}
+
+/* The count on it, and the ring around it is a cutout rather than a border: it is the surface
+   the tile is drawn on, so the badge reads as a hole punched through it. **It rides the square
+   corner** — a count hung off the round end floats beside the tile instead of on it. */
+.vu-tile-badge {
+  position: absolute;
+  top: -12px;
+  left: -10px;
+  padding: 3px 11px;
+  border: 3.5px solid var(--vu-surface);
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  font: 700 14px var(--font-mono);
+}
+
+/* The wide half-pill panel a list modal is drawn on: a column of rows under a capped height,
+   the same chassis behind the picker, the cast, the chat log, the credits and Load Game. */
+.vu-sheet {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(1240px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 56px 70px 50px 250px;
+  border-radius: 330px 0 0 330px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The same panel at sprite width: two panes side by side, the flattest tilt there is, and no
+   cap — the Edit modal and the wardrobe repairs opened out of it. */
+.vu-sheet--wide {
+  --paper-offset: 11px 10px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  gap: 38px;
+  width: min(1800px, 100% - 60px);
+  padding: 38px 50px 34px 116px;
+  border-radius: 90px 0 0 90px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The box that holds a scroller. `flex: 0 1 auto`, never `1 1 0`: it asks for its full height
+   and gives it back only once the panel is against its cap, which is where the scrolling
+   starts. The negative margin is room for what a hover lifts past a row, which the scroller
+   clips in both axes — the scroller's own padding hands it back, so the fade at this box's
+   foot lands on the scroller's own edge. */
+.vu-scroll-box {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: -4px -6px;
+}
+
+/* The soft end of a scroller: a strip of the surface fading up over the last row, absolute
+   against the box that holds the scroller, and never in the pointer's way. */
+.vu-scroll-fade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 34px;
+  background: linear-gradient(transparent, var(--vu-surface));
+  pointer-events: none;
+}
+
+/* A screen's name, on its own tint blob. The blob rotates, the word never does;
+   `isolation` keeps the negative-z pseudo above the screen's ground instead of behind it. */
+.vu-title {
+  position: relative;
+  isolation: isolate;
+}
+
+.vu-title::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -12px -14px -14px 14px;
+  border-radius: 26px;
+  background: var(--vu-highlight);
+  rotate: -4deg;
+}
+
+.vu-title-text {
+  margin: 0;
+  font: 400 52px var(--font-display);
+  white-space: nowrap;
+}
+
+/* A modal's title on a tab over its own corner: accent-filled, and flat right to oppose the
+   panel under it. The panel isolates, so its `z-index: 10` is scoped there — without it, a
+   scroller or sticker later in the DOM would paint over the tab by tree order. */
+.vu-tab {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  --paper-offset: 9px 7px;
+  position: absolute;
+  z-index: 10;
+  top: -40px;
+  right: 64px;
+  margin: 0;
+  padding: 14px 34px 14px 44px;
+  border-radius: 999px 0 0 999px;
+  color: var(--vu-accent-ink);
+  font: 400 30px var(--font-display);
+  white-space: nowrap;
+  rotate: -2deg;
+}
+
+/* ---- the modal veil ------------------------------------------------------- */
+/* Not a screen's layout: the shell every modal wears. */
+
+/* `absolute` inside `#root` matches the veil to the stage exactly, so a dim never reaches the
+   letterbox, and centring on it centres on the stage in every band. `z-index: 100` sits above
+   the Game View's own stacked chrome, which tops out at 3. */
+.vu-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  /* Definite tracks in both axes, or the panel is the one sizing them: an auto track takes
+     its size from the item, and a percentage on the panel then resolves against the panel's
+     own content. On the column that made a 1477px panel inside a 1440px stage; on the row it
+     makes a `max-height: 100%` panel no shorter than the list inside it, so a long one grows
+     off the stage instead of scrolling. `center` still centres the panel in both. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: 22px;
+  background: color-mix(in srgb, var(--vu-accent-shadow) 60%, transparent);
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* No padding for a modal that is a screen rather than a panel on one — a contact's page and
+   the self-improvement screen both bleed past where dimming would frame them. */
+.vu-veil--bare {
+  padding: 0;
+}
+
+/* ---- form controls -------------------------------------------------------- */
+/* Draws nothing for focus: nothing walks this window, so a field marks itself only by the
+   caret already blinking in it. */
+
+
+.vu-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vu-field-label {
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The label's second line: a placeholder-toned aside on the shape of text the
+   field wants. */
+.vu-field-hint {
+  color: var(--vu-text-muted);
+  font: 500 12.5px/1.4 var(--font-body);
+  font-style: italic;
+  margin-top: -2px;
+}
+
+/* Pill single-line, rounded box multiline. Fields never rotate and never carry a
+   shadow — a well is not a sheet of paper. */
+.vu-input {
+  width: 100%;
+  padding: 11px 18px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font: 500 14px/1.55 var(--font-body);
+}
+
+.vu-input--multiline {
+  padding: 14px 18px;
+  border-radius: 20px;
+  resize: vertical;
+}
+
+.vu-input--grow {
+  overflow-y: hidden;
+  resize: none;
+}
+
+.vu-input::placeholder {
+  color: var(--vu-text-muted);
+  font-style: italic;
+}
+
+.vu-select {
+  padding-right: 40px;
+  appearance: none;
+}
+
+/* The dropdown caret `appearance: none` hides on the native control, drawn here instead on
+   whichever box holds the select. */
+.vu-field:has(> .vu-select)::after,
+.vu-chips-pick::after {
+  content: '▾';
+  position: absolute;
+  right: 18px;
+  bottom: 13px;
+  color: var(--vu-accent);
+  font: 800 13px var(--font-body);
+}
+
+.vu-check {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The real control, kept focusable and keyboard-operable under the box drawn for it. */
+.vu-check-input {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  opacity: 0;
+}
+
+.vu-check-box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--vu-border);
+  border-radius: 9px;
+  background: var(--vu-ground);
+}
+
+.vu-check-box::after {
+  content: '✓';
+  color: var(--vu-accent-ink);
+  font: 700 15px var(--font-body);
+  opacity: 0;
+}
+
+.vu-check-input:checked + .vu-check-box {
+  border-color: var(--vu-accent);
+  background: var(--vu-accent);
+}
+
+.vu-check-input:checked + .vu-check-box::after {
+  opacity: 1;
+}
+
+.vu-check-label {
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+}
+
+/* What a set costs to render, beside the name of it — the queue is serial and
+   hours are real, so the price is on the checkbox rather than in a warning after. */
+.vu-check-meta {
+  color: var(--vu-text-muted);
+  font: 500 13px var(--font-mono);
+}
+
+/* A box whose label is followed by a sentence, not a count: it aligns with the first line
+   rather than centring itself against a paragraph, which is what `.vu-check`'s own `center`
+   would do. */
+.vu-check--noted {
+  align-items: flex-start;
+}
+
+.vu-check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* What turning it on actually costs — the whole of what the app promises about the setting,
+   so it is said at rest and in full. */
+.vu-check-note {
+  color: var(--vu-text-muted);
+  font: 500 14px/1.5 var(--font-body);
+}
+
+/* A value set by dragging, where the approximate value is the point and the exact one is
+   read off the number beside it. The track is the progress bar's — a sand pill with an
+   accent fill — and `--range-fill` is how far along it the thumb sits, set per element.
+   Like a field it never rotates and carries no shadow. */
+.vu-range {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  background: none;
+  appearance: none;
+}
+
+.vu-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--vu-accent), var(--vu-accent)) 0 / var(--range-fill, 0%) 100% no-repeat,
+    var(--vu-tint);
+}
+
+.vu-range::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  margin-top: -7px;
+  border: 3px solid var(--vu-surface);
+  border-radius: 999px;
+  background: var(--vu-accent);
+  appearance: none;
+}
+
+/* A labelled slider is the mono label, the track and the reading beside it, or, where the
+   value has no unit anyone could read, a word at each end of the track instead. */
+.vu-range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vu-range-label {
+  flex: none;
+  width: 104px;
+  color: var(--vu-text-body);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vu-range-reading {
+  flex: none;
+  min-width: 62px;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vu-range-end {
+  flex: none;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 7px 10px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 20px;
+  background: var(--vu-ground);
+}
+
+.vu-chip-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-chip-x {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--vu-text-muted);
+  font: 700 15px var(--font-body);
+  line-height: 1;
+}
+
+.vu-chips-draft {
+  flex: 1;
+  min-width: 90px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--vu-text);
+  font: 500 14px var(--font-body);
+}
+
+.vu-chips-draft::placeholder {
+  color: var(--vu-text-muted);
+  font-style: italic;
+}
+
+.vu-chips-pick {
+  position: relative;
+  display: inline-flex;
+}
+
+.vu-chips-picker {
+  width: auto;
+  max-width: 100%;
+  padding: 6px 34px 6px 14px;
+  font-size: 13px;
+}
+
+.vu-chips-pick::after {
+  right: 14px;
+  bottom: 9px;
+}
+
+
+/* A slot in a week grid: a rounded rectangle and a quiet one — fourteen sheets of paper in a
+   panel is a pile. The grid's own layout stays per screen. */
+.vu-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 6px;
+  border: 2.5px solid transparent;
+  border-radius: 16px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: inherit;
+}
+
+.vu-slot-half {
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The one he has picked. The border is on every tile and transparent on most, so picking one
+   moves no layout. */
+.vu-slot--on {
+  border-color: var(--vu-accent);
+  background: var(--vu-highlight);
+  color: var(--vu-accent);
+}
+
+/* An hour that is already spoken for. The dead-control dim, and the thing holding it written on the
+   tile — which is why the button beneath needs no line explaining itself. */
+.vu-slot--dead {
+  opacity: 0.45;
+}
+
+/* What is holding the hour, wrapped to two lines rather than cut to a stub: a name trimmed to
+   "Florentine — Ethic…" says less than the same name over two rows. */
+.vu-slot-note {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 500 10.5px/1.3 var(--font-mono);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* A gallery: a grid of pictures is a rounded rectangle, not a pill or an archway, with quiet
+   cells — the weight in a gallery belongs to the images. A screen states its own column count. */
+.vu-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vu-gallery-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vu-gallery-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 26px;
+  background: var(--vu-recessed);
+  aspect-ratio: 1216 / 832;
+  overflow: hidden;
+}
+
+/* A gap in the set is drawn as a gap: dashed, and it says which state it is in rather
+   than showing an empty box. */
+.vu-gallery-cell--empty {
+  border: 3px dashed var(--vu-border);
+  background: none;
+}
+
+.vu-gallery-empty {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.vu-gallery-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Every image says what it is without being hovered. */
+.vu-gallery-caption {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Interaction states with no duration — everything that moves is motion's, in views/motion.ts.
+   Scoped by `[data-theme]` and written against elements rather than classes, so a screen's own
+   control gets the same states as a primitive. */
+
+/* Generated content is never a hit target: without this, sliding from a pseudo's box onto the
+   label inside it crosses element boundaries, so Chromium fires a spurious `pointerleave`/
+   `pointerover` pair with no `pointerenter`, which drops motion's hover mid-gesture. */
+[data-theme] ::before,
+[data-theme] ::after {
+  pointer-events: none;
+}
+
+/* A control the player cannot use, whatever shape it is. `.vu-paper:disabled`
+   above adds only the missing shadow — the paper layer is what marks weight. A control
+   that deals itself in carries motion's own inline `opacity`, which beats this rule, and
+   lands at the dim itself instead (`dealtItemDead`). */
+[data-theme] button:disabled {
+  opacity: 0.45;
+}
+
+/* Scoped by `[data-theme]`, the attribute every screen's root carries, so the
+   selection colour follows whichever theme is active rather than one fixed accent. */
+[data-theme] ::selection {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+/* Every surface that scrolls wears the same bar. A screen still owes the
+   fade at the foot of its own scroller, which is layout and is its own. */
+[data-theme] ::-webkit-scrollbar {
+  width: 7px;
+}
+
+[data-theme] ::-webkit-scrollbar-track {
+  border-radius: 99px;
+  background: var(--vu-tint);
+}
+
+[data-theme] ::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: var(--vu-accent);
+}

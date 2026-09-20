@@ -1,0 +1,72 @@
+/* The handover, in two panels: who the present is for, and the line the reader says as he
+   holds it out. They are one act in two steps — `Dialog.css`'s argument, where a confirm and an
+   error are one frame with two feet — so they share a file and neither owns it. Imported from
+   the view modules, never from index.css.
+
+   No mock: the first is the New Game picker's card at the size a face is chosen at, and the
+   second is the form modals' frame with one field in it. */
+
+/* ---- who it is for -------------------------------------------------------- */
+
+.vu-giftto {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  /* Sized to the faces it is offering, not to a guess: a scene holds one girl or four, and a
+     panel fixed at the widest left two faces stranded at one end of it. The floor is what the
+     title tab needs to hang over. */
+  width: fit-content;
+  min-width: 560px;
+  max-width: min(940px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 44px 60px 30px 170px;
+  border-radius: 160px 0 0 160px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* One row of faces, wrapping where a scene is crowded. It reserves what a card wears outside
+   its own box — the paper shadow and `cardLift`'s 4% — and hands it back, so the first face
+   still starts where the panel's padding puts it. */
+.vu-giftto-row {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin: -14px;
+  padding: 14px;
+  overflow: hidden auto;
+}
+
+.vu-giftto-card {
+  width: 150px;
+}
+
+/* A person is an archway, and this is her `profile.png` at the size the reader picks
+   her at — the map's face one step larger, with her given name under it. */
+.vu-giftto-arch {
+  height: 180px;
+}
+
+/* ---- and the word with it ------------------------------------------------- */
+
+.vu-giftsay {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(900px, 100% - 60px);
+  /* **The head clears the tab, which is as wide as the question on it.** The title hangs 40px
+     above the panel and its lean drops the near end another ten; at the ordinary 44 the hint
+     under it was read through the tab shadow. Whatever sits under that corner owes it the room.
+     */
+  padding: 78px 56px 28px 100px;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}

@@ -1,0 +1,5 @@
+# Copied beside the exe as `.itch.toml`; it is what the itch app launches.
+[[actions]]
+name = "play"
+path = "Venus University.exe"
+platform = "windows"

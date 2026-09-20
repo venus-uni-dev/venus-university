@@ -1,0 +1,30 @@
+/* The Game menu: the ⚙ on the rail and Escape both open it. Derived from the shape
+   grammar and the panels already built: a fan of
+   outline answers rather than a question with one answer on the right, so they read as a list.
+   Imported from the view module, never from index.css.
+
+   The veil, the tab, the fan, the buttons and the foot are base.css's. */
+
+/* No `overflow` here: the tab overhangs the panel's top edge, and the paper layer's own
+   shadow is a pseudo-element this box would clip with it. */
+.vu-menu-modal {
+  --paper-offset: 11px 10px;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: min(620px, 100% - 60px);
+  padding: 54px 60px 42px 90px;
+  border-radius: 140px 0 0 140px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* Each answer hugs its own words, as the Main Menu's own rack does — not stretched to the
+   panel's width. */
+.vu-menu-modal-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}

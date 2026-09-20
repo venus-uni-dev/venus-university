@@ -1,0 +1,45 @@
+appId: com.venusuniversity.app
+productName: Venus University
+directories:
+  output: release
+  buildResources: build
+
+# `out` is the whole app; the renderer's own copies of React and the fonts are
+# already bundled into it, and main's only externals are 7zip-bin, node-7z and
+# @electron-toolkit/utils.
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.{map,ts,tsx,md}'
+  - '!node_modules/@fontsource/**'
+  - '!node_modules/{react,react-dom,scheduler,motion,motion-dom,motion-utils,framer-motion,zustand,signalsmith-stretch}/**'
+  - '!node_modules/7zip-bin/{linux,mac}/**'
+
+asar: true
+# archiveService spawns 7za off __dirname, which has to be a real path.
+asarUnpack:
+  - '**/node_modules/7zip-bin/**'
+
+# The WebP cast, the pose manifest, the workflows and the sound, where
+# `getAssetsPath()` looks for them when the app is packaged. No backgrounds:
+# the renderer bundles those itself.
+extraResources:
+  - from: build/desktop-assets
+    to: assets
+
+extraFiles:
+  - from: build/itch.toml
+    to: .itch.toml
+
+npmRebuild: false
+compression: normal
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: zip
+      arch: [x64]
+  artifactName: venus-university-${version}-win.${ext}
+  # The game writes `data/` beside its own exe; asking for elevation would be
+  # both a lie and a UAC prompt on every launch.
+  requestedExecutionLevel: asInvoker

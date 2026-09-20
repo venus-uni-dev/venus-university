@@ -1,0 +1,66 @@
+{
+  "arms_at_sides": {
+    "tags": [
+      "arms_at_sides"
+    ],
+    "description": "Arms hanging loose at her sides. Relaxed, open, or maybe just spaced out."
+  },
+  "folded_hands": {
+    "tags": [
+      "own_hands_together"
+    ],
+    "description": "Hands clasped together in front of her. Demure, careful, or maybe just shy."
+  },
+  "hand_on_hip": {
+    "tags": [
+      "hand_on_own_hip",
+      "arm_at_side"
+    ],
+    "description": "One hand cocked on her hip, the other arm loose. Self-assured, sassy, or maybe just aloof."
+  },
+  "hands_on_hips": {
+    "tags": [
+      "hands_on_own_hips"
+    ],
+    "description": "Both hands planted on her hips, elbows out. Bold, commanding, or maybe just silly."
+  },
+  "crossed_arms": {
+    "tags": [
+      "crossed_arms"
+    ],
+    "description": "Arms folded across her chest. Closed off, defensive, or maybe just confident."
+  },
+  "clutching_arm": {
+    "tags": [
+      "hand_on_own_arm",
+      "arm_at_side"
+    ],
+    "description": "One hand gripping her own opposite arm. Nervous, self-soothing, or maybe just creepy."
+  },
+  "one_arm_crossed_other_up": {
+    "tags": [
+      "arm_under_breasts",
+      "hand_up"
+    ],
+    "description": "One arm braced under her chest, the other hand raised near her face. Theatrical, thoughtful, or maybe just a worrier."
+  },
+  "hand_on_chest": {
+    "tags": [
+      "hand_on_own_chest"
+    ],
+    "description": "One hand resting over her heart. Earnest, easygoing, or maybe just arrogant."
+  },
+  "bold": {
+    "tags": [
+      "legs_apart",
+      "arms_at_sides"
+    ],
+    "description": "Standing with legs apart and arms at her sides. Assertive, poised, or maybe just rude."
+  },
+  "hands_behind_back": {
+    "tags": [
+      "arms_behind_back"
+    ],
+    "description": "Hip cocked and hands hidden behind her back. Playful, coy, or maybe a little mysterious."
+  }
+}

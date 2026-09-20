@@ -1,0 +1,244 @@
+/* Both wardrobe repairs: a sprite, a layer of paint over or under it, and the tools
+   that put it there — Fix transparency and Fix fingers are one chassis in two orders, so
+   this is one file rather than two kept in step by hand. Imported from `LayerPainter`,
+   never from index.css — a screen's file must load after base.css or its overrides lose
+   at equal specificity.
+
+   The colour wheel's own layout lives here too rather than beside its component: these two
+   are its only callers, and a screen owns its layout. */
+
+/* The stage takes the height, as the wardrobe panels do in the modal that opens this: what
+   is being repaired is the picture, and everything else is a knob. It scrolls down alone:
+   at the zoom the stage is wider than this box, and the sides are clipped rather than
+   handed a bar — a hole out at an arm is painted at rest, where the whole of her is on
+   screen. `safe` centring on the axis that does scroll, so her top is still reachable. */
+.vu-fix-stage-box {
+  display: flex;
+  flex: 1;
+  align-items: safe center;
+  justify-content: center;
+  min-width: 0;
+  height: 780px;
+  border-radius: 30px;
+  background: var(--vu-recessed);
+  overflow: hidden auto;
+}
+
+/* Sized off the sprite's own aspect, scaled by the zoom. Bare, it is the box's own recessed
+   ground: the hand repair paints over an opaque sprite and has no hole to key. */
+.vu-fix-stage {
+  position: relative;
+  flex: none;
+  height: calc(var(--zoom, 1) * 100%);
+  aspect-ratio: var(--stage-w, 1160) / var(--stage-h, 1696);
+}
+
+/* Chroma green, and the one literal colour in vu_styles: it is a key rather than a palette
+   colour — what is still green is still a hole — so it must not follow the theme. */
+.vu-fix-stage--chroma {
+  background: #00b140;
+}
+
+.vu-fix-paint,
+.vu-fix-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.vu-fix-paint {
+  /* The canvas is drawn to its own edges, so nothing may pan or scroll under a stroke
+     that leaves it — the pointer is still painting. */
+  touch-action: none;
+}
+
+.vu-fix-sprite {
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/* The brush, drawn where it will land and at the size it will land at. Two-tone rather
+   than one colour, because it has to read over a sprite, over paint and over the green. */
+.vu-fix-cursor {
+  position: absolute;
+  left: calc(var(--brush-x, 0) * 1px);
+  top: calc(var(--brush-y, 0) * 1px);
+  width: calc(var(--brush-d, 0) * 1px);
+  height: calc(var(--brush-d, 0) * 1px);
+  border: 2px solid var(--vu-surface);
+  border-radius: 999px;
+  outline: 1px solid var(--vu-text);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+/* Taking paint back rather than laying it down. */
+.vu-fix-cursor--erase {
+  border-style: dashed;
+}
+
+/* ---- the rail ------------------------------------------------------------- */
+
+/* The tab overhangs this corner of the panel, and its shadow reaches further still, so the
+   rail starts below both rather than under them. */
+.vu-fix-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  width: 360px;
+  min-height: 0;
+  padding-top: 26px;
+}
+
+.vu-fix-hint {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 500 14px/1.45 var(--font-body);
+}
+
+/* The tools as a palette: three rounded rectangles, an icon over its word, and the one in
+   force filled — a tool is one control in three states, not three independent switches. */
+.vu-fix-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.vu-fix-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-body);
+}
+
+/* The icon takes the context's accent; on the filled one it is the ink instead. */
+.vu-fix-tool-btn svg {
+  color: var(--vu-accent);
+}
+
+.vu-fix-tool-btn--on {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-fix-tool-btn--on svg {
+  color: inherit;
+}
+
+.vu-fix-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The exact reading of the control beside it, in the mono everything countable wears. */
+.vu-fix-readout {
+  flex: none;
+  min-width: 62px;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  text-align: right;
+}
+
+/* A field's well, so focus swaps its border like every other field's. */
+.vu-fix-swatch {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  padding: 3px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 16px;
+  background: var(--vu-ground);
+}
+
+.vu-fix-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.vu-fix-swatch::-webkit-color-swatch {
+  border: 0;
+  border-radius: 10px;
+}
+
+.vu-fix-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Quiet pills: frequent little actions, and the panel's weight belongs to the picture. */
+.vu-fix-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-body);
+}
+
+.vu-fix-tool--on {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-fix-gap {
+  flex: 1;
+}
+
+/* ---- the colour wheel ----------------------------------------------------- */
+
+.vu-wheel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The positioning context for the marker, sized by the canvas inside it. */
+.vu-wheel-disc {
+  position: relative;
+  line-height: 0;
+}
+
+.vu-wheel-canvas {
+  width: 160px;
+  height: 160px;
+  /* As the paint canvas: a drag off the disc is still choosing a colour. */
+  touch-action: none;
+}
+
+/* Centred on its own coordinates so the percentage position is the point the player
+   picked, not that point plus half a marker. Two-tone for the brush ring's reason. */
+.vu-wheel-marker {
+  position: absolute;
+  left: var(--marker-x, 50%);
+  top: var(--marker-y, 50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--vu-surface);
+  border-radius: 999px;
+  outline: 1px solid var(--vu-text);
+  background: var(--marker-colour, transparent);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.vu-wheel-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}

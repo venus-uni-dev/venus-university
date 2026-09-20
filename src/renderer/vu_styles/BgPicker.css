@@ -1,0 +1,103 @@
+/* Where the scene is set: a rail of three shelves beside the grid each one shows.
+   Imported from the view module, never from index.css — a screen's file must load after
+   base.css or its overrides lose at equal specificity. */
+
+.vu-bgpick {
+  --paper-offset: 10px 9px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(1320px, 100% - 60px);
+  /* The tab's own overhang plus its lean, given back rather than let the veil clip it. */
+  max-height: calc(100% - 100px);
+  padding: 52px 60px 46px 60px;
+  border-radius: 100px 0 0 100px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+.vu-bgpick-body {
+  display: flex;
+  gap: 30px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* The three shelves, always offered — none of them is ever the dead one. */
+.vu-bgpick-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 18px;
+  width: 168px;
+}
+
+.vu-bgpick-tile {
+  --tile-radius: 30px;
+  width: 100%;
+  height: 100px;
+  gap: 9px;
+  rotate: -2deg;
+}
+
+.vu-bgpick-tile svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+.vu-bgpick-tile-word {
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+/* The shelf being read: an accent fill, a state rather than a colour of its own — so its
+   hover is a scale and never a tint (`toggleLift`). */
+.vu-bgpick-tile--on {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  color: var(--vu-accent-ink);
+}
+
+.vu-bgpick-tile--on .vu-bgpick-tile-word {
+  color: var(--vu-accent-ink);
+}
+
+/* The grid clips in both axes, so it needs padding for the hover's own reach — a quiet
+   cell swells under `quietLift` with no paper shadow to spread — and a matching negative
+   margin so the first column still lines up with the rail beside it. */
+.vu-bgpick-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px;
+  margin: -10px;
+  overflow: hidden auto;
+}
+
+.vu-bgpick-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* The bg on screen right now, ringed rather than tinted: a border on the cell, which is
+   not a paper element and so may carry one without hiding a shadow behind it. */
+.vu-bgpick-cell--on {
+  border: 3px solid var(--vu-accent);
+}
+
+.vu-bgpick-wait {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 0;
+  color: var(--vu-text-muted);
+}
+
+.vu-bgpick-wait-label {
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

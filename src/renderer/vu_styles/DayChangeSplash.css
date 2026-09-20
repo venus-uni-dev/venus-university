@@ -1,0 +1,151 @@
+/* The day-change splash: what the curtain says while it is down. Layout only — every clock is
+   `views/motion.ts`'s and when it plays is
+   `stores/crossingStore.ts`'s. It is drawn inside the curtain sheet, so the sheet's own edge
+   reveals it and takes it away. */
+
+/* The stage exactly, in the sheet's own coordinates: every sheet runs past the stage by the
+   overshoot on each side, so the stage starts one overshoot in. The three offsets are the bunny's
+   and have its derivation: the sheet rests at a different place in each shape, and the component
+   counters the sheet's `x` so nothing here is ever measured. */
+.vu-splash {
+  position: absolute;
+  top: var(--overshoot);
+  width: 100cqw;
+  height: 100cqh;
+  display: grid;
+  place-items: center;
+}
+
+.vu-splash--out {
+  left: calc(100cqw + 50cqh + var(--overshoot));
+}
+
+.vu-splash--cut {
+  left: calc(50cqh + var(--overshoot));
+}
+
+.vu-splash--still {
+  left: var(--overshoot);
+}
+
+/* The mark, most of the stage tall, anchored to the middle rather than an edge so the composition
+   holds its shape as the stage reflows; raised above the middle so its disc clears the pill. */
+.vu-splash-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 700px;
+  height: 700px;
+  margin: -570px 0 0 -1030px;
+  color: var(--vu-accent);
+}
+
+.vu-splash-turn {
+  position: absolute;
+  inset: 0;
+}
+
+.vu-splash-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The day itself: the focal point, centred on the stage, and the only thing here at display
+   size. `nowrap` because the surface behind it is anchored to a fragment of the word. */
+.vu-splash-line {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 180px;
+  line-height: 1;
+  color: var(--vu-text);
+  white-space: nowrap;
+}
+
+/* The day's name, and the box the surface under it is anchored to. `isolation` is what keeps
+   that surface's own `z-index: -1` inside this box rather than sinking it behind the curtain. */
+.vu-splash-word {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  color: var(--vu-accent-ink);
+}
+
+/* Where the surface may reach: a lead at each end anchored to the word, not to a length that
+   knows how wide a weekday is. The left lead floors where the mark sits, written on `left` rather
+   than `min-width`, since with both offsets set a width would over-constrain the box. */
+.vu-splash-pillbox {
+  position: absolute;
+  left: min(-110px, calc(50% - 520px));
+  right: -70px;
+  top: 50%;
+  height: 300px;
+  margin-top: -150px;
+  z-index: -1;
+}
+
+/* Flat on the right, so its own edge is the wipe front motion drives; the round cap stays where
+   the box begins. It fills the box above, which is the whole of its geometry — and it wears the
+   loud control's own colours (`base.css`'s `.vu-btn--primary`), the day being the one thing the
+   splash is about. Nothing here is clipped: `.vu-paper`'s shadow is a pseudo-element, and a
+   `right` that animates from 100% is a wipe that needs no clip. */
+.vu-splash-pill {
+  --paper-face: var(--vu-accent);
+  --paper-shadow: var(--vu-accent-shadow);
+  --paper-offset: 14px 12px;
+  --paper-tilt: -1.2deg;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px 0 0 999px;
+}
+
+.vu-splash-ink {
+  display: inline-block;
+}
+
+/* Absolute, so the readings do not push the day off the middle of the stage. The offset is the
+   pill's own half-height and a gap, measured from the middle of the line the pill is centred on
+   — and the gap clears the paper shadow under it, not just the surface. */
+.vu-splash-below {
+  position: absolute;
+  top: calc(50% + 202px);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.vu-splash-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 64px;
+  font-family: var(--font-mono);
+  font-size: 26px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--vu-text);
+  white-space: nowrap;
+}
+
+/* The one figure among the readings, and the only accent on the curtain beside the mark. */
+.vu-splash-figure {
+  color: var(--vu-accent);
+  letter-spacing: 0.12em;
+}
+
+/* What else is happening today, where there is something — a line about the day rather than a
+   reading of it, so it is prose and not mono (occasions). One step quieter than the row
+   above it and no further: the curtain is the ends of the range rather than a surface, and the
+   muted tone is tuned to read on cream and plum. */
+.vu-splash-occasion {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 27px;
+  color: var(--vu-text-body);
+  white-space: nowrap;
+}

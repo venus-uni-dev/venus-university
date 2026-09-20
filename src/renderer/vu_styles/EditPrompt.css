@@ -1,0 +1,51 @@
+/* The prompt editor: the gift form's frame — a field in a panel with a hint and two
+   answers — widened for a block of text rather than a line of one. No mock. Imported from the
+   view module, never from index.css.
+
+   The veil, the field, the buttons and the foot are base.css's. */
+
+.vu-editprompt {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1100px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  /* The head clears the tab exactly as the gift form's does: the title hangs 40px above the
+     panel and its lean drops the near end another ten. */
+  padding: 78px 56px 28px 100px;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+.vu-editprompt-hint {
+  margin: 0;
+  flex: none;
+  color: var(--vu-text-muted);
+  font: italic 500 16px/1.5 var(--font-body);
+}
+
+/* The field takes whatever room the hint and the foot leave, and the well scrolls its own text
+   past that rather than growing: `field-sizing: content` sizes it with nothing measured, and
+   the chain — field, then well, each free to shrink to nothing — is what holds it inside the
+   panel's max-height. */
+.vu-editprompt .vu-field {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Monospaced and tight, so the prompt's own line breaks — the boundaries a hand edit is
+   cutting along — survive on screen. */
+.vu-editprompt .vu-input--multiline {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  field-sizing: content;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}

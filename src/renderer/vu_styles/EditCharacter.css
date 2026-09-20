@@ -1,0 +1,550 @@
+/* The Edit Character modal: its own panel and its two panes. Imported from the view
+   module, never from index.css: a screen's file must load after base.css or its overrides
+   of a primitive lose at equal specificity.
+
+   The wardrobe column, the landscape tile and the set control live here too rather than
+   beside their components, because a screen owns its layout and this modal is where all
+   three were written. The read-only character panel is this frame with the controls taken
+   out, so it imports this file rather than copying it, and adds only what is its
+   own in CharacterPanel.css. */
+
+/* ---- the left pane -------------------------------------------------------- */
+
+.vu-edit-images {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.vu-edit-wardrobes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.vu-edit-tiles {
+  display: flex;
+  gap: 16px;
+}
+
+/* ---- one wardrobe --------------------------------------------------------- */
+
+.vu-wardrobe {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.vu-wardrobe-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vu-wardrobe-title {
+  color: var(--vu-text);
+  font: 700 14px var(--font-mono);
+  text-transform: uppercase;
+}
+
+/* The panel's 297×620 shape, as a ratio: the columns narrow with the stage between 4:3 and
+   16:9, and a fixed height would leave four slivers standing 620px tall. */
+.vu-wardrobe-arch {
+  width: 100%;
+  max-height: 620px;
+  aspect-ratio: 297 / 620;
+}
+
+.vu-wardrobe-crop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sprites are full-body: the panel shows her from the top down, cropping in CSS and never
+   touching the PNG. */
+.vu-wardrobe-sprite {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 112%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.vu-wardrobe-empty {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+/* Opaque, not translucent: a cover that leaks the picture is not a cover. */
+.vu-wardrobe-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-radius: inherit;
+  background: var(--vu-tint);
+  color: var(--vu-text-muted);
+}
+
+.vu-wardrobe-cover-label {
+  color: var(--vu-text-muted);
+  font: 700 13px/1.5 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.vu-wardrobe-cover-reason {
+  font-size: 12px;
+  text-align: center;
+}
+
+.vu-wardrobe-show,
+.vu-wardrobe-hide {
+  padding: 8px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 14px var(--font-body);
+}
+
+/* It sits in the crop's square bottom corner, clear of the arch's curve, and takes the card
+   tag's outline because it lies on the sprite. */
+.vu-wardrobe-hide {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 4px 13px;
+  border: 2px solid var(--vu-border);
+  font-size: 12.5px;
+}
+
+.vu-wardrobe-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.vu-wardrobe-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0 0 3px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--vu-accent);
+  font: 700 20px var(--font-body);
+  line-height: 1;
+}
+
+.vu-wardrobe-emotion {
+  min-width: 96px;
+  color: var(--vu-text-body);
+  font: 700 14px var(--font-mono);
+  text-align: center;
+}
+
+.vu-wardrobe-stepper--dead .vu-wardrobe-emotion {
+  color: var(--vu-text-muted);
+}
+
+/* The two repairs sit on one row: they are the same kind of offer over the same set, and a
+   column this narrow has no room for a second line of them. */
+.vu-wardrobe-links {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* The wrapper that hears the pointer for a dead Fix fingers stands in the row where the link
+   itself stood, so it carries the link the way the row lays one out rather than as a line of
+   text with a strut of its own. */
+.vu-wardrobe-links > .vu-deadnote {
+  display: flex;
+}
+
+/* An explicit inline action, so it stays underlined at rest. */
+.vu-wardrobe-fix {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vu-text-muted);
+  font: 600 12.5px var(--font-body);
+  text-align: center;
+  text-decoration: underline;
+}
+
+/* ---- the set control ------------------------------------------------------ */
+
+.vu-set {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.vu-set--compact {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.vu-set-pill {
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  font: 700 14px var(--font-body);
+  text-align: center;
+}
+
+.vu-set-pill--quiet {
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+}
+
+.vu-set-pill--accent {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-set--compact .vu-set-pill {
+  width: auto;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+.vu-set-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* ---- a landscape set ------------------------------------------------------ */
+
+/* This screen's own row, and `vu-landscape` rather than `vu-tile` because `base.css` holds a
+   `.vu-tile` that is a different object entirely — the place the reader goes, a mark stacked
+   over its word. A screen file wins only on the properties it re-declares, so a shared name
+   would leak that one's `flex-direction: column` into this row and stand it on end. */
+.vu-landscape {
+  container-type: inline-size;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px 20px;
+  border-radius: 24px;
+  background: var(--vu-recessed);
+}
+
+.vu-landscape-title {
+  color: var(--vu-text);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.vu-landscape-thumbs {
+  display: flex;
+  gap: 6px;
+}
+
+/* The room's two stills, at a size that says which is which and nothing more. The CG tile
+   has no peek at all: eight images are a gallery, and three squares of one would be a
+   sample of something the eye beside them opens in full. */
+.vu-landscape-thumb {
+  flex: none;
+  width: 66px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--vu-tint);
+  object-fit: cover;
+}
+
+/* The peek is the first thing to go when the stage narrows to 4:3 and the two tiles have
+   378px apiece: the count, the eye and the control are what the tile owes, and the
+   thumbnails are a courtesy the gallery behind the eye repeats in full.
+
+   After the rule it overrides, not beside the container that carries it: `@container`
+   adds no specificity, so a later plain rule would win. */
+@container (max-width: 430px) {
+  .vu-landscape-thumbs {
+    display: none;
+  }
+}
+
+.vu-landscape-gap {
+  flex: 1;
+}
+
+.vu-landscape-eye {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  color: var(--vu-text-body);
+}
+
+/* ---- the right rail ------------------------------------------------------- */
+
+/* The top padding is the clearance the title tab owes whatever sits under its corner:
+   the tab hangs 30px above the panel and its own hard shadow falls a further 7px past its
+   foot, which lands on the icon squares at the head of this column. */
+.vu-edit-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 360px;
+  min-height: 0;
+  padding-top: 28px;
+}
+
+/* Her portrait, her name and the pencil, in that order: the pencil sits against the name it
+   renames rather than at the row's end, which is what separates it from the squares below. */
+.vu-edit-name {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* A face at the size a face is recognised at, on the surface so it lifts off the panel. The
+   ratio is the archway's, which is the ratio the file itself is cut to. The hover is
+   `portraitLift` and not `lift`: the row below is 12px away, and a tenth plus a 6px throw
+   put the shadow's foot in it. */
+.vu-edit-portrait {
+  --paper-face: var(--vu-surface);
+  --paper-offset: 6px 5px;
+  flex: none;
+  width: 60px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* `.vu-circle` at the size the 60px arch has room for; what belongs here is where it sits.
+   It rides inside the crop, which is the only positioned box in the portrait — the paper
+   element itself may not clip, so the circle hangs off the child that does. */
+.vu-edit-portrait-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  translate: -50% -50%;
+}
+
+/* The card's name anatomy at rail size: given name over the surname as a
+   letterspaced mono strip. The row holds a 60px portrait and one 38px square either side of
+   it, so the name has ~240px — more than the 176px four squares left it, and still not enough
+   for "Florentine Chastain" on one line at 30px, which is what the two rows are for. */
+.vu-edit-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+  font: 400 30px/1.15 var(--font-display);
+}
+
+.vu-edit-given {
+  overflow: hidden;
+  color: var(--vu-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vu-edit-surname {
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vu-edit-name-fields {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* What she costs to spend, under a rule of its own: the pencil above renames a form field,
+   these three act on the file as saved, and the line is what says so. */
+.vu-edit-name-actions {
+  display: flex;
+  border-top: 1px solid var(--vu-border);
+  padding: 8px 0 0;
+  flex: none;
+  gap: 8px;
+}
+
+.vu-edit-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-body);
+}
+
+/* The form is the scroller and the footer below it is not, so Save stays reachable from
+   anywhere in the fields. `flex-basis: 0` is what keeps the fields' own height out of the
+   panel's: an opened disclosure scrolls instead of growing the modal past the stage. */
+.vu-edit-scroll {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  /* Room for what a hover lifts past the box, which the scroller clips in both axes — the
+     scroller's own padding hands it back, so the fade at this wrapper's foot lands on the
+     scroller's own edge. */
+  margin: -4px -6px;
+}
+
+.vu-edit-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+/* The status line sits above the buttons rather than beside them: Cancel and Save are one
+   pair and read as one, and a line about the form is not one of the answers to it. */
+.vu-edit-footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+
+.vu-edit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 20px;
+  color: var(--vu-text-muted);
+  font: italic 600 14px var(--font-body);
+}
+
+.vu-edit-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.vu-edit-dot--warn {
+  background: var(--vu-warn);
+}
+
+.vu-edit-dot--good {
+  background: var(--vu-good);
+}
+
+/* ---- the disclosures ------------------------------------------------------ */
+
+.vu-disc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The row shape every disclosure's `summary` wears. */
+.vu-disc-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 22px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-ground);
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+  text-align: left;
+  list-style: none;
+}
+
+.vu-disc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.vu-disc-summary::after {
+  content: '▸';
+  color: var(--vu-accent);
+  font-weight: 800;
+}
+
+.vu-disc[open] > .vu-disc-summary::after {
+  content: '▾';
+}
+
+/* A summary is not a button and cannot be disabled, so the row held shut says so through the
+   one thing it can carry, and the dead dim is written against that attribute instead. */
+.vu-disc-summary[aria-disabled='true'] {
+  opacity: 0.45;
+}
+
+.vu-disc-note {
+  color: var(--vu-text-muted);
+}
+
+.vu-disc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+/* A bare row among the fields, its label flush with theirs and narrower than the standard,
+   the ends of the track needing the width more — the height row beside it reads the same
+   width, so the two labels line up. */
+.vu-edit-voice .vu-range-label,
+.vu-edit-height .vu-range-label {
+  width: 62px;
+}
+
+/* The value reads beside its label and the button sits at the row's end. The right and bottom
+   padding is what `lift` grows into — a tenth off the left edge and a 12px 10px shadow — past
+   the 6px the scroller itself reserves, so nothing of it is clipped. */
+.vu-edit-height {
+  padding: 0 24px 4px 0;
+}
+
+.vu-edit-height .vu-btn {
+  margin-left: auto;
+}
+
