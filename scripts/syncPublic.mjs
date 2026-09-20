@@ -26,6 +26,9 @@ const MIRROR_REF = 'refs/public/main'
 /** How many private subjects the squashed commit's body lists. */
 const MAX_BODY_SUBJECTS = 100
 
+/** How far back the mirror's history is searched for the last `Source-Commit:` trailer. */
+const MAX_TRAILER_LOOKBACK = 50
+
 /** The working notes, which stay private. */
 const PRIVATE_DOCS = new Set(['CLAUDE.md', 'DESIGN_GUIDE.md', 'UI_STYLE_GUIDE.md'])
 
@@ -41,7 +44,11 @@ export function isPublic(path) {
   if (path.startsWith('assets/')) {
     const rest = path.slice('assets/'.length)
     if (!rest.includes('/')) return true
-    return rest.startsWith('workflows/') || path === 'assets/pose/pose.json'
+    return (
+      rest.startsWith('workflows/') ||
+      rest.startsWith('pose/skeletons/') ||
+      rest === 'pose/pose.json'
+    )
   }
   return true
 }
@@ -149,6 +156,7 @@ function assertNothingPrivate(paths) {
     const allowedAsset =
       /^assets\/[^/]+$/.test(path) ||
       path.startsWith('assets/workflows/') ||
+      path.startsWith('assets/pose/skeletons/') ||
       path === 'assets/pose/pose.json'
     if (
       PRIVATE_DOCS.has(path) ||
@@ -186,8 +194,9 @@ async function main() {
   let lastSynced = null
   if (remoteHasMain) {
     parent = (await git(['rev-parse', `${MIRROR_REF}^{commit}`])).trim()
+    // The newest trailer wins; a commit made on the mirror itself carries none.
     const trailer = /^Source-Commit:\s*([0-9a-f]{7,40})\s*$/m.exec(
-      await git(['log', '-1', '--format=%B', parent])
+      await git(['log', `--max-count=${MAX_TRAILER_LOOKBACK}`, '--format=%B', parent])
     )
     lastSynced = trailer ? trailer[1] : null
   }

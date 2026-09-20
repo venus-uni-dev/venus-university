@@ -22,15 +22,14 @@ These folders are excluded from the mirror and do not exist here:
 - `assets/bg`, `assets/bg_thumbs` — shipped backgrounds/thumbs
 - `assets/characters` — character sprites since some of them contain NSFW imagery (breaches github's rules)
 - `assets/sound` — music/sfx that I don't have permission to redistribute
-- `assets/pose/skeletons` — the openpose skeleton images ComfyUI renders against. Please note that image gen will fail without these
+- `assets/pose/poseMaterial` — the reference pictures the openpose skeletons were made from; the skeletons themselves are included
 - `.github/` — the private repository's CI configuration.
 
 ## Quirks of running from this repository
 
-- `npm run dev` starts, but with no backgrounds, no shipped cast, no music or sound effects and no
-  pose skeletons. Quickstart and the shipped characters are unavailable, and character generation
-  cannot run: every ComfyUI graph the app builds loads a skeleton image from
-  `assets/pose/skeletons`, which is not here.
+- `npm run dev` starts, but with no backgrounds, no shipped cast and no music or sound effects.
+  Quickstart and the shipped characters are unavailable. Character generation works: the pose
+  manifest and openpose skeletons under `assets/pose` are included.
 - A Gemini API key is required to play. It is stored in `data/settings.json`, encrypted at rest
   with Windows DPAPI (Electron's `safeStorage`); where DPAPI is unavailable it falls back to
   storing the key as plain text in the same file.
