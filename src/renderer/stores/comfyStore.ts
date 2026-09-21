@@ -1,44 +1,36 @@
 import { create } from 'zustand'
-import type { AppError } from '@shared/types'
+import type { AppError, ComfyRuntimeState } from '@shared/types'
 import { isWebBuild } from '../platform'
 
-/** Where the local ComfyUI process is, as far as this window knows. */
-type ComfyState = 'idle' | 'starting' | 'ready' | 'error'
-
 interface ComfyStoreState {
-  state: ComfyState
+  state: ComfyRuntimeState
   error?: AppError
-  /** Starts ComfyUI if it is not already up; concurrent callers share one attempt. */
+  /** Asks main to start ComfyUI unless it is already up; concurrent callers share one boot. */
   ensureStarted: () => Promise<void>
+  /** Kills the server; it stays down until someone starts it again or a render job needs it. */
+  stop: () => Promise<void>
 }
-
-/** The in-flight start, shared by every concurrent caller. */
-let starting: Promise<void> | null = null
 
 /**
  * ComfyUI's *runtime* state, kept apart from `setupStore`'s *install* state:
- * one answers "is the server up", the other "are the files on disk".
+ * one answers "is the server up", the other "are the files on disk". Main owns the answer
+ * and broadcasts it, so nothing here sets the state from what a call returned.
  */
-export const useComfyStore = create<ComfyStoreState>((set, get) => ({
+export const useComfyStore = create<ComfyStoreState>(() => ({
   state: 'idle',
 
-  ensureStarted: () => {
+  ensureStarted: async () => {
     // There is no local server in the browser, so the state stays idle and no start is asked for.
-    if (isWebBuild()) return Promise.resolve()
-    if (get().state === 'ready') return Promise.resolve()
-    if (starting) return starting
+    if (isWebBuild()) return
+    await window.api.comfy.start()
+  },
 
-    set({ state: 'starting', error: undefined })
-    starting = window.api.comfy
-      .start()
-      .then((result) => {
-        // Reported in place, never as a modal.
-        if (result.ok) set({ state: 'ready', error: undefined })
-        else set({ state: 'error', error: result.error })
-      })
-      .finally(() => {
-        starting = null
-      })
-    return starting
+  stop: async () => {
+    await window.api.comfy.stop()
   }
 }))
+
+/** Subscribes to `comfy:state` at module scope, so a start this window never asked for lands. */
+window.api.comfy.onState((status) => {
+  useComfyStore.setState({ state: status.state, error: status.error })
+})

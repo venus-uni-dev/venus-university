@@ -8,13 +8,13 @@ import type { AppError, StructuredRequest } from '@shared/types'
  * lost". The transport module is mocked whole, which keeps `settingsService` out.
  */
 
-/** What `keyedSettings` answers with. */
+/** What `writerSettings` answers with. */
 let settings: Record<string, unknown> = {}
 /** Responses `sendCall` hands back, in order; each call shifts one off. */
 let responses: Response[] = []
 
 vi.mock('../src/shared/llm/transport', () => ({
-  keyedSettings: async () => settings,
+  writerSettings: async () => settings,
   startClock: () => () => 0,
   sendCall: async () => {
     const next = responses.shift()

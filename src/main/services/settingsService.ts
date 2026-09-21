@@ -14,12 +14,14 @@ import { getDataPath, getSettingsPath } from '../paths'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
 
 /**
- * The on-disk shape: {@link Settings} with the secret as a DPAPI blob (`apiKeyEnc`), or as
- * the bare string only where encryption is unavailable.
+ * The on-disk shape: {@link Settings} with each secret as a DPAPI blob (`apiKeyEnc`,
+ * `endpointApiKeyEnc`), or as the bare string only where encryption is unavailable.
  */
-type SettingsFile = Omit<Settings, 'apiKey'> & {
+type SettingsFile = Omit<Settings, 'apiKey' | 'endpointApiKey'> & {
   apiKey?: string
   apiKeyEnc?: string
+  endpointApiKey?: string
+  endpointApiKeyEnc?: string
 }
 
 /** The codes the OS refuses a write with when the folder is not the player's to write in. */
@@ -72,13 +74,17 @@ function decryptSecret(enc: string | undefined, plain: string | undefined, field
 async function writeSettingsFile(settings: Settings): Promise<void> {
   await ensureDataDir()
 
-  const { apiKey, ...rest } = settings
+  const { apiKey, endpointApiKey, ...rest } = settings
   const file: SettingsFile = { ...rest, schemaVersion: SETTINGS_SCHEMA_VERSION }
 
   // Exactly one of the two forms, never both.
   const api = encryptSecret(apiKey)
   if (api.enc) file.apiKeyEnc = api.enc
   if (api.plain) file.apiKey = api.plain
+
+  const endpoint = encryptSecret(endpointApiKey ?? '')
+  if (endpoint.enc) file.endpointApiKeyEnc = endpoint.enc
+  if (endpoint.plain) file.endpointApiKey = endpoint.plain
 
   await writeAtomicJson(getSettingsPath(), file, {
     code: 'SETTINGS_UNWRITABLE',
@@ -87,8 +93,8 @@ async function writeSettingsFile(settings: Settings): Promise<void> {
 }
 
 /**
- * Reads `/data/settings.json` or defaults, decrypting the secret; a malformed, wrong-version or
- * incomplete file is a hard error.
+ * Reads `/data/settings.json` or defaults, decrypting both secrets; a malformed, wrong-version
+ * or incomplete file is a hard error.
  */
 export async function getSettings(): Promise<Settings> {
   const candidate = await readValidatedJson<SettingsFile>(getSettingsPath(), {
@@ -98,8 +104,19 @@ export async function getSettings(): Promise<Settings> {
     onMissing: defaultSettings
   })
 
-  const { apiKeyEnc, apiKey: plain, ...stored } = candidate
-  return { ...stored, apiKey: decryptSecret(apiKeyEnc, plain, 'apiKey') }
+  const {
+    apiKeyEnc,
+    apiKey: plain,
+    endpointApiKeyEnc,
+    endpointApiKey: endpointPlain,
+    ...stored
+  } = candidate
+  return {
+    ...stored,
+    apiKey: decryptSecret(apiKeyEnc, plain, 'apiKey'),
+    endpointApiKey:
+      decryptSecret(endpointApiKeyEnc, endpointPlain, 'endpointApiKey') || undefined
+  }
 }
 
 /** Records which shipped characters the player has taken off the roster. */

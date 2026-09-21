@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { toAppError } from '@shared/errors'
+import { writerReady } from '@shared/settingsRules'
 import { shuffle } from '@shared/shuffle'
 import type { Result } from '@shared/types'
 import logoUrl from '../../../assets/vu_logo.png'
 import { isWebBuild } from '../platform'
 import { formatShortGameDate, formatWeekday } from '../prompts/gameDate'
-import { enterGame, prepareGameServices } from '../stores/gameLoop'
+import { enterGame } from '../stores/gameLoop'
 import { spriteUrl } from '../stores/characterStore'
 import { beginCrossing, coverSwap, endCrossing, useCrossingStore } from '../stores/crossingStore'
 import { entryCrossing } from '../stores/slotCrossing'
@@ -87,8 +88,11 @@ export function MainMenu(): JSX.Element {
   // The browser has no local renderer to install and no window of its own to close.
   const webBuild = isWebBuild()
 
-  // The key is the whole gate on playing.
-  const apiKeyReady = useSettingsStore((s) => s.settings?.apiKeySet ?? false)
+  // The writer being callable is the whole gate on playing: Gemini's key, or a custom
+  // endpoint with a model named.
+  const writerOk = useSettingsStore((s) =>
+    s.settings ? writerReady(s.settings, s.settings.apiKeySet) : false
+  )
 
   const crossing = useCrossingStore((s) => s.phase !== 'idle')
 
@@ -215,12 +219,13 @@ export function MainMenu(): JSX.Element {
   }, [resuming])
 
   const newest = newestPlaythrough(playthroughs)
-  const playDead = !apiKeyReady
+  const playDead = !writerOk
 
   /* Each button's deadness is named once and read three times: the deal it lands on, the
      gestures it is not handed, and the attribute. A dealt button carries motion's own inline
-     `opacity`, which beats the CSS dim, so a dead one is dealt to the dim instead. The key gate
-     reaches New Game and Load Game alone — the top slot answers it with a button of its own. */
+     `opacity`, which beats the CSS dim, so a dead one is dealt to the dim instead. The writer
+     gate reaches New Game and Load Game alone — the top slot answers it with a button of its
+     own. */
   const continueDead = resuming !== null
   const loadDead = playDead || !newest
 
@@ -307,7 +312,7 @@ export function MainMenu(): JSX.Element {
           {/* One slot, three identities: the key first where there is none — nothing below it
               can be played without one — then Continue with a playthrough on disk, Quickstart
               without. */}
-          {!apiKeyReady ? (
+          {!writerOk ? (
             <motion.button
               id="menu-api-key"
               className="vu-btn vu-btn--primary vu-paper"
@@ -324,11 +329,7 @@ export function MainMenu(): JSX.Element {
               variants={continueDead ? dealtItemDead : dealtItem}
               {...gestures(continueDead, lift, press)}
               disabled={continueDead}
-              onClick={() => {
-                // Fired together: nothing about resuming waits on ComfyUI.
-                void prepareGameServices()
-                setResuming(continueNewest())
-              }}
+              onClick={() => setResuming(continueNewest())}
             >
               Continue
               <span className="vu-btn-sub">

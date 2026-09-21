@@ -459,7 +459,8 @@ const TIPS = [
   'Avoid short, passive replies or actions. Try asking questions of other people or taking the initiative.',
   'You can mix dialogue and action in one turn, like: "Yeah, I bet," I say, chuckling. I buy her a donut and hand it to her.',
   "If you're getting bored of the scene, mention going home or saying goodbye.",
-  'You can click the arrow button to send a "Keep going" prompt if you don\'t know what to do.'
+  'You can click the arrow button to send a "Keep going" prompt if you don\'t know what to do.',
+  'If there\'s a problem with the output, you can load the last autosave to retry your action.'
 ]
 
 /**

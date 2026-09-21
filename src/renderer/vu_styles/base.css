@@ -130,6 +130,45 @@ body {
   transform-origin: center;
 }
 
+/* A foot with a line standing over it: the status sits above the answers rather than beside
+   them, Cancel and its primary being one pair that reads as one. */
+.vu-foot-stack {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* What a form has to say about itself: a dot and a few words, right-aligned over the answers,
+   free to wrap to a second line and keeping their line when there is nothing to say. */
+.vu-form-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  min-height: 20px;
+  color: var(--vu-text-muted);
+  font: italic 600 14px var(--font-body);
+  text-align: right;
+}
+
+/* The mark before those words, coloured by the role the line is in. */
+.vu-form-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.vu-form-dot--warn {
+  background: var(--vu-warn);
+}
+
+.vu-form-dot--good {
+  background: var(--vu-good);
+}
+
 /* A note modal's panel: prose, whatever it shows, and a foot. The Feedback and Support
    Development modals wear it.
 
@@ -731,6 +770,7 @@ body {
 /* The dropdown caret `appearance: none` hides on the native control, drawn here instead on
    whichever box holds the select. */
 .vu-field:has(> .vu-select)::after,
+.vu-field:has(> .vu-combo--caret)::after,
 .vu-chips-pick::after {
   content: '▾';
   position: absolute;

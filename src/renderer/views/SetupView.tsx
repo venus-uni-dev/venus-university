@@ -1,7 +1,9 @@
 import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { defaultModelFor, defaultSecondaryModelFor } from '@shared/providers'
+import { writerReady } from '@shared/settingsRules'
 import { modelForComponentId } from '@shared/setupManifest'
-import type { SetupComponent } from '@shared/types'
+import type { SetupComponent, SettingsPatch } from '@shared/types'
 import { CheckField } from '../components/CheckField'
 import { isWebBuild } from '../platform'
 import { useComfyStore } from '../stores/comfyStore'
@@ -36,16 +38,16 @@ type SetupStage = 'apiKey' | 'imageGen' | 'content'
 export type SetupMode = 'setup' | 'apiKey' | 'firstRun'
 
 /**
- * The stages a first run still owes: a stage already settled is skipped — a key on disk, an
- * install finished or deferred — and the content question is always last, because answering it
- * is what says the first run is over.
+ * The stages a first run still owes: a stage already settled is skipped — a writer that can be
+ * called, an install finished or deferred — and the content question is always last, because
+ * answering it is what says the first run is over.
  */
 function firstRunStages(
-  apiKeySet: boolean,
+  writerOk: boolean,
   comfySettled: boolean
 ): [SetupStage, ...SetupStage[]] {
-  if (!apiKeySet && !comfySettled) return ['apiKey', 'imageGen', 'content']
-  if (!apiKeySet) return ['apiKey', 'content']
+  if (!writerOk && !comfySettled) return ['apiKey', 'imageGen', 'content']
+  if (!writerOk) return ['apiKey', 'content']
   if (!comfySettled) return ['imageGen', 'content']
   return ['content']
 }
@@ -56,7 +58,7 @@ function stagesOf(mode: SetupMode): [SetupStage, ...SetupStage[]] {
   if (mode === 'setup') return ['imageGen']
   const settings = useSettingsStore.getState().settings
   return firstRunStages(
-    Boolean(settings?.apiKeySet),
+    settings ? writerReady(settings, settings.apiKeySet) : false,
     // The browser has no install to settle, so that stage is settled before it is asked for.
     isWebBuild() ||
       Boolean(useSetupStore.getState().status?.comfyReady) ||
@@ -483,7 +485,21 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
     if (!settings || blank) return
     // Every non-secret field rides along, or a save from here would drop the rest; main keeps
     // whatever is stored wherever a key is absent, and stores this one encrypted.
-    const ok = await save({ ...patchOf(settings), apiKey: key.trim(), rememberKey: remember })
+    const patch: SettingsPatch = {
+      ...patchOf(settings),
+      apiProvider: 'gemini',
+      apiKey: key.trim(),
+      rememberKey: remember
+    }
+    // The key pasted here is Gemini's, so a writer pointed at a custom endpoint comes back to
+    // Gemini's own defaults with it rather than taking the key as that endpoint's.
+    if (settings.apiProvider !== 'gemini') {
+      patch.apiModel = defaultModelFor('gemini').id
+      patch.thinkingLevel = defaultModelFor('gemini').defaultThinkingLevel
+      patch.secondaryModel = defaultSecondaryModelFor('gemini').id
+      patch.secondaryModelFor = undefined
+    }
+    const ok = await save(patch)
     // A failed write leaves the stage up; the store has already raised the error.
     if (!ok) return
     onDone()
@@ -601,6 +617,7 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
         <div className="vu-setup-foot">
           <span className="vu-setup-hint">
             You can add a key later in Settings if you skip for now. You'll still be able to manage and generate characters.
+            Using OpenAI, OpenRouter or a local model instead? Skip this, then pick Custom under Provider in Settings.
           </span>
           {/* Two direct children, so `.vu-foot > button` reaches both and an answer swells
               in place rather than lunging at the one beside it. */}

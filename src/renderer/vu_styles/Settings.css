@@ -15,6 +15,7 @@
   display: flex;
   gap: 56px;
   width: min(1460px, 100% - 60px);
+  max-height: calc(100% - 100px);
   padding: 60px 80px 52px 300px;
   border-radius: 400px 0 0 400px;
   color: var(--vu-text);
@@ -44,12 +45,36 @@
 
 /* ---- the left column: who writes ------------------------------------------ */
 
+/* The heading and, under it, the box the fields scroll inside. `min-height: 0` is what lets
+   that box shrink: a flex item's own default refuses to, and the column would overflow the
+   capped panel instead of scrolling. */
 .vu-settings-writer {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 17px;
   min-width: 0;
+  min-height: 0;
+}
+
+/* The fields themselves, the one thing in the panel that scrolls: padding for the swell and
+   the shadow a field's own box grows into, and room at the foot for the fade. */
+.vu-settings-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 17px;
+  min-width: 0;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+/* The layer a field's floating list is drawn on: the panel's own frame, taking no pointer of
+   its own and adding no positioning, so a list is placed against the panel and nothing else. */
+.vu-settings-popups {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 /* What the second model writes: a heading and three boxes, tucked under the select they
@@ -72,10 +97,32 @@
   text-transform: uppercase;
 }
 
-/* The key is the last thing in the column and the only field the player types a secret
-   into; the space above it separates it from the four pickers. */
+/* A field the player types a secret into; the space above it separates it from the pickers
+   it follows. */
 .vu-settings-key {
   margin-top: 4px;
+}
+
+/* What a custom endpoint answers when it is asked, tucked under the fields it answers for:
+   the button, the word it comes back with beside it, and — on a failure — the sentence
+   below the pair, since a wrapped row gives a full-width child its own line. */
+.vu-settings-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.vu-settings-test .vu-btn-sub {
+  letter-spacing: 0.12em;
+}
+
+/* Why it could not be reached: body text, because it is a sentence rather than a state. */
+.vu-settings-test-note {
+  flex-basis: 100%;
+  color: var(--vu-text-body);
+  font: 500 13px/1.45 var(--font-body);
 }
 
 /* ---- the right column: what is shown -------------------------------------- */
@@ -86,6 +133,7 @@
   flex-direction: column;
   gap: 18px;
   width: 430px;
+  min-height: 0;
 }
 
 /* The sliders and the two data copies are each a set rather than a run of settings, so they
@@ -114,7 +162,9 @@
   gap: 12px;
 }
 
-/* The answers sit at the foot of the column, whatever the toggles above them come to. */
-.vu-settings-foot {
+/* The answers, and any line standing over them, sit at the foot of the column, whatever the
+   toggles above them come to. */
+.vu-settings-content > .vu-foot,
+.vu-settings-content > .vu-foot-stack {
   margin-top: auto;
 }

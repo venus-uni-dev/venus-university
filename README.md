@@ -1,9 +1,10 @@
 # Venus University
 
 Venus University is a local, single-player, AI-driven dating sim in visual-novel form. It is an
-Electron desktop app in which Google's Gemini writes the scenes and a locally managed ComfyUI
-renders the character art. There is no server: everything the player configures lives in a
-`data/` folder next to the app.
+Electron desktop app in which a cloud LLM writes the scenes — Google's Gemini by default, or any
+endpoint that speaks OpenAI chat completions — and a locally managed ComfyUI renders the
+character art. There is no server: everything the player configures lives in a `data/` folder
+next to the app.
 
 The supported way to play is the itch.io page:
 **https://venus-dev.itch.io/venus-university**
@@ -33,6 +34,14 @@ These folders are excluded from the mirror and do not exist here:
 - A Gemini API key is required to play. It is stored in `data/settings.json`, encrypted at rest
   with Windows DPAPI (Electron's `safeStorage`); where DPAPI is unavailable it falls back to
   storing the key as plain text in the same file.
+- Settings can instead point the writer at a custom endpoint speaking OpenAI chat completions
+  (OpenRouter, OpenAI, Gemini's compatibility layer, Ollama, LM Studio and the like), with its
+  own key, model id and reasoning effort; that key goes to that endpoint and nowhere else, and
+  is kept only for the origin it was typed for. Room backgrounds and the graduation picture
+  still come from Gemini's image model, so the Gemini key sits beside it and draws them whoever
+  writes. The URL must be `https:`, or `http:` for a server on the same machine. In the browser
+  build the endpoint has to answer cross-origin requests, and a plain-`http` local server cannot
+  be reached from the itch.io page at all.
 - The browser build (`npm run build:web`) needs `build/web-assets`, which only the private
   repository's release script produces; it is not present here.
 - The game contains optional adult content. The code paths and prompts that produce it are

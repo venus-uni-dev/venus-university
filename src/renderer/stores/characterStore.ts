@@ -1001,7 +1001,7 @@ interface MissingSet {
 /** What the sweep cannot read off the character herself: the Edit modal's per-set gates. */
 interface MissingContentGates {
   comfyReady: boolean
-  apiKeySet: boolean
+  pictureKeySet: boolean
   noNsfwImages: boolean
 }
 
@@ -1054,7 +1054,7 @@ export function missingContentPlan(
       }
     }
 
-    if (gates.apiKeySet && character.roomPrompt.trim()) {
+    if (gates.pictureKeySet && character.roomPrompt.trim()) {
       consider('room', ROOM_VARIANTS.filter((variant) => !state.rooms[charId]?.[variant]).length)
     }
   }

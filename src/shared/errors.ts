@@ -124,6 +124,8 @@ const PERMANENT_CODES = new Set([
   // account is simply out of funds, so Retry after topping up is the right answer.
   'API_KEY_MISSING',
   'LLM_REQUEST_REJECTED',
+  // A custom endpoint URL that cannot be sent to; only Settings changes that.
+  'LLM_ENDPOINT_INVALID',
   // An unadjustable content filter fired; the player has to reword.
   'LLM_BLOCKED',
   // The generated class catalog broke a rule the scheduler depends on; retried from New Game.

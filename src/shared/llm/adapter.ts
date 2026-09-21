@@ -20,6 +20,9 @@ export interface StreamDelta {
   usage?: Record<string, number>
 }
 
+/** The reply cap a call carries where the player named none, so a cut-off reply is unambiguous. */
+export const MAX_OUTPUT_TOKENS = 65536
+
 /** One fully-formed HTTP call, ready for the service to send. */
 export interface LlmCall {
   url: string
@@ -37,6 +40,8 @@ export interface BuildCallContext {
   thinkingLevel: ThinkingLevel
   /** Already resolved against `provider` by the service — never re-check it here. */
   serviceTier: ServiceTier
+  /** The reply cap this call carries, already resolved by the service — send it as it is. */
+  maxOutputTokens: number
   /** True when the caller passed an `onDelta` preview channel. */
   streaming: boolean
 }

@@ -97,6 +97,18 @@ describe('commitStagedSet', () => {
     expect(await bodiesIn(getCharacterCgsPath(CHAR))).toEqual(['new:sex'])
   })
 
+  it('commits an outfit set for a character who has no outfits folder yet', async () => {
+    // A first staged outfit renames into `outfits/{set}`, and nothing has made `outfits/` before.
+    await seed(getStagedOutfitSetPath(CHAR, 'pe'), EMOTIONS, 'new')
+
+    await expect(characterService.commitStagedSet(CHAR, 'pe')).resolves.toBe('committed')
+
+    expect(await bodiesIn(getCharacterOutfitSetPath(CHAR, 'pe'))).toEqual(
+      EMOTIONS.map((e) => `new:${e}`).sort()
+    )
+    await expect(readdir(getCharacterStagingPath(CHAR))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('moves only the room variants that were staged', async () => {
     await seed(getCharacterPath(CHAR), ['room_day', 'room_night'], 'old')
     await seed(getCharacterStagingPath(CHAR), ['room_day'], 'new')

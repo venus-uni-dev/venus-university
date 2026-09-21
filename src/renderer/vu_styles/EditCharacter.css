@@ -438,41 +438,6 @@
   overflow: hidden auto;
 }
 
-/* The status line sits above the buttons rather than beside them: Cancel and Save are one
-   pair and read as one, and a line about the form is not one of the answers to it. */
-.vu-edit-footer {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-
-.vu-edit-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 20px;
-  color: var(--vu-text-muted);
-  font: italic 600 14px var(--font-body);
-}
-
-.vu-edit-dot {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.vu-edit-dot--warn {
-  background: var(--vu-warn);
-}
-
-.vu-edit-dot--good {
-  background: var(--vu-good);
-}
-
 /* ---- the disclosures ------------------------------------------------------ */
 
 .vu-disc {

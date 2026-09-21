@@ -9,8 +9,12 @@ import type {
   LlmCall,
   StreamDelta
 } from './adapter'
+import { htmlGist, isHtml, permanentStatus, retryableCode } from './httpStatus'
 
-/** Native Gemini `generateContent` adapter, needed for `safetySettings`. */
+/**
+ * Native Gemini `generateContent` adapter; every call it builds switches the four adjustable
+ * harm categories off explicitly.
+ */
 
 /** The four adjustable harm categories at `BLOCK_NONE`; civic integrity is a 400. */
 const SAFETY_OFF = [
@@ -30,9 +34,6 @@ const BLOCKED_FINISH_REASONS = new Set([
   'LANGUAGE',
   'IMAGE_SAFETY'
 ])
-
-/** HTTP statuses worth retrying; other 4xx responses are permanent. */
-const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 
 /** Minimal shape of Gemini's JSON error envelope. */
 interface GeminiErrorBody {
@@ -56,19 +57,6 @@ interface GeminiResponse {
   promptFeedback?: { blockReason?: string }
   usageMetadata?: Record<string, number>
   error?: GeminiErrorBody['error']
-}
-
-/** True when Google's front end returned HTML instead of Gemini's JSON envelope. */
-function isHtml(contentType: string, body: string): boolean {
-  return contentType.includes('text/html') || body.trimStart().startsWith('<')
-}
-
-/** The human-readable gist of an HTML error page, without 2000 chars of markup. */
-function htmlGist(body: string): string {
-  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)
-  const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(body)
-  const text = (title?.[1] ?? heading?.[1] ?? '').replace(/<[^>]+>/g, '').trim()
-  return text || body.replace(/\s+/g, ' ').trim().slice(0, 200)
 }
 
 /** Throws when a parsed Gemini response is blocked, truncated or otherwise unusable. */
@@ -121,14 +109,6 @@ function assertUsable(parsed: GeminiResponse, label: string): void {
   }
 }
 
-/** True for statuses that describe a wrong request rather than a busy service. */
-function permanentStatus(status: number): boolean {
-  return !RETRYABLE_STATUSES.has(status)
-}
-
-/** The two statuses whose retryable code says something the player can act on. */
-const STATUS_CODES: Record<number, string> = { 429: 'LLM_RATE_LIMITED', 503: 'LLM_OVERLOADED' }
-
 /** True when a 429's message names Google's own prepayment-balance error. */
 function creditsDepleted(message: string | undefined): boolean {
   return /prepayment credits|credits are depleted/i.test(message ?? '')
@@ -137,7 +117,7 @@ function creditsDepleted(message: string | undefined): boolean {
 /** The retryable code a busy service's status earns; a 429 with an empty balance earns its own. */
 function codeForStatus(status: number, message?: string): string {
   if (status === 429 && creditsDepleted(message)) return 'LLM_CREDITS_DEPLETED'
-  return STATUS_CODES[status] ?? 'LLM_HTTP'
+  return retryableCode(status)
 }
 
 /** Concatenates the first candidate's non-thought text parts. */
@@ -208,6 +188,7 @@ export const geminiAdapter: LlmAdapter = {
     apiKey,
     thinkingLevel,
     serviceTier,
+    maxOutputTokens,
     streaming
   }: BuildCallContext): LlmCall {
     // `?alt=sse` makes the stream `data:`-framed SSE rather than a growing JSON array.
@@ -238,8 +219,9 @@ export const geminiAdapter: LlmAdapter = {
         ],
         generationConfig: {
           responseMimeType: 'application/json',
-          // Pinned so a reply that ran out of room is unambiguous when read back.
-          maxOutputTokens: 65536,
+          // Always the pinned ceiling here, the player's own cap being a custom endpoint's
+          // alone, so a reply that ran out of room is unambiguous when read back.
+          maxOutputTokens,
           // `responseJsonSchema`, never `responseSchema`.
           responseJsonSchema: request.schema.schema,
           // Never pair with the legacy `thinkingBudget`: sending both is a 400.

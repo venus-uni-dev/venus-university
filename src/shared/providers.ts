@@ -1,12 +1,13 @@
+import { normalizeEndpoint } from './endpoint'
 import type { Settings } from './types'
 
 /** Cloud LLM provider table shared with Settings; main adapters key off `api`. */
 
 /** Request/response shape a provider speaks. One adapter exists per value. */
-export type ProviderApi = 'gemini'
+export type ProviderApi = 'gemini' | 'openai'
 
 /** How hard the model reasons before answering, cheapest first. */
-const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'] as const
+export const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'] as const
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number]
 
 function isThinkingLevel(value: unknown): value is ThinkingLevel {
@@ -61,8 +62,8 @@ export interface ProviderConfig {
   defaultSecondaryModel: string
   /** Tiers this provider's text models accept. */
   serviceTiers: readonly ServiceTier[]
-  /** Where to get a key, shown in Settings. */
-  keyUrl: string
+  /** Where to get a key; the custom endpoint has no one place. */
+  keyUrl?: string
 }
 
 /**
@@ -78,11 +79,12 @@ export const IMAGE_MODEL_ID = 'gemini-3.1-flash-image'
 /** The image model behind the graduation picture. `3`, not `3.1`: the vendor versions the pro image model separately. */
 export const ENDING_IMAGE_MODEL_ID = 'gemini-3-pro-image'
 
-const PROVIDERS: Record<Settings['apiProvider'], ProviderConfig> = {
+const PROVIDERS: Record<ProviderApi, ProviderConfig> = {
   gemini: {
     label: 'Google (Gemini)',
     api: 'gemini',
-    // Gemini native REST, which can send `safetySettings`.
+    // Gemini native REST; every call carries `safetySettings` with the four adjustable
+    // categories switched off explicitly.
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     // Text models only: `IMAGE_MODEL_ID` rejects the field with a permanent 400.
     serviceTiers: SERVICE_TIERS,
@@ -124,32 +126,62 @@ const PROVIDERS: Record<Settings['apiProvider'], ProviderConfig> = {
         defaultThinkingLevel: 'minimal'
       }
     ]
+  },
+  openai: {
+    label: 'Custom endpoint',
+    api: 'openai',
+    // The root is the player's, read off the settings at call time by `providerToRun`.
+    baseUrl: '',
+    // The custom adapter sends no tier field, so only the tier that sends nothing is offered.
+    serviceTiers: ['standard'],
+    defaultModel: '',
+    defaultSecondaryModel: '',
+    // Model ids are free text: `modelFor` answers any id with `customModel`.
+    models: []
   }
 }
 
+/** The config a custom endpoint's model id runs under: every level accepted, minimal by default. */
+function customModel(id: string): ModelConfig {
+  return { id, label: id, thinkingLevels: THINKING_LEVELS, defaultThinkingLevel: 'minimal' }
+}
+
 /** The config for the configured provider, falling back to the default. */
-export function providerFor(apiProvider: Settings['apiProvider']): ProviderConfig {
+export function providerFor(apiProvider: ProviderApi): ProviderConfig {
   return PROVIDERS[apiProvider] ?? PROVIDERS.gemini
 }
 
-/** A provider's default model — the one it names, or its first entry. */
-export function defaultModelFor(apiProvider: Settings['apiProvider']): ModelConfig {
+/**
+ * The provider a call runs against: the table entry, with the custom endpoint's root taken
+ * off the settings. `providerFor` is what Settings reads; this is what the transports read.
+ */
+export function providerToRun(settings: Settings): ProviderConfig {
+  const provider = providerFor(settings.apiProvider)
+  if (provider.api !== 'openai') return provider
+  return { ...provider, baseUrl: normalizeEndpoint(settings.endpointUrl ?? '') }
+}
+
+/** A provider's default model — the one it names, or its first entry; any id off an empty table. */
+export function defaultModelFor(apiProvider: ProviderApi): ModelConfig {
   const provider = providerFor(apiProvider)
+  if (provider.models.length === 0) return customModel(provider.defaultModel)
   return provider.models.find((model) => model.id === provider.defaultModel) ?? provider.models[0]
 }
 
 /** Its default *secondary* model, resolved the same way. */
-export function defaultSecondaryModelFor(apiProvider: Settings['apiProvider']): ModelConfig {
+export function defaultSecondaryModelFor(apiProvider: ProviderApi): ModelConfig {
   const provider = providerFor(apiProvider)
+  if (provider.models.length === 0) return customModel(provider.defaultSecondaryModel)
   return (
     provider.models.find((model) => model.id === provider.defaultSecondaryModel) ??
     defaultModelFor(apiProvider)
   )
 }
 
-/** Returns a stored model config, falling back to the provider default. */
-export function modelFor(apiProvider: Settings['apiProvider'], modelId: string): ModelConfig {
+/** A stored model config, falling back to the provider default; an empty table takes the id as it is. */
+export function modelFor(apiProvider: ProviderApi, modelId: string): ModelConfig {
   const provider = providerFor(apiProvider)
+  if (provider.models.length === 0) return customModel(modelId)
   return provider.models.find((model) => model.id === modelId) ?? defaultModelFor(apiProvider)
 }
 
@@ -159,7 +191,7 @@ export function modelFor(apiProvider: Settings['apiProvider'], modelId: string):
  * lowest accepted level at or above it, or leaves it if the model accepts none such.
  */
 export function thinkingLevelFor(
-  apiProvider: Settings['apiProvider'],
+  apiProvider: ProviderApi,
   modelId: string,
   stored: string,
   floor?: ThinkingLevel
@@ -168,24 +200,44 @@ export function thinkingLevelFor(
   const resolved = isThinkingLevel(stored) && model.thinkingLevels.includes(stored)
     ? stored
     : model.defaultThinkingLevel
-  if (!floor) return resolved
+  return raiseTo(resolved, floor, model.thinkingLevels)
+}
 
+/**
+ * `level` raised to the lowest of `accepted` at or above `floor`, or left where it is when it
+ * already clears the floor, there is no floor, or nothing accepted clears it.
+ */
+export function raiseTo(
+  level: ThinkingLevel,
+  floor: ThinkingLevel | undefined,
+  accepted: readonly ThinkingLevel[]
+): ThinkingLevel {
+  if (!floor) return level
   const floorIndex = THINKING_LEVELS.indexOf(floor)
-  if (THINKING_LEVELS.indexOf(resolved) >= floorIndex) return resolved
-  const raised = THINKING_LEVELS.slice(floorIndex).find((level) =>
-    model.thinkingLevels.includes(level)
-  )
-  return raised ?? resolved
+  if (THINKING_LEVELS.indexOf(level) >= floorIndex) return level
+  return THINKING_LEVELS.slice(floorIndex).find((candidate) => accepted.includes(candidate)) ?? level
+}
+
+/**
+ * The level a call names. Gemini reads its own setting, a custom endpoint the reasoning effort
+ * beside it — an absent one reading as minimal — and either is resolved against the model that
+ * will run, with a floor raising it.
+ */
+export function reasoningToSend(
+  settings: Settings,
+  modelId: string,
+  floor?: ThinkingLevel
+): ThinkingLevel {
+  const stored =
+    settings.apiProvider === 'openai' ? (settings.reasoningEffort ?? '') : settings.thinkingLevel
+  return thinkingLevelFor(settings.apiProvider, modelId, stored, floor)
 }
 
 /**
  * Resolves a stored service tier against the provider that will run, the way
  * `thinkingLevelFor` resolves a level against its model.
  */
-export function serviceTierFor(
-  apiProvider: Settings['apiProvider'],
-  stored: string
-): ServiceTier {
+export function serviceTierFor(apiProvider: ProviderApi, stored: string): ServiceTier {
   const provider = providerFor(apiProvider)
   return isServiceTier(stored) && provider.serviceTiers.includes(stored) ? stored : 'standard'
 }

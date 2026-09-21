@@ -1,5 +1,6 @@
 import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
+import { writerReady } from '@shared/settingsRules'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
@@ -34,10 +35,10 @@ import { isWebBuild } from './platform'
  * Which screen a finished boot opens on: the first run where one is still owed, then whatever
  * this build can still be short of before the menu is worth showing.
  */
-function bootView(firstRun: boolean, comfySettled: boolean, keySet: boolean): ViewName {
+function bootView(firstRun: boolean, comfySettled: boolean, writerOk: boolean): ViewName {
   if (firstRun) return 'firstRun'
-  // The browser build installs nothing, so the key is the only thing it can still owe.
-  if (isWebBuild()) return keySet ? 'mainMenu' : 'apiKey'
+  // The browser build installs nothing, so the writer is the only thing it can still owe.
+  if (isWebBuild()) return writerOk ? 'mainMenu' : 'apiKey'
   return comfySettled ? 'mainMenu' : 'setup'
 }
 
@@ -87,10 +88,11 @@ async function boot(): Promise<void> {
   // how a boot knows the run never finished; the screen it opens picks up at whichever stage
   // is still unsettled.
   const firstRun = useSettingsStore.getState().settings?.sfwAsked === false
-  const keySet = Boolean(useSettingsStore.getState().settings?.apiKeySet)
+  const stored = useSettingsStore.getState().settings
+  const writerOk = stored ? writerReady(stored, stored.apiKeySet) : false
 
   // The boot's own cover, raised before the first frame (`main.tsx`), opens here.
-  endCrossing(() => ui.setView(bootView(firstRun, deferred || comfyInstalled, keySet)))
+  endCrossing(() => ui.setView(bootView(firstRun, deferred || comfyInstalled, writerOk)))
 
   // Not awaited: nothing on the menu needs it.
   if (comfyInstalled) void useComfyStore.getState().ensureStarted()

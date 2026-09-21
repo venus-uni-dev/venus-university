@@ -18,7 +18,9 @@ When reporting, please include:
 
 Venus University is a single-player desktop app that runs entirely on the player's own machine.
 There is no server and no account system. Its network touchpoints are Google's Gemini API (which
-writes the game's scenes), the player's own locally managed ComfyUI (which renders character
-art), and, during first-time setup, the model and runtime files ComfyUI needs, fetched from GitHub
-and Hugging Face. Reports about any of these integrations, about how the Gemini API key is stored,
-or about how saved data is read or written, are the most relevant and the most welcome.
+writes the game's scenes and draws its cloud pictures), any OpenAI-compatible endpoint the player
+names in Settings to write the scenes instead (which receives only its own key, never the Gemini
+one), the player's own locally managed ComfyUI (which renders character art), and, during
+first-time setup, the model and runtime files ComfyUI needs, fetched from GitHub and Hugging
+Face. Reports about any of these integrations, about how the API keys are stored, or about how
+saved data is read or written, are the most relevant and the most welcome.

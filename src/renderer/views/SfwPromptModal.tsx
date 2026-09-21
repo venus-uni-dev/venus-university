@@ -72,9 +72,9 @@ export function SfwPromptModal({ theme, onClose }: SfwPromptModalProps): JSX.Ele
             Explicit content is optional and can be toggled below or in Settings.
           </p>
 
-          <SfwCheckList sfw={sfw} setSfw={setSfw} />
+          <SfwCheckList sfw={sfw} onChange={setSfw} />
 
-          <div className="vu-foot vu-settings-foot">
+          <div className="vu-foot">
             <motion.button
               id="sfw-prompt-continue"
               className="vu-btn vu-btn--primary vu-paper vu-btn--panel"

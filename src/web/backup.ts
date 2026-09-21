@@ -110,7 +110,7 @@ export async function importBackup(): Promise<boolean> {
 
   // Nothing the backup does not name is written: an entry naming a path of its own choosing
   // would put a file where this build never looks for one.
-  const { apiKeySet: _flag, ...settings } = record.settings
+  const { apiKeySet: _flag, endpointApiKeySet: _endpointFlag, ...settings } = record.settings
   const updatedAt = Date.now()
 
   await storage('restore the backup', async () => {

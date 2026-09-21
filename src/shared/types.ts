@@ -1,7 +1,7 @@
 /** Shared on-disk schema and IPC result types. */
 
 // Type-only, so the import cycles erase: most of these modules import back from here.
-import type { ServiceTier, ThinkingLevel } from './providers'
+import type { ProviderApi, ServiceTier, ThinkingLevel } from './providers'
 import type { LedgerStats, PlayerStats, StatKey, StatTier } from './playerStats'
 import type { ClassDifficulty, ClassKind, ExamPeriod, Professor } from './academics'
 import type { CharacterTrait } from './traits'
@@ -1524,12 +1524,40 @@ export interface GrabBagsFile {
 /** On-disk settings — `/data/settings.json`. */
 export interface Settings {
   schemaVersion: 1
-  apiProvider: 'gemini'
-  /** Defaults to the configured provider's `defaultModel` (see `providers.ts`). */
+  /** Which writer the scenes come from: Gemini by default, or a chat-completions endpoint. */
+  apiProvider: ProviderApi
+  /**
+   * Defaults to the configured provider's `defaultModel` (see `providers.ts`). Under `openai`
+   * it is whatever id the player typed.
+   */
   apiModel: string
+  /**
+   * The Gemini key: it writes under `gemini`, and draws the cloud pictures under either
+   * provider. Empty is no key at all, which is what the pictures are skipped without.
+   */
   apiKey: string
-  /** How hard the model reasons; resolved against the model at call time. */
+  /** How hard the model reasons; resolved against the model at call time. Gemini's alone. */
   thinkingLevel: ThinkingLevel
+  /**
+   * The custom endpoint's API root, up to and including the version segment and without
+   * `/chat/completions`. Read only under `openai`.
+   */
+  endpointUrl?: string
+  /**
+   * How hard a custom endpoint's model reasons, sent as `reasoning_effort`. Absent reads as
+   * minimal. Read only under `openai`.
+   */
+  reasoningEffort?: ThinkingLevel
+  /**
+   * The reply cap a custom endpoint is sent as `max_tokens`. Absent sends the pinned ceiling,
+   * which a small-context server refuses. Read only under `openai`.
+   */
+  maxOutputTokens?: number
+  /**
+   * The custom endpoint's own key, sent to it and nowhere else; absent where the endpoint
+   * needs none. It is kept only for the origin it was typed for.
+   */
+  endpointApiKey?: string
   /**
    * A second model for the calls named in {@link secondaryModelFor} — a model id from
    * the same provider's table. Absent or empty means every call runs on {@link apiModel}.
@@ -1604,21 +1632,23 @@ export interface Settings {
 }
 
 /**
- * What `settings:get` returns: {@link Settings} with the secret replaced by a
- * presence flag, so the key is never in renderer memory.
+ * What `settings:get` returns: {@link Settings} with each secret replaced by a
+ * presence flag, so no key is ever in renderer memory.
  */
-export interface RendererSettings extends Omit<Settings, 'apiKey'> {
+export interface RendererSettings extends Omit<Settings, 'apiKey' | 'endpointApiKey'> {
   apiKeySet: boolean
+  endpointApiKeySet: boolean
 }
 
 /**
- * What `settings:set` carries. A key field left absent means "keep the stored key" — the
- * renderer cannot read one back, so it can only ever replace one.
+ * What `settings:set` carries. A key field left absent — `apiKey` or `endpointApiKey` — means
+ * "keep the stored key": the renderer cannot read one back, so it can only ever replace one.
  */
 export type SettingsPatch = Omit<
   Settings,
   | 'schemaVersion'
   | 'apiKey'
+  | 'endpointApiKey'
   | 'freezeSeeds'
   | 'editPregens'
   | 'forceTime'
@@ -1627,6 +1657,23 @@ export type SettingsPatch = Omit<
   | 'streamResponses'
 > & {
   apiKey?: string
+  endpointApiKey?: string
+}
+
+/**
+ * What the Settings form's Test connection sends: the writer fields as typed, with the key
+ * absent where the field was left blank so the stored one is tried.
+ */
+export type WriterCandidate = Pick<
+  Settings,
+  | 'apiProvider'
+  | 'apiModel'
+  | 'endpointUrl'
+  | 'reasoningEffort'
+  | 'maxOutputTokens'
+  | 'thinkingLevel'
+> & {
+  endpointApiKey?: string
 }
 
 /** A single line of a scene, as emitted by the cloud LLM. */
@@ -1815,6 +1862,16 @@ export interface InstallProgress {
 export interface InstallResult {
   status: SetupStatus
   errors: Array<{ componentId: string; error: AppError }>
+}
+
+/** Where the local ComfyUI server is, as main knows it. */
+export type ComfyRuntimeState = 'idle' | 'starting' | 'ready' | 'error'
+
+/** One ComfyUI runtime state on the fixed `comfy:state` channel. */
+export interface ComfyStatus {
+  state: ComfyRuntimeState
+  /** Why the boot failed; carried only by the `error` state. */
+  error?: AppError
 }
 
 /** Lifecycle of a single job in `jobQueue`. */

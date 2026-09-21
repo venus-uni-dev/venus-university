@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { pictureKeySet } from '@shared/settingsRules'
 import { fullNameOf, type Character } from '@shared/types'
 import { CharacterJobCard } from '../components/CharacterJobCard'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -38,12 +39,11 @@ import {
   quietLift,
   quietPress
 } from './motion'
-import { BackIcon, DownloadIcon } from './screenIcons'
+import { BackIcon, CloseIcon, DownloadIcon } from './screenIcons'
 import '../vu_styles/ManageCharacters.css'
 
-/** The header pill's wording per runtime state, once the install is there. */
+/** The header chip's wording for each state it reports; a stopped server is a button instead. */
 const COMFY_PILL = {
-  idle: '○ COMFYUI IDLE',
   starting: '◌ COMFYUI STARTING…',
   ready: '● COMFYUI READY',
   error: '● COMFYUI FAILED'
@@ -80,10 +80,13 @@ export function ManageCharactersView(): JSX.Element {
   const generateAllMissing = useCharacterStore((s) => s.generateAllMissing)
   const comfyState = useComfyStore((s) => s.state)
   const comfyError = useComfyStore((s) => s.error)
+  const ensureStarted = useComfyStore((s) => s.ensureStarted)
+  const stopComfy = useComfyStore((s) => s.stop)
   const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
   const setComfyDeferred = useSettingsStore((s) => s.setComfyDeferred)
-  // The room renders in the cloud, so its half of the sweep is gated on the key.
-  const apiKeySet = useSettingsStore((s) => s.settings?.apiKeySet ?? false)
+  // The room renders in the cloud, so its half of the sweep is gated on whichever key draws
+  // the pictures.
+  const picturesReady = useSettingsStore((s) => (s.settings ? pictureKeySet(s.settings) : false))
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
   const comfyInstalled = useSetupStore((s) => s.status?.comfyReady ?? false)
   const setView = useUiStore((s) => s.setView)
@@ -98,6 +101,7 @@ export function ManageCharactersView(): JSX.Element {
   const [importing, setImporting] = useState(false)
   const [filling, setFilling] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [stopping, setStopping] = useState(false)
 
   // Drawn once per visit, from the dev switch or the machine clock.
   const [theme] = useState(heldScreenTheme)
@@ -150,7 +154,7 @@ export function ManageCharactersView(): JSX.Element {
 
   // Every optional set the roster is short of, off the status maps already
   // loaded; a `load()` here would reset every card.
-  const gates = { comfyReady: canGenerate, apiKeySet, noNsfwImages }
+  const gates = { comfyReady: canGenerate, pictureKeySet: picturesReady, noNsfwImages }
   const missing = missingContentPlan(
     { characters, order, expressions, cgs, outfits, rooms, progress, pregenIds },
     gates
@@ -158,9 +162,8 @@ export function ManageCharactersView(): JSX.Element {
   const missingImages = missing.reduce((total, entry) => total + entry.missing, 0)
   const missingChars = new Set(missing.map((entry) => entry.charId)).size
 
-  // ComfyUI's state, once there is a state to report: while the install is missing the header
-  // offers the install itself rather than a state nothing can act on. Only the two settled
-  // states are tinted.
+  // The chip's tint, for the two settled states that carry a tone; starting reports itself by
+  // pulsing instead, and the states the header answers with a button never reach the chip.
   const comfyTint =
     comfyState === 'ready' || comfyState === 'error' ? ` vu-manage-comfy--${comfyState}` : ''
   const comfyNote =
@@ -197,14 +200,7 @@ export function ManageCharactersView(): JSX.Element {
           <h1 className="vu-title-text">Characters</h1>
         </div>
 
-        {webBuild ? null : canGenerate ? (
-          <motion.span
-            className={`vu-manage-comfy${comfyTint}`}
-            animate={comfyState === 'starting' ? pulse : { opacity: 1 }}
-          >
-            {COMFY_PILL[comfyState]}
-          </motion.span>
-        ) : (
+        {webBuild ? null : !canGenerate ? (
           <motion.button
             id="manage-install-comfy"
             className="vu-pill vu-manage-install"
@@ -213,6 +209,36 @@ export function ManageCharactersView(): JSX.Element {
           >
             Install ComfyUI
           </motion.button>
+        ) : comfyState === 'idle' ? (
+          <motion.button
+            id="manage-start-comfy"
+            className="vu-pill vu-manage-install"
+            {...gestures(false, quietLift, quietPress)}
+            onClick={() => void ensureStarted()}
+          >
+            Start ComfyUI
+          </motion.button>
+        ) : (
+          <span className="vu-manage-comfy-wrap">
+            <motion.span
+              className={`vu-manage-comfy vu-manage-comfy--stoppable${comfyTint}`}
+              animate={comfyState === 'starting' ? pulse : { opacity: 1 }}
+            >
+              {COMFY_PILL[comfyState]}
+            </motion.span>
+            <motion.button
+              className="vu-x vu-manage-comfy-x"
+              aria-label="Stop ComfyUI"
+              {...gestures(stopping, quietLift, quietPress)}
+              disabled={stopping}
+              onClick={() => {
+                setStopping(true)
+                void stopComfy().finally(() => setStopping(false))
+              }}
+            >
+              <CloseIcon />
+            </motion.button>
+          </span>
         )}
         {comfyNote && <span className="vu-manage-comfy-note">{comfyNote}</span>}
 

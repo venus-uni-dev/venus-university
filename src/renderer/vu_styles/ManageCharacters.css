@@ -90,6 +90,28 @@
   color: var(--vu-text-muted);
 }
 
+/* The chip and the ✕ that stops what it reports: siblings, the ✕ riding the chip's right end. */
+.vu-manage-comfy-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* The room the ✕ takes out of the chip's own right padding. */
+.vu-manage-comfy--stoppable {
+  padding-right: 44px;
+}
+
+/* `.vu-x` is the circle; a 40px one would outgrow a 14px chip, so it is drawn at 28px here. */
+.vu-manage-comfy-x {
+  position: absolute;
+  inset: 0 3px 0 auto;
+  margin: auto 0;
+  width: 28px;
+  height: 28px;
+}
+
 .vu-manage-actions {
   display: flex;
   gap: 14px;

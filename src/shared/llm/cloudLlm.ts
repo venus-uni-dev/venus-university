@@ -1,11 +1,13 @@
 import { appError, isAppError, messageOf, tailOf, truncate } from '../errors'
-import { modelFor, providerFor, serviceTierFor, thinkingLevelFor } from '../providers'
+import { modelFor, providerToRun, reasoningToSend, serviceTierFor } from '../providers'
 import type { ModelConfig } from '../providers'
 import { DEFAULT_SECONDARY_KINDS, isPromptKind, type PromptKind } from '../promptKinds'
+import { maxOutputTokensOf, writerKeyOf } from '../settingsRules'
 import type { Settings } from '../types'
+import { MAX_OUTPUT_TOKENS } from './adapter'
 import { adapterFor } from './index'
 import type { LlmAdapter, StructuredRequest } from './index'
-import { keyedSettings, sendCall, startClock } from './transport'
+import { sendCall, startClock, writerSettings } from './transport'
 
 /**
  * Cloud LLM transport; the provider-specific wire format lives in the adapter beside it,
@@ -172,27 +174,26 @@ function modelToRun(settings: Settings, kind: PromptKind | undefined): ModelConf
 
 /**
  * Sends one provider-enforced structured-output request and returns parsed JSON;
- * `onDelta` is preview-only and the full response stays authoritative.
+ * `onDelta` is preview-only and the full response stays authoritative, and `override` sends
+ * the call on candidate settings rather than the stored ones.
  */
 export async function completeStructured<T>(
   request: StructuredRequest,
   signal?: AbortSignal,
-  onDelta?: (delta: string) => void
+  onDelta?: (delta: string) => void,
+  override?: Settings
 ): Promise<T> {
-  const settings = await keyedSettings('generate characters')
+  const settings = await writerSettings('generate characters', override)
 
-  const provider = providerFor(settings.apiProvider)
+  const provider = providerToRun(settings)
   const model = modelToRun(settings, request.kind)
   // Against the model that will actually run, so a secondary that takes fewer levels than the
   // primary falls to its own default rather than 400ing.
-  const thinkingLevel = thinkingLevelFor(
-    settings.apiProvider,
-    model.id,
-    settings.thinkingLevel,
-    request.minThinking
-  )
+  const thinkingLevel = reasoningToSend(settings, model.id, request.minThinking)
   // Absent is `priority`: the tier is a hand-edited switch rather than a player setting.
   const serviceTier = serviceTierFor(settings.apiProvider, settings.serviceTier ?? 'priority')
+  // The player's own cap where a custom endpoint names one, else the pinned ceiling.
+  const maxOutputTokens = maxOutputTokensOf(settings) ?? MAX_OUTPUT_TOKENS
   const adapter = adapterFor(provider)
 
   // Carried out of the attempt so the `JSON.parse` failure can name the stream's holes.
@@ -209,14 +210,16 @@ export async function completeStructured<T>(
       request,
       provider,
       model,
-      apiKey: settings.apiKey,
+      apiKey: writerKeyOf(settings),
       thinkingLevel,
       serviceTier,
+      maxOutputTokens,
       streaming
     })
 
     console.log(
       `[llm] → ${log.what} (thinking=${thinkingLevel}, tier=${serviceTier}` +
+        `, maxTokens=${maxOutputTokens}` +
         `, schema=${request.schema.name}` +
         `${request.cacheKey ? `, cacheKey=${request.cacheKey}` : ''}` +
         `${request.kind ? `, kind=${request.kind}` : ''}` +

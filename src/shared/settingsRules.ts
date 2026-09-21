@@ -1,3 +1,4 @@
+import { endpointProblem, sameEndpointHost } from './endpoint'
 import type { ValidateRecordOptions } from './jsonValidate'
 import { defaultModelFor, defaultSecondaryModelFor } from './providers'
 import type { RendererSettings, Settings, SettingsPatch } from './types'
@@ -8,14 +9,18 @@ import type { RendererSettings, Settings, SettingsPatch } from './types'
 export const SETTINGS_SCHEMA_VERSION = 1
 
 /**
- * What the settings must carry; the key, the three dev switches, the two hand-edited call
- * switches, the secondary model, the group volumes, the NSFW sound switch and the browser
- * build's key-remembering are all optional.
+ * What the settings must carry; the two keys, the custom endpoint's URL, effort and reply cap,
+ * the three dev switches, the two hand-edited call switches, the secondary model, the group
+ * volumes, the NSFW sound switch and the browser build's key-remembering are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
     Settings,
     | 'apiKey'
+    | 'endpointApiKey'
+    | 'endpointUrl'
+    | 'reasoningEffort'
+    | 'maxOutputTokens'
     | 'freezeSeeds'
     | 'editPregens'
     | 'forceTime'
@@ -82,10 +87,83 @@ export function defaultSettings(): Settings {
   }
 }
 
-/** Strips the secret, leaving only whether it is set — the renderer's view. */
+/** Strips both secrets, leaving only whether each is set — the renderer's view. */
 export function redactSettings(settings: Settings): RendererSettings {
-  const { apiKey, ...rest } = settings
-  return { ...rest, apiKeySet: Boolean(apiKey) }
+  const { apiKey, endpointApiKey, ...rest } = settings
+  return { ...rest, apiKeySet: Boolean(apiKey), endpointApiKeySet: Boolean(endpointApiKey) }
+}
+
+/**
+ * Whether the writer can be called: Gemini needs its key; a custom endpoint needs a URL that
+ * can be sent to and a model id, and may run without a key. `keySet` is `Boolean(apiKey)`
+ * where the key is held and `apiKeySet` where it is not.
+ */
+export function writerReady(
+  settings: Pick<Settings, 'apiProvider' | 'apiModel' | 'endpointUrl'>,
+  keySet: boolean
+): boolean {
+  if (settings.apiProvider !== 'openai') return keySet
+  return endpointProblem(settings.endpointUrl ?? '') === null && settings.apiModel.trim() !== ''
+}
+
+/** The Gemini key the cloud pictures are drawn with, empty where there is none. */
+export function pictureKeyOf(settings: Settings): string {
+  return settings.apiKey
+}
+
+/** The renderer's answer to the same question, off the presence flag. */
+export function pictureKeySet(settings: RendererSettings): boolean {
+  return settings.apiKeySet
+}
+
+/** The key the writer runs on: a custom endpoint's own, or the Gemini key. */
+export function writerKeyOf(settings: Settings): string {
+  return settings.apiProvider === 'openai' ? (settings.endpointApiKey ?? '') : settings.apiKey
+}
+
+/**
+ * The reply cap a custom endpoint is sent, and undefined wherever the pinned ceiling stands
+ * instead. The file is hand-editable, so anything but a positive whole number reads as absent.
+ */
+export function maxOutputTokensOf(
+  settings: Pick<Settings, 'apiProvider' | 'maxOutputTokens'>
+): number | undefined {
+  if (settings.apiProvider !== 'openai') return undefined
+  const cap = settings.maxOutputTokens
+  return typeof cap === 'number' && Number.isInteger(cap) && cap > 0 ? cap : undefined
+}
+
+/**
+ * Whether the stored endpoint key still belongs to the endpoint `endpointUrl` names: it was
+ * typed for one origin and never follows the player to another host.
+ */
+export function endpointKeyStays(
+  current: Pick<Settings, 'endpointUrl'>,
+  endpointUrl: string | undefined
+): boolean {
+  return sameEndpointHost(current.endpointUrl ?? '', endpointUrl ?? '')
+}
+
+/** The stored endpoint key where a probe of `endpointUrl` may use it, else undefined. */
+export function storedEndpointKeyFor(stored: Settings, endpointUrl: string): string | undefined {
+  return endpointKeyStays(stored, endpointUrl) ? stored.endpointApiKey || undefined : undefined
+}
+
+/**
+ * The two secrets a patch leaves behind. An absent field keeps the stored key: the Gemini key
+ * whichever provider writes, and the endpoint's only while the patch still names the origin it
+ * was typed for.
+ */
+function secretsAfter(
+  current: Settings,
+  patch: SettingsPatch
+): Pick<Settings, 'apiKey' | 'endpointApiKey'> {
+  return {
+    apiKey: patch.apiKey ?? current.apiKey,
+    endpointApiKey:
+      patch.endpointApiKey ??
+      (endpointKeyStays(current, patch.endpointUrl) ? current.endpointApiKey : undefined)
+  }
 }
 
 /** The settings a renderer patch leaves behind, merged over the stored ones. */
@@ -97,6 +175,11 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     thinkingLevel: patch.thinkingLevel,
     secondaryModel: patch.secondaryModel,
     secondaryModelFor: patch.secondaryModelFor,
+    // All three custom-endpoint fields ride every patch, so a provider switched away and back
+    // finds them as they were.
+    endpointUrl: patch.endpointUrl,
+    reasoningEffort: patch.reasoningEffort,
+    maxOutputTokens: patch.maxOutputTokens,
     // `serviceTier` and `streamResponses` are not the renderer's to send: `...current`
     // is what carries whatever is stored, so a hand-edited switch survives every save.
     comfyDeferred: patch.comfyDeferred,
@@ -107,9 +190,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     sfwAsked: patch.sfwAsked,
     // Absent stays absent, `JSON.stringify` dropping the key, which is full volume.
     volumes: patch.volumes,
-    // The browser build's opt-in, which decides whether the key is written beside the rest.
+    // The browser build's opt-in, which decides whether the keys are written beside the rest.
     rememberKey: patch.rememberKey,
-    // Absent means keep: the renderer never had the key to send back.
-    apiKey: patch.apiKey ?? current.apiKey
+    ...secretsAfter(current, patch)
   }
 }

@@ -16,7 +16,15 @@ import { isEmotion } from '@shared/emotions'
 import { baseRel, cgRel, expressionRel, faceRel, outfitRel } from '@shared/characterFiles'
 import { isOutfitSet } from '@shared/outfits'
 import { isPosition } from '@shared/positions'
-import type { Character, Emotion, OutfitSet, Position } from '@shared/types'
+import type {
+  AppError,
+  Character,
+  ComfyRuntimeState,
+  ComfyStatus,
+  Emotion,
+  OutfitSet,
+  Position
+} from '@shared/types'
 import {
   getCharacterCgPath,
   getCharacterExpressionPath,
@@ -158,6 +166,22 @@ let serverProcess: ChildProcess | null = null
 /** The in-flight `start()`, shared by every concurrent caller so there is one boot. */
 let starting: Promise<void> | null = null
 
+/** How many times `stop()` has run, so a boot can tell being killed from failing. */
+let stopEpoch = 0
+
+/** Where runtime state events go; wired to the renderer once, in `ipc.ts`. */
+let stateSink: ((status: ComfyStatus) => void) | null = null
+
+/** Registers the runtime state sink. Called once at startup. */
+export function setStateSink(fn: (status: ComfyStatus) => void): void {
+  stateSink = fn
+}
+
+/** Emits one runtime state, if a sink is registered. */
+function emit(state: ComfyRuntimeState, error?: AppError): void {
+  stateSink?.({ state, error })
+}
+
 /**
  * True once the running server has answered for every class the workflows name. Cleared
  * whenever a process is spawned or killed, so the check costs one request per server, not
@@ -199,9 +223,16 @@ function assertOwnServer(): void {
  */
 export function start(onProgress?: (step: string) => void): Promise<void> {
   if (starting) return starting
-  starting = startOnce(onProgress).finally(() => {
-    starting = null
-  })
+  // A boot the player killed mid-way reports nothing: `stop()` has already said idle.
+  const epoch = stopEpoch
+  starting = startOnce(onProgress)
+    .catch((err) => {
+      if (stopEpoch === epoch) emit('error', toAppError(err))
+      throw err
+    })
+    .finally(() => {
+      starting = null
+    })
   return starting
 }
 
@@ -213,10 +244,12 @@ async function startOnce(onProgress?: (step: string) => void): Promise<void> {
     // rather than one per job.
     if (!nodesVerified && serverProcess === null) assertOwnServer()
     await assertWorkflowNodes()
+    emit('ready')
     return
   }
 
   onProgress?.('Starting ComfyUI')
+  emit('starting')
   const python = getComfyPythonPath()
 
   // Both streams go to the log file through one descriptor: a file has no pipe to fill, and
@@ -260,6 +293,8 @@ async function startOnce(onProgress?: (step: string) => void): Promise<void> {
     if (serverProcess === child) {
       serverProcess = null
       nodesVerified = false
+      // A crash with no boot in flight is the only exit nothing else already reports.
+      if (starting === null) emit('idle')
     }
     exitCode = code
   })
@@ -284,7 +319,7 @@ async function startOnce(onProgress?: (step: string) => void): Promise<void> {
   }
 
   if (!ready) {
-    stop()
+    killServer()
     throw appError(
       'COMFY_START_TIMEOUT',
       'ComfyUI did not become ready within three minutes.',
@@ -296,6 +331,7 @@ async function startOnce(onProgress?: (step: string) => void): Promise<void> {
 
   onProgress?.('Loading checkpoint')
   await warm()
+  emit('ready')
 }
 
 /** The end of ComfyUI's log, or nothing when the boot never wrote one. */
@@ -370,10 +406,28 @@ async function warm(): Promise<void> {
  * did not start is left alone.
  */
 export function stop(): void {
+  stopEpoch += 1
+  killServer()
+  emit('idle')
+}
+
+/** The kill itself, without the verdict: a boot that gave up reports its own failure. */
+function killServer(): void {
   nodesVerified = false
   if (!serverProcess) return
   killTree(serverProcess.pid)
   serverProcess = null
+}
+
+/**
+ * The player's stop. The boot in flight is left to unwind before the next `start()` begins,
+ * and an adopted server — the one thing `stop()` cannot reach — is killed after it.
+ */
+export async function stopByHand(): Promise<void> {
+  const boot = starting
+  stop()
+  if (boot) await boot.catch(() => {})
+  killStray()
 }
 
 /** Kills a ComfyUI left over from a previous run, before this one claims the port. */

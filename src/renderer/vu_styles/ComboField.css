@@ -1,0 +1,51 @@
+/* The floating list a field with suggestions hangs under its own box, inside the panel that
+   opened it. */
+
+/* The container: a rounded rectangle of the field's own ground, forward of the columns and
+   behind a panel's tab. It takes the pointer back from the layer it is placed in, and it may
+   clip, being quiet. */
+.vu-combo-pop {
+  position: absolute;
+  z-index: 5;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 20px;
+  background: var(--vu-ground);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* The rows, capped and scrolling past the cap. The foot padding is the room the fade covers,
+   and the contained overscroll keeps the column behind the list still at either end. */
+.vu-combo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 264px;
+  padding: 8px 8px 22px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+/* The soft end of that scroller, shallower than a panel's and on the list's own ground. */
+.vu-combo-pop .vu-scroll-fade {
+  height: 22px;
+  background: linear-gradient(transparent, var(--vu-ground));
+}
+
+/* One row: a button reset to a full pill of body text, quiet until it is the row in force. */
+.vu-combo-option {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--vu-text);
+  font: 500 14px/1.4 var(--font-body);
+  text-align: left;
+}
+
+/* The row the arrows or the pointer are on, tinted by that state alone. */
+.vu-combo-option--on {
+  background: var(--vu-tint);
+}

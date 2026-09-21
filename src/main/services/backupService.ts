@@ -334,6 +334,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     // characters the player took off the roster travels with the backup, through its own writer.
     const {
       apiKeySet: _flag,
+      endpointApiKeySet: _endpointFlag,
       schemaVersion: _version,
       removedDefaults,
       freezeSeeds: _seeds,

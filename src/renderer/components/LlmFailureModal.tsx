@@ -2,6 +2,7 @@ import type { JSX, ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { isPermanent, retryAfterSeconds } from '@shared/errors'
 import type { AppError } from '@shared/types'
+import { useSettingsStore } from '../stores/settingsStore'
 import { linkLift } from '../views/motion'
 import { ConfirmModal } from './ConfirmModal'
 import { ErrorModal } from './ErrorModal'
@@ -14,7 +15,7 @@ function isConnectionError(code: string): boolean {
   return code === 'LLM_NETWORK' || code === 'LLM_OVERLOADED' || code === 'LLM_HTTP'
 }
 
-/** The two codes a reworded action answers: Gemini's own filter, and the app's local refusal. */
+/** The two codes a reworded action answers: the provider's filter, and the app's local refusal. */
 export function isProhibited(code: string): boolean {
   return code === 'LLM_BLOCKED' || code === 'CLASSIFIER_REJECTED'
 }
@@ -70,7 +71,7 @@ function quotaMessage(error: AppError): string {
       ? null
       : `The error message says you can try again in ${seconds === 1 ? '1 second' : `${seconds} seconds`}.`
   return [
-    'Your free-tier quota for Gemini has been reached.',
+    'Your free-tier quota has been reached.',
     wait,
     "If you don't want to wait, set up billing for your API key or downgrade the model."
   ]
@@ -79,8 +80,12 @@ function quotaMessage(error: AppError): string {
 }
 
 /** The connection branch's message: the service failed, not the request, so it replaces the raw error entirely. */
-const CONNECTION_MESSAGE =
+const GEMINI_CONNECTION_MESSAGE =
   'The connection to the Gemini API was lost mid-reply. The current model may be experiencing high demand, or you may be using an API key without billing set up. Try downgrading the model to 3.5 or 3.6.'
+
+/** The same branch where the writer is a custom endpoint, which the app knows nothing else about. */
+const ENDPOINT_CONNECTION_MESSAGE =
+  'The connection to the endpoint was lost mid-reply. The model may be experiencing high demand, or the endpoint may not support this request. Try another model.'
 
 export interface LlmFailureModalProps {
   id: string
@@ -135,6 +140,11 @@ export function LlmFailureModal({
   onRetry,
   onAbandon
 }: LlmFailureModalProps): JSX.Element {
+  // Which service the lost connection was to, which is the whole of what the copy differs on.
+  const apiProvider = useSettingsStore((s) => s.settings?.apiProvider)
+  const connectionMessage =
+    apiProvider === 'openai' ? ENDPOINT_CONNECTION_MESSAGE : GEMINI_CONNECTION_MESSAGE
+
   const retryable = alwaysRetryable || !isPermanent(error)
 
   // The hand-edited prompt answers a refusal; nothing else that failed was the prompt.
@@ -175,7 +185,7 @@ export function LlmFailureModal({
         id={id}
         theme={theme}
         title={title}
-        message={CONNECTION_MESSAGE}
+        message={connectionMessage}
         confirmText="Retry"
         cancelText="Settings"
         lockOut={lockOut}
@@ -192,7 +202,7 @@ export function LlmFailureModal({
       : error.code === 'LLM_RATE_LIMITED'
         ? quotaMessage(error)
         : isConnectionError(error.code)
-          ? `${CONNECTION_MESSAGE} ${retryMessage}`
+          ? `${connectionMessage} ${retryMessage}`
           : `${error.message} ${retryMessage}`
 
   return (

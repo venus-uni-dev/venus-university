@@ -122,6 +122,24 @@ describe('encryption at rest', () => {
     expect(file.apiKeyEnc).toBeUndefined()
     expect((await settingsService.getSettings()).apiKey).toBe('plain-key')
   })
+
+  it('writes the endpoint key as its own blob, never the plaintext, and keeps it unasked', async () => {
+    const endpoint = { endpointUrl: 'https://example.com/v1', apiProvider: 'openai' }
+    await settingsService.applySettingsPatch(
+      patch({ ...endpoint, endpointApiKey: 'endpoint-secret' })
+    )
+
+    const file = await fileOnDisk()
+    expect(file.endpointApiKeyEnc).toBe(
+      Buffer.from(`${ENC_PREFIX}endpoint-secret`).toString('base64')
+    )
+    expect(file.endpointApiKey).toBeUndefined()
+    expect(JSON.stringify(file)).not.toContain('endpoint-secret')
+    expect((await settingsService.getSettings()).endpointApiKey).toBe('endpoint-secret')
+
+    await settingsService.applySettingsPatch(patch(endpoint))
+    expect((await settingsService.getSettings()).endpointApiKey).toBe('endpoint-secret')
+  })
 })
 
 describe('an incomplete file', () => {

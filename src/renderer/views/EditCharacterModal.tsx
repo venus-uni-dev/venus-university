@@ -24,6 +24,7 @@ import { EMOTIONS } from '@shared/emotions'
 import { isStatKey, type StatKey } from '@shared/playerStats'
 import { POSITIONS } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
+import { pictureKeySet } from '@shared/settingsRules'
 import { sfwWithholds } from '@shared/sfw'
 import { isGiftCategory } from '@shared/shop'
 import type { GiftCategory } from '@shared/shop'
@@ -252,8 +253,10 @@ export function EditCharacterModal({
   // The same gate the new-character slot uses: rendering needs the optional install.
   const comfyInstalled = useSetupStore((s) => s.status?.comfyReady ?? false)
   const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
-  // The room renders in the cloud, so its gate is the API key.
-  const apiKeySet = useSettingsStore((s) => s.settings?.apiKeySet ?? false)
+  // The room renders in the cloud, so its gate is whichever key draws the pictures.
+  const picturesReady = useSettingsStore((s) => (s.settings ? pictureKeySet(s.settings) : false))
+  // Under a custom endpoint that key is a second one, asked for by a name of its own.
+  const customWriter = useSettingsStore((s) => s.settings?.apiProvider === 'openai')
   // Withholds the nude wardrobe and the CGs outright: neither viewable nor renderable under it.
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
 
@@ -273,7 +276,7 @@ export function EditCharacterModal({
      own prompt. Where there is no local renderer it holds the prompt alone, and a prompt the
      cloud reads is not waiting on an install, so there it opens like any other panel. */
   const advancedShut = comfyMissing && !webBuild
-  const keyNote = apiKeySet ? null : 'Requires API key'
+  const keyNote = picturesReady ? null : customWriter ? 'Requires Gemini key' : 'Requires API key'
 
   const defaultsPresent = doneCountOf(expressions, charId) === EMOTIONS.length
   const roomOnDisk = ROOM_VARIANTS.filter((variant) => rooms?.[variant]).length
@@ -305,8 +308,8 @@ export function EditCharacterModal({
       short of, the control raises that beside it; a set waiting on the default sprites says
       nothing. */
   const setBlocked = (target: SetTarget): boolean => {
-    // The room is a cloud render, gated on the key alone.
-    if (target === 'room') return !apiKeySet || !character.roomPrompt.trim()
+    // The room is a cloud render, gated on the picture key alone.
+    if (target === 'room') return !picturesReady || !character.roomPrompt.trim()
     if (comfyMissing) return true
     return target !== 'default' && !defaultsPresent
   }
@@ -944,17 +947,17 @@ export function EditCharacterModal({
             </div>
 
             {/* Outside the scroller, so the answers stay in reach. */}
-            <div className="vu-edit-footer">
+            <div className="vu-foot-stack">
               {/* "Saved" gives way the moment the form differs again. */}
-              <span className="vu-edit-status">
+              <span className="vu-form-status">
                 {dirty ? (
                   <>
-                    <span className="vu-edit-dot vu-edit-dot--warn" />
+                    <span className="vu-form-dot vu-form-dot--warn" />
                     Unsaved changes
                   </>
                 ) : saved ? (
                   <>
-                    <span className="vu-edit-dot vu-edit-dot--good" />
+                    <span className="vu-form-dot vu-form-dot--good" />
                     Saved
                   </>
                 ) : null}

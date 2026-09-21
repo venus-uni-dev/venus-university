@@ -3,6 +3,7 @@ import type { RoomVariant } from '@shared/room'
 import type {
   Character,
   CharacterBrief,
+  ComfyStatus,
   CreatedEnrollment,
   Emotion,
   EndingPostsResponse,
@@ -40,7 +41,8 @@ import type {
   TextingResponse,
   WardrobeFixImage,
   WardrobeLayer,
-  WardrobeTarget
+  WardrobeTarget,
+  WriterCandidate
 } from '@shared/types'
 
 /** The renderer-visible preload bridge: thin `Result`-returning IPC wrappers only. */
@@ -97,6 +99,13 @@ export interface VenusUniversityApi {
     generateOccasions: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
     /** Generates one exam's multiple-choice questions. Never streams. */
     generateQuiz: <T>(request: StructuredRequest) => Promise<Result<T>>
+    /**
+     * The model ids a custom endpoint lists, for the Settings form's suggestions. An absent
+     * `apiKey` tries the stored one.
+     */
+    listModels: (endpointUrl: string, apiKey?: string) => Promise<Result<string[]>>
+    /** Sends one tiny structured request on the form's writer fields; the error is the answer. */
+    testWriter: (candidate: WriterCandidate) => Promise<Result<void>>
     /** Reports named roster charKeys, the action type, and any refusal. */
     classify: (
       request: ClassifierPromptRequest,
@@ -286,6 +295,10 @@ export interface VenusUniversityApi {
   }
   comfy: {
     start: () => Promise<Result<void>>
+    /** Kills the local server, freeing the VRAM it holds until something starts it again. */
+    stop: () => Promise<Result<void>>
+    /** Subscribes to the server's runtime state on the fixed state channel. */
+    onState: (listener: (status: ComfyStatus) => void) => () => void
     /**
      * Resolves when this expression's queued job finishes. `seed` renders this one image
      * off a seed other than the character's, without persisting it.

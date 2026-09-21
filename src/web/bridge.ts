@@ -7,9 +7,11 @@ import { LINEUP_MIME_TYPE } from '@shared/lineup'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generateImage } from '@shared/llm/cloudImage'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
+import { listModels, testWriter } from '@shared/llm/endpointProbe'
 import { logRecordOf } from '@shared/logRules'
 import { ENDING_IMAGE_MODEL_ID } from '@shared/providers'
 import { assertSafePlaythroughId } from '@shared/saveRules'
+import { storedEndpointKeyFor } from '@shared/settingsRules'
 import {
   MAX_LOG_RECORD_CHARS,
   type AppError,
@@ -33,7 +35,7 @@ import { readGrabBags, writeGrabBags } from './db/grabbags'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
 import { emitter } from './emitter'
 import { exportLog, writeLogLine } from './log'
-import { patchSettings, rendererSettings } from './settings'
+import { currentSettings, patchSettings, rendererSettings } from './settings'
 import { duplicateCharacter, exportCharacter, importCharacter } from './transfer'
 
 /**
@@ -133,6 +135,29 @@ export function buildApi(): VenusUniversityApi {
         ),
       generateQuiz: <T,>(request: StructuredRequest) =>
         result('generate the exam', () => completeStructured<T>(request)),
+      // The model ids a custom endpoint lists, falling back to the stored key for that origin.
+      listModels: (endpointUrl, apiKey) =>
+        result('list the models', async () => {
+          const stored = await currentSettings()
+          return listModels({
+            endpointUrl,
+            apiKey: apiKey ?? storedEndpointKeyFor(stored, endpointUrl)
+          })
+        }),
+      // One tiny structured request on the form's own writer fields; the error is the answer.
+      testWriter: (candidate) =>
+        result('test the connection', async () => {
+          const stored = await currentSettings()
+          await testWriter({
+            ...stored,
+            ...candidate,
+            // Named rather than left to the spread, so a blank field tests the pinned ceiling
+            // rather than the stored cap.
+            maxOutputTokens: candidate.maxOutputTokens,
+            endpointApiKey:
+              candidate.endpointApiKey ?? storedEndpointKeyFor(stored, candidate.endpointUrl ?? '')
+          })
+        }),
       classify: (request: ClassifierPromptRequest, charKeys: string[], group: string) =>
         result<ClassifierVerdict>('classify the action', () =>
           runAbortable(group, (signal) => classifyCloud(request, charKeys, signal))
@@ -251,6 +276,9 @@ export function buildApi(): VenusUniversityApi {
     // Local image generation is the desktop's; no control in the browser reaches any of these.
     comfy: {
       start: () => desktopOnly('comfy.start'),
+      stop: () => desktopOnly('comfy.stop'),
+      // Nothing ever reports on this channel here, so the unsubscribe has nothing to take off.
+      onState: () => () => {},
       generateExpression: () => desktopOnly('comfy.generateExpression'),
       generateCg: () => desktopOnly('comfy.generateCg'),
       generateOutfit: () => desktopOnly('comfy.generateOutfit'),

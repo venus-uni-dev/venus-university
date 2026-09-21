@@ -90,11 +90,9 @@ import {
   ledgerStoryFallback,
   shortenSceneSoFar
 } from '../prompts/scenePrompt'
-import { useComfyStore } from './comfyStore'
 import { useGrabBagStore } from './grabBagStore'
 import { namesCharacter, PORTRAIT_SLOTS, useGameStore, type SceneKind } from './gameStore'
 import { castOf, useSaveStore } from './saveStore'
-import { useSetupStore } from './setupStore'
 import {
   applyLedger,
   bondedCharIds,
@@ -2172,12 +2170,6 @@ export function resetLoop(): void {
   dropHeldSceneLines()
   // A browser resource rather than loop state, so released here.
   dropEndingArt()
-}
-
-/** Nudges ComfyUI awake on the way into a game and returns at once. */
-export async function prepareGameServices(): Promise<void> {
-  if (!useSetupStore.getState().status?.comfyReady) return
-  void useComfyStore.getState().ensureStarted()
 }
 
 /**

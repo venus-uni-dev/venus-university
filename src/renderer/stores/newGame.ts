@@ -36,7 +36,6 @@ import {
 } from '../prompts/occasionPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
-import { prepareGameServices } from './gameLoop'
 import { useGrabBagStore } from './grabBagStore'
 import { retrySilently } from './silentRetry'
 
@@ -283,8 +282,6 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
   }
   attempt = current
 
-  await prepareGameServices()
-  if (stale(mine)) return { status: 'cancelled' }
   return runAttempt(current, mine)
 }
 

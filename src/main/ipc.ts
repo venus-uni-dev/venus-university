@@ -15,6 +15,7 @@ import type {
   AppError,
   Character,
   CharacterBrief,
+  ComfyStatus,
   Emotion,
   EndingPostsResponse,
   EnrollmentDraft,
@@ -37,7 +38,8 @@ import type {
   TextingResponse,
   WardrobeFixImage,
   WardrobeLayer,
-  WardrobeTarget
+  WardrobeTarget,
+  WriterCandidate
 } from '@shared/types'
 import { MAX_LOG_RECORD_CHARS } from '@shared/types'
 import type { ClassifierPromptRequest } from '@shared/classifier'
@@ -95,14 +97,18 @@ import {
   fixHands,
   generateCg,
   generateSprite,
-  start as startComfy
+  setStateSink as setComfyStateSink,
+  start as startComfy,
+  stopByHand as stopComfyByHand
 } from './services/comfyService'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
+import { listModels, testWriter } from '@shared/llm/endpointProbe'
 import { backupName } from '@shared/backup'
 import { exportFileName } from '@shared/characterTransfer'
 import { useSettingsSource } from '@shared/llm/settingsPort'
 import { logExportName, logRecordOf } from '@shared/logRules'
+import { storedEndpointKeyFor } from '@shared/settingsRules'
 import {
   cancelGroup,
   cancelKeys,
@@ -161,7 +167,7 @@ function handle<Args extends unknown[], T>(
   })
 }
 
-/** One progress event on its way out, with this machine's paths out of the failure it carries. */
+/** One event on its way to a window, with this machine's paths out of the failure it carries. */
 function redactedProgress<T extends { error?: AppError }>(progress: T): T {
   if (progress.error === undefined) return progress
   return { ...progress, error: redactError(progress.error) }
@@ -196,6 +202,13 @@ export function registerIpcHandlers(): void {
     const sent = redactedProgress(progress)
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.webContents.isDestroyed()) window.webContents.send('jobs:progress', sent)
+    }
+  })
+  // Fixed channel too: main owns where ComfyUI is, and jobs start it without the renderer.
+  setComfyStateSink((status: ComfyStatus) => {
+    const sent = redactedProgress(status)
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.webContents.isDestroyed()) window.webContents.send('comfy:state', sent)
     }
   })
 
@@ -312,6 +325,7 @@ export function registerIpcHandlers(): void {
   )
 
   handle('comfy:start', () => startComfy())
+  handle('comfy:stop', () => stopComfyByHand())
 
   // `staged` renders into the character's staging tree instead of over the live set.
   handle(
@@ -403,6 +417,26 @@ export function registerIpcHandlers(): void {
 
   // The exam-question call: structured, unstreamed, no group.
   handle('llm:generateQuiz', (_event, request: StructuredRequest) => completeStructured(request))
+
+  // The model ids a custom endpoint lists, falling back to the stored key for that origin.
+  handle('llm:listModels', async (_event, endpointUrl: string, apiKey?: string) => {
+    const stored = await getSettings()
+    return listModels({ endpointUrl, apiKey: apiKey ?? storedEndpointKeyFor(stored, endpointUrl) })
+  })
+
+  // One tiny structured request on the form's own writer fields; the error is the answer.
+  handle('llm:testWriter', async (_event, candidate: WriterCandidate) => {
+    const stored = await getSettings()
+    await testWriter({
+      ...stored,
+      ...candidate,
+      // Named rather than left to the spread, so a blank field tests the pinned ceiling
+      // rather than the stored cap.
+      maxOutputTokens: candidate.maxOutputTokens,
+      endpointApiKey:
+        candidate.endpointApiKey ?? storedEndpointKeyFor(stored, candidate.endpointUrl ?? '')
+    })
+  })
 
   handle('chars:list', () => listCharacters())
   handle(

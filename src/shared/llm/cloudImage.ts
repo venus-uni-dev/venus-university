@@ -3,7 +3,7 @@ import { appError } from '../errors'
 import { IMAGE_MODEL_ID, providerFor, type ImageSize } from '../providers'
 import { imageTypeOf } from '../imageBytes'
 import { adapterFor } from './index'
-import { keyedSettings, sendCall, startClock } from './transport'
+import { pictureSettings, sendCall, startClock } from './transport'
 
 /**
  * Cloud image transport — the picture-generating sibling of `cloudLlm`. Never
@@ -30,8 +30,9 @@ export async function generateImage(
   prompt: string,
   request: ImageRequest = {}
 ): Promise<Uint8Array> {
-  const settings = await keyedSettings('generate images')
-  const provider = providerFor(settings.apiProvider)
+  const settings = await pictureSettings('generate images')
+  // Named outright: the pictures are Gemini's whoever writes the scenes.
+  const provider = providerFor('gemini')
   const adapter = adapterFor(provider)
   const modelId = request.modelId ?? IMAGE_MODEL_ID
   const source = request.source
@@ -40,7 +41,7 @@ export async function generateImage(
     prompt,
     provider,
     modelId,
-    apiKey: settings.apiKey,
+    apiKey: settings.pictureKey,
     imageSize: request.imageSize,
     image: source ? { mimeType: source.mimeType, data: bytesToBase64(source.bytes) } : undefined
   })

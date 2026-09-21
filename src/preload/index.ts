@@ -37,6 +37,8 @@ const api: VenusUniversityApi = {
     generateOccasions: (request, group) =>
       ipcRenderer.invoke('llm:generateOccasions', request, group),
     generateQuiz: (request) => ipcRenderer.invoke('llm:generateQuiz', request),
+    listModels: (endpointUrl, apiKey) => ipcRenderer.invoke('llm:listModels', endpointUrl, apiKey),
+    testWriter: (candidate) => ipcRenderer.invoke('llm:testWriter', candidate),
     classify: (request, charKeys, group) =>
       ipcRenderer.invoke('llm:classify', request, charKeys, group),
     classifyHangout: (request) => ipcRenderer.invoke('llm:classifyHangout', request),
@@ -112,6 +114,13 @@ const api: VenusUniversityApi = {
   },
   comfy: {
     start: () => ipcRenderer.invoke('comfy:start'),
+    stop: () => ipcRenderer.invoke('comfy:stop'),
+    onState: (listener) => {
+      const wrapped = (_event: unknown, status: Parameters<typeof listener>[0]): void =>
+        listener(status)
+      ipcRenderer.on('comfy:state', wrapped)
+      return () => ipcRenderer.removeListener('comfy:state', wrapped)
+    },
     generateExpression: (character, emotion, seed, staged) =>
       ipcRenderer.invoke('comfy:generateExpression', character, emotion, seed, staged),
     generateCg: (character, position, seed, staged) =>

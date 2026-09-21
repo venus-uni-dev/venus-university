@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import {
   baseRel,
   layerRel,
@@ -324,6 +324,11 @@ async function pruneStaging(charId: string): Promise<void> {
   }
 }
 
+/** Swallows the error a `mkdir` of a folder that is already there throws, and nothing else. */
+function ignoreExisting(err: unknown): void {
+  if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+}
+
 /**
  * Makes a staged regenerate the live set: the staged images replace the old ones wholesale,
  * and the old ones are gone only once there is something to put in their place.
@@ -362,6 +367,11 @@ export async function commitStagedSet(
       }
     } else {
       await rm(live, { recursive: true, force: true })
+      // `outfits/{set}` sits one folder below her root, and nothing makes that folder before the
+      // first set lands in it. Not recursive, and never her own folder: a commit racing her
+      // deletion must not put the folder back.
+      const parent = dirname(live)
+      if (parent !== getCharacterPath(charId)) await mkdir(parent).catch(ignoreExisting)
       await rename(staged, live)
     }
   } catch (err) {

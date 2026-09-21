@@ -279,7 +279,7 @@ describe('manageOrderOf', () => {
 /** Which sets "Generate missing content" would queue. */
 describe('missingContentPlan', () => {
   /** Both gates open. */
-  const OPEN = { comfyReady: true, apiKeySet: true, noNsfwImages: false }
+  const OPEN = { comfyReady: true, pictureKeySet: true, noNsfwImages: false }
 
   /** A roster of one with her default sprites and nothing optional, in whatever run `progress` says. */
   function roster(

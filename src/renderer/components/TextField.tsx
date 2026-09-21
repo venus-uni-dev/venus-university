@@ -11,6 +11,8 @@ export interface TextFieldProps {
   hint?: string
   /** Caps a single-line field; a name is 32. */
   maxLength?: number
+  /** Fires when a single-line field is left, for whatever its value has to be checked against. */
+  onBlur?: () => void
   multiline?: boolean
   rows?: number
   /** Grow the box to fit its text. */
@@ -31,6 +33,7 @@ export function TextField({
   placeholder,
   hint,
   maxLength,
+  onBlur,
   multiline,
   rows = 3,
   autoGrow,
@@ -86,6 +89,7 @@ export function TextField({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           maxLength={maxLength}
+          onBlur={onBlur}
           autoFocus={autoFocus}
         />
       )}

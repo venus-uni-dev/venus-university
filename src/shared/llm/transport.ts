@@ -1,23 +1,55 @@
+import { endpointProblem } from '../endpoint'
 import { appError, messageOf } from '../errors'
+import { pictureKeyOf, writerReady } from '../settingsRules'
 import type { Settings } from '../types'
 import type { LlmAdapter, LlmCall } from './adapter'
 import { readSettings } from './settingsPort'
 
 /**
- * The HTTP half both cloud services share: prove the key is there, time the round trip,
- * send the call, and hand a non-2xx to the adapter.
+ * The HTTP half both cloud services share: prove the call can be made, time the round trip,
+ * send it, and hand a non-2xx to the adapter.
  */
 
 /**
- * Settings with the API key proven present, or the permanent failure saying how to add one;
- * `purpose` completes that message (Add one in Settings to …).
+ * Settings the writer can run on, or the permanent failure naming what is missing; `purpose`
+ * completes that message (… in Settings to …). `override` runs candidate settings instead of
+ * the stored ones.
  */
-export async function keyedSettings(purpose: string): Promise<Settings & { apiKey: string }> {
-  const settings = await readSettings()
-  if (!settings.apiKey) {
-    throw appError('API_KEY_MISSING', `No API key is configured. Add one in Settings to ${purpose}.`)
+export async function writerSettings(purpose: string, override?: Settings): Promise<Settings> {
+  const settings = override ?? (await readSettings())
+  if (writerReady(settings, Boolean(settings.apiKey))) return settings
+
+  if (settings.apiProvider === 'openai') {
+    const problem = endpointProblem(settings.endpointUrl ?? '')
+    if (problem) {
+      throw appError('LLM_ENDPOINT_INVALID', `${problem} Fix the endpoint in Settings to ${purpose}.`)
+    }
+    throw appError(
+      'API_KEY_MISSING',
+      `No model is set for the custom endpoint. Name one in Settings to ${purpose}.`
+    )
   }
-  return settings as Settings & { apiKey: string }
+  throw appError('API_KEY_MISSING', `No API key is configured. Add one in Settings to ${purpose}.`)
+}
+
+/**
+ * Settings with the Gemini key the pictures are drawn with proven present, or the permanent
+ * failure saying how to add one. The pictures never run on a custom endpoint.
+ */
+export async function pictureSettings(
+  purpose: string
+): Promise<Settings & { pictureKey: string }> {
+  const settings = await readSettings()
+  const pictureKey = pictureKeyOf(settings)
+  if (!pictureKey) {
+    throw appError(
+      'API_KEY_MISSING',
+      settings.apiProvider === 'openai'
+        ? `No Gemini key is set. Add one in Settings to ${purpose}.`
+        : `No API key is configured. Add one in Settings to ${purpose}.`
+    )
+  }
+  return { ...settings, pictureKey }
 }
 
 /** Wall clock for a round trip, in ms; read on every exit path. */

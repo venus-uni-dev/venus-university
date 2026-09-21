@@ -6,7 +6,6 @@ import {
   AUTOSAVE_ID,
   MAX_SLOT_SAVES,
   fullNameOf,
-  type AppError,
   type Character,
   type GameSave,
   type PlaythroughRecord,
@@ -19,13 +18,7 @@ import { formatDateBanner } from '../prompts/gameDate'
 import { GOODBYES_SAVE_LABEL } from '../prompts/graduation'
 import { profileUrl, useCharacterStore } from '../stores/characterStore'
 import { beginCrossing, coverSwap, endCrossing, useCrossingStore } from '../stores/crossingStore'
-import {
-  enterGame,
-  hasDecisionPoint,
-  leaveToMenu,
-  prepareGameServices,
-  switchGame
-} from '../stores/gameLoop'
+import { enterGame, hasDecisionPoint, leaveToMenu, switchGame } from '../stores/gameLoop'
 import { stageEnrollment } from '../stores/newGame'
 import {
   castOf,
@@ -65,12 +58,11 @@ export interface LoadGameModalProps {
   onClose?: () => void
 }
 
-/** A save on its way in, held with the service warm-up it is waiting on. */
+/** A save on its way in, held until the crossing has drawn its cover. */
 interface Entering {
   save: GameSave
   record: PlaythroughRecord
   characters: Character[]
-  ready: Promise<void>
 }
 
 /** When a file was written, in the machine's own locale. */
@@ -199,8 +191,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
     setEntering({
       save: entry.save,
       record: entry.record,
-      characters: entry.characters,
-      ready: prepareGameServices()
+      characters: entry.characters
     })
   }
 
@@ -215,8 +206,6 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
     const resolved = await resolveEnrollment(playthrough)
     // A refused file has reported itself; a roster it cannot be played with is on its own row.
     if (!resolved || resolved.unloadable) return
-    // Fired together: nothing about the registrar waits on ComfyUI.
-    void prepareGameServices()
 
     if (!onClose) {
       const cut = beginCrossing(
@@ -264,16 +253,9 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
     setHovered(null)
   }
 
-  /** Runs once the service warm-up has settled — hydrate and hand off, under the cover. */
-  function onServicesReady(entry: Entering, error: AppError | null): void {
+  /** Hydrates the held save and hands it to whoever runs it, under the cover. */
+  function handOff(entry: Entering): void {
     setEntering(null)
-    if (error) {
-      // The panel is revealed again and the error read over it, the abandon idiom.
-      endCrossing()
-      showError(error)
-      return
-    }
-
     // Handed over under the cover, without a word about being ready: what the curtain is
     // covering is the game booting, and `enterGame` is what knows when that is done.
     coverSwap(() => {
@@ -305,27 +287,14 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   }
 
   /**
-   * The wait itself, settled by an effect since the crossing's curtain is already the loading
-   * screen; the handler rides a ref, being a new function every render.
+   * The hand-off, run from an effect so it lands after the crossing has rendered its cover;
+   * the handler rides a ref, being a new function every render.
    */
-  const settle = useRef(onServicesReady)
-  settle.current = onServicesReady
+  const settle = useRef(handOff)
+  settle.current = handOff
   useEffect(() => {
     if (!entering) return
-    const entry = entering
-    let stale = false
-    void entry.ready.then(
-      () => {
-        if (!stale) settle.current(entry, null)
-      },
-      (err: unknown) => {
-        console.error('[load game] the services failed', err)
-        if (!stale) settle.current(entry, toAppError(err))
-      }
-    )
-    return () => {
-      stale = true
-    }
+    settle.current(entering)
   }, [entering])
 
   const { host, overlayProps } = useModalShell(dismiss)
