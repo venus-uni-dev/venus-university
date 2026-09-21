@@ -18,7 +18,8 @@ const PRIVATE = [
   '.github/workflows/sync-public.yml',
   'CLAUDE.md',
   'DESIGN_GUIDE.md',
-  'UI_STYLE_GUIDE.md'
+  'UI_STYLE_GUIDE.md',
+  'TESTING_PLAN.md'
 ]
 
 const PUBLIC = [

@@ -30,7 +30,7 @@ const MAX_BODY_SUBJECTS = 100
 const MAX_TRAILER_LOOKBACK = 50
 
 /** The working notes, which stay private. */
-const PRIVATE_DOCS = new Set(['CLAUDE.md', 'DESIGN_GUIDE.md', 'UI_STYLE_GUIDE.md'])
+const PRIVATE_DOCS = new Set(['CLAUDE.md', 'DESIGN_GUIDE.md', 'UI_STYLE_GUIDE.md', 'TESTING_PLAN.md'])
 
 /**
  * Whether one tracked path, as `git ls-tree` prints it, belongs in the public

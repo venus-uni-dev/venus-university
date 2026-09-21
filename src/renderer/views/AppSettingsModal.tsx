@@ -755,7 +755,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
               <CheckField
                 id="settings-check-updates"
                 label="Check for updates on launch"
-                note="Asks itch.io for a newer build each time the game starts, and offers to install it. Your saves, characters and settings are left alone."
                 checked={checkUpdates}
                 onChange={handleCheckUpdatesChange}
               />
