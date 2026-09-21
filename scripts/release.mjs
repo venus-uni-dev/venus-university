@@ -142,15 +142,38 @@ async function zipFolder(folder, target) {
 }
 
 /** Everything the packaged folder has to contain, and the things it must not. */
-async function assertDesktopPayload() {
+async function assertDesktopPayload(version) {
   const required = [
     'Venus University.exe',
     '.itch.toml',
     'resources/app.asar',
-    'resources/app.asar.unpacked/node_modules/7zip-bin/win/x64/7za.exe'
+    'resources/app.asar.unpacked/node_modules/7zip-bin/win/x64/7za.exe',
+    'resources/build-manifest.json'
   ]
   for (const rel of required) {
     if (!existsSync(join(UNPACKED, rel))) throw new Error(`The build is missing ${rel}.`)
+  }
+
+  const manifest = JSON.parse(await readFile(join(UNPACKED, 'resources/build-manifest.json'), 'utf8'))
+  if (manifest.version !== version) {
+    throw new Error(
+      `resources/build-manifest.json is version ${manifest.version}, but the release is ${version}.`
+    )
+  }
+  for (const file of manifest.files) {
+    if (!existsSync(join(UNPACKED, file.rel))) {
+      throw new Error(`resources/build-manifest.json lists ${file.rel}, which the build does not have.`)
+    }
+  }
+
+  const updateSource = await readFile(join(REPO, 'src/shared/updateSource.ts'), 'utf8')
+  const targetMatch = updateSource.match(/ITCH_TARGET = '([^']+)'/)
+  if (!targetMatch) throw new Error('Could not find ITCH_TARGET in src/shared/updateSource.ts.')
+  const { itchTarget } = JSON.parse(await readFile(join(REPO, 'build/release.json'), 'utf8'))
+  if (itchTarget !== targetMatch[1]) {
+    throw new Error(
+      `build/release.json's itchTarget (${itchTarget}) does not match ITCH_TARGET (${targetMatch[1]}).`
+    )
   }
 
   const cast = await readdir(join(UNPACKED, 'resources/assets/characters'))
@@ -230,7 +253,7 @@ async function main() {
     ])
   )
 
-  const asarBytes = await step('check the desktop payload', assertDesktopPayload)
+  const asarBytes = await step('check the desktop payload', () => assertDesktopPayload(version))
 
   const winZip = join(RELEASE, `venus-university-${version}-win.zip`)
   const winZipBytes = existsSync(winZip) ? (await stat(winZip)).size : 0

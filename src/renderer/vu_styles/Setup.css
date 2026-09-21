@@ -1,6 +1,7 @@
-/* The setup screen's stages and their own layout. Only the corner decoration is
-   placed absolutely against the stage, which is 1080 units tall at every window size;
-   everything else is flex and gap.
+/* The setup screen's stages and their own layout: the arch down the left, the pitch standing
+   in the top of its curve, and beside them either the checklist the install stage spreads over
+   the ground or the card the key stage centres in its stand. Only the arch is placed absolutely
+   against the stage, which is 1080 units tall at every window size; everything else is flex.
 
    Imported from the view module, never from index.css: a screen's file must load after
    base.css or its overrides of a primitive lose at equal specificity. */
@@ -16,16 +17,26 @@
 
 /* ---- the decoration -------------------------------------------------------- */
 
-/* Two arches off the left edge, drawn as one object so the sheet and its shadow breathe
-   together. Reaches past the top and bottom edges with negative insets, and takes no pointer. */
+/* Two arches off the left edge, tall enough that the curve's apex is cut by the top of the
+   stage and the foot still runs off the bottom, which is what makes it a frame the pitch stands
+   inside rather than a corner ornament. It takes no pointer. The width and the left inset are
+   the stage's own — declared here for the checklist's narrower arch and written over by the
+   view, which tweens them across a stage change. */
 .vu-setup-decor {
   position: absolute;
-  top: 110px;
-  bottom: -180px;
-  left: -210px;
-  width: 727px;
+  top: -120px;
+  bottom: -220px;
+  left: -230px;
+  width: 840px;
   pointer-events: none;
-  transform-origin: 30% 60%;
+}
+
+/* The sheet that arrives and then breathes: the two arches as one object, pivoting where the
+   curve is widest so a swell reads as the frame filling rather than as the box growing. */
+.vu-setup-decor-sheet {
+  position: absolute;
+  inset: 0;
+  transform-origin: 26% 64%;
 }
 
 .vu-setup-decor-shadow,
@@ -52,19 +63,29 @@
 
 /* ---- the pitch ------------------------------------------------------------- */
 
-/* Bottom-anchored: the arch is the tall object and the words sit
-   in its foot. A screen's own layers count from 1, and this one is owed one — it is
-   written after the decoration and has to paint over it. */
+/* Top-anchored, inside the curve: the padding at the head is the clearance the arch's own
+   chord needs, above which the boundary closes in and a line would touch it. A screen's own
+   layers count from 1, and this one is owed one — it is written after the decoration and has
+   to paint over it. */
 .vu-setup-pitch {
   position: relative;
   z-index: 1;
   display: flex;
   flex: none;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 18px;
   width: 520px;
-  padding: 0 0 90px 70px;
+  padding: 120px 0 0 96px;
+}
+
+/* The key stage's measure: two provider blurbs under the intro, in the wider arch. */
+.vu-setup-pitch--wide {
+  width: 540px;
+}
+
+.vu-setup-pitch--wide .vu-setup-body {
+  max-width: 560px;
 }
 
 .vu-setup-kicker {
@@ -92,6 +113,19 @@
   font: 500 17px/1.55 var(--font-body);
 }
 
+/* One provider the pitch names: what it is called, and the paragraph saying what taking it
+   costs. The head is the pitch's own body weight one step up, not a heading. */
+.vu-setup-blurb {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vu-setup-blurb-head {
+  color: var(--vu-text);
+  font: 700 19px var(--font-body);
+}
+
 /* ---- the checklist --------------------------------------------------------- */
 
 .vu-setup-panel {
@@ -102,7 +136,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 16px;
-  padding: 76px 90px 58px 60px;
+  padding: 76px 70px 58px 150px;
 }
 
 /* The header is the panel's forward layer, and it is owed one: the list below reaches 10px
@@ -123,8 +157,8 @@
   font-size: 36px;
 }
 
-/* A header row that holds one control for the thing beside it puts it at the end — the
-   checklist's re-check, and the key stage's link to the page the steps are about. */
+/* A header row that holds one control for the thing beside it puts it at the end: the
+   checklist's re-check. */
 .vu-setup-head .vu-pill {
   margin-left: auto;
 }
@@ -314,12 +348,63 @@
 
 /* ---- the key stage --------------------------------------------------------- */
 
+/* Where the card stands: the whole of the ground right of the pitch, with the card centred on
+   it, so the blank a sparser page leaves falls evenly around it. */
+.vu-setup-stand {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  place-items: center;
+}
+
+/* The card the key stage is typed into: the Settings panel's chassis at a screen's scale, its
+   round left end negative space the content is inset past rather than curved around. The height
+   is fixed, which is what holds the card still across a provider change, and the width allows
+   for the paper offset and what the lean throws past the flat edge at both ends. No `overflow`
+   — the title tab overhangs the top edge, and the paper layer's shadow is a pseudo-element this
+   box would clip. */
+.vu-setup-card {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(1000px, 100% - 48px);
+  height: 980px;
+  padding: 46px 60px 32px 240px;
+  border-radius: 400px 0 0 400px;
+}
+
+/* What the steps under it are about, and the one thing on the card that changes with the
+   provider: a reading over a group, at a field label's weight one size up. */
+.vu-setup-card-heading {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Everything between the provider select and the foot, and the one thing in the card that
+   scrolls: padding for the swell and the shadow a field's own box grows into, and room at the
+   foot for the fade. */
+.vu-setup-card-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 6px 24px;
+  overflow: hidden auto;
+}
+
 .vu-setup-steps {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   margin: 0;
-  margin-top: 20px;
   padding: 0;
   list-style: none;
   counter-reset: vu-step;
@@ -352,19 +437,10 @@
   font: 700 16px var(--font-mono);
 }
 
-/* A key is forty characters, not a paragraph — the well stops where the reading does. */
-.vu-setup-key {
-  max-width: 560px;
-}
+/* ---- the feet -------------------------------------------------------------- */
 
-/* The box under the key, held to the field's own measure so its sentence wraps with it
-   rather than running the width of the panel. */
-.vu-setup-remember {
-  max-width: 560px;
-}
-
-/* ---- the foot -------------------------------------------------------------- */
-
+/* The checklist's foot: the hint and the answers on one line, the ground being wide enough
+   to hold both. */
 .vu-setup-foot {
   display: flex;
   flex: none;
@@ -381,5 +457,20 @@
 }
 
 .vu-setup-foot .vu-foot {
+  flex: none;
+}
+
+/* The card's: the same pair stacked, the card's column being too narrow for a sentence and
+   two answers side by side. */
+.vu-setup-card-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.vu-setup-card-foot .vu-setup-hint {
   flex: none;
 }

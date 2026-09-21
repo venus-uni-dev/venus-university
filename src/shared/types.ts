@@ -11,6 +11,7 @@ import type { PromptKind } from './promptKinds'
 import type { RumorPassOutcome } from './rumors'
 import type { DormId } from './dorms'
 import type { AudioGroup } from './audio'
+import type { ComfyGpu } from './setupManifest'
 import type { Weather } from './weather'
 
 /** Discriminated result envelope returned by every IPC handler. */
@@ -1582,6 +1583,26 @@ export interface Settings {
   /** The player skipped the optional ComfyUI install; boot stops verifying it. */
   comfyDeferred: boolean
   /**
+   * Which ComfyUI portable build is installed and verified. **Not a player setting** —
+   * hand-edited like {@link serviceTier}, absent meaning the GPUs Electron reports decide.
+   */
+  comfyGpu?: ComfyGpu
+  /**
+   * Whether the desktop asks itch.io for a newer build at every launch. Optional on disk,
+   * absent meaning it does.
+   */
+  checkUpdates?: boolean
+  /**
+   * The version the update check pretends this build is. **Not a player setting** — hand-edited
+   * like {@link serviceTier}, for exercising an update against a build already on itch.io.
+   */
+  updateAsVersion?: string
+  /**
+   * An https URL answering `{ latest, url }` in place of itch.io, for exercising an update
+   * against a build served locally. **Not a player setting** — hand-edited like {@link serviceTier}.
+   */
+  updateFeed?: string
+  /**
    * Withhold the explicit images: the nude wardrobe and the CGs are covered wherever shown, and
    * a scene that calls for either changes her expression instead.
    */
@@ -1655,6 +1676,9 @@ export type SettingsPatch = Omit<
   | 'removedDefaults'
   | 'serviceTier'
   | 'streamResponses'
+  | 'comfyGpu'
+  | 'updateAsVersion'
+  | 'updateFeed'
 > & {
   apiKey?: string
   endpointApiKey?: string
@@ -1862,6 +1886,49 @@ export interface InstallProgress {
 export interface InstallResult {
   status: SetupStatus
   errors: Array<{ componentId: string; error: AppError }>
+}
+
+/** What `update:check` answers: the running version, the newest on itch.io, and whether it is newer. */
+export interface UpdateCheck {
+  current: string
+  /** Null when the build could not check, or the channel's build carries no version. */
+  latest: string | null
+  available: boolean
+}
+
+/** Where an update is, on the fixed `update:progress` channel. Numbers only: nothing to redact. */
+export type UpdatePhase = 'download' | 'unpack' | 'restart'
+
+export interface UpdateProgress {
+  phase: UpdatePhase
+  /** 0-100 when the total is known. */
+  percent?: number
+  bytesDone?: number
+  bytesTotal?: number
+}
+
+/** One shipped file, as the build's manifest records it: a forward-slash path under the app folder. */
+export interface FileStamp {
+  rel: string
+  size: number
+  /** Lowercase hex SHA256. */
+  sha256: string
+}
+
+/**
+ * `resources/build-manifest.json`: every file a build shipped, written when it was packaged.
+ * An update is planned from the installed build's copy and the new build's.
+ */
+export interface BuildManifest {
+  schemaVersion: 1
+  version: string
+  files: FileStamp[]
+}
+
+/** Which files an update puts in place and which it takes away, as manifest paths. */
+export interface UpdatePlan {
+  install: string[]
+  remove: string[]
 }
 
 /** Where the local ComfyUI server is, as main knows it. */

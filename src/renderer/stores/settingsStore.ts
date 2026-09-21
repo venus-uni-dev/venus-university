@@ -140,6 +140,8 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     secondaryModel: settings.secondaryModel,
     secondaryModelFor: settings.secondaryModelFor,
     comfyDeferred: settings.comfyDeferred,
+    // Carried, or a save made from anywhere else would turn the update check back on.
+    checkUpdates: settings.checkUpdates,
     noNsfwImages: settings.noNsfwImages,
     lessNsfwText: settings.lessNsfwText,
     noNsfwSound: settings.noNsfwSound,

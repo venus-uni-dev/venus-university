@@ -620,6 +620,36 @@ body {
   margin: -4px -6px;
 }
 
+/* The layer a field's floating list is drawn on: the panel's own frame, taking no pointer of
+   its own and adding no positioning, so a list is placed against the panel and nothing else. */
+.vu-popups {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* What a custom endpoint answers when it is asked, tucked under the fields it answers for:
+   the button, the word it comes back with beside it, and — on a failure — the sentence
+   below the pair, since a wrapped row gives a full-width child its own line. */
+.vu-test-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.vu-test-row .vu-btn-sub {
+  letter-spacing: 0.12em;
+}
+
+/* Why it could not be reached: body text, because it is a sentence rather than a state. */
+.vu-test-note {
+  flex-basis: 100%;
+  color: var(--vu-text-body);
+  font: 500 13px/1.45 var(--font-body);
+}
+
 /* The soft end of a scroller: a strip of the surface fading up over the last row, absolute
    against the box that holds the scroller, and never in the pointer's way. */
 .vu-scroll-fade {

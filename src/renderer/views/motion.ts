@@ -1692,6 +1692,9 @@ export const decorIn: Variants = {
   }
 }
 
+/** The arch widening or narrowing between two setup stages. */
+export const archResize: Transition = { duration: 0.5, ease: 'easeOut' }
+
 /**
  * The two halves of a day breathing in opposite phase, in the faint opacity the word is drawn at
  * so a `+` still reads through it. No `ease` is named: an accelerated opacity animates over

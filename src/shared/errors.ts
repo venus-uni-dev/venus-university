@@ -75,6 +75,14 @@ const PERMANENT_CODES = new Set([
   'NODE_DEPS_MISSING',
   // The embedded interpreter would not answer what it has installed.
   'PYTHON_PROBE_FAILED',
+  // Update: a folder the app cannot write, a page that no longer answers as itch.io's did, a
+  // download that is not a build of this app, a disk with no room, and a dev build, which
+  // has no app folder to update.
+  'UPDATE_INSTALL_READONLY',
+  'UPDATE_SOURCE_CHANGED',
+  'UPDATE_BUILD_INVALID',
+  'UPDATE_DISK_FULL',
+  'UPDATE_DEV_BUILD',
   // Generation
   'CANCELLED',
   'COMFY_PROMPT_REJECTED',

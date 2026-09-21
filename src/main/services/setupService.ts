@@ -1,14 +1,15 @@
-import { mkdir, rename, rm, stat } from 'fs/promises'
+import { mkdir, readFile, rename, rm, stat } from 'fs/promises'
 import { dirname, join } from 'path'
 import {
   COMFY_ARCHIVE_WRAPPER_DIR,
-  COMFY_RUNTIME,
+  COMFY_RUNTIMES,
   PINNED_MODELS,
   PINNED_NODES,
   modelForComponentId,
   nodeZipUrl,
   nodeZipWrapperDir,
   runtimeAssetUrl,
+  type ComfyGpu,
   type PinnedModel,
   type PinnedNode,
   type PinnedRuntime
@@ -25,12 +26,15 @@ import {
   getComfyModelDirPath,
   getComfyModelFilePath,
   getComfyPythonPath,
+  getComfyTorchVersionPath,
   getComfyUiPath,
   getTempPath
 } from '../paths'
 import { extract7z, extractZip, renameExtractedDir, stripWrapperDir } from './archiveService'
 import { stop as stopComfy } from './comfyService'
 import { downloadFile, hashFile } from './downloadService'
+import { resolveComfyGpu } from './gpuService'
+import { getSettings } from './settingsService'
 import { findMissingModules, hasRequirements, pipInstallRequirements } from './pythonService'
 import { withRetry } from '@shared/retry'
 import { appError, toAppError } from '@shared/errors'
@@ -57,8 +61,28 @@ async function fileSize(path: string): Promise<number | null> {
   }
 }
 
-/** Verifies the extracted ComfyUI portable build and its embedded python. */
-async function checkComfyRuntime(): Promise<SetupComponent> {
+/** How each build is named on the runtime row and in what that row says. */
+const GPU_LABELS: Readonly<Record<ComfyGpu, string>> = { nvidia: 'NVIDIA', amd: 'AMD ROCm' }
+
+/**
+ * The vendor the installed build was compiled for, read off torch's own version file: the
+ * ROCm wheels assign `hip` a version string where the CUDA ones assign it `None`, with or
+ * without the type annotation torch writes beside the name. Null where the file cannot be read.
+ */
+async function installedComfyGpu(): Promise<ComfyGpu | null> {
+  try {
+    const source = await readFile(getComfyTorchVersionPath(), 'utf8')
+    return /^hip\s*(?::[^=]*)?=\s*['"][^'"]+['"]/m.test(source) ? 'amd' : 'nvidia'
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Verifies the extracted ComfyUI portable build and its embedded python, and that the build
+ * on disk is the one `gpu` names: the other vendor's wheels find no device to render on.
+ */
+async function checkComfyRuntime(gpu: ComfyGpu): Promise<SetupComponent> {
   const base: Omit<SetupComponent, 'state' | 'detail'> = {
     id: 'comfyRuntime',
     label: 'ComfyUI portable runtime',
@@ -79,8 +103,25 @@ async function checkComfyRuntime(): Promise<SetupComponent> {
       detail: 'The ComfyUI folder exists but python_embeded/python.exe is missing.'
     }
   }
-  console.log('[verify] comfyRuntime: ok')
-  return { ...base, state: 'ok' }
+
+  const installed = await installedComfyGpu()
+  if (installed === null) {
+    console.log('[verify] comfyRuntime: ok (build unnamed, torch version.py unreadable)')
+    return { ...base, state: 'ok' }
+  }
+  const named = { ...base, label: `${base.label} (${GPU_LABELS[installed]})` }
+  if (installed !== gpu) {
+    console.log(`[verify] comfyRuntime: invalid (installed ${installed}, machine wants ${gpu})`)
+    return {
+      ...named,
+      state: 'invalid',
+      detail:
+        `Installed for ${GPU_LABELS[installed]}; this machine needs the ${GPU_LABELS[gpu]} ` +
+        'build. Installing replaces it, and the nodes and models under it.'
+    }
+  }
+  console.log(`[verify] comfyRuntime: ok (${installed})`)
+  return { ...named, state: 'ok' }
 }
 
 /**
@@ -187,8 +228,9 @@ async function checkModels(): Promise<SetupComponent[]> {
 /** Runs startup verification with independent rows for each component. */
 export async function getSetupStatus(): Promise<SetupStatus> {
   console.log('[verify] starting setup verification')
+  const gpu = await resolveComfyGpu(await getSettings())
   const [comfyRuntime, nodes, models] = await Promise.all([
-    checkComfyRuntime(),
+    checkComfyRuntime(gpu),
     checkCustomNodes(),
     checkModels()
   ])
@@ -380,7 +422,7 @@ export async function runInstall(
   emit: (progress: InstallProgress) => void
 ): Promise<InstallResult> {
   const errors: InstallResult['errors'] = []
-  const status = await getSetupStatus()
+  let status = await getSetupStatus()
   const stateOf = (id: string): SetupComponent['state'] | undefined =>
     status.components.find((c) => c.id === id)?.state
 
@@ -409,15 +451,26 @@ export async function runInstall(
       emit({ jobId, componentId, step: 'Installed', percent: 100, done: true })
     } catch (err) {
       const error = toAppError(err, 'INSTALL_FAILED')
+      // The row shows the message; the log keeps the detail the row has no room for.
+      const detail = error.detail ? ` — ${error.detail}` : ''
+      console.warn(`[setup] ${componentId} failed: ${error.message}${detail}`)
       errors.push({ componentId, error })
       emit({ jobId, componentId, step: 'Failed', done: true, error })
     }
   }
 
-  // 1. ComfyUI portable runtime; the nodes and models install into its tree.
-  await runStep('comfyRuntime', (report) =>
-    installRuntimeArchive(COMFY_RUNTIME, getComfyUiPath(), COMFY_ARCHIVE_WRAPPER_DIR, report)
-  )
+  // 1. ComfyUI portable runtime, the build this machine resolves to; the nodes and models
+  //    install into its tree. Extracting over a build that is there replaces that tree
+  //    wholesale, so a server running on it is stopped first and the rows under it are
+  //    read again afterwards rather than kept as they were before the swap.
+  const gpu = await resolveComfyGpu(await getSettings())
+  if (stateOf('comfyRuntime') !== 'ok') {
+    stopComfy()
+    await runStep('comfyRuntime', (report) =>
+      installRuntimeArchive(COMFY_RUNTIMES[gpu], getComfyUiPath(), COMFY_ARCHIVE_WRAPPER_DIR, report)
+    )
+    status = await getSetupStatus()
+  }
 
   const comfyInstalled = (await fileSize(getComfyPythonPath())) !== null
 

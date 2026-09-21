@@ -4,10 +4,9 @@
  */
 
 import { app } from 'electron'
-import { dirname } from 'path'
 import { escapeRegExp } from '@shared/sentences'
 import type { AppError } from '@shared/types'
-import { getDataPath } from './paths'
+import { getDataPath, getInstallPath } from './paths'
 
 /** One root and the placeholder that stands in for it. */
 export interface RedactedRoot {
@@ -70,7 +69,7 @@ function runRoots(): RedactedRoot[] {
   return [
     { path: rootPath(getDataPath), label: '<data>' },
     { path: rootPath(() => app.getAppPath()), label: '<app>' },
-    { path: rootPath(() => dirname(app.getPath('exe'))), label: '<app>' },
+    { path: rootPath(getInstallPath), label: '<app>' },
     { path: rootPath(() => app.getPath('home')), label: '<home>' }
   ]
 }

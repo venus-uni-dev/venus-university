@@ -17,18 +17,22 @@ import { DownloadModal } from './views/DownloadModal'
 import { FeedbackModal } from './views/FeedbackModal'
 import { LoadGameModal } from './views/LoadGameModal'
 import { SupportModal } from './views/SupportModal'
+import { UpdateFailedModal } from './views/UpdateFailedModal'
+import { UpdateModal } from './views/UpdateModal'
 import { heldScreenTheme } from './views/clockTheme'
+import { updateCaption } from './views/updateCaption'
 import { useAssetStore } from './stores/assetStore'
 import { useAudioStore } from './stores/audioStore'
 import { useCharacterStore } from './stores/characterStore'
 import { useComfyStore } from './stores/comfyStore'
-import { cancelCrossing, endCrossing } from './stores/crossingStore'
+import { cancelCrossing, endCrossing, nameCrossingWait } from './stores/crossingStore'
 import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
 import { useSaveStore } from './stores/saveStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useSetupStore } from './stores/setupStore'
 import { useUiStore, type ViewName } from './stores/uiStore'
+import { useUpdateStore } from './stores/updateStore'
 import { isWebBuild } from './platform'
 
 /**
@@ -54,6 +58,25 @@ async function boot(): Promise<void> {
   if (useUiStore.getState().fatalError) {
     cancelCrossing()
     return
+  }
+
+  // A newer build on itch.io, offered under the cover the boot is already behind. On "Update"
+  // the mark's caption reports each phase and the app quits into the swap, so boot ends here;
+  // a failure is waited out like any other modal in front of a cover, and the launch goes on.
+  const version = await useUpdateStore.getState().check()
+  if (version && (await useUpdateStore.getState().ask(version)) === 'update') {
+    nameCrossingWait(updateCaption(null))
+    let shown = updateCaption(null)
+    const stop = useUpdateStore.subscribe((state) => {
+      const caption = updateCaption(state.progress)
+      if (caption !== shown) {
+        shown = caption
+        nameCrossingWait(caption)
+      }
+    })
+    const failure = await useUpdateStore.getState().apply()
+    stop()
+    if (!failure) return
   }
 
   // Non-fatal: a failed read leaves the grab bags running in memory for the session.
@@ -104,6 +127,8 @@ function App(): JSX.Element {
   const error = useUiStore((s) => s.error)
   const fatalError = useUiStore((s) => s.fatalError)
   const download = useUiStore((s) => s.download)
+  const offer = useUpdateStore((s) => s.offer)
+  const updateFailure = useUpdateStore((s) => s.failure)
   // The Game View's own key: a save switched over a running game replaces
   // this store's state under the curtain, and its React state — crossfade pairs, `sending`,
   // `uiHidden` — is a fact about the save on screen and must not outlive it.
@@ -137,7 +162,9 @@ function App(): JSX.Element {
       {/* The gate itself is what a closing modal has to outlive, so it is the presence's
           child: the exits run inside it, and it unmounts once they finish. */}
       <AnimatePresence>
-        {(modals.length > 0 || error || download) && <AppModals key="app-modals" />}
+        {(modals.length > 0 || error || download || offer || updateFailure) && (
+          <AppModals key="app-modals" />
+        )}
       </AnimatePresence>
 
       {/* It draws nothing here — it publishes what the pointer is doing onto the document and
@@ -149,14 +176,17 @@ function App(): JSX.Element {
 }
 
 /**
- * The modals no single view owns — the menu's five and the tier-2 error — portalled out with a
- * theme read once via `heldScreenTheme()`, remounted fresh each time one of them opens.
+ * The modals no single view owns — the menu's five, the tier-2 error and the boot's two update
+ * panels — portalled out with a theme read once via `heldScreenTheme()`, remounted fresh each
+ * time one of them opens.
  */
 function AppModals(): JSX.Element {
   const modals = useUiStore((s) => s.modals)
   const error = useUiStore((s) => s.error)
   const download = useUiStore((s) => s.download)
   const dismissError = useUiStore((s) => s.dismissError)
+  const offer = useUpdateStore((s) => s.offer)
+  const updateFailure = useUpdateStore((s) => s.failure)
 
   const [theme] = useState(heldScreenTheme)
 
@@ -172,6 +202,10 @@ function AppModals(): JSX.Element {
         {modals.includes('loadGame') && <LoadGameModal key="load-game" theme={theme} />}
         {download && (
           <DownloadModal key="download" theme={theme} name={download.name} url={download.url} />
+        )}
+        {offer && <UpdateModal key="update-offer" theme={theme} version={offer.version} />}
+        {updateFailure && (
+          <UpdateFailedModal key="update-failed" theme={theme} error={updateFailure} />
         )}
         {error && (
           <ErrorModal

@@ -126,6 +126,7 @@ import {
   runInstall,
   verifyModel
 } from './services/setupService'
+import { applyUpdate, getUpdateCheck } from './services/updateService'
 import { copyLogTo, writeLogLine } from './logFile'
 import { getCharacterPath } from './paths'
 import { redactError } from './redact'
@@ -221,6 +222,17 @@ export function registerIpcHandlers(): void {
   // The caller has already saved; main writes nothing on its way out.
   handle('app:quit', () => {
     app.quit()
+  })
+  // What the launch check found, answered off the cached promise.
+  handle('update:check', () => getUpdateCheck())
+  // Progress goes out on a fixed push channel; the quit waits for this invoke to be answered,
+  // so the renderer's await settles before the window goes away.
+  handle('update:apply', async (event) => {
+    await applyUpdate((progress) => {
+      if (event.sender.isDestroyed()) return
+      event.sender.send('update:progress', progress)
+    })
+    setTimeout(() => app.quit(), 250)
   })
   // The renderer's own console, appended to the file main's goes to; main stamps the clock and
   // holds what the window sent to one level of its own and one record's worth of characters.

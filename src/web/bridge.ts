@@ -297,6 +297,11 @@ export function buildApi(): VenusUniversityApi {
       // Nothing ever reports on this channel here, so the unsubscribe has nothing to take off.
       onInstallProgress: () => () => {}
     },
+    update: {
+      check: () => desktopOnly('update.check'),
+      apply: () => desktopOnly('update.apply'),
+      onProgress: () => () => {}
+    },
     backup: {
       export: () => result('save the backup', exportBackup),
       import: () => result('restore the backup', importBackup)

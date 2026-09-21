@@ -152,6 +152,16 @@ const api: VenusUniversityApi = {
       return () => ipcRenderer.removeListener('setup:installProgress', wrapped)
     }
   },
+  update: {
+    check: () => ipcRenderer.invoke('update:check'),
+    apply: () => ipcRenderer.invoke('update:apply'),
+    onProgress: (listener) => {
+      const wrapped = (_event: unknown, progress: Parameters<typeof listener>[0]): void =>
+        listener(progress)
+      ipcRenderer.on('update:progress', wrapped)
+      return () => ipcRenderer.removeListener('update:progress', wrapped)
+    }
+  },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),
     import: () => ipcRenderer.invoke('backup:import')

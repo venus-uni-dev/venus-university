@@ -69,14 +69,6 @@
   overflow: hidden auto;
 }
 
-/* The layer a field's floating list is drawn on: the panel's own frame, taking no pointer of
-   its own and adding no positioning, so a list is placed against the panel and nothing else. */
-.vu-settings-popups {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
 /* What the second model writes: a heading and three boxes, tucked under the select they
    answer for and inset from it, so the group reads as that field's own rather than as three
    more settings in the column. Tight, because each row is a label and a short aside — not the
@@ -101,28 +93,6 @@
    it follows. */
 .vu-settings-key {
   margin-top: 4px;
-}
-
-/* What a custom endpoint answers when it is asked, tucked under the fields it answers for:
-   the button, the word it comes back with beside it, and — on a failure — the sentence
-   below the pair, since a wrapped row gives a full-width child its own line. */
-.vu-settings-test {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.vu-settings-test .vu-btn-sub {
-  letter-spacing: 0.12em;
-}
-
-/* Why it could not be reached: body text, because it is a sentence rather than a state. */
-.vu-settings-test-note {
-  flex-basis: 100%;
-  color: var(--vu-text-body);
-  font: 500 13px/1.45 var(--font-body);
 }
 
 /* ---- the right column: what is shown -------------------------------------- */

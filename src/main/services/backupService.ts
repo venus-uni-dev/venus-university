@@ -330,8 +330,9 @@ export async function importBackup(archivePath: string): Promise<void> {
     const record = await readBackupRecord(scratch)
 
     // The stored key stays: a backup carries settings as the renderer sees them, so it never
-    // carries one. The dev switches stay too, being this install's own; which shipped
-    // characters the player took off the roster travels with the backup, through its own writer.
+    // carries one. The dev switches and the ComfyUI build stay too, being this install's own;
+    // which shipped characters the player took off the roster travels with the backup, through
+    // its own writer.
     const {
       apiKeySet: _flag,
       endpointApiKeySet: _endpointFlag,
@@ -342,6 +343,7 @@ export async function importBackup(archivePath: string): Promise<void> {
       forceTime: _clock,
       serviceTier: _tier,
       streamResponses: _stream,
+      comfyGpu: _gpu,
       ...patch
     } = record.settings
 

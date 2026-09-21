@@ -17,7 +17,7 @@ import { endpointKeyStays, maxOutputTokensOf } from '@shared/settingsRules'
 
 import type { ProviderApi, ThinkingLevel } from '@shared/providers'
 import type { PromptKind } from '@shared/promptKinds'
-import type { AppError, RendererSettings, SettingsPatch } from '@shared/types'
+import type { RendererSettings, SettingsPatch } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -31,6 +31,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useAudioStore } from '../stores/audioStore'
 import { useUiStore } from '../stores/uiStore'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
+import { useEndpointProbe } from './useEndpointProbe'
 import { sfwValuesOf, type SfwKey } from './sfwFields'
 import { VOLUME_FIELDS } from './volumeFields'
 import { PROMPT_KIND_FIELDS, promptKindValuesOf, promptKindsFrom } from './promptKindFields'
@@ -47,18 +48,8 @@ export interface AppSettingsModalProps {
   onClose?: () => void
 }
 
-/** What a probe of the custom endpoint has to say: nothing yet, in flight, reached, or why not. */
-type TestState = 'idle' | 'testing' | 'ok' | { error: AppError }
-
 /** How long a slider stands still before what it reads is written. */
 const VOLUME_SETTLE_MS = 250
-
-/** The one word a probe leaves beside the button, and nothing at all until one has been run. */
-function testWordOf(test: TestState): string | null {
-  if (test === 'idle') return null
-  if (test === 'testing') return 'TESTING…'
-  return test === 'ok' ? 'CONNECTED' : 'FAILED'
-}
 
 /**
  * Why Save cannot take a custom endpoint's typed fields, in the order the fields are met, or
@@ -98,8 +89,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const update = useSettingsStore((s) => s.update)
   const exportBackup = useSettingsStore((s) => s.exportBackup)
   const importBackup = useSettingsStore((s) => s.importBackup)
-  const listModels = useSettingsStore((s) => s.listModels)
-  const testWriter = useSettingsStore((s) => s.testWriter)
   const closeModal = useUiStore((s) => s.closeModal)
   const close = onClose ?? ((): void => closeModal('settings'))
 
@@ -137,6 +126,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [volumes, setVolumes] = useState<Volumes>(() => volumesOf(settings?.volumes))
   // Only the browser keeps a key anywhere the player might not want it kept.
   const [remember, setRemember] = useState(settings?.rememberKey === true)
+  // Absent on the record means the desktop does check, so only an explicit false is off.
+  const [checkUpdates, setCheckUpdates] = useState(settings?.checkUpdates !== false)
 
   // The typed fields, staged until Save. The URL and the two keys outlive a provider switch,
   // so a panel switched away and back finds them as they were; the ids are the endpoint's own.
@@ -157,10 +148,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [geminiKey, setGeminiKey] = useState('')
   const [endpointKey, setEndpointKey] = useState('')
 
-  // What the endpoint answered when asked which models it serves — the rows under the two id
-  // fields, and empty wherever it was never asked or could not say.
-  const [modelIds, setModelIds] = useState<string[]>([])
-  const [test, setTest] = useState<TestState>('idle')
   // What a backup is doing, so the two buttons are dead while one of them is working.
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -173,9 +160,28 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   // The layer inside the panel a combobox hangs its list on, once it is in the document.
   const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
 
-  // The URL the newest probe was sent to: an answer naming any other is stale, the player
-  // having typed on while it was in flight.
-  const probed = useRef('')
+  // Which page the column is drawn as, and what a typed field is checked against.
+  const custom = apiProvider === 'openai'
+  // The custom endpoint's typed model id, as it would be saved.
+  const modelId = modelIdText.trim()
+  // The typed reply cap, and the number it stands for — undefined where the field is blank or
+  // holds what Save would refuse, so a probe never sends anything but a cap or nothing.
+  const maxOutputCap = maxOutputText.trim()
+  const parsedCap = /^\d+$/.test(maxOutputCap) ? Number(maxOutputCap) : NaN
+  const maxOutputTokens = parsedCap > 0 ? parsedCap : undefined
+
+  // What the endpoint has answered — the rows under the two id fields and the last verdict —
+  // asked on the staged fields as they stand.
+  const probe = useEndpointProbe({
+    enabled: custom,
+    endpointUrl,
+    endpointKey,
+    modelId,
+    reasoningEffort,
+    thinkingLevel,
+    maxOutputTokens
+  })
+
   // Where the sliders stand right now, read by every write and by the flush on the way out.
   const volumesRef = useRef(volumes)
   // The write a still-moving slider owes, and null once there is none.
@@ -197,11 +203,9 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   // once. Every later ask is one of the two fields behind them being left, so the provider is
   // the whole of what re-runs this.
   useEffect(() => {
-    void refreshModels()
+    void probe.refreshModels()
   }, [apiProvider])
 
-  // Which page the column is drawn as, and what a typed field is checked against.
-  const custom = apiProvider === 'openai'
   // Whether anything staged differs from what is stored. A key counts the moment there is
   // something in it, the renderer never being told what is held.
   const dirty =
@@ -233,24 +237,15 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   // Likewise off the held model: which levels are accepted is a per-model fact.
   const thinkingLevels = modelFor(apiProvider, apiModel).thinkingLevels
 
-  // The custom endpoint's two typed ids, as they would be saved.
-  const modelId = modelIdText.trim()
+  // The custom endpoint's second typed id, as it would be saved.
   const secondaryId = secondaryIdText.trim()
-  // The typed reply cap, and the number it stands for — undefined where the field is blank or
-  // holds what Save would refuse, so a probe never sends anything but a cap or nothing.
-  const maxOutputCap = maxOutputText.trim()
-  const parsedCap = /^\d+$/.test(maxOutputCap) ? Number(maxOutputCap) : NaN
-  const maxOutputTokens = parsedCap > 0 ? parsedCap : undefined
   // Whether a second model is named at all, which is what the list of its calls hangs on.
   const secondaryPicked = custom ? secondaryId !== '' : secondaryModel !== ''
-  // Whether a custom endpoint is still short of what a probe cannot be sent without: a URL
-  // that can be sent to, and a model id. Gemini asks for neither.
-  const writerIncomplete = custom && (endpointProblem(endpointUrl) !== null || modelId === '')
 
   // Why Save is dead, checked against the staged text alone. Gemini stages nothing that can
   // be wrong.
   const saveProblem = custom
-    ? saveProblemOf(endpointUrl, modelId, secondaryId, maxOutputCap, modelIds)
+    ? saveProblemOf(endpointUrl, modelId, secondaryId, maxOutputCap, probe.modelIds)
     : null
   // The one line over the answers: the reason Save cannot take the form, else that there is
   // something for it to take, else nothing.
@@ -271,11 +266,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const geminiKeyPlaceholder = settings.apiKeySet
     ? 'Leave blank to keep your saved key'
     : undefined
-
-  const testWord = testWordOf(test)
-  // Nothing to send while a field it would be sent on is missing, or while one is in flight.
-  // An id the endpoint's list lacks is exactly what a probe should be allowed to try.
-  const testDead = writerIncomplete || test === 'testing'
 
   /**
    * Writes the fields a control has just changed. The mix is put back where the sliders stand
@@ -321,8 +311,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     // The ids, the rows behind them and the probe all belong to the endpoint left behind.
     setModelIdText('')
     setSecondaryIdText('')
-    setModelIds([])
-    setTest('idle')
+    probe.reset()
     void write(fields).then(
       reseed((stored) => {
         setApiProvider(stored.apiProvider)
@@ -406,6 +395,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     )
   }
 
+  /** Whether the desktop asks itch.io for a newer build at every launch. */
+  function handleCheckUpdatesChange(checked: boolean): void {
+    setCheckUpdates(checked)
+    void write({ checkUpdates: checked }).then(
+      reseed((stored) => setCheckUpdates(stored.checkUpdates !== false))
+    )
+  }
+
   /** A group's slider: heard at once, and written once it has stood still for a moment. */
   function handleVolumeChange(key: AudioGroup, value: number): void {
     const next: Volumes = { ...volumesRef.current, [key]: value }
@@ -417,36 +414,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       volumeTimer.current = null
       void write({ volumes: volumesRef.current })
     }, VOLUME_SETTLE_MS)
-  }
-
-  /** Asks the endpoint which models it serves; a list it cannot give is simply no rows. */
-  async function refreshModels(): Promise<void> {
-    if (apiProvider !== 'openai' || endpointProblem(endpointUrl) !== null) return
-    const url = normalizeEndpoint(endpointUrl)
-    probed.current = url
-    const result = await listModels(url, endpointKey.trim() || undefined)
-    if (probed.current !== url) return
-    if (!result.ok) {
-      setModelIds([])
-      console.warn(`Could not list the models at ${url}: ${result.error.message}`)
-      return
-    }
-    setModelIds(result.data)
-  }
-
-  /** Sends one tiny request on the writer fields as typed; what comes back is the whole answer. */
-  async function runTest(): Promise<void> {
-    setTest('testing')
-    const result = await testWriter({
-      apiProvider: 'openai',
-      apiModel: modelId,
-      endpointUrl: normalizeEndpoint(endpointUrl),
-      reasoningEffort,
-      maxOutputTokens,
-      thinkingLevel,
-      endpointApiKey: endpointKey.trim() || undefined
-    })
-    setTest(result.ok ? 'ok' : { error: result.error })
   }
 
   /** Writes the staged text and leaves; a key field left blank keeps the key it stands for. */
@@ -523,7 +490,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       hint="https, or http for a server on this machine. Make sure the URL is a chat completions endpoint (usually contains /v1 or /v1/chat/completions)"
                       value={endpointUrl}
                       onChange={setEndpointUrl}
-                      onBlur={() => void refreshModels()}
+                      onBlur={() => void probe.refreshModels()}
                     />
 
                     {/* The endpoint's own key, which never follows the player to another host. */}
@@ -535,7 +502,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                         type="password"
                         value={endpointKey}
                         onChange={(e) => setEndpointKey(e.target.value)}
-                        onBlur={() => void refreshModels()}
+                        onBlur={() => void probe.refreshModels()}
                         placeholder={endpointKeyPlaceholder}
                       />
                     </label>
@@ -546,7 +513,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       hint="As the endpoint names it, for example a provider/model id"
                       value={modelIdText}
                       onChange={setModelIdText}
-                      options={modelIds}
+                      options={probe.modelIds}
                       popupHost={popupHost}
                     />
 
@@ -578,7 +545,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       hint="Leave this blank to run every call on the model above."
                       value={secondaryIdText}
                       onChange={setSecondaryIdText}
-                      options={modelIds}
+                      options={probe.modelIds}
                       emptyOption="None (Use one model for everything)"
                       popupHost={popupHost}
                     />
@@ -645,20 +612,20 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                   <>
                     {/* One tiny request on the fields as typed, so the endpoint answers for them
                         before a game does. */}
-                    <div className="vu-settings-test">
+                    <div className="vu-test-row">
                       <motion.button
                         id="settings-test-connection"
                         className="vu-btn vu-btn--quiet"
                         type="button"
-                        disabled={testDead}
-                        {...gestures(testDead, quietLift, quietPress)}
-                        onClick={() => void runTest()}
+                        disabled={probe.testDead}
+                        {...gestures(probe.testDead, quietLift, quietPress)}
+                        onClick={() => void probe.runTest()}
                       >
                         Test connection
                       </motion.button>
-                      {testWord && <span className="vu-btn-sub">{testWord}</span>}
-                      {typeof test === 'object' && (
-                        <span className="vu-settings-test-note">{test.error.message}</span>
+                      {probe.testWord && <span className="vu-btn-sub">{probe.testWord}</span>}
+                      {typeof probe.test === 'object' && (
+                        <span className="vu-test-note">{probe.test.error.message}</span>
                       )}
                     </div>
 
@@ -783,6 +750,17 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
               </span>
             </div>
 
+            {/* Only the desktop has a build of itself to replace, and only it asks. */}
+            {!webBuild && (
+              <CheckField
+                id="settings-check-updates"
+                label="Check for updates on launch"
+                note="Asks itch.io for a newer build each time the game starts, and offers to install it. Your saves, characters and settings are left alone."
+                checked={checkUpdates}
+                onChange={handleCheckUpdatesChange}
+              />
+            )}
+
             <div className="vu-foot-stack">
               {/* Why Save is dead, or that there is something left for it to take. */}
               <span className="vu-form-status">
@@ -819,7 +797,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
 
           {/* The frame a combobox's floating list is placed against, over both columns and
               taking no pointer of its own. */}
-          <div className="vu-settings-popups" ref={setPopupHost} />
+          <div className="vu-popups" ref={setPopupHost} />
         </motion.div>
       </motion.div>
 

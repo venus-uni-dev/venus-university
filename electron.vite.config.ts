@@ -10,6 +10,15 @@ const { version } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as
 
 export default defineConfig({
   main: {
+    build: {
+      rollupOptions: {
+        // Two bundles: the app, and the update helper the app runs in Node mode after it quits.
+        input: {
+          index: resolve('src/main/index.ts'),
+          updateHelper: resolve('src/main/updateHelper.ts')
+        }
+      }
+    },
     resolve: {
       alias: {
         '@shared': resolve('src/shared')

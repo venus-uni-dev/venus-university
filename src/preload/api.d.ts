@@ -39,6 +39,8 @@ import type {
   SlotIntroResponse,
   StructuredRequest,
   TextingResponse,
+  UpdateCheck,
+  UpdateProgress,
   WardrobeFixImage,
   WardrobeLayer,
   WardrobeTarget,
@@ -358,6 +360,18 @@ export interface VenusUniversityApi {
     verifyModel: (componentId: string) => Promise<Result<SetupStatus>>
     /** Subscribes to install progress without exposing the raw IPC event. */
     onInstallProgress: (listener: (progress: InstallProgress) => void) => () => void
+  }
+  /** The desktop's self-update off itch.io; the browser build has nothing to update. */
+  update: {
+    /** Whether a newer build is on itch.io. Started at boot in main; this waits on that answer. */
+    check: () => Promise<Result<UpdateCheck>>
+    /**
+     * Downloads and stages the newer build, hands the file swap to a helper and quits moments
+     * after answering. Reports on `update:progress`; answers an error and touches nothing when
+     * any step fails.
+     */
+    apply: () => Promise<Result<void>>
+    onProgress: (listener: (progress: UpdateProgress) => void) => () => void
   }
   /**
    * The whole game as one zip, in the format both builds write and read back. `export` answers

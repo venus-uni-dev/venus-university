@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { readdirSync } from 'fs'
-import { join, resolve, sep } from 'path'
+import { dirname, join, resolve, sep } from 'path'
 import {
   baseRel,
   CHARACTER_FILE_NAME,
@@ -28,6 +28,16 @@ export function getDataPath(): string {
     return join(resolve(app.getPath('exe'), '..'), 'data')
   }
   return resolve(app.getAppPath(), 'data')
+}
+
+/** The folder the app runs from: the exe, its runtime files and `data` beside them. */
+export function getInstallPath(): string {
+  return dirname(app.getPath('exe'))
+}
+
+/** `/data/update` — where an update stages its download, its unpacked tree and its plan. */
+export function getUpdatePath(): string {
+  return join(getDataPath(), 'update')
 }
 
 /** The shipped, read-only asset root — kept outside asar so ComfyUI gets real paths. */
@@ -317,6 +327,11 @@ export function getComfyUiPath(): string {
 /** The portable build's embedded interpreter — also the ComfyUI install marker. */
 export function getComfyPythonPath(): string {
   return join(getComfyUiPath(), 'python_embeded', 'python.exe')
+}
+
+/** Torch's own version file, which names the CUDA and ROCm builds apart. */
+export function getComfyTorchVersionPath(): string {
+  return join(getComfyUiPath(), 'python_embeded', 'Lib', 'site-packages', 'torch', 'version.py')
 }
 
 /** `/data/services/comfyui/comfyui.log` — the server's output, rewritten each boot. */

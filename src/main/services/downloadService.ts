@@ -19,10 +19,10 @@ export interface DownloadOptions {
   url: string
   /** Final path. Bytes land at `{destPath}.partial` until the transfer completes. */
   destPath: string
-  /** Rejects the download if the finished size differs. */
-  expectedBytes: number
-  /** Case-insensitive hex SHA256; verified from the same pass as the write. */
-  expectedSha256: string
+  /** Rejects the download if the finished size differs; unset where the size is unknown. */
+  expectedBytes?: number
+  /** Case-insensitive hex SHA256, verified from the same pass as the write; unset where there is none. */
+  expectedSha256?: string
   headers?: Record<string, string>
   onProgress?: (progress: DownloadProgress) => void
   signal?: AbortSignal
@@ -35,7 +35,16 @@ export interface DownloadOutcome {
 }
 
 /** Query parameters that carry a credential rather than an address. */
-const SECRET_PARAMS = ['token', 'key', 'api_key', 'apikey', 'access_token']
+const SECRET_PARAMS = [
+  'token',
+  'key',
+  'api_key',
+  'apikey',
+  'access_token',
+  'X-Amz-Signature',
+  'X-Amz-Credential',
+  'X-Amz-Security-Token'
+]
 
 /** The URL with any credential-bearing query value blanked. */
 export function redactUrl(url: string): string {
@@ -94,8 +103,8 @@ function progressListener(
 }
 
 /**
- * Downloads with progress and integrity checks, streaming to `.partial` before
- * an atomic rename; hashes during write to avoid a second multi-GB pass.
+ * Downloads with progress, streaming to `.partial` before an atomic rename; it hashes during
+ * the write to avoid a second multi-GB pass, and checks the size and hash the caller named.
  */
 export async function downloadFile(options: DownloadOptions): Promise<DownloadOutcome> {
   const { url, destPath, expectedBytes, expectedSha256, headers, onProgress, signal } = options
@@ -161,7 +170,7 @@ export async function downloadFile(options: DownloadOptions): Promise<DownloadOu
   const sha256 = hash.digest('hex')
   const actualBytes = (await stat(partialPath)).size
 
-  if (actualBytes !== expectedBytes) {
+  if (expectedBytes !== undefined && actualBytes !== expectedBytes) {
     await rm(partialPath, { force: true })
     throw appError(
       'DOWNLOAD_SIZE_MISMATCH',
@@ -170,7 +179,7 @@ export async function downloadFile(options: DownloadOptions): Promise<DownloadOu
     )
   }
 
-  if (sha256.toLowerCase() !== expectedSha256.toLowerCase()) {
+  if (expectedSha256 !== undefined && sha256.toLowerCase() !== expectedSha256.toLowerCase()) {
     await rm(partialPath, { force: true })
     throw appError(
       'DOWNLOAD_HASH_MISMATCH',

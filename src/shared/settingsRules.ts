@@ -10,8 +10,9 @@ export const SETTINGS_SCHEMA_VERSION = 1
 
 /**
  * What the settings must carry; the two keys, the custom endpoint's URL, effort and reply cap,
- * the three dev switches, the two hand-edited call switches, the secondary model, the group
- * volumes, the NSFW sound switch and the browser build's key-remembering are all optional.
+ * the three dev switches, the two hand-edited call switches, the hand-edited ComfyUI build,
+ * the secondary model, the group volumes, the NSFW sound switch and the browser build's
+ * key-remembering are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -26,6 +27,10 @@ const SETTINGS_REQUIRED: Record<
     | 'forceTime'
     | 'serviceTier'
     | 'streamResponses'
+    | 'comfyGpu'
+    | 'checkUpdates'
+    | 'updateAsVersion'
+    | 'updateFeed'
     | 'secondaryModel'
     | 'secondaryModelFor'
     | 'volumes'
@@ -76,8 +81,10 @@ export function defaultSettings(): Settings {
     // absent beside it, which is what routes the default set (`DEFAULT_SECONDARY_KINDS`)
     // until the panel says otherwise.
     secondaryModel: defaultSecondaryModelFor('gemini').id,
-    // `serviceTier` and `streamResponses` are deliberately absent: they are hand-edited
-    // switches now, and absent is what resolves to priority and to streaming on.
+    // `serviceTier`, `streamResponses`, `comfyGpu`, `updateAsVersion` and `updateFeed` are
+    // deliberately absent: they are hand-edited switches, and absent is what resolves to
+    // priority, to streaming on, to whichever GPU vendor the machine reports and to the real
+    // build on itch.io. `checkUpdates` is absent too, and absent is checking.
     comfyDeferred: false,
     // Nothing is withheld until the player says so; an unanswered `sfwAsked` raises the question.
     noNsfwImages: false,
@@ -180,9 +187,12 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     endpointUrl: patch.endpointUrl,
     reasoningEffort: patch.reasoningEffort,
     maxOutputTokens: patch.maxOutputTokens,
-    // `serviceTier` and `streamResponses` are not the renderer's to send: `...current`
-    // is what carries whatever is stored, so a hand-edited switch survives every save.
+    // `serviceTier`, `streamResponses`, `comfyGpu`, `updateAsVersion` and `updateFeed` are not
+    // the renderer's to send: `...current` is what carries whatever is stored, so a hand-edited
+    // switch survives every save.
     comfyDeferred: patch.comfyDeferred,
+    // Absent stays absent, and absent is checking.
+    checkUpdates: patch.checkUpdates,
     noNsfwImages: patch.noNsfwImages,
     lessNsfwText: patch.lessNsfwText,
     // Absent stays absent, as the volumes below do, and absent is the sound playing.

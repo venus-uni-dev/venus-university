@@ -62,22 +62,32 @@ export async function createZip(sourceDir: string, archivePath: string): Promise
   })
 }
 
+/** One listed entry, read off the property map 7-Zip's `-slt` output was parsed into. */
+function zipEntryOf(info: Map<string, string>): ZipEntry {
+  const size = Number(info.get('Size'))
+  return {
+    path: info.get('Path') ?? '',
+    size: Number.isFinite(size) && size > 0 ? size : 0,
+    attributes: (info.get('Attributes') ?? '').trim()
+  }
+}
+
 /** Reads an archive's whole listing with bundled 7-Zip, unpacking nothing. */
 export async function listZip(archivePath: string): Promise<ZipEntry[]> {
   return new Promise<ZipEntry[]>((resolve, reject) => {
-    const entries: ZipEntry[] = []
+    // One map per entry, however many times the parser announces it. node-7z splits stdout
+    // on line endings, and a chunk that ends on one leaves an empty "line" behind, which its
+    // listing parser takes for the end of a block: it announces the entry half-filled, keeps
+    // filling the same map, and announces it again at the real end. So the maps are collected
+    // and read only once the listing is over; a path that truly repeats is still two maps.
+    const infos = new Set<Map<string, string>>()
     const stream = list(archivePath, { $bin: BIN_7ZA, techInfo: true })
 
     stream.on('data', (data) => {
       const info = (data as { techInfo?: Map<string, string> }).techInfo
-      const size = Number(info?.get('Size'))
-      entries.push({
-        path: data.file,
-        size: Number.isFinite(size) && size > 0 ? size : 0,
-        attributes: (info?.get('Attributes') ?? '').trim()
-      })
+      if (info) infos.add(info)
     })
-    stream.on('end', () => resolve(entries))
+    stream.on('end', () => resolve(Array.from(infos, zipEntryOf)))
     stream.on('error', (err: Error) => {
       reject(appError('ZIP_LIST_FAILED', 'Could not read that archive.', messageOf(err)))
     })

@@ -1,10 +1,21 @@
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useState, type JSX, type KeyboardEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { defaultModelFor, defaultSecondaryModelFor } from '@shared/providers'
+import { endpointProblem, normalizeEndpoint } from '@shared/endpoint'
+import {
+  defaultModelFor,
+  defaultSecondaryModelFor,
+  modelFor,
+  providerFor,
+  thinkingLevelFor
+} from '@shared/providers'
 import { writerReady } from '@shared/settingsRules'
 import { modelForComponentId } from '@shared/setupManifest'
+import type { ProviderApi } from '@shared/providers'
 import type { SetupComponent, SettingsPatch } from '@shared/types'
 import { CheckField } from '../components/CheckField'
+import { ComboField } from '../components/ComboField'
+import { SelectField } from '../components/SelectField'
+import { TitleTab } from '../components/TitleTab'
 import { isWebBuild } from '../platform'
 import { useComfyStore } from '../stores/comfyStore'
 import { beginCrossing, endCrossing, useCrossingStore } from '../stores/crossingStore'
@@ -13,6 +24,7 @@ import { useSetupStore, type ComponentProgress } from '../stores/setupStore'
 import { useUiStore } from '../stores/uiStore'
 import { heldScreenTheme } from './clockTheme'
 import {
+  archResize,
   decorIn,
   dealt,
   dealtItem,
@@ -21,6 +33,7 @@ import {
   gestures,
   lift,
   linkLift,
+  panelUnderTab,
   press,
   pulse,
   quietLift,
@@ -29,6 +42,7 @@ import {
 } from './motion'
 import { CloseIcon, DownloadIcon } from './screenIcons'
 import { SfwPromptModal } from './SfwPromptModal'
+import { useEndpointProbe } from './useEndpointProbe'
 import '../vu_styles/Setup.css'
 
 /** One thing the screen asks for, in the order a run asks for them. */
@@ -69,6 +83,15 @@ function stagesOf(mode: SetupMode): [SetupStage, ...SetupStage[]] {
 /** A stage arrives as two layers, the pitch and the panel a beat behind it. */
 const PITCH_IN = fadeIn(0.1)
 const PANEL_IN = fadeIn(0.18)
+
+/**
+ * How wide the arch stands on each stage and how far off the left edge it starts: the key stage
+ * carries the most copy inside the curve, so it takes the wider of the two.
+ */
+const ARCH = {
+  apiKey: { width: 1000, left: -250 },
+  imageGen: { width: 840, left: -230 }
+}
 
 /** What a row is: the four faces one component wears, from its run or from the snapshot. */
 type RowKind = 'ok' | 'busy' | 'failed' | 'waiting'
@@ -277,17 +300,27 @@ export function SetupView({ mode }: { mode: SetupMode }): JSX.Element {
     // `inert` while a crossing runs, as the Main Menu does, so nothing behind a curtain answers.
     <div className="vu-setup" data-theme={theme} inert={crossing}>
       {/* The screen's idle: the arch and its shadow arrive together and then breathe as one
-          sheet, both on the single variant. It is absent on the bare ground the question is
-          asked on. */}
+          sheet, both on the single variant. The outer box carries only the measure the stage it
+          frames asks for, tweened because it stands outside the presence the stages cross in and
+          would otherwise snap mid-crossfade; `initial={false}` is what keeps the first paint at
+          the stage's own width rather than animating to it. It is absent on the bare ground the
+          question is asked on. */}
       {stage !== 'content' && (
         <motion.div
           className="vu-setup-decor"
-          variants={decorIn}
-          initial="hidden"
-          animate="shown"
+          initial={false}
+          animate={ARCH[stage]}
+          transition={archResize}
         >
-          <div className="vu-setup-decor-shadow" />
-          <div className="vu-setup-decor-face" />
+          <motion.div
+            className="vu-setup-decor-sheet"
+            variants={decorIn}
+            initial="hidden"
+            animate="shown"
+          >
+            <div className="vu-setup-decor-shadow" />
+            <div className="vu-setup-decor-face" />
+          </motion.div>
         </motion.div>
       )}
 
@@ -354,7 +387,16 @@ function ImageGenStage({ onDone, last }: { onDone: () => void; last: boolean }):
         <p className="vu-setup-body">
           Image generation runs on your own machine and is only needed if you want to{' '}
           <strong>create new characters</strong>. You can still play with pre-genned characters.
-          An NVIDIA GPU with greater than 8GB of VRAM is recommended for image generation.
+          
+        </p>
+        <p className="vu-setup-body">
+          An NVIDIA GPU (GeForce 20 series or newer) with more than 8GB of VRAM is recommended.
+        </p>
+        <p className="vu-setup-body">
+          AMD support is experimental and only lightly tested: please reach out if you encounter issues.
+        </p>
+        <p className="vu-setup-body">
+          Your GPU is automatically detected when deciding which ComfyUI version to install.
         </p>
       </motion.div>
 
@@ -466,7 +508,8 @@ function ImageGenStage({ onDone, last }: { onDone: () => void; last: boolean }):
 }
 
 /**
- * The key stage — what a Gemini key is for, how to make one, and the field it is pasted into.
+ * The key stage — which provider writes, what it needs and the card those fields are typed into.
+ * Both providers are staged here and nothing is written until Save; Skip writes nothing at all.
  * It is a screen and not a modal, so it answers no Escape and no click outside.
  */
 function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
@@ -474,175 +517,370 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
   const saving = useSettingsStore((s) => s.saving)
   const save = useSettingsStore((s) => s.save)
 
-  const [key, setKey] = useState('')
-  const blank = key.trim().length === 0
+  // Which page the card is drawn as. Staged like everything else on it: a provider picked here
+  // is written by Save and by nothing else.
+  const [apiProvider, setApiProvider] = useState<ProviderApi>(
+    () => settings?.apiProvider ?? 'gemini'
+  )
+  // Off the held provider, so the select never opens on another provider's model.
+  const [apiModel, setApiModel] = useState(() =>
+    settings?.apiProvider === 'gemini'
+      ? modelFor('gemini', settings.apiModel).id
+      : defaultModelFor('gemini').id
+  )
+  const [geminiKey, setGeminiKey] = useState('')
   // Only the browser has anywhere to keep a key between visits that the player might not want
   // it kept in; the desktop encrypts its own either way.
   const webBuild = isWebBuild()
   const [remember, setRemember] = useState(settings?.rememberKey === true)
+  // The custom endpoint's own fields. The keys are the exception to the seeding: the renderer is
+  // never told either one, so both open blank.
+  const [endpointUrl, setEndpointUrl] = useState(() => settings?.endpointUrl ?? '')
+  const [endpointKey, setEndpointKey] = useState('')
+  const [modelIdText, setModelIdText] = useState(() =>
+    settings?.apiProvider === 'openai' ? settings.apiModel : ''
+  )
+  // The layer inside the card a combobox hangs its list on, once it is in the document.
+  const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
 
+  const custom = apiProvider === 'openai'
+  const modelId = modelIdText.trim()
+
+  // The two questions the custom page asks its endpoint. A first run sends the lowest effort
+  // there is, and the thinking level and the reply cap are whatever is already stored.
+  const probe = useEndpointProbe({
+    enabled: custom,
+    endpointUrl,
+    endpointKey,
+    modelId,
+    reasoningEffort: 'minimal',
+    thinkingLevel: settings?.thinkingLevel ?? defaultModelFor('gemini').defaultThinkingLevel,
+    maxOutputTokens: settings?.maxOutputTokens
+  })
+
+  // A stage opening on a stored endpoint has a URL to ask on already; every later ask is one of
+  // the two fields behind the list being left, so the provider is the whole of what re-runs this.
+  useEffect(() => {
+    void probe.refreshModels()
+  }, [apiProvider])
+
+  // Why Save is dead, checked against the staged text alone.
+  const saveDead =
+    saving ||
+    (custom ? endpointProblem(endpointUrl) !== null || modelId === '' : geminiKey.trim() === '')
+
+  /** The provider, and with it the page the card redresses itself as. Nothing is written. */
+  function handleProviderChange(value: string): void {
+    const next = value as ProviderApi
+    setApiProvider(next)
+    if (next === 'gemini') setApiModel(defaultModelFor('gemini').id)
+    setModelIdText('')
+    probe.reset()
+  }
+
+  /** Writes the staged provider with everything it runs on, and hands the run on where it lands. */
   async function handleSave(): Promise<void> {
-    if (!settings || blank) return
+    if (!settings || saveDead) return
     // Every non-secret field rides along, or a save from here would drop the rest; main keeps
-    // whatever is stored wherever a key is absent, and stores this one encrypted.
-    const patch: SettingsPatch = {
-      ...patchOf(settings),
-      apiProvider: 'gemini',
-      apiKey: key.trim(),
-      rememberKey: remember
-    }
-    // The key pasted here is Gemini's, so a writer pointed at a custom endpoint comes back to
-    // Gemini's own defaults with it rather than taking the key as that endpoint's.
-    if (settings.apiProvider !== 'gemini') {
-      patch.apiModel = defaultModelFor('gemini').id
-      patch.thinkingLevel = defaultModelFor('gemini').defaultThinkingLevel
-      patch.secondaryModel = defaultSecondaryModelFor('gemini').id
-      patch.secondaryModelFor = undefined
-    }
+    // whatever is stored wherever a key is absent, and stores one given here encrypted.
+    const patch: SettingsPatch = custom
+      ? {
+          ...patchOf(settings),
+          apiProvider: 'openai',
+          endpointUrl: normalizeEndpoint(endpointUrl),
+          apiModel: modelId,
+          // The effort a first run sends at, and one model for every call: Settings is where
+          // the three of them are tuned, once there is a game to tune them for.
+          reasoningEffort: 'minimal',
+          secondaryModel: '',
+          secondaryModelFor: undefined,
+          rememberKey: remember,
+          ...(endpointKey.trim() ? { endpointApiKey: endpointKey.trim() } : {})
+        }
+      : {
+          ...patchOf(settings),
+          apiProvider: 'gemini',
+          apiKey: geminiKey.trim(),
+          rememberKey: remember,
+          apiModel,
+          thinkingLevel: thinkingLevelFor('gemini', apiModel, settings.thinkingLevel),
+          // A writer coming back from a custom endpoint takes Gemini's own second model with it;
+          // one that was Gemini's already keeps whatever it was pointed at.
+          secondaryModel:
+            settings.apiProvider === 'gemini'
+              ? settings.secondaryModel
+              : defaultSecondaryModelFor('gemini').id,
+          secondaryModelFor:
+            settings.apiProvider === 'gemini' ? settings.secondaryModelFor : undefined
+        }
     const ok = await save(patch)
     // A failed write leaves the stage up; the store has already raised the error.
     if (!ok) return
     onDone()
   }
 
+  /** Enter in a typed field is the foot's primary, wherever that primary is live. */
+  function handleEnter(event: KeyboardEvent<HTMLInputElement>): void {
+    if (event.key === 'Enter' && !saveDead) void handleSave()
+  }
+
   return (
     <>
       <motion.div
-        className="vu-setup-pitch"
+        className="vu-setup-pitch vu-setup-pitch--wide"
         variants={PITCH_IN}
         initial="hidden"
         animate="shown"
         exit="gone"
       >
-        <span className="vu-setup-kicker">GOOGLE GEMINI API</span>
-        <h1 className="vu-setup-title">Set up your API key</h1>
+        <span className="vu-setup-kicker">AI PROVIDER SETUP</span>
+        <h1 className="vu-setup-title">Set up text generation</h1>
         <p className="vu-setup-body">
-          Venus University is and always will be free, but it relies on the Gemini API to support emergent gameplay. 
-          You can create a Gemini API key for free, but the free tier comes with rate and usage limits.
-          Setting up billing upgrades you to a paid tier and costs about $0.30 USD per hour of game time, and is highly recommended for a smooth experience.
+          Venus University relies on external chat completions API to support emergent gameplay.
+          Two options are supported for providers:
         </p>
-      </motion.div>
-
-      <motion.div
-        className="vu-setup-panel"
-        variants={PANEL_IN}
-        initial="hidden"
-        animate="shown"
-        exit="gone"
-      >
-        <header className="vu-setup-head">
-          <div className="vu-title">
-            <h2 className="vu-title-text">How to get a key</h2>
-          </div>
-          <motion.a
-            className="vu-pill"
-            href="https://aistudio.google.com/apikey"
-            target="_blank"
-            rel="noreferrer"
-            {...gestures(false, quietLift, quietPress)}
-          >
-            <LinkMark />
-            Google AI Studio
-          </motion.a>
-        </header>
-
-        <ol className="vu-setup-steps">
-          <li className="vu-setup-step">
-            Open Google AI Studio&apos;s API keys page{' '}
-            <motion.a
-              className="vu-link"
-              href="https://aistudio.google.com/apikey"
-              target="_blank"
-              rel="noreferrer"
-              whileHover={linkLift}
-              whileFocus={linkLift}
-            >
-              here
-            </motion.a>
-            , sign in with a Google account and accept
-            the Terms of Service. A Cloud project and a key should be made by default for you, but if none appear,
-            click <strong>Create API key</strong>.
-          </li>
-          <li className="vu-setup-step">
-            Optional: To bypass the free-tier rate limits, click <strong>Set up billing</strong> on
-            that same page, pick or create a Cloud Billing account, add a payment method, and
-            prepay at least $5.
-          </li>
-          <li className="vu-setup-step">
-            Your API key is encrypted and stored on your own machine and only sent to Google. But
-            it's recommended to set up a{' '}
-            <motion.a
-              className="vu-link"
-              href="https://ai.google.dev/gemini-api/docs/billing#spend-caps"
-              target="_blank"
-              rel="noreferrer"
-              whileHover={linkLift}
-              whileFocus={linkLift}
-            >
-              spending cap
-            </motion.a>{' '}
-            on your key just in case.
-          </li>
-          <li className="vu-setup-step">Copy the key and paste it below.</li>
-        </ol>
-
-        {/* No placeholder: a placeholder is a value the field would submit, and a secret has
-            none. */}
-        <label className="vu-field vu-setup-key" htmlFor="setup-api-key">
-          <span className="vu-field-label">API key</span>
-          <input
-            id="setup-api-key"
-            className="vu-input"
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !blank) void handleSave()
-            }}
-          />
-        </label>
-
-        {webBuild && (
-          <div className="vu-setup-remember">
-            <CheckField
-              id="setup-remember-key"
-              label="Remember my key on this device"
-              note="By default, your key will be deleted every session. Enabling this setting will save your key in browser storage so you won't have to type it in again next time. Warning: other itch.io games will be able to read your key."
-              checked={remember}
-              onChange={setRemember}
-            />
-          </div>
-        )}
-
-        <div className="vu-setup-foot">
-          <span className="vu-setup-hint">
-            You can add a key later in Settings if you skip for now. You'll still be able to manage and generate characters.
-            Using OpenAI, OpenRouter or a local model instead? Skip this, then pick Custom under Provider in Settings.
-          </span>
-          {/* Two direct children, so `.vu-foot > button` reaches both and an answer swells
-              in place rather than lunging at the one beside it. */}
-          <div className="vu-foot">
-            <motion.button
-              id="setup-key-skip"
-              className="vu-btn vu-btn--quiet"
-              {...gestures(saving, quietLift, quietPress)}
-              disabled={saving}
-              onClick={onDone}
-            >
-              Skip for now
-            </motion.button>
-            <motion.button
-              id="setup-key-save"
-              className="vu-btn vu-btn--primary vu-btn--panel vu-paper"
-              {...gestures(blank || saving, lift, press)}
-              disabled={blank || saving}
-              onClick={() => void handleSave()}
-            >
-              {saving ? 'Saving…' : 'Save key'}
-            </motion.button>
-          </div>
+        <div className="vu-setup-blurb">
+          <span className="vu-setup-blurb-head">Google AI Studio</span>
+          <p className="vu-setup-body">
+            The recommended option. Signing up with a Google Account gives you access to a free
+            tier with rate limits. If you add billing on your account, you&apos;ll get access to a
+            paid tier with 0 upfront fees, and will be billed as-you-go based on usage.
+          </p>
+        </div>
+        <div className="vu-setup-blurb">
+          <span className="vu-setup-blurb-head">Custom</span>
+          <p className="vu-setup-body">
+            If you would prefer to use something other than Google AI Studio, any API endpoint
+            with a chat completions compatible endpoint can be used. I recommend still using
+            Gemini Flash 3.x models since that&apos;s what I test on. You can also technically use
+            locally hosted models but I strongly discourage this for speed and quality reasons.
+          </p>
         </div>
       </motion.div>
+
+      <div className="vu-setup-stand">
+        <motion.div
+          id="setup-card"
+          className="vu-setup-card vu-paper"
+          variants={panelUnderTab}
+          initial="hidden"
+          animate="shown"
+          exit="gone"
+        >
+          <TitleTab>Setup</TitleTab>
+
+          {/* Who writes the scenes: the app's own default, or any endpoint that speaks chat
+              completions. Everything under it is drawn off this, and the card keeps its size
+              across the swap. */}
+          <SelectField
+            id="setup-provider"
+            label="Provider"
+            value={apiProvider}
+            onChange={handleProviderChange}
+            options={[
+              { value: 'gemini', label: 'Google AI Studio (default)' },
+              { value: 'openai', label: 'Custom (Compatible with Chat Completions/OpenAI)' }
+            ]}
+          />
+
+          <div className="vu-scroll-box">
+            <div className="vu-setup-card-fields">
+              <span className="vu-setup-card-heading">
+                {custom ? 'How to set up a custom endpoint' : 'How to get a key'}
+              </span>
+
+              {custom ? (
+                <ol className="vu-setup-steps">
+                  <li className="vu-setup-step">
+                    Find your endpoint URL. The URL must be a chat completions endpoint,
+                    usually ending in /v1 or /v1/chat/completions.
+                  </li>
+                  <li className="vu-setup-step">
+                    If you're using an online provider, grab an API key. Instructions vary based on the exact provider.
+                  </li>
+                  <li className="vu-setup-step">
+                    Test your connection to make sure your setup is working.
+                  </li>
+                </ol>
+              ) : (
+                <ol className="vu-setup-steps">
+                  <li className="vu-setup-step">
+                    Open Google AI Studio&apos;s API keys page{' '}
+                    <motion.a
+                      className="vu-link"
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      whileHover={linkLift}
+                      whileFocus={linkLift}
+                    >
+                      here
+                    </motion.a>
+                    , sign in with a Google account and accept the Terms of Service. A Cloud
+                    project and a key should be made by default for you, but if none appear,
+                    click <strong>Create API key</strong>.
+                  </li>
+                  <li className="vu-setup-step">
+                    Optional: To bypass the free-tier rate limits, click{' '}
+                    <strong>Set up billing</strong> on that same page, pick or create a Cloud
+                    Billing account and add a payment method.
+                  </li>
+                  <li className="vu-setup-step">
+                    Your API key is encrypted and stored on your own machine and only sent to
+                    Google. But it&apos;s recommended to set up a{' '}
+                    <motion.a
+                      className="vu-link"
+                      href="https://ai.google.dev/gemini-api/docs/billing#spend-caps"
+                      target="_blank"
+                      rel="noreferrer"
+                      whileHover={linkLift}
+                      whileFocus={linkLift}
+                    >
+                      spending cap
+                    </motion.a>{' '}
+                    on your key just in case.
+                  </li>
+                  <li className="vu-setup-step">Copy the key and paste it below.</li>
+                </ol>
+              )}
+
+              {custom ? (
+                <>
+                  {/* The root every request is sent to. Leaving it asks the endpoint what it
+                      serves, so the id field below has something to offer. */}
+                  <label className="vu-field" htmlFor="setup-endpoint-url">
+                    <span className="vu-field-label">Endpoint URL</span>
+                    <input
+                      id="setup-endpoint-url"
+                      className="vu-input"
+                      type="text"
+                      value={endpointUrl}
+                      onChange={(e) => setEndpointUrl(e.target.value)}
+                      onBlur={() => void probe.refreshModels()}
+                      onKeyDown={handleEnter}
+                    />
+                  </label>
+
+                  {/* The endpoint's own key, which never follows the player to another host. */}
+                  <label className="vu-field" htmlFor="setup-endpoint-key">
+                    <span className="vu-field-label">API key</span>
+                    <input
+                      id="setup-endpoint-key"
+                      className="vu-input"
+                      type="password"
+                      value={endpointKey}
+                      onChange={(e) => setEndpointKey(e.target.value)}
+                      onBlur={() => void probe.refreshModels()}
+                      onKeyDown={handleEnter}
+                    />
+                  </label>
+
+                  <ComboField
+                    id="setup-model-id"
+                    label="Model ID"
+                    hint="If you're not seeing any options as you type, you may have the wrong URL. Gemini Flash 3.x models are what the game is tested on and I highly recommend them."
+                    value={modelIdText}
+                    onChange={setModelIdText}
+                    options={probe.modelIds}
+                    popupHost={popupHost}
+                  />
+
+                  {/* One tiny request on the fields as typed, so the endpoint answers for them
+                      before a game does. */}
+                  <div className="vu-test-row">
+                    <motion.button
+                      id="setup-test-connection"
+                      className="vu-btn vu-btn--quiet"
+                      type="button"
+                      disabled={probe.testDead}
+                      {...gestures(probe.testDead, quietLift, quietPress)}
+                      onClick={() => void probe.runTest()}
+                    >
+                      Test connection
+                    </motion.button>
+                    {probe.testWord && <span className="vu-btn-sub">{probe.testWord}</span>}
+                    {typeof probe.test === 'object' && (
+                      <span className="vu-test-note">{probe.test.error.message}</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* No placeholder: a placeholder is a value the field would submit, and a
+                      secret has none. */}
+                  <label className="vu-field" htmlFor="setup-api-key">
+                    <span className="vu-field-label">API key</span>
+                    <input
+                      id="setup-api-key"
+                      className="vu-input"
+                      type="password"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      onKeyDown={handleEnter}
+                    />
+                  </label>
+
+                  <SelectField
+                    id="setup-model"
+                    label="Model"
+                    hint="Gemini Flash 3.5 or 3.6 is recommended for free tier users. Flash 3.8 is the best and fastest model available, but may sometimes drop calls during heavy traffic."
+                    value={apiModel}
+                    onChange={setApiModel}
+                    options={providerFor('gemini').models.map((model) => ({
+                      value: model.id,
+                      label: model.label
+                    }))}
+                  />
+                </>
+              )}
+
+              {webBuild && (
+                <CheckField
+                  id="setup-remember-key"
+                  label="Remember my key on this device"
+                  note="By default, your key will be deleted every session. Enabling this setting will save your key in browser storage so you won't have to type it in again next time. Warning: other itch.io games will be able to read your key."
+                  checked={remember}
+                  onChange={setRemember}
+                />
+              )}
+            </div>
+            <div className="vu-scroll-fade" />
+          </div>
+
+          <div className="vu-setup-card-foot">
+            <span className="vu-setup-hint">
+              If you skip for now, you can add a key later in the settings. You&apos;ll still be
+              able to manage and generate characters.
+            </span>
+            {/* Two direct children, so `.vu-foot > button` reaches both and an answer swells
+                in place rather than lunging at the one beside it. */}
+            <div className="vu-foot">
+              <motion.button
+                id="setup-key-skip"
+                className="vu-btn vu-btn--quiet"
+                {...gestures(saving, quietLift, quietPress)}
+                disabled={saving}
+                onClick={onDone}
+              >
+                Skip for now
+              </motion.button>
+              <motion.button
+                id="setup-key-save"
+                className="vu-btn vu-btn--primary vu-btn--panel vu-paper"
+                {...gestures(saveDead, lift, press)}
+                disabled={saveDead}
+                onClick={() => void handleSave()}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </motion.button>
+            </div>
+          </div>
+
+          {/* The frame a combobox's floating list is placed against: a direct child of the card,
+              which is the panel the list is measured inside. */}
+          <div className="vu-popups" ref={setPopupHost} />
+        </motion.div>
+      </div>
     </>
   )
 }

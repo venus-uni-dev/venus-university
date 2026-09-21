@@ -34,6 +34,9 @@ extraFiles:
 npmRebuild: false
 compression: normal
 
+# Writes resources/build-manifest.json into the packed folder, which the update plan is built from.
+afterPack: build/afterPack.mjs
+
 win:
   icon: build/icon.ico
   target:
