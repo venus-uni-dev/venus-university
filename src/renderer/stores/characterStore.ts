@@ -2,12 +2,26 @@ import { create } from 'zustand'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
 import { isWritten } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
-import { allFollowMain, OUTFIT_SETS, OUTFIT_SET_LABELS } from '@shared/outfits'
+import type { PromptEdit } from '@shared/imagePrompt'
+import {
+  allFollowMain,
+  CUSTOM_OUTFIT_SLOTS,
+  followsMain,
+  outfitLabelOf,
+  OUTFIT_SETS,
+  parseSpriteRef,
+  spriteRef,
+  STOCK_OUTFIT_SETS,
+  withCustomOutfit,
+  withoutCustomOutfit
+} from '@shared/outfits'
 import { isPosition, POSITIONS } from '@shared/positions'
 import type {
   AppError,
   Character,
   CharacterBrief,
+  CustomOutfit,
+  CustomOutfitSlot,
   Emotion,
   GenerateOptions,
   HandFixResult,
@@ -53,7 +67,7 @@ export function isInFlight(progress?: CharacterProgress): boolean {
 }
 
 /** A kind of image work a run can do; each kind is its own progress bucket on the card. */
-type RenderTaskKind = 'expressions' | 'cgs' | 'cg' | 'outfit' | 'room'
+type RenderTaskKind = 'expressions' | 'cgs' | 'cg' | 'outfit' | 'room' | 'expression'
 
 /** One bucket of a run, counted from THIS run's completions — never from disk. */
 export interface RenderTask {
@@ -62,6 +76,8 @@ export interface RenderTask {
   set?: OutfitSet
   /** Which CG a `cg` bucket is re-rolling; absent for the other kinds. */
   position?: Position
+  /** Which sprite an `expression` bucket is re-rolling; absent for the other kinds. */
+  emotion?: Emotion
   done: number
   total: number
   /** Set the moment the player cancels this bucket, before the abort round trip resolves. */
@@ -93,12 +109,23 @@ type ExportOutcome = 'exported' | 'cancelled' | 'failed'
  */
 type CgTarget = `cg:${Position}`
 
-/** Everything a bucket can be asked for: a whole set, or one CG. */
-type RenderTarget = SetTarget | CgTarget
+/**
+ * One expression sprite of one wardrobe, addressed on its own — the wardrobe column's
+ * per-sprite control. Renderer-only, like {@link CgTarget}.
+ */
+type ExpressionTarget = `expression:${SpriteRef}`
+
+/** Everything a bucket can be asked for: a whole set, one CG, or one sprite. */
+export type RenderTarget = SetTarget | CgTarget | ExpressionTarget
 
 /** The {@link CgTarget} naming one position — the spelling every id here answers to. */
 export function cgTargetFor(position: Position): CgTarget {
   return `cg:${position}`
+}
+
+/** The {@link ExpressionTarget} naming one sprite of one wardrobe. */
+export function expressionTargetFor(emotion: Emotion, set: OutfitSet | null): ExpressionTarget {
+  return `expression:${spriteRef(emotion, set)}`
 }
 
 /** True for the one-CG form. */
@@ -106,11 +133,24 @@ function isCgTarget(target: RenderTarget): target is CgTarget {
   return target.startsWith('cg:')
 }
 
+/** True for the one-sprite form. */
+function isExpressionTarget(target: RenderTarget): target is ExpressionTarget {
+  return target.startsWith('expression:')
+}
+
 /** The position a {@link CgTarget} names, or `undefined` for a whole-set target. */
 function positionOfTarget(target: RenderTarget): Position | undefined {
   if (!isCgTarget(target)) return undefined
   const position = target.slice(3)
   return isPosition(position) ? position : undefined
+}
+
+/** The sprite an {@link ExpressionTarget} names, or `undefined` for any other target. */
+function spriteOfTarget(
+  target: RenderTarget
+): { emotion: Emotion; set: OutfitSet | null } | undefined {
+  if (!isExpressionTarget(target)) return undefined
+  return parseSpriteRef(target.slice('expression:'.length)) ?? undefined
 }
 
 export interface CharacterProgress {
@@ -158,6 +198,14 @@ export function liveTaskFor(
 /** Which CGs are being re-rolled on their own right now. */
 export function liveCgTasks(progress: CharacterProgress | undefined): Position[] {
   return POSITIONS.filter((position) => liveTaskFor(progress, cgTargetFor(position)))
+}
+
+/** Which of one wardrobe's sprites are being re-rolled on their own right now. */
+export function liveExpressionTasks(
+  progress: CharacterProgress | undefined,
+  set: OutfitSet | null
+): Emotion[] {
+  return EMOTIONS.filter((emotion) => liveTaskFor(progress, expressionTargetFor(emotion, set)))
 }
 
 interface CharacterStoreState {
@@ -215,13 +263,30 @@ interface CharacterStoreState {
   retryGeneration: (charId: string) => Promise<void>
   /**
    * Renders one set: `fill` queues only the images missing from disk; `regenerate` renders the
-   * set whole into staging and commits it at the end.
+   * set whole into staging and commits it at the end, under the regenerate modal's edit where
+   * it came from one.
    */
-  generateSet: (charId: string, target: RenderTarget, mode: RenderMode) => Promise<void>
+  generateSet: (
+    charId: string,
+    target: RenderTarget,
+    mode: RenderMode,
+    edit?: RenderEdit
+  ) => Promise<void>
   /** Aborts one set's outstanding jobs, leaving the rest of the run alone. */
   cancelSet: (charId: string, target: RenderTarget) => Promise<void>
   /** Persists edits made in the EditCharacterModal. */
   save: (character: Character) => Promise<boolean>
+  /** Writes one player-authored wardrobe's tags and name onto her record. */
+  writeCustomOutfit: (
+    charId: string,
+    slot: CustomOutfitSlot,
+    entry: CustomOutfit
+  ) => Promise<boolean>
+  /**
+   * Deletes one player-authored wardrobe, its images and its record entry; refused outright
+   * while anything of that set is still rendering.
+   */
+  deleteCustomOutfit: (charId: string, slot: CustomOutfitSlot) => Promise<boolean>
   /** Writes one character out as a zip through the native save dialog. */
   exportCharacter: (charId: string) => Promise<ExportOutcome>
   /** Adopts a character zip picked through the native open dialog into the roster. */
@@ -474,13 +539,13 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     await runWritePipeline(charId, request, set, get)
   },
 
-  generateSet: async (charId, target, mode) => {
+  generateSet: async (charId, target, mode, edit) => {
     if (!get().characters[charId]) return
 
     // A run already holding this character takes the set.
     const run = activeRuns.get(charId)
     if (run) {
-      queueOnRun(charId, run, target, mode, set, get)
+      queueOnRun(charId, run, target, mode, edit, set, get)
       return
     }
 
@@ -488,7 +553,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const started: ActiveRun = { pending: [] }
     activeRuns.set(charId, started)
 
-    const spec = await prepareSpec(charId, target, mode, set, get)
+    const spec = await prepareSpec(charId, target, mode, edit, set, get)
     const specs = spec && specKeys(spec).length > 0 ? [spec] : []
     const character = get().characters[charId]
     if (!character || (specs.length === 0 && started.pending.length === 0)) {
@@ -516,17 +581,59 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       return { progress: { ...state.progress, [charId]: { ...entry, tasks } } }
     })
 
-    await window.api.jobs.cancelKeys(charId, jobKeysFor(target))
+    // Only the running bucket has jobs in main: one still waiting its turn has submitted
+    // nothing, and its keys may be the very ones a running single of the same set occupies.
+    const current = currentTask(get().progress[charId])
+    if (current && bucketIdOfTask(current) === bucketId) {
+      await window.api.jobs.cancelKeys(charId, jobKeysFor(target))
+    }
   },
 
-  save: async (character) => {
-    const result = await window.api.chars.update(character)
-    if (!result.ok) {
-      useUiStore.getState().showError(result.error)
+  save: (character) =>
+    patchCharacter(
+      character.charId,
+      (current) => {
+        // The run owns the seeds and the custom wardrobes, so a Save landing mid-render keeps
+        // what a bucket has just written.
+        const { customOutfits: _stale, ...edited } = character
+        return {
+          ...edited,
+          setSeeds: current.setSeeds,
+          seedFollowsMain: current.seedFollowsMain,
+          ...(current.customOutfits ? { customOutfits: current.customOutfits } : {})
+        }
+      },
+      set,
+      get
+    ),
+
+  writeCustomOutfit: (charId, slot, entry) =>
+    patchCharacter(charId, (current) => withCustomOutfit(current, slot, entry), set, get),
+
+  deleteCustomOutfit: async (charId, slot) => {
+    // Its folder is being written into: there is nothing to say to that but no.
+    const progress = get().progress[charId]
+    if (liveTaskFor(progress, slot) || liveExpressionTasks(progress, slot).length > 0) return false
+
+    const removed = await window.api.chars.deleteSet(charId, slot)
+    if (!removed.ok) {
+      useUiStore.getState().showError(removed.error)
       return false
     }
-    set((state) => ({ characters: { ...state.characters, [character.charId]: result.data } }))
-    return true
+
+    const written = await patchCharacter(
+      charId,
+      (current) => withoutCustomOutfit(current, slot),
+      set,
+      get
+    )
+
+    const outfits = await window.api.chars.outfits(charId)
+    set((state) => ({
+      ...(outfits.ok ? { outfits: { ...state.outfits, [charId]: outfits.data } } : {}),
+      ...bumpSpriteVersion(state, charId)
+    }))
+    return written
   },
 
   exportCharacter: async (charId) => {
@@ -762,17 +869,34 @@ async function adoptCharacter(character: Character, set: SetState): Promise<void
  * subset being rendered; completeness is still judged over the whole set, off disk.
  */
 type RenderTaskSpec =
-  | ({ kind: 'expressions'; emotions: Emotion[] } & Staging)
-  | ({ kind: 'cgs'; positions: Position[] } & SetPlan & Staging)
+  | ({ kind: 'expressions'; emotions: Emotion[] } & Staging & Edited)
+  | ({ kind: 'cgs'; positions: Position[] } & SetPlan & Staging & Edited)
   // No SetPlan: a CG re-roll's seed is never recorded.
-  | ({ kind: 'cg'; position: Position; seed: number } & Staging)
-  | ({ kind: 'outfit'; set: OutfitSet; emotions: Emotion[] } & SetPlan & Staging)
+  | ({ kind: 'cg'; position: Position; seed: number } & Staging & Edited)
+  // No SetPlan: one sprite's seed is never recorded either.
+  | ({ kind: 'expression'; set: OutfitSet | null; emotion: Emotion; seed: number } & Staging &
+      Edited)
+  | ({ kind: 'outfit'; set: OutfitSet; emotions: Emotion[] } & SetPlan & Staging & Edited)
   // No SetPlan: the room is a cloud render with no seed to record.
   | ({ kind: 'room'; variants: RoomVariant[] } & Staging)
 
 /** Whether a bucket renders into the staging tree instead of over the live set. */
 interface Staging {
   staged: boolean
+}
+
+/**
+ * What the regenerate modal hands a render: the tags as it left them, and the seed it
+ * settled — `null` asks for a fresh random one.
+ */
+export interface RenderEdit {
+  prompt: PromptEdit
+  seed: number | null
+}
+
+/** The tag groups a bucket renders under instead of the character's own. */
+interface Edited {
+  edit?: PromptEdit
 }
 
 /** How one optional set's render resolves against the seed rules. */
@@ -799,8 +923,17 @@ function seededKeyOf(target: Exclude<SetTarget, 'default' | 'room'>): SeededSet 
   return target === 'cgs' ? 'cg' : target
 }
 
-/** The seed one optional set renders under, and what that means for clearing and arming. */
-export function resolveSetPlan(character: Character, key: SeededSet, mode: RenderMode): SetPlan {
+/**
+ * The seed one optional set renders under, and what that means for clearing and arming. A
+ * chosen seed is the regenerate modal's, and the arming is spent only where the render really
+ * used the main seed.
+ */
+export function resolveSetPlan(
+  character: Character,
+  key: SeededSet,
+  mode: RenderMode,
+  chosen?: number
+): SetPlan {
   if (seedsFrozen()) {
     return {
       seed: character.generationSeed,
@@ -809,7 +942,7 @@ export function resolveSetPlan(character: Character, key: SeededSet, mode: Rende
     }
   }
 
-  const armed = character.seedFollowsMain[key]
+  const armed = followsMain(character, key)
   const recorded = character.setSeeds[key]
 
   if (mode === 'fill' && recorded !== undefined) {
@@ -823,16 +956,48 @@ export function resolveSetPlan(character: Character, key: SeededSet, mode: Rende
   if (mode === 'fill' && armed) {
     return { seed: character.generationSeed, replace: false, spendArming: true }
   }
-  return {
-    seed: armed ? character.generationSeed : randomSeed(),
-    replace: true,
-    spendArming: armed
-  }
+  const seed = chosen ?? (armed ? character.generationSeed : randomSeed())
+  return { seed, replace: true, spendArming: armed && seed === character.generationSeed }
 }
 
-/** The seed a render nobody records runs under: one CG re-rolled, one hand fix. */
-function rerollSeed(character: Character): number {
-  return seedsFrozen() ? character.generationSeed : randomSeed()
+/** The seed of a character's set, which is her own seed for the default wardrobe. */
+function setSeedOf(character: Character, set: OutfitSet | null): number {
+  if (set === null) return character.generationSeed
+  return character.setSeeds[set] ?? character.generationSeed
+}
+
+/**
+ * What the regenerate modal's seed row opens on: the seed the render would use, and whether
+ * the box starts on a fresh random one. An armed set opens on the main seed, unchecked, so it
+ * still follows a freshly rerolled face unless the player says otherwise — the same rule
+ * {@link resolveSetPlan} applies.
+ */
+export function seedPrefillFor(
+  character: Character,
+  target: Exclude<RenderTarget, 'room'>
+): { seed: number; random: boolean } {
+  if (seedsFrozen()) return { seed: character.generationSeed, random: false }
+
+  if (isExpressionTarget(target)) {
+    const sprite = spriteOfTarget(target)
+    return { seed: setSeedOf(character, sprite?.set ?? null), random: true }
+  }
+  if (isCgTarget(target)) {
+    return { seed: character.setSeeds.cg ?? character.generationSeed, random: true }
+  }
+  if (target === 'default') return { seed: character.generationSeed, random: true }
+
+  const key = seededKeyOf(target)
+  if (followsMain(character, key)) return { seed: character.generationSeed, random: false }
+  return { seed: character.setSeeds[key] ?? character.generationSeed, random: true }
+}
+
+/**
+ * The seed a render nobody records runs under — one sprite or one CG re-rolled, one hand fix:
+ * the modal's where it settled one, a fresh one otherwise, the frozen one under the dev switch.
+ */
+function rerollSeed(character: Character, chosen?: number): number {
+  return seedsFrozen() ? character.generationSeed : (chosen ?? randomSeed())
 }
 
 /** The optional buckets a New Character run adds, in the order they render. */
@@ -877,6 +1042,8 @@ interface PendingSet {
   mode: RenderMode
   /** The {@link RenderTask.id} of the placeholder standing in for it on the card. */
   taskId: number
+  /** What the regenerate modal settled, held until the run reaches this set and plans it. */
+  edit?: RenderEdit
 }
 
 interface ActiveRun {
@@ -901,6 +1068,7 @@ function queueOnRun(
   run: ActiveRun,
   target: RenderTarget,
   mode: RenderMode,
+  edit: RenderEdit | undefined,
   set: SetState,
   get: () => CharacterStoreState
 ): void {
@@ -911,7 +1079,7 @@ function queueOnRun(
   if (total === 0) return
 
   cancelledBuckets.get(charId)?.delete(bucketIdFor(target))
-  const pending: PendingSet = { target, mode, taskId: nextTaskId++ }
+  const pending: PendingSet = { target, mode, taskId: nextTaskId++, ...(edit ? { edit } : {}) }
   run.pending.push(pending)
   set((state) => {
     const entry = state.progress[charId]
@@ -928,6 +1096,9 @@ function queueOnRun(
 
 /** The id a bucket is cancelled under — one per set, matching {@link bucketIdFor}. */
 function bucketIdOfTask(task: RenderTask): string {
+  if (task.kind === 'expression') {
+    return task.emotion ? expressionTargetFor(task.emotion, task.set ?? null) : 'expression:'
+  }
   if (task.kind === 'outfit') return `outfit:${task.set}`
   if (task.kind === 'cg') return `cg:${task.position}`
   return task.kind
@@ -935,6 +1106,8 @@ function bucketIdOfTask(task: RenderTask): string {
 
 /** The same id, addressed the way the Edit modal's controls name a set. */
 function bucketIdFor(target: RenderTarget): string {
+  // A single sprite is its own bucket, named by the target itself, as a single CG is.
+  if (isExpressionTarget(target)) return target
   if (target === 'default') return 'expressions'
   if (target === 'cgs') return 'cgs'
   if (target === 'room') return 'room'
@@ -945,6 +1118,7 @@ function bucketIdFor(target: RenderTarget): string {
 
 /** The set a bucket belongs to, named as the Edit modal's controls name it. */
 function targetOfSpec(spec: RenderTaskSpec): RenderTarget {
+  if (spec.kind === 'expression') return expressionTargetFor(spec.emotion, spec.set)
   if (spec.kind === 'expressions') return 'default'
   if (spec.kind === 'cgs') return 'cgs'
   if (spec.kind === 'cg') return cgTargetFor(spec.position)
@@ -952,8 +1126,14 @@ function targetOfSpec(spec: RenderTaskSpec): RenderTarget {
   return spec.set
 }
 
-/** The identifying half of a task — `kind` plus whichever of `set`/`position` names it. */
-export function taskShapeOf(target: RenderTarget): Pick<RenderTask, 'kind' | 'set' | 'position'> {
+/** The identifying half of a task — `kind` plus whatever of `set`/`position`/`emotion` names it. */
+export function taskShapeOf(
+  target: RenderTarget
+): Pick<RenderTask, 'kind' | 'set' | 'position' | 'emotion'> {
+  if (isExpressionTarget(target)) {
+    const sprite = spriteOfTarget(target)
+    return { kind: 'expression', set: sprite?.set ?? undefined, emotion: sprite?.emotion }
+  }
   if (isCgTarget(target)) return { kind: 'cg', position: positionOfTarget(target) }
   if (target === 'default') return { kind: 'expressions' }
   if (target === 'cgs') return { kind: 'cgs' }
@@ -963,6 +1143,7 @@ export function taskShapeOf(target: RenderTarget): Pick<RenderTask, 'kind' | 'se
 
 /** The keys one spec renders, whichever kind it is. */
 function specKeys(spec: RenderTaskSpec): readonly string[] {
+  if (spec.kind === 'expression') return [spec.emotion]
   if (spec.kind === 'cg') return [spec.position]
   if (spec.kind === 'cgs') return spec.positions
   if (spec.kind === 'room') return spec.variants
@@ -976,7 +1157,8 @@ function plannedTotal(
   mode: RenderMode,
   get: () => CharacterStoreState
 ): number {
-  // One image whichever mode asked: a re-roll replaces exactly the clicked CG.
+  // One image whichever mode asked: a re-roll replaces exactly the clicked sprite or CG.
+  if (isExpressionTarget(target)) return 1
   if (isCgTarget(target)) return 1
   if (mode === 'regenerate') {
     return target === 'cgs' ? POSITIONS.length : target === 'room' ? ROOM_VARIANTS.length : EMOTIONS.length
@@ -1045,9 +1227,17 @@ export function missingContentPlan(
 
     const defaultsPresent = doneCountOf(state.expressions, charId) === EMOTIONS.length
     if (gates.comfyReady && defaultsPresent) {
-      for (const set of OUTFIT_SETS) {
+      for (const set of STOCK_OUTFIT_SETS) {
         if (sfwWithholds(set, gates.noNsfwImages)) continue
         consider(set, EMOTIONS.filter((emotion) => !state.outfits[charId]?.[set]?.[emotion]).length)
+      }
+      // Only a slot her record carries tags for: nothing else has anything to render from.
+      for (const slot of CUSTOM_OUTFIT_SLOTS) {
+        if (!character.customOutfits?.[slot]) continue
+        consider(
+          slot,
+          EMOTIONS.filter((emotion) => !state.outfits[charId]?.[slot]?.[emotion]).length
+        )
       }
       if (!sfwWithholds('cgs', gates.noNsfwImages)) {
         consider('cgs', POSITIONS.filter((position) => !state.cgs[charId]?.[position]).length)
@@ -1067,18 +1257,50 @@ async function prepareSpec(
   charId: string,
   target: RenderTarget,
   mode: RenderMode,
+  edit: RenderEdit | undefined,
   set: SetState,
   get: () => CharacterStoreState
 ): Promise<RenderTaskSpec | null> {
   const character = get().characters[charId]
   if (!character) return null
 
+  // The seed the modal settled, a fresh one where it asked for one, and nothing without a modal.
+  const chosen = edit === undefined ? undefined : (edit.seed ?? randomSeed())
+
+  if (isExpressionTarget(target)) {
+    const sprite = spriteOfTarget(target)
+    if (!sprite) return null
+    const { emotion, set: outfitSet } = sprite
+    const present =
+      outfitSet === null
+        ? get().expressions[charId]?.[emotion]
+        : get().outfits[charId]?.[outfitSet]?.[emotion]
+    // Only a sprite still on disk is re-rolled: a queued bucket is planned long after the click.
+    if (!present) return null
+    // Live, not staged: one sprite is written in place, and a staged commit would replace
+    // the whole wardrobe's directory.
+    return {
+      kind: 'expression',
+      set: outfitSet,
+      emotion,
+      seed: rerollSeed(character, chosen),
+      staged: false,
+      edit: edit?.prompt
+    }
+  }
+
   if (isCgTarget(target)) {
     const position = positionOfTarget(target)
     // Only a CG still on disk is re-rolled: a queued bucket is planned long after the click.
     if (!position || !get().cgs[charId]?.[position]) return null
     // Live, not staged: a staged commit would replace the whole `cg/` directory.
-    return { kind: 'cg', position, seed: rerollSeed(character), staged: false }
+    return {
+      kind: 'cg',
+      position,
+      seed: rerollSeed(character, chosen),
+      staged: false,
+      edit: edit?.prompt
+    }
   }
 
   if (target === 'default') {
@@ -1089,23 +1311,26 @@ async function prepareSpec(
     }
 
     // A defaults regenerate rerolls the seed and re-arms the optional sets in one write.
-    if (seedsFrozen()) return { kind: 'expressions', emotions: [...EMOTIONS], staged: true }
-
-    const wasLive = isLive(get, charId)
-    const saved = await window.api.chars.update({
-      ...character,
-      generationSeed: randomSeed(),
-      seedFollowsMain: allFollowMain()
-    })
-    if (!get().characters[charId]) return null
-    if (wasLive && !isLive(get, charId)) return null
-    if (!saved.ok) {
-      useUiStore.getState().showError(saved.error)
-      return null
+    if (seedsFrozen()) {
+      return { kind: 'expressions', emotions: [...EMOTIONS], staged: true, edit: edit?.prompt }
     }
 
-    set((state) => ({ characters: { ...state.characters, [charId]: saved.data } }))
-    return { kind: 'expressions', emotions: [...EMOTIONS], staged: true }
+    // Through the record's one writer, so a seed a bucket records meanwhile is not lost. The
+    // fresh flags carry no custom slot, which is what arms one to follow the new face.
+    const wasLive = isLive(get, charId)
+    const written = await patchCharacter(
+      charId,
+      (fresh) => ({
+        ...fresh,
+        generationSeed: chosen ?? randomSeed(),
+        seedFollowsMain: allFollowMain()
+      }),
+      set,
+      get
+    )
+    if (!written || !get().characters[charId]) return null
+    if (wasLive && !isLive(get, charId)) return null
+    return { kind: 'expressions', emotions: [...EMOTIONS], staged: true, edit: edit?.prompt }
   }
 
   if (target === 'room') {
@@ -1118,13 +1343,13 @@ async function prepareSpec(
     return { kind: 'room', variants, staged: mode === 'regenerate' }
   }
 
-  const plan = resolveSetPlan(character, seededKeyOf(target), mode)
+  const plan = resolveSetPlan(character, seededKeyOf(target), mode, chosen)
 
   if (target === 'cgs') {
     const positions = plan.replace
       ? [...POSITIONS]
       : POSITIONS.filter((position) => !get().cgs[charId]?.[position])
-    return { kind: 'cgs', positions, staged: plan.replace, ...plan }
+    return { kind: 'cgs', positions, staged: plan.replace, ...plan, edit: edit?.prompt }
   }
 
   const emotions = plan.replace
@@ -1134,7 +1359,14 @@ async function prepareSpec(
         target,
         EMOTIONS.filter((emotion) => !get().outfits[charId]?.[target]?.[emotion])
       )
-  return { kind: 'outfit', set: target, emotions, staged: plan.replace, ...plan }
+  return {
+    kind: 'outfit',
+    set: target,
+    emotions,
+    staged: plan.replace,
+    ...plan,
+    edit: edit?.prompt
+  }
 }
 
 /**
@@ -1157,6 +1389,12 @@ async function withBase(
 
 /** The job keys one set occupies — what `jobs:cancelKeys` matches on. */
 function jobKeysFor(target: RenderTarget): string[] {
+  // One sprite occupies the key its own set's bucket would render it under.
+  if (isExpressionTarget(target)) {
+    const sprite = spriteOfTarget(target)
+    if (!sprite) return []
+    return [sprite.set ? `outfit:${sprite.set}:${sprite.emotion}` : sprite.emotion]
+  }
   // For a single CG the bucket id is the job key.
   if (isCgTarget(target)) return [target]
   if (target === 'default') return [...EMOTIONS]
@@ -1170,6 +1408,38 @@ function isBucketCancelled(charId: string, bucketId: string): boolean {
   return cancelledBuckets.get(charId)?.has(bucketId) ?? false
 }
 
+/** The turn each character's record writes are queued behind, so two never interleave. */
+const recordWrites = new Map<string, Promise<unknown>>()
+
+/**
+ * The one writer of a character's record: at the head of its turn it reads her as the store
+ * holds her then, hands that to `patch`, and puts back what main wrote.
+ */
+function patchCharacter(
+  charId: string,
+  patch: (current: Character) => Character,
+  set: SetState,
+  get: () => CharacterStoreState
+): Promise<boolean> {
+  const turn = (recordWrites.get(charId) ?? Promise.resolve()).then(async () => {
+    const current = get().characters[charId]
+    if (!current) return false
+
+    const saved = await window.api.chars.update(patch(current))
+    if (!saved.ok) {
+      useUiStore.getState().showError(saved.error)
+      return false
+    }
+    // Only while she is still on the roster: a character deleted mid-write is not put back.
+    if (get().characters[charId]) {
+      set((state) => ({ characters: { ...state.characters, [charId]: saved.data } }))
+    }
+    return true
+  })
+  recordWrites.set(charId, turn.catch(() => undefined))
+  return turn
+}
+
 /** Records the seed a set rendered under, so a later fill can match it. */
 async function recordSetSeed(
   charId: string,
@@ -1181,12 +1451,12 @@ async function recordSetSeed(
   const current = get().characters[charId]
   if (!current || seedsFrozen() || current.setSeeds[key] === seed) return
 
-  const saved = await window.api.chars.update({
-    ...current,
-    setSeeds: { ...current.setSeeds, [key]: seed }
-  })
-  if (!isLive(get, charId) || !saved.ok) return
-  set((state) => ({ characters: { ...state.characters, [charId]: saved.data } }))
+  await patchCharacter(
+    charId,
+    (fresh) => ({ ...fresh, setSeeds: { ...fresh.setSeeds, [key]: seed } }),
+    set,
+    get
+  )
 }
 
 /** Records that `sets` have used their follow-the-main-seed turn, in one write per run. */
@@ -1197,14 +1467,18 @@ async function consumeArming(
   get: () => CharacterStoreState
 ): Promise<void> {
   const current = get().characters[charId]
-  if (!current || !sets.some((s) => current.seedFollowsMain[s])) return
+  if (!current || !sets.some((s) => followsMain(current, s))) return
 
-  const seedFollowsMain = { ...current.seedFollowsMain }
-  for (const s of sets) seedFollowsMain[s] = false
-
-  const saved = await window.api.chars.update({ ...current, seedFollowsMain })
-  if (!isLive(get, charId) || !saved.ok) return
-  set((state) => ({ characters: { ...state.characters, [charId]: saved.data } }))
+  await patchCharacter(
+    charId,
+    (fresh) => {
+      const seedFollowsMain = { ...fresh.seedFollowsMain }
+      for (const s of sets) seedFollowsMain[s] = false
+      return { ...fresh, seedFollowsMain }
+    },
+    set,
+    get
+  )
 }
 
 /**
@@ -1302,6 +1576,7 @@ async function runWritePipeline(
 
 /** Images one spec renders — the denominator of its bucket, and a fill renders fewer. */
 function taskTotal(spec: RenderTaskSpec): number {
+  if (spec.kind === 'expression') return 1
   if (spec.kind === 'cg') return 1
   if (spec.kind === 'cgs') return spec.positions.length
   if (spec.kind === 'room') return spec.variants.length
@@ -1478,7 +1753,7 @@ async function runBuckets(
       if (!next) return
       const spec = isBucketCancelled(charId, bucketIdFor(next.target))
         ? null
-        : await prepareSpec(charId, next.target, next.mode, set, get)
+        : await prepareSpec(charId, next.target, next.mode, next.edit, set, get)
       if (!spec || specKeys(spec).length === 0) {
         dropTask(next.taskId)
         continue
@@ -1636,7 +1911,7 @@ async function runBuckets(
     if (complete === null) return 'stop'
 
     // Only whole sets stage, so `target` is the `SetTarget` the folder channels take.
-    if (staged && !isCgTarget(target)) {
+    if (staged && !isCgTarget(target) && !isExpressionTarget(target)) {
       if (cancelled()) {
         await discard(target, bucketId)
         return 'skip'
@@ -1712,7 +1987,7 @@ async function runBuckets(
         keys: spec.emotions,
         first: 'neutral' as Emotion,
         generate: (emotion) =>
-          window.api.comfy.generateExpression(current, emotion, undefined, spec.staged),
+          window.api.comfy.generateExpression(current, emotion, undefined, spec.staged, spec.edit),
         ...flatMap('expressions', () => window.api.chars.expressions(charId), EMOTIONS),
         recordSeed: null,
         settle: (complete) => {
@@ -1726,7 +2001,14 @@ async function runBuckets(
         keys: spec.emotions,
         first: 'neutral' as Emotion,
         generate: (emotion) =>
-          window.api.comfy.generateOutfit(current, outfitSet, emotion, spec.seed, spec.staged),
+          window.api.comfy.generateOutfit(
+            current,
+            outfitSet,
+            emotion,
+            spec.seed,
+            spec.staged,
+            spec.edit
+          ),
         disk: {
           recount: () => window.api.chars.outfits(charId),
           applyRecount: (data) =>
@@ -1770,7 +2052,7 @@ async function runBuckets(
       plan = bucketPlan({
         all: [position],
         keys: [position],
-        generate: () => window.api.comfy.generateCg(current, position, spec.seed, false),
+        generate: () => window.api.comfy.generateCg(current, position, spec.seed, false, spec.edit),
         disk: {
           // Recounted anyway, to keep the store's map honest about the folder.
           recount: () => window.api.chars.cgs(charId),
@@ -1790,12 +2072,87 @@ async function runBuckets(
           if (!complete) cgsDone = false
         }
       })
+    } else if (spec.kind === 'expression') {
+      const emotion = spec.emotion
+      const outfitSet = spec.set
+      // Judged on this render landing, not on the sprites already on disk.
+      let landed = false
+      if (outfitSet === null) {
+        // One of the seven the run's terminal error speaks for: without this, the tail would
+        // recompute `expressionsDone` off disk, where the sprite this re-roll failed to
+        // replace is still sitting, and the failure would go unsaid.
+        expressionsAsked = true
+        plan = bucketPlan({
+          all: [emotion],
+          keys: [emotion],
+          generate: () =>
+            window.api.comfy.generateExpression(current, emotion, spec.seed, false, spec.edit),
+          disk: {
+            recount: () => window.api.chars.expressions(charId),
+            applyRecount: (data) =>
+              set((state) => ({ expressions: { ...state.expressions, [charId]: data } })),
+            complete: () => landed
+          },
+          markDone: () => {
+            landed = true
+            set((state) => ({
+              expressions: {
+                ...state.expressions,
+                [charId]: { ...state.expressions[charId], [emotion]: true }
+              },
+              ...bumpSpriteVersion(state, charId)
+            }))
+          },
+          // A re-roll's seed is nobody's record.
+          recordSeed: null,
+          settle: (complete) => {
+            if (!complete) expressionsDone = false
+          }
+        })
+      } else {
+        plan = bucketPlan({
+          all: [emotion],
+          keys: [emotion],
+          generate: () =>
+            window.api.comfy.generateOutfit(
+              current,
+              outfitSet,
+              emotion,
+              spec.seed,
+              false,
+              spec.edit
+            ),
+          disk: {
+            recount: () => window.api.chars.outfits(charId),
+            applyRecount: (data) =>
+              set((state) => ({ outfits: { ...state.outfits, [charId]: data } })),
+            complete: () => landed
+          },
+          markDone: () => {
+            landed = true
+            set((state) => ({
+              outfits: {
+                ...state.outfits,
+                [charId]: {
+                  ...state.outfits[charId],
+                  [outfitSet]: { ...state.outfits[charId]?.[outfitSet], [emotion]: true }
+                } as Record<OutfitSet, Record<Emotion, boolean>>
+              },
+              ...bumpSpriteVersion(state, charId)
+            }))
+          },
+          recordSeed: null,
+          settle: (complete) => {
+            if (!complete) outfitsFailed.push(outfitSet)
+          }
+        })
+      }
     } else {
       plan = bucketPlan({
         all: POSITIONS,
         keys: spec.positions,
         generate: (position) =>
-          window.api.comfy.generateCg(current, position, spec.seed, spec.staged),
+          window.api.comfy.generateCg(current, position, spec.seed, spec.staged, spec.edit),
         ...flatMap('cgs', () => window.api.chars.cgs(charId), POSITIONS),
         recordSeed: () => recordSetSeed(charId, 'cg', spec.seed, set, get),
         settle: (complete) => {
@@ -1836,7 +2193,7 @@ async function runBuckets(
         ? {
             code: 'OUTFITS_INCOMPLETE',
             message: `Some ${outfitsFailed
-              .map((s) => OUTFIT_SET_LABELS[s])
+              .map((s) => outfitLabelOf(get().characters[charId] ?? character, s))
               .join(' and ')} sprites could not be generated. Generate them again.`
           }
         : !roomDone

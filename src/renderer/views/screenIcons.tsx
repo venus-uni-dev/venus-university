@@ -48,10 +48,14 @@ export function CloseIcon(): JSX.Element {
 }
 
 /**
- * The forward mark on a button that goes somewhere, or with `back` the way it came. A button
- * never carries a typographic arrow: the half-pill already points where it is going.
+ * The forward mark on a button that goes somewhere, with `back` the way it came and `down` the
+ * list a pill opens under itself. A button never carries a typographic arrow: the half-pill
+ * already points where it is going.
  */
-export function ChevronIcon({ back = false }: { back?: boolean } = {}): JSX.Element {
+export function ChevronIcon({
+  back = false,
+  down = false
+}: { back?: boolean; down?: boolean } = {}): JSX.Element {
   return (
     <svg
       width="18"
@@ -64,7 +68,27 @@ export function ChevronIcon({ back = false }: { back?: boolean } = {}): JSX.Elem
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d={back ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'} />
+      <path d={down ? 'm6 9 6 6 6-6' : back ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'} />
+    </svg>
+  )
+}
+
+/** The plus that adds one more of whatever it sits on, sized by the caller like the eye. */
+export function PlusIcon({ size }: { size: number }): JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
     </svg>
   )
 }

@@ -411,7 +411,7 @@ export function ManageCharactersView(): JSX.Element {
             message={
               deletingIsShipped
                 ? `You can restore ${nameOf(deletingCharacter)} later with the Restore Default Characters button.`
-                : `${nameOf(deletingCharacter)} and all generated sprites will be permanently deleted.`
+                : `${nameOf(deletingCharacter)} and all generated sprites will be permanently deleted. All playthroughs including her will become unloadable.`
             }
             onCancel={() => setDeleting(null)}
             onConfirm={() => {

@@ -16,6 +16,8 @@ const PRIVATE = [
   'assets/pose/poseMaterial/bold.png',
   'build/itch-page/shots/lab.jpg',
   '.github/workflows/sync-public.yml',
+  'private/supporters.json',
+  'private/notes.md',
   'CLAUDE.md',
   'DESIGN_GUIDE.md',
   'UI_STYLE_GUIDE.md',

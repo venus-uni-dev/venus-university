@@ -3,7 +3,7 @@ import { EMOTIONS } from '@shared/emotions'
 import { allFollowMain, OUTFIT_SETS } from '@shared/outfits'
 import { ROOM_VARIANTS, type RoomVariant } from '@shared/room'
 import { POSITIONS } from '@shared/positions'
-import type { Emotion, OutfitSet, Position, SeededSet } from '@shared/types'
+import type { Character, Emotion, OutfitSet, Position, SeededSet } from '@shared/types'
 import { character, stubApi } from './fixtures'
 
 // `characterStore` subscribes to `jobs:progress` at module scope, so the bridge
@@ -12,10 +12,13 @@ stubApi({ jobs: { onProgress: () => () => {} } })
 const {
   useCharacterStore,
   briefRequestOf,
+  cgTargetFor,
+  expressionTargetFor,
   manageOrderOf,
   missingContentPlan,
   readyOutfitSets,
   resolveSetPlan,
+  seedPrefillFor,
   taskShapeOf
 } = await import('../src/renderer/stores/characterStore')
 /** The progress entry as the planner reads it — named off the function itself. */
@@ -115,6 +118,27 @@ describe('resolveSetPlan', () => {
     expect(plan.seed).not.toBe(4242)
   })
 
+  it('regenerates under the seed the modal settled', () => {
+    const unarmed = subject({ armed: { pe: false } })
+    expect(resolveSetPlan(unarmed, 'pe', 'regenerate', 777)).toEqual({
+      seed: 777,
+      replace: true,
+      spendArming: false
+    })
+  })
+
+  it('spends the arming on a chosen seed only when it is the main one', () => {
+    // The arming is the promise that the set matches her face, and a seed the player
+    // typed over it keeps that promise only where it turns out to be the main one.
+    const armed = subject({ armed: { pe: true } })
+    expect(resolveSetPlan(armed, 'pe', 'regenerate', 777)).toEqual({
+      seed: 777,
+      replace: true,
+      spendArming: false
+    })
+    expect(resolveSetPlan(armed, 'pe', 'regenerate', 4242).spendArming).toBe(true)
+  })
+
   it('pins every set to the main seed and spends nothing while seeds are frozen', () => {
     // The dev switch must not be able to change anything about the character's
     // seed state, which is what `spendArming: false` in both modes says.
@@ -126,6 +150,97 @@ describe('resolveSetPlan', () => {
         replace: mode === 'regenerate',
         spendArming: false
       })
+    }
+  })
+
+  it('pins a chosen seed to the main one while seeds are frozen', () => {
+    useSettingsStore.setState({ settings: { freezeSeeds: true } as never })
+    const armed = subject({ armed: { pe: true } })
+    expect(resolveSetPlan(armed, 'pe', 'regenerate', 777)).toEqual({
+      seed: 4242,
+      replace: true,
+      spendArming: false
+    })
+  })
+
+  it('treats a custom slot with no flag of its own as armed', () => {
+    // Nobody writes a flag for a wardrobe that has never rendered, and reading that
+    // absence as unarmed would render her first custom set off another face.
+    expect(resolveSetPlan(subject({}), 'custom1', 'regenerate')).toEqual({
+      seed: 4242,
+      replace: true,
+      spendArming: true
+    })
+  })
+})
+
+/**
+ * The seed the regenerate modal opens on is the one the player confirms, and what
+ * `generationSeed`/`setSeeds` are then written with — a prefill off by a set pins that
+ * wardrobe to a face that is not hers.
+ */
+describe('seedPrefillFor', () => {
+  it('opens the default wardrobe on the main seed, free to reroll', () => {
+    expect(seedPrefillFor(subject({}), 'default')).toEqual({ seed: 4242, random: true })
+  })
+
+  it('opens an armed optional set on the main seed with the box unchecked', () => {
+    // Armed is "follow her face", so the render has to stay free to follow a reroll of it.
+    const armed = subject({ armed: { pe: true }, seeds: { pe: 999 } })
+    expect(seedPrefillFor(armed, 'pe')).toEqual({ seed: 4242, random: false })
+  })
+
+  it('opens an unarmed set on the seed it last rendered under', () => {
+    expect(seedPrefillFor(subject({ armed: { pe: false }, seeds: { pe: 999 } }), 'pe')).toEqual({
+      seed: 999,
+      random: true
+    })
+    expect(seedPrefillFor(subject({ armed: { cg: false }, seeds: { cg: 555 } }), 'cgs')).toEqual({
+      seed: 555,
+      random: true
+    })
+  })
+
+  it('opens a single CG and a single sprite on the seed of the set they belong to', () => {
+    const own = subject({ seeds: { cg: 555, pe: 999 } })
+    expect(seedPrefillFor(own, cgTargetFor('sex'))).toEqual({ seed: 555, random: true })
+    expect(seedPrefillFor(own, expressionTargetFor('happy', 'pe'))).toEqual({
+      seed: 999,
+      random: true
+    })
+    expect(seedPrefillFor(own, expressionTargetFor('happy', null))).toEqual({
+      seed: 4242,
+      random: true
+    })
+  })
+
+  it('opens a custom slot with no flag of its own on the main seed, unchecked', () => {
+    expect(seedPrefillFor(subject({}), 'custom1')).toEqual({ seed: 4242, random: false })
+  })
+
+  it('opens on the main seed unchecked, whatever the set, while seeds are frozen', () => {
+    useSettingsStore.setState({ settings: { freezeSeeds: true } as never })
+    const armed = subject({ armed: { pe: true }, seeds: { pe: 999 } })
+    expect(seedPrefillFor(armed, 'pe')).toEqual({ seed: 4242, random: false })
+    expect(seedPrefillFor(armed, cgTargetFor('sex'))).toEqual({ seed: 4242, random: false })
+  })
+})
+
+/**
+ * `taskShapeOf` and `expressionTargetFor` are two spellings of one sprite: the shape files the
+ * image that lands and the target names the bucket that is cancelled, so a disagreement writes
+ * a sprite into another wardrobe's map and stops the wrong render.
+ */
+describe('expression targets', () => {
+  it('reads back the wardrobe and the emotion every single-sprite target was written from', () => {
+    for (const emotion of EMOTIONS) {
+      for (const set of [null, ...OUTFIT_SETS]) {
+        expect(taskShapeOf(expressionTargetFor(emotion, set))).toEqual({
+          kind: 'expression',
+          set: set ?? undefined,
+          emotion
+        })
+      }
     }
   })
 })
@@ -283,10 +398,11 @@ describe('missingContentPlan', () => {
 
   /** A roster of one with her default sprites and nothing optional, in whatever run `progress` says. */
   function roster(
-    progress: Record<string, CharacterProgress> = {}
+    progress: Record<string, CharacterProgress> = {},
+    over: Partial<Character> = {}
   ): Parameters<typeof missingContentPlan>[0] {
     return {
-      characters: { c1: character({ charId: 'c1' }) },
+      characters: { c1: character({ charId: 'c1', ...over }) },
       order: ['c1'],
       expressions: { c1: presentMap(EMOTIONS, true) as Record<Emotion, boolean> },
       cgs: { c1: presentMap(POSITIONS, false) as Record<Position, boolean> },
@@ -317,5 +433,26 @@ describe('missingContentPlan', () => {
   it('leaves out the nude wardrobe and the CGs while noNsfwImages is set', () => {
     const plan = missingContentPlan(roster(), { ...OPEN, noNsfwImages: true })
     expect(plan.map((set) => set.target)).toEqual(['pe', 'swim', 'room'])
+  })
+
+  it('queues a custom wardrobe she has tags for and never one she has not', () => {
+    // A slot with no record entry has nothing to render from, so counting its seven
+    // missing sprites would queue a bucket that can only fail.
+    const written = roster({}, { customOutfits: { custom1: { tags: ['maid'] } } })
+    expect(missingContentPlan(written, OPEN).map((set) => set.target)).toEqual([
+      'pe',
+      'swim',
+      'nude',
+      'custom1',
+      'cgs',
+      'room'
+    ])
+    expect(missingContentPlan(roster(), OPEN).map((set) => set.target)).toEqual([
+      'pe',
+      'swim',
+      'nude',
+      'cgs',
+      'room'
+    ])
   })
 })

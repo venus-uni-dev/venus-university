@@ -89,8 +89,14 @@ export function FeedbackModal({ theme, onClose }: FeedbackModalProps): JSX.Eleme
           venus.university.dev@gmail.com
         </motion.a>
         <p className="vu-note-text">
-          When reporting a bug, include what happened and when it happened. You can also attach
-          your game log, but please note that it will contain your inputs and Gemini outputs.
+          When reporting a bug, include:
+          <ul>
+            <li>What happened and when it happened</li>
+            <li>Screenshots if relevant</li>
+            <li>What provider/model you are using</li>
+            <li>Your game log, downloadable below</li>
+          </ul>
+          Please note that the log may contain sensitive info like your text choices and LLM responses. Redact those parts if you'd like to keep them private.
         </p>
 
         <div className="vu-foot vu-note-foot">

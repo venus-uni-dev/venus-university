@@ -33,13 +33,6 @@
   font-size: 15px;
 }
 
-/* What a click does, said at rest — the pill it describes is revealed by a hover, and a
-   control nobody knows about is not offered (the tooltip rule). */
-.vu-gallery-hint {
-  color: var(--vu-text-muted);
-  font: italic 500 14px var(--font-body);
-}
-
 /* Two 16:9 frames instead of eight portraits-of-a-position. */
 .vu-gallery-grid--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -47,18 +40,4 @@
 
 .vu-gallery-grid--pair .vu-gallery-cell {
   aspect-ratio: 16 / 9;
-}
-
-/* The re-roll, revealed on the image it would replace. Quiet on a surface, so it reads
-   over whatever the picture is. */
-.vu-gallery-action {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 18px;
-  border-radius: 999px;
-  background: var(--vu-surface);
-  color: var(--vu-text-body);
-  font: 700 14px var(--font-body);
 }

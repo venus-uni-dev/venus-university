@@ -2,7 +2,7 @@ import { useState, type JSX, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { isWritten } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
-import { OUTFIT_SET_LABELS } from '@shared/outfits'
+import { outfitLabelOf } from '@shared/outfits'
 import type { Character } from '@shared/types'
 import {
   currentTask,
@@ -41,11 +41,16 @@ type CardState =
   | 'unfinished'
 
 /** Names the counter's denominator, so `4/7` says which seven it is counting. */
-function taskName(task: RenderTask): string {
+function taskName(task: RenderTask, character: Character): string {
   if (task.kind === 'cgs') return 'CGS'
   if (task.kind === 'cg') return 'CG'
   if (task.kind === 'room') return 'ROOM'
-  if (task.kind === 'outfit' && task.set) return OUTFIT_SET_LABELS[task.set].toUpperCase()
+  if (task.kind === 'expression' && task.emotion) {
+    return task.set
+      ? `${task.emotion} ${outfitLabelOf(character, task.set)}`.toUpperCase()
+      : task.emotion.toUpperCase()
+  }
+  if (task.kind === 'outfit' && task.set) return outfitLabelOf(character, task.set).toUpperCase()
   return 'EXPRESSIONS'
 }
 
@@ -188,7 +193,7 @@ export function CharacterJobCard({
           {state === 'rendering' && task && (
             <div className="vu-manage-strip">
               <span className="vu-manage-strip-label">
-                RENDERING · {taskName(task)} {task.done}/{task.total}
+                RENDERING · {taskName(task, character)} {task.done}/{task.total}
               </span>
               <div className="vu-track">
                 <motion.div

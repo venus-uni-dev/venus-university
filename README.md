@@ -25,6 +25,7 @@ These folders are excluded from the mirror and do not exist here:
 - `assets/sound` — music/sfx that I don't have permission to redistribute
 - `assets/pose/poseMaterial` — the reference pictures the openpose skeletons were made from; the skeletons themselves are included
 - `.github/` — the private repository's CI configuration.
+- `private/` — the maintainer's own records; nothing in the game reads them.
 
 ## Quirks of running from this repository
 

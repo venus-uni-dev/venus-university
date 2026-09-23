@@ -25,7 +25,13 @@ export const CHARACTER_SCHEMA_VERSION = 2
 const CHARACTER_REQUIRED: Record<
   keyof Omit<
     Character,
-    'brief' | 'charId' | 'negativeTags' | 'profileCrop' | 'updatedAt' | 'voicePitch'
+    | 'brief'
+    | 'charId'
+    | 'customOutfits'
+    | 'negativeTags'
+    | 'profileCrop'
+    | 'updatedAt'
+    | 'voicePitch'
   >,
   true
 > = {

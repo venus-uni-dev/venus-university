@@ -23,13 +23,14 @@ import {
 import { appError, messageOf } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
-import { OUTFIT_SETS } from '@shared/outfits'
+import { isCustomOutfitSlot, OUTFIT_SETS } from '@shared/outfits'
 import { POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS, roomStem, type RoomVariant } from '@shared/room'
 import type {
   AppError,
   Character,
   CharacterBrief,
+  CustomOutfitSlot,
   Emotion,
   OutfitSet,
   Position,
@@ -255,8 +256,8 @@ export async function getExpressionStatus(charId: string): Promise<Record<Emotio
 }
 
 /**
- * Whether one set's base frame — the white-background neutral its other six expressions are
- * face-passed from — is on disk.
+ * Whether one set's base frame — the neutral its other six expressions are face-passed
+ * from — is on disk.
  */
 export async function hasBaseImage(charId: string, target: SetTarget): Promise<boolean> {
   assertSafeCharId(charId)
@@ -398,6 +399,26 @@ export async function discardStaged(charId: string, target?: SetTarget): Promise
     for (const name of loose) await rm(join(staged, name), { force: true })
   } else {
     await rm(staged, { recursive: true, force: true })
+  }
+  await pruneStaging(charId)
+}
+
+/**
+ * Deletes one player-authored wardrobe's images, live and staged. The record is the
+ * renderer's to rewrite.
+ */
+export async function deleteCustomSet(charId: string, slot: CustomOutfitSlot): Promise<void> {
+  await assertEditableChar(charId)
+  if (!isCustomOutfitSlot(slot)) {
+    throw appError('OUTFIT_SET_UNKNOWN', `"${String(slot)}" is not a custom outfit.`)
+  }
+
+  const { live, staged } = setLocation(charId, slot)
+  try {
+    await rm(live, { recursive: true, force: true })
+    await rm(staged, { recursive: true, force: true })
+  } catch (err) {
+    throw appError('OUTFIT_UNDELETABLE', 'Could not delete the outfit.', messageOf(err))
   }
   await pruneStaging(charId)
 }

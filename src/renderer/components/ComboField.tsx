@@ -8,7 +8,8 @@ import {
   type KeyboardEvent
 } from 'react'
 import { createPortal } from 'react-dom'
-import '../vu_styles/ComboField.css'
+import { placeUnder } from './popupPlace'
+import '../vu_styles/PopList.css'
 
 export interface ComboFieldProps {
   id: string
@@ -145,41 +146,13 @@ export function ComboField({
     }
   }
 
-  /**
-   * Places the list in the panel's own units: the offsets up to the panel, less every scroll on
-   * the way, so neither the modal's arrival transform nor a root zoom is read into the figure.
-   * It flips above the box where there is no room under it.
-   */
+  /** Hangs the list under the box, at the box's own width. */
   const reposition = useCallback((): void => {
     const box = input.current
     const layer = pop.current
     const panel = popupHost?.parentElement
     if (!box || !layer || !panel) return
-
-    let top = box.offsetTop
-    let left = box.offsetLeft
-    for (
-      let node = box.offsetParent instanceof HTMLElement ? box.offsetParent : null;
-      node !== null && node !== panel;
-      node = node.offsetParent instanceof HTMLElement ? node.offsetParent : null
-    ) {
-      top += node.offsetTop
-      left += node.offsetLeft
-    }
-    for (let node = box.parentElement; node !== null && node !== panel; node = node.parentElement) {
-      if (node.scrollHeight > node.clientHeight) {
-        top -= node.scrollTop
-        left -= node.scrollLeft
-      }
-    }
-
-    // The width is written first: the list's height is what that width wraps its rows to.
-    layer.style.setProperty('left', `${Math.round(left)}px`)
-    layer.style.setProperty('width', `${Math.round(box.offsetWidth)}px`)
-    const under = top + box.offsetHeight + GAP
-    const height = layer.offsetHeight
-    const flip = under + height > panel.clientHeight && top - GAP > panel.clientHeight - under
-    layer.style.setProperty('top', `${Math.round(flip ? top - GAP - height : under)}px`)
+    placeUnder(box, layer, panel, GAP, true)
   }, [popupHost])
 
   useLayoutEffect(reposition, [reposition, showList, rows.length])
@@ -235,14 +208,14 @@ export function ComboField({
         createPortal(
           /* The press is swallowed on the whole layer, so neither a row nor a drag of the
              list's own scrollbar takes the focus out of the box. */
-          <div ref={pop} className="vu-combo-pop" onMouseDown={(event) => event.preventDefault()}>
-            <div ref={list} id={listId} className="vu-combo-list" role="listbox">
+          <div ref={pop} className="vu-pop" onMouseDown={(event) => event.preventDefault()}>
+            <div ref={list} id={listId} className="vu-pop-list" role="listbox">
               {rows.map((row, index) => (
                 <button
                   key={row.value}
                   id={`${id}-option-${index}`}
                   type="button"
-                  className={`vu-combo-option${index === active ? ' vu-combo-option--on' : ''}`}
+                  className={`vu-pop-option${index === active ? ' vu-pop-option--on' : ''}`}
                   role="option"
                   aria-selected={row.value === value}
                   onMouseEnter={() => setActive(index)}

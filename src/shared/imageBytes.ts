@@ -36,6 +36,14 @@ export function imageTypeOf(
   return null
 }
 
+/** Byte 25 of a PNG is its IHDR colour type; 6 is RGBA, the type every image the app writes with alpha is under. */
+const PNG_COLOUR_TYPE_RGBA = 6
+
+/** Whether `bytes` is a PNG whose pixels carry an alpha channel. */
+export function isRgbaPng(bytes: Uint8Array): boolean {
+  return startsWith(bytes, PNG_SIGNATURE) && bytes[25] === PNG_COLOUR_TYPE_RGBA
+}
+
 /** Refuses anything that is not a PNG before it can land on a sprite or stage as a graph's input. */
 export function assertPng(bytes: Uint8Array, what: string): void {
   if (startsWith(bytes, PNG_SIGNATURE)) return

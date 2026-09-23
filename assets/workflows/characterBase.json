@@ -338,6 +338,20 @@
       "model_name": "bbox/hand_yolov9c.pt"
     }
   },
+  "37": {
+    "class_type": "InspyrenetRembgAdvanced",
+    "_meta": {
+      "title": "Background Cut"
+    },
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "threshold": 0.9,
+      "torchscript_jit": "on"
+    }
+  },
   "39": {
     "class_type": "LoadImage",
     "_meta": {
@@ -354,10 +368,38 @@
     },
     "inputs": {
       "images": [
-        "20",
+        "63",
         0
       ],
       "filename_prefix": "venus-university/expression_base"
+    }
+  },
+  "62": {
+    "class_type": "InvertMask",
+    "_meta": {
+      "title": "Invert Cut Mask"
+    },
+    "inputs": {
+      "mask": [
+        "37",
+        1
+      ]
+    }
+  },
+  "63": {
+    "class_type": "JoinImageWithAlpha",
+    "_meta": {
+      "title": "Apply Alpha"
+    },
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "alpha": [
+        "62",
+        0
+      ]
     }
   }
 }

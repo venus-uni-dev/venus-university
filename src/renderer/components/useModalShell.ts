@@ -17,11 +17,50 @@ export interface ModalShell {
 }
 
 /**
- * Every open shell, oldest first: Escape is answered by the last one alone. Module
- * scope because the stack spans components — a modal opened over another is a different
- * tree, and only the two of them together know which is on top.
+ * Every open shell and every layer inside one, oldest first: Escape is answered by the last one
+ * alone. Module scope because the stack spans components — a modal opened over another is a
+ * different tree, and only the two of them together know which is on top.
  */
 const openShells: object[] = []
+
+/**
+ * Takes the top of that stack for as long as the caller holds the teardown, and hands the key
+ * to `answer` only while nothing has been pushed over it. Captured, so a screen's own listener
+ * on the bubble does not also fire; whether the event is stopped is `answer`'s to say.
+ */
+function topmostEscape(answer: (event: KeyboardEvent) => void): () => void {
+  const token = {}
+  openShells.push(token)
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return
+    if (openShells[openShells.length - 1] !== token) return
+    answer(event)
+  }
+  window.addEventListener('keydown', onKeyDown, true)
+  return () => {
+    window.removeEventListener('keydown', onKeyDown, true)
+    openShells.splice(openShells.indexOf(token), 1)
+  }
+}
+
+/**
+ * A layer inside a modal — a menu — that takes Escape ahead of the shell under it, since a
+ * later listener on the same target and phase cannot otherwise win against the shell's capture
+ * listener.
+ */
+export function useEscapeLayer(onEscape: () => void, active: boolean): void {
+  // Read at keypress rather than closed over, so the listener is registered once.
+  const escape = useRef(onEscape)
+  escape.current = onEscape
+
+  useEffect(() => {
+    if (!active) return
+    return topmostEscape((event) => {
+      event.stopPropagation()
+      escape.current()
+    })
+  }, [active])
+}
 
 /**
  * The portal host, the outside-click rule, Escape and the sounds a panel arrives and leaves on;
@@ -87,22 +126,15 @@ export function useModalShell(
    * Escape runs the same handler as an outside click, so a modal that ignores one ignores the
    * other too. Captured and stopped, so the Game View's own Escape listener does not also fire.
    */
-  useEffect(() => {
-    const token = {}
-    openShells.push(token)
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      if (openShells[openShells.length - 1] !== token) return
-      if (leaving.current) return
-      event.stopPropagation()
-      close.current()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
-      openShells.splice(openShells.indexOf(token), 1)
-    }
-  }, [])
+  useEffect(
+    () =>
+      topmostEscape((event) => {
+        if (leaving.current) return
+        event.stopPropagation()
+        close.current()
+      }),
+    []
+  )
 
   /**
    * Records whether the press began on the dimming: a `click` fires on the common ancestor of

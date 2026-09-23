@@ -6,9 +6,11 @@ import {
   FEED_EMOJI,
   FEED_EMOJI_BAG,
   FEED_HANDLE_BAG,
-  FEED_HANDLES,
+  FEED_HANDLE_POOL,
   FEED_MESSAGE_BAG,
-  FEED_MESSAGES
+  FEED_MESSAGES,
+  feedMessageText,
+  isStrangersOnly
 } from '../../prompts/feedRandoms'
 import { useGameStore } from '../gameStore'
 import { useGrabBagStore } from '../grabBagStore'
@@ -123,16 +125,26 @@ function nudgeFirstContactPost(charId: string): void {
   deliverBunnybotNow(bunnybotFirstPostTexts(firstName))
 }
 
-/** Draws the slot's random student and clears the slot the teaser sits in. */
+/**
+ * Draws the slot's random student and clears the slot the teaser sits in; the handle comes
+ * first, since a supporter's name is never dealt a line marked for strangers.
+ */
 export function rollFeedExtrasIfNewSlot(): void {
   const game = useGameStore.getState()
   const extras = game.feedExtras
   if (extras?.date === game.date && extras.time === game.time) return
 
   const bag = useGrabBagStore.getState()
+  const handle = bag.draw(FEED_HANDLE_BAG, FEED_HANDLE_POOL, (one) => one.key)
+  const message = bag.draw(
+    FEED_MESSAGE_BAG,
+    FEED_MESSAGES,
+    feedMessageText,
+    handle.supporter ? (one) => !isStrangersOnly(one) : undefined
+  )
   const student = {
-    handle: bag.draw(FEED_HANDLE_BAG, FEED_HANDLES),
-    text: bag.draw(FEED_MESSAGE_BAG, FEED_MESSAGES),
+    handle: handle.handle,
+    text: feedMessageText(message),
     emoji: bag.draw(FEED_EMOJI_BAG, FEED_EMOJI)
   }
   game.setFeedExtras({

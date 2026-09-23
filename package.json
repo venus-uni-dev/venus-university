@@ -1,6 +1,6 @@
 {
   "name": "venus-university",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Venus University is a dating sim where you can say and do anything.",
   "main": "./out/main/index.js",
   "author": "Venus Dev",
@@ -18,7 +18,8 @@
     "test": "vitest run",
     "dev:web": "vite -c vite.web.config.ts",
     "build:web": "vite build -c vite.web.config.ts",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "supporters": "node scripts/supporters.mjs"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",

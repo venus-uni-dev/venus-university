@@ -17,8 +17,13 @@ interface GrabBagStoreState {
 
   /** Reads the file. A failure is a tier 2 error and the bags run in memory for the session. */
   load: () => Promise<void>
-  /** Draws one item from `items` under `bagId`, setting it aside. */
-  draw: <T>(bagId: string, items: readonly T[], keyOf?: (item: T) => string) => T
+  /** Draws one item from `items` under `bagId`, narrowed to what `accept` passes, setting it aside. */
+  draw: <T>(
+    bagId: string,
+    items: readonly T[],
+    keyOf?: (item: T) => string,
+    accept?: (item: T) => boolean
+  ) => T
   /** Draws `count` distinct items from `items` under `bagId`. */
   drawMany: <T>(bagId: string, items: readonly T[], count: number, keyOf?: (item: T) => string) => T[]
   /** Resolves once every draw so far is on disk (or has failed to get there). */
@@ -74,8 +79,8 @@ export const useGrabBagStore = create<GrabBagStoreState>((set, get) => ({
     set({ bags: result.data, hydrated: true })
   },
 
-  draw: (bagId, items, keyOf = itemKey) => {
-    const { item, drawn } = drawFromBag(items, get().bags[bagId] ?? [], keyOf)
+  draw: (bagId, items, keyOf = itemKey, accept) => {
+    const { item, drawn } = drawFromBag(items, get().bags[bagId] ?? [], keyOf, Math.random, accept)
     set({ bags: { ...get().bags, [bagId]: drawn } })
     if (get().hydrated) scheduleWrite()
     return item

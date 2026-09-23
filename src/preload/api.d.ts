@@ -1,10 +1,12 @@
 import type { ClassifierPromptRequest, ClassifierVerdict } from '@shared/classifier'
+import type { PromptEdit } from '@shared/imagePrompt'
 import type { RoomVariant } from '@shared/room'
 import type {
   Character,
   CharacterBrief,
   ComfyStatus,
   CreatedEnrollment,
+  CustomOutfitSlot,
   Emotion,
   EndingPostsResponse,
   Enrollment,
@@ -172,8 +174,8 @@ export interface VenusUniversityApi {
     /** Which alternate-outfit sprites exist on disk, per set and emotion. */
     outfits: (charId: string) => Promise<Result<Record<OutfitSet, Record<Emotion, boolean>>>>
     /**
-     * Whether one set's white-background base frame is on disk — what its other
-     * six expressions are face-passed from. Never part of a count.
+     * Whether one set's base frame is on disk — what its other six expressions are
+     * face-passed from. Never part of a count.
      */
     hasBase: (charId: string, target: SetTarget) => Promise<Result<boolean>>
     /**
@@ -183,6 +185,11 @@ export interface VenusUniversityApi {
     commitStaged: (charId: string, target: SetTarget) => Promise<Result<'committed' | 'empty'>>
     /** Throws away one staged set, or every staged set when `target` is omitted. */
     discardStaged: (charId: string, target?: SetTarget) => Promise<Result<void>>
+    /**
+     * Deletes one custom set's images, live and staged; the record is the renderer's
+     * to rewrite.
+     */
+    deleteSet: (charId: string, slot: CustomOutfitSlot) => Promise<Result<void>>
     /**
      * The bytes of one wardrobe image — a sprite by emotion, or `'fix'` for the set's saved
      * transparency-repair layer — or `null` if it is not on disk. The hand repair keeps
@@ -303,28 +310,38 @@ export interface VenusUniversityApi {
     onState: (listener: (status: ComfyStatus) => void) => () => void
     /**
      * Resolves when this expression's queued job finishes. `seed` renders this one image
-     * off a seed other than the character's, without persisting it.
+     * off a seed other than the character's, without persisting it; `edit` rewrites this
+     * render's tag groups and nothing on her record.
      */
     generateExpression: (
       character: Character,
       emotion: Emotion,
       seed?: number,
-      staged?: boolean
+      staged?: boolean,
+      edit?: PromptEdit
     ) => Promise<Result<string>>
-    /** Resolves when this CG's queued job finishes; `seed`/`staged` as above. */
+    /**
+     * Resolves when this CG's queued job finishes; `seed`/`staged` as above, and `edit`
+     * rewrites this render's tag groups and nothing on her record.
+     */
     generateCg: (
       character: Character,
       position: Position,
       seed?: number,
-      staged?: boolean
+      staged?: boolean,
+      edit?: PromptEdit
     ) => Promise<Result<string>>
-    /** Resolves when this outfit sprite's queued job finishes; args as above. */
+    /**
+     * Resolves when this outfit sprite's queued job finishes; args as above, and `edit`
+     * rewrites this render's tag groups and nothing on her record.
+     */
     generateOutfit: (
       character: Character,
       set: OutfitSet,
       emotion: Emotion,
       seed?: number,
-      staged?: boolean
+      staged?: boolean,
+      edit?: PromptEdit
     ) => Promise<Result<string>>
     /**
      * Redraws the hand the player painted on; `paintLayer` is a base64 PNG with no `data:`

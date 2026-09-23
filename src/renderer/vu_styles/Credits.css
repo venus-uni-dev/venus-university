@@ -25,6 +25,25 @@
   font: 400 24px var(--font-display);
 }
 
+/* The two thanks at the head of the list, side by side; a lone one takes the whole width. */
+.vu-credits-thanks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.vu-credits-thanks > :only-child {
+  grid-column: 1 / -1;
+}
+
+/* Every name in a category on one line, wrapping inside its row rather than one row apiece. */
+.vu-credits-names {
+  margin: 0;
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+  line-height: 1.5;
+}
+
 .vu-credits-list {
   display: flex;
   flex-direction: column;

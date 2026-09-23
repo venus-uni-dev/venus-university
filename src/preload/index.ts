@@ -74,6 +74,7 @@ const api: VenusUniversityApi = {
     hasBase: (charId, target) => ipcRenderer.invoke('chars:hasBase', charId, target),
     commitStaged: (charId, target) => ipcRenderer.invoke('chars:commitStaged', charId, target),
     discardStaged: (charId, target) => ipcRenderer.invoke('chars:discardStaged', charId, target),
+    deleteSet: (charId, slot) => ipcRenderer.invoke('chars:deleteSet', charId, slot),
     readWardrobeImage: (charId, target, image) =>
       ipcRenderer.invoke('chars:readWardrobeImage', charId, target, image),
     applyWardrobeFix: (charId, target, images, paintLayer, kind) =>
@@ -121,12 +122,12 @@ const api: VenusUniversityApi = {
       ipcRenderer.on('comfy:state', wrapped)
       return () => ipcRenderer.removeListener('comfy:state', wrapped)
     },
-    generateExpression: (character, emotion, seed, staged) =>
-      ipcRenderer.invoke('comfy:generateExpression', character, emotion, seed, staged),
-    generateCg: (character, position, seed, staged) =>
-      ipcRenderer.invoke('comfy:generateCg', character, position, seed, staged),
-    generateOutfit: (character, set, emotion, seed, staged) =>
-      ipcRenderer.invoke('comfy:generateOutfit', character, set, emotion, seed, staged),
+    generateExpression: (character, emotion, seed, staged, edit) =>
+      ipcRenderer.invoke('comfy:generateExpression', character, emotion, seed, staged, edit),
+    generateCg: (character, position, seed, staged, edit) =>
+      ipcRenderer.invoke('comfy:generateCg', character, position, seed, staged, edit),
+    generateOutfit: (character, set, emotion, seed, staged, edit) =>
+      ipcRenderer.invoke('comfy:generateOutfit', character, set, emotion, seed, staged, edit),
     fixHands: (character, target, paintLayer, seed) =>
       ipcRenderer.invoke('comfy:fixHands', character, target, paintLayer, seed)
   },

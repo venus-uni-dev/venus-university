@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { slotPartsOf, yearLabel } from '@shared/classes'
 import { dormLabel } from '@shared/dorms'
 import { jobDefOf, WEEK_DAY_HEADERS } from '@shared/jobs'
-import { OUTFIT_SET_LABELS, OUTFIT_SETS, spriteRef } from '@shared/outfits'
+import { OUTFIT_SET_LABELS, spriteRef, STOCK_OUTFIT_SETS } from '@shared/outfits'
 import { npcEnemiesOf, npcFriendsOf } from '@shared/npcRelationships'
 import { STAT_ATTRACTIONS } from '@shared/playerStats'
 import {
@@ -19,7 +19,7 @@ import {
   MEMORY_CAP
 } from '@shared/relationship'
 import { isCharacterTrait } from '@shared/traits'
-import { fullNameOf, type OutfitSet } from '@shared/types'
+import { fullNameOf, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
@@ -70,7 +70,7 @@ export function ContactPage({ charId }: { charId: string }): JSX.Element {
   const version = useSpriteVersion(charId)
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
   // Which wardrobe she is standing in, which is the screen's own state and nothing the save keeps.
-  const [outfit, setOutfit] = useState<OutfitSet | null>(null)
+  const [outfit, setOutfit] = useState<StockOutfitSet | null>(null)
 
   if (!character) return <p className="vu-contact-gone">This account no longer exists.</p>
 
@@ -139,7 +139,7 @@ export function ContactPage({ charId }: { charId: string }): JSX.Element {
 
   // Only what a scene has actually put her in (the save's `seenOutfits`), and never
   // the nude set while the reader has asked not to be shown one.
-  const seen = OUTFIT_SETS.filter((set) => !(set === 'nude' && noNsfwImages))
+  const seen = STOCK_OUTFIT_SETS.filter((set) => !(set === 'nude' && noNsfwImages))
   const wearing = outfit && info?.seenOutfits?.includes(outfit) ? outfit : null
 
   return (

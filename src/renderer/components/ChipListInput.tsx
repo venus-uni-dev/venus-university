@@ -5,6 +5,8 @@ export interface ChipListInputProps {
   values: readonly string[]
   onChange: (values: string[]) => void
   placeholder?: string
+  /** Takes focus when the well mounts — a form modal's first field. */
+  autoFocus?: boolean
 }
 
 /** Turns typed text into a booru tag: trimmed, whitespace runs closed up into underscores. */
@@ -20,7 +22,8 @@ export function ChipListInput({
   id,
   values,
   onChange,
-  placeholder
+  placeholder,
+  autoFocus
 }: ChipListInputProps): JSX.Element {
   const [draft, setDraft] = useState('')
 
@@ -86,6 +89,7 @@ export function ChipListInput({
         className="vu-chips-draft"
         value={draft}
         placeholder={values.length === 0 ? placeholder : undefined}
+        autoFocus={autoFocus}
         onChange={(e) => onDraft(e.target.value)}
         onKeyDown={onKeyDown}
         // Commits a half-typed tag on blur, so a Save click does not lose it.

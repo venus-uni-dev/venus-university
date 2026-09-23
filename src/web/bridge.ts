@@ -214,6 +214,8 @@ export function buildApi(): VenusUniversityApi {
         result('save the regenerated images', () => chars.commitStagedSet(charId, target)),
       discardStaged: (charId, target) =>
         result('discard the staged images', () => chars.discardStaged(charId, target)),
+      deleteSet: (charId, slot) =>
+        result('delete the outfit', () => chars.deleteCustomSet(charId, slot)),
       readWardrobeImage: (charId, target, image) =>
         result('read the image', async () => {
           const bytes = await chars.readWardrobeImage(charId, target, image)

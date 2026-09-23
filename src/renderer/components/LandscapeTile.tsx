@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { motion } from 'motion/react'
 import { gestures, quietLift, quietPress } from '../views/motion'
-import { EyeIcon } from '../views/screenIcons'
+import { EyeIcon, PlusIcon } from '../views/screenIcons'
 import { SetControl, type SetControlProps } from './SetControl'
 
 export interface LandscapeTileProps {
@@ -20,6 +20,14 @@ export interface LandscapeTileProps {
   showLockedReason?: string
   /** The set's render control, where the tile is offered over something. */
   control?: SetControlProps
+  /** What the circle draws: the eye that opens a gallery, or the plus that adds one more. */
+  mark?: 'eye' | 'plus'
+  /** Overrides the circle's own label, for a tile whose circle does not open a gallery. */
+  label?: string
+  /** The tile takes only the width it needs rather than its share of the row. */
+  auto?: boolean
+  /** The tile hugs its words where the row is wide, leaving the width to the tile with a peek. */
+  hug?: boolean
 }
 
 /**
@@ -35,12 +43,16 @@ export function LandscapeTile({
   onShow,
   showLocked = false,
   showLockedReason,
-  control
+  control,
+  mark = 'eye',
+  label,
+  auto = false,
+  hug = false
 }: LandscapeTileProps): JSX.Element {
-  const label = showLocked ? (showLockedReason ?? `Show ${what}`) : `Show ${what}`
+  const circleLabel = label ?? (showLocked ? (showLockedReason ?? `Show ${what}`) : `Show ${what}`)
 
   return (
-    <div className="vu-landscape">
+    <div className={`vu-landscape${auto ? ' vu-landscape--auto' : ''}${hug ? ' vu-landscape--hug' : ''}`}>
       <span className="vu-landscape-title">{title}</span>
       <span
         className={`vu-count vu-count--${showLocked ? 'muted' : shownDone === total ? 'good' : 'warn'}`}
@@ -66,11 +78,11 @@ export function LandscapeTile({
         className="vu-circle vu-landscape-eye"
         type="button"
         disabled={showLocked}
-        aria-label={label}
+        aria-label={circleLabel}
         {...gestures(showLocked, quietLift, quietPress)}
         onClick={onShow}
       >
-        <EyeIcon size={17} />
+        {mark === 'plus' ? <PlusIcon size={17} /> : <EyeIcon size={17} />}
       </motion.button>
 
       {control && <SetControl {...control} compact />}

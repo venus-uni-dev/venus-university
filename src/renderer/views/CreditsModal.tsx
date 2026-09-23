@@ -1,6 +1,7 @@
 import type { JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
+import { DONORS, PLAYTESTERS } from '../prompts/supporters'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { useUiStore } from '../stores/uiStore'
@@ -313,6 +314,23 @@ export function CreditsModal({ theme }: CreditsModalProps): JSX.Element | null {
 
         <div className="vu-scroll-box">
           <div className="vu-credits-body">
+            {/* The people first: who gave, and who played it before it shipped. */}
+            {(DONORS.length > 0 || PLAYTESTERS.length > 0) && (
+              <div className="vu-credits-thanks">
+                {DONORS.length > 0 && (
+                  <section className="vu-credits-section">
+                    <h3 className="vu-credits-title">Donors</h3>
+                    <p className="vu-row vu-credits-names">{DONORS.join(', ')}</p>
+                  </section>
+                )}
+                {PLAYTESTERS.length > 0 && (
+                  <section className="vu-credits-section">
+                    <h3 className="vu-credits-title">Playtesters</h3>
+                    <p className="vu-row vu-credits-names">{PLAYTESTERS.join(', ')}</p>
+                  </section>
+                )}
+              </div>
+            )}
             {SECTIONS.map((section) => (
               <section key={section.title} className="vu-credits-section">
                 <h3 className="vu-credits-title">{section.title}</h3>

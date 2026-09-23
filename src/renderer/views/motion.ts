@@ -167,6 +167,9 @@ export const tuck: TargetAndTransition = {
   transition: REVEAL
 }
 
+/** The pair as one variants object, for a reveal driven by a `shown`/`hidden` label. */
+export const revealed: Variants = { shown: peek, hidden: tuck }
+
 /**
  * What a dead control wears in place of a gesture: a target that moves nothing. Motion only
  * records a hover ending while the prop is present, so a control handed nothing at all comes
@@ -298,6 +301,15 @@ const DEAD_OPACITY = 0.45
 export const dealtItemDead: Variants = {
   hidden: DEALT_HIDDEN,
   shown: { opacity: DEAD_OPACITY, scale: 1, transition: DEAL }
+}
+
+/**
+ * The dim a field deals itself while it is switched off: `button:disabled` is the only thing
+ * the CSS rule reaches, so an input that goes dead lands at the same opacity from here.
+ */
+export const fieldDim: Variants = {
+  live: { opacity: 1, transition: REVEAL },
+  dead: { opacity: DEAD_OPACITY, transition: REVEAL }
 }
 
 /**

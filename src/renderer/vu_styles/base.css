@@ -1117,6 +1117,27 @@ body {
   object-fit: cover;
 }
 
+/* The pill a picture raises saying what a click on it does. Quiet on a surface, so it reads
+   over whatever the picture is. */
+.vu-pic-action {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 14px var(--font-body);
+}
+
+/* The one line saying what a click on the pictures beside it does, said at rest — the pill it
+   describes is revealed by a hover, and a control nobody knows about is not offered. */
+.vu-hint {
+  color: var(--vu-text-muted);
+  font: italic 500 14px var(--font-body);
+}
+
 /* Every image says what it is without being hovered. */
 .vu-gallery-caption {
   color: var(--vu-text-muted);

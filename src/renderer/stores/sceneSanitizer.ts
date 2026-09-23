@@ -1,5 +1,5 @@
 import { settleDating, type DatingPassInput, type DatingPassOutcome } from '@shared/dating'
-import { parseSpriteRef } from '@shared/outfits'
+import { isCustomOutfitSlot, parseSpriteRef } from '@shared/outfits'
 import type { PlayerStats } from '@shared/playerStats'
 import {
   affectionOf,
@@ -274,10 +274,14 @@ export function createSceneSanitizer(options: SanitizerOptions = {}): {
             console.warn(`[scene] ${rawAction} but "${parsed.charKey}" is not on screen — dropping it.`)
             continue
           }
-          // A set not fully rendered for her degrades to the bare emotion.
+          // A set not fully rendered for her degrades to the bare emotion, as does a custom
+          // wardrobe: the model is never told about one, so it cannot have meant it.
           const outfit = parseSpriteRef(parsed.ref)
           const charId = charKeyToId[parsed.charKey]
-          if (outfit?.set && !outfitReady[charId]?.includes(outfit.set)) {
+          if (
+            outfit?.set &&
+            (isCustomOutfitSlot(outfit.set) || !outfitReady[charId]?.includes(outfit.set))
+          ) {
             console.warn(
               `[scene] "${parsed.ref}" is not rendered for "${parsed.charKey}" — showing her default outfit.`
             )

@@ -1,0 +1,23 @@
+{
+  "donors": [
+    "thatmaestroguy",
+    "NihilBaxter"
+  ],
+  "playtesters": [
+    "Maboy"
+  ],
+  "handles": [
+    {
+      "name": "Maboy",
+      "marbles": 2
+    },
+    {
+      "name": "NihilBaxter",
+      "marbles": 5
+    },
+    {
+      "name": "thatmaestroguy",
+      "marbles": 8
+    }
+  ]
+}

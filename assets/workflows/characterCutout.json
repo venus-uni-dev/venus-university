@@ -1,0 +1,66 @@
+{
+  "10": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Neutral Base"
+    },
+    "inputs": {
+      "image": "neutral.base.png"
+    }
+  },
+  "37": {
+    "class_type": "InspyrenetRembgAdvanced",
+    "_meta": {
+      "title": "Background Cut"
+    },
+    "inputs": {
+      "image": [
+        "10",
+        0
+      ],
+      "threshold": 0.9,
+      "torchscript_jit": "on"
+    }
+  },
+  "41": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Base"
+    },
+    "inputs": {
+      "images": [
+        "63",
+        0
+      ],
+      "filename_prefix": "venus-university/expression_base"
+    }
+  },
+  "62": {
+    "class_type": "InvertMask",
+    "_meta": {
+      "title": "Invert Cut Mask"
+    },
+    "inputs": {
+      "mask": [
+        "37",
+        1
+      ]
+    }
+  },
+  "63": {
+    "class_type": "JoinImageWithAlpha",
+    "_meta": {
+      "title": "Apply Alpha"
+    },
+    "inputs": {
+      "image": [
+        "10",
+        0
+      ],
+      "alpha": [
+        "62",
+        0
+      ]
+    }
+  }
+}

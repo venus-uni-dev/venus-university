@@ -18,12 +18,15 @@ function remaining<T>(items: readonly T[], keyOf: (item: T) => string, drawn: Re
 /**
  * Draws one item. `drawn` is the set-aside list as stored; the returned `drawn` replaces it.
  * Keys that name nothing in `items` are dropped on the way through. Throws on an empty pool.
+ * `accept` narrows the draw to the items it passes, and a draw with nothing unseen acceptable
+ * repeats one without turning the bag.
  */
 export function drawFromBag<T>(
   items: readonly T[],
   drawn: readonly string[],
   keyOf: (item: T) => string,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  accept?: (item: T) => boolean
 ): BagDraw<T> {
   if (items.length === 0) throw new Error('drawFromBag: the pool is empty')
 
@@ -33,12 +36,19 @@ export function drawFromBag<T>(
   const firstHalf = items.slice(0, split)
   const secondHalf = items.slice(split)
 
-  let candidates = remaining(firstHalf, keyOf, aside)
-  if (candidates.length === 0) candidates = remaining(secondHalf, keyOf, aside)
+  const ok = accept ?? ((): boolean => true)
+  const pick = (half: readonly T[]): T[] => remaining(half, keyOf, aside).filter(ok)
+
+  let candidates = pick(firstHalf)
+  if (candidates.length === 0) candidates = pick(secondHalf)
+  // Nothing unseen is acceptable: repeat one rather than resetting a bag with items left in it.
+  if (candidates.length === 0 && remaining(items, keyOf, aside).length > 0) candidates = items.filter(ok)
   if (candidates.length === 0) {
     aside.clear()
-    candidates = firstHalf
+    candidates = firstHalf.filter(ok)
+    if (candidates.length === 0) candidates = secondHalf.filter(ok)
   }
+  if (candidates.length === 0) throw new Error('drawFromBag: nothing in the pool passes the filter')
 
   const item = candidates[Math.floor(rand() * candidates.length)]
   aside.add(keyOf(item))

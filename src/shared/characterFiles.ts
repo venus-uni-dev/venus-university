@@ -12,8 +12,9 @@ import type { OutfitSet, SetTarget, SpriteRef, WardrobeLayer, WardrobeTarget } f
  */
 
 /**
- * The white-background, pre-rembg neutral frame one set is detailed from. Named outside
- * the `{emotion}.png` vocabulary so a presence scan never reads it as a sprite.
+ * The neutral frame one set's sprites are face-passed from, saved with its background
+ * already cut so every sprite takes its alpha from it. Named outside the `{emotion}.png`
+ * vocabulary so a presence scan never reads it as a sprite.
  */
 const BASE_IMAGE_NAME = 'neutral.base.png'
 

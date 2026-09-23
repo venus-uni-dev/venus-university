@@ -45,6 +45,25 @@ describe('drawFromBag', () => {
     expect(result.drawn).not.toContain('ghost')
   })
 
+  it('never deals an item the filter rejects, and leaves it in the bag for a plain draw', () => {
+    const pool = ['a', 'b', 'c', 'd']
+    const rand = lcg(11)
+    let drawn: string[] = []
+    for (let i = 0; i < 12; i++) {
+      const result = drawFromBag(pool, drawn, identity, rand, (item) => item !== 'a')
+      expect(result.item).not.toBe('a')
+      expect(result.drawn).not.toContain('a')
+      drawn = result.drawn
+    }
+    const seen: string[] = []
+    for (let i = 0; i < 6; i++) {
+      const result = drawFromBag(pool, drawn, identity, rand)
+      seen.push(result.item)
+      drawn = result.drawn
+    }
+    expect(seen).toContain('a')
+  })
+
   it('returns the one item every time on a single-item pool', () => {
     const pool = ['only']
     let drawn: string[] = []

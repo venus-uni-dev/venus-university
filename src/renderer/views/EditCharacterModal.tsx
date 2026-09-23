@@ -11,7 +11,7 @@ import { TitleTab } from '../components/TitleTab'
 import { SelectField } from '../components/SelectField'
 import { TagSelect } from '../components/TagSelect'
 import { TextField } from '../components/TextField'
-import { WardrobeColumn } from '../components/WardrobeColumn'
+import { WardrobeColumn, type WardrobeColumnProps } from '../components/WardrobeColumn'
 import type { SetControlProps } from '../components/SetControl'
 import { DESKTOP_ONLY_NOTE, isWebBuild } from '../platform'
 import {
@@ -21,6 +21,20 @@ import {
   VOICE_PITCH_MIN
 } from '@shared/audio'
 import { EMOTIONS } from '@shared/emotions'
+import {
+  cgDraft,
+  cgSetDraft,
+  expressionDraft,
+  spriteDraft,
+  type PromptEdit
+} from '@shared/imagePrompt'
+import {
+  CUSTOM_OUTFIT_NAME_MAX,
+  CUSTOM_OUTFIT_SLOTS,
+  customSlotNumber,
+  isCustomOutfitSlot,
+  outfitLabelOf
+} from '@shared/outfits'
 import { isStatKey, type StatKey } from '@shared/playerStats'
 import { POSITIONS } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
@@ -34,23 +48,30 @@ import { fullNameOf } from '@shared/types'
 import type {
   Character,
   CharacterBehavior,
+  CustomOutfitSlot,
+  Emotion,
   OutfitSet,
   SetTarget,
   WardrobeLayer
 } from '@shared/types'
+import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import {
   cgTargetFor,
   doneCountOf,
+  expressionTargetFor,
   isInFlight,
   liveCgTasks,
+  liveExpressionTasks,
   liveTaskFor,
   profileUrl,
   roomUrl,
+  seedPrefillFor,
   stagedOf,
   useCharacterStore,
   useSpriteVersion,
   type RenderMode,
+  type RenderTarget,
   type RenderTask
 } from '../stores/characterStore'
 import { renameMentions } from '../stores/renameMentions'
@@ -67,8 +88,10 @@ import {
   WARDROBES
 } from './characterFields'
 import { DuplicateIcon, FolderIcon } from './characterIcons'
+import { CustomOutfitsModal } from './CustomOutfitsModal'
 import { ImageGalleryModal } from './ImageGalleryModal'
 import { ProfilePictureModal } from './ProfilePictureModal'
+import { RegenerateModal, type GroupKey, type SeedPrefill } from './RegenerateModal'
 import { SetHeightModal } from './SetHeightModal'
 import { FingerFixModal } from './FingerFixModal'
 import { TransparencyFixModal } from './TransparencyFixModal'
@@ -119,6 +142,25 @@ const PENDING_MESSAGE: Record<PendingVerb, string> = {
 interface PendingAction {
   verb: PendingVerb
   run: () => void
+}
+
+/** One render the tag modal is open on, and everything that modal draws itself from. */
+interface RegenerateRequest {
+  target: RenderTarget
+  title: string
+  edit: PromptEdit
+  seed: SeedPrefill
+  /** Asks for a name too, where the set is being made rather than replaced. */
+  name?: { value: string; placeholder: string; maxLength: number }
+  /** A group the render cannot be sent without. */
+  requireGroup?: GroupKey
+  /** The primary's words, where the render is not a replacement. */
+  submitLabel?: string
+}
+
+/** True for a whole-set target: the single-image forms name what they are in front of the key. */
+function isSetTarget(target: RenderTarget): target is SetTarget {
+  return !target.startsWith('cg:') && !target.startsWith('expression:')
 }
 
 /**
@@ -200,6 +242,9 @@ export function EditCharacterModal({
   const [sizing, setSizing] = useState(false)
   const [gallery, setGallery] = useState(false)
   const [roomGallery, setRoomGallery] = useState(false)
+  const [customs, setCustoms] = useState(false)
+  // Which player-authored wardrobe the delete confirm is standing in front of.
+  const [deleting, setDeleting] = useState<CustomOutfitSlot | null>(null)
   const [fixing, setFixing] = useState<{
     set: OutfitSet | null
     title: string
@@ -208,7 +253,8 @@ export function EditCharacterModal({
   const [framing, setFraming] = useState(false)
   // Whether the portrait is being pointed at, which is what raises the mark over it.
   const [overPortrait, setOverPortrait] = useState(false)
-  const [confirmCgs, setConfirmCgs] = useState<RenderMode | null>(null)
+  const [confirmSet, setConfirmSet] = useState<{ target: SetTarget; mode: RenderMode } | null>(null)
+  const [regen, setRegen] = useState<RegenerateRequest | null>(null)
   const [saved, setSaved] = useState(false)
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
@@ -247,6 +293,8 @@ export function EditCharacterModal({
   const save = useCharacterStore((s) => s.save)
   const generateSet = useCharacterStore((s) => s.generateSet)
   const cancelSet = useCharacterStore((s) => s.cancelSet)
+  const writeCustomOutfit = useCharacterStore((s) => s.writeCustomOutfit)
+  const deleteCustomOutfit = useCharacterStore((s) => s.deleteCustomOutfit)
   const exportCharacter = useCharacterStore((s) => s.exportCharacter)
   const duplicateCharacter = useCharacterStore((s) => s.duplicateCharacter)
   const openFolder = useCharacterStore((s) => s.openFolder)
@@ -304,6 +352,9 @@ export function EditCharacterModal({
   ): Record<string, boolean> | undefined =>
     regenerating(target) ? stagedOf(staged, charId, target) : onDisk
 
+  /** One wardrobe's sprites being re-rolled one at a time right now. */
+  const singleExpressions = (set: OutfitSet | null): Emotion[] => liveExpressionTasks(progress, set)
+
   /** Whether a set cannot be rendered right now. Where the install or the key is what it is
       short of, the control raises that beside it; a set waiting on the default sprites says
       nothing. */
@@ -317,6 +368,8 @@ export function EditCharacterModal({
   /** Whether a wardrobe cannot be repaired right now — the link says nothing about it. */
   const fixBlocked = (target: SetTarget, set: OutfitSet | null): boolean => {
     if (taskOf(target)) return true
+    // A repair paints over sprites a single re-roll is about to rewrite.
+    if (singleExpressions(set).length > 0) return true
     const neutral = set === null ? expressions[charId]?.neutral : outfits?.[set]?.neutral
     return !neutral
   }
@@ -326,10 +379,13 @@ export function EditCharacterModal({
   const fingersBlocked = (target: SetTarget, set: OutfitSet | null): boolean =>
     comfyMissing || fixBlocked(target, set)
 
-  // The portrait is a slice of the default neutral, so it is gated on the same two things the
-  // repair is, and it says nothing about either: neither is a prerequisite the player can go
-  // and get.
-  const portraitBlocked = Boolean(taskOf('default')) || !expressions[charId]?.neutral
+  // The portrait is a slice of the default neutral, so it is gated on the same things the
+  // repair is, and it says nothing about any of them: none is a prerequisite the player can
+  // go and get.
+  const portraitBlocked =
+    Boolean(taskOf('default')) ||
+    singleExpressions(null).length > 0 ||
+    !expressions[charId]?.neutral
 
   /** The character as the form has her — what Save writes and what `dirty` compares against. */
   const buildNext = (): Character => {
@@ -425,16 +481,113 @@ export function EditCharacterModal({
     })
   }
 
+  /** Throws one player-authored wardrobe away, its sprites and its record entry alike. */
+  const runDelete = (): void => {
+    const slot = deleting
+    if (slot === null) return
+    setWorking(true)
+    void deleteCustomOutfit(charId, slot).finally(() => {
+      setWorking(false)
+      setDeleting(null)
+    })
+  }
+
   /** CGs being re-rolled one at a time right now. */
   const singleCgs = liveCgTasks(progress)
 
-  /** Stops every single-CG re-roll, then renders the whole set over them. */
-  const regenerateAllCgs = (mode: RenderMode): void => {
+  /** The four sprite wardrobes by target, for the two things that address one by name. */
+  const wardrobeOf = (target: SetTarget): (typeof WARDROBES)[number] | undefined =>
+    WARDROBES.find((entry) => entry.target === target)
+
+  /** Which wardrobe a target addresses; the default one and the landscape sets have none. */
+  const setOfTarget = (target: SetTarget): OutfitSet | null =>
+    target === 'default' || target === 'cgs' || target === 'room' ? null : target
+
+  /** What a confirm calls the set it is about to replace. */
+  const setLabel = (target: SetTarget): string =>
+    isCustomOutfitSlot(target)
+      ? outfitLabelOf(character, target)
+      : (wardrobeOf(target)?.title ?? (target === 'cgs' ? 'NSFW CG' : 'Room BG'))
+
+  /** Every image inside one set that is being re-rolled on its own right now. */
+  const liveSinglesOf = (target: SetTarget): RenderTarget[] => {
+    if (target === 'cgs') return singleCgs.map(cgTargetFor)
+    if (target === 'room') return []
+    const set = setOfTarget(target)
+    return singleExpressions(set).map((emotion) => expressionTargetFor(emotion, set))
+  }
+
+  /** Stops every single re-roll inside one set, so a render of the whole set lands over them. */
+  const cancelSingles = (target: SetTarget): void => {
     // No await between the two: `cancelSet` flags the bucket before its round
     // trip, so the set queued here is already behind a cancelled one.
-    for (const position of singleCgs) void cancelSet(charId, cgTargetFor(position))
-    setConfirmCgs(null)
-    void generateSet(charId, 'cgs', mode)
+    for (const single of liveSinglesOf(target)) void cancelSet(charId, single)
+  }
+
+  /** Opens the tag modal on one render, built from the character as the store holds her now. */
+  const openRegenerate = (
+    build: (character: Character, poseTags: readonly string[]) => RegenerateRequest
+  ): void => {
+    // Read fresh out of the store, never off `character`: the dirty gate may have just saved,
+    // and the closure this runs from still holds the character as she was typed over.
+    const current = useCharacterStore.getState().characters[charId]
+    if (!current) return
+    const poseTags = useAssetStore.getState().poses[current.pose]?.tags ?? []
+    setRegen(build(current, poseTags))
+  }
+
+  /** What a set's control runs: a fill goes straight out, a regenerate opens on its tags first. */
+  const runSet = (target: SetTarget, mode: RenderMode): void => {
+    /* A player-authored wardrobe with nothing in it is written before it is rendered: there
+       are no stored tags for a fill to dress her in, so its first run opens the modal too. */
+    const fresh = isCustomOutfitSlot(target) && wardrobeDone(target) === 0
+    // A fill replaces nothing, and the room's prompt is prose rather than booru tags, so
+    // neither has a set of groups for the modal to open on.
+    if (!fresh && (mode === 'fill' || target === 'room')) {
+      cancelSingles(target)
+      void generateSet(charId, target, mode)
+      return
+    }
+    if (isCustomOutfitSlot(target)) {
+      const slot = target
+      openRegenerate((current, poseTags) => ({
+        target: slot,
+        title: fresh ? 'Generate custom outfit' : `Regenerate ${outfitLabelOf(current, slot)}`,
+        edit: spriteDraft(current, poseTags, slot),
+        seed: seedPrefillFor(current, slot),
+        // A wardrobe with no clothes in it is the one render the tags are the whole point of.
+        requireGroup: 'outfit',
+        ...(fresh
+          ? {
+              name: {
+                value: current.customOutfits?.[slot]?.name ?? '',
+                placeholder: `Custom outfit ${customSlotNumber(slot)}`,
+                maxLength: CUSTOM_OUTFIT_NAME_MAX
+              },
+              submitLabel: 'Generate'
+            }
+          : {})
+      }))
+      return
+    }
+    if (target === 'cgs') {
+      openRegenerate((current) => ({
+        target: 'cgs',
+        title: 'Regenerate NSFW CG',
+        edit: cgSetDraft(current),
+        seed: seedPrefillFor(current, 'cgs')
+      }))
+      return
+    }
+    const wardrobe = wardrobeOf(target)
+    if (!wardrobe) return
+    const spriteTarget = target
+    openRegenerate((current, poseTags) => ({
+      target: spriteTarget,
+      title: `Regenerate ${wardrobe.title}`,
+      edit: spriteDraft(current, poseTags, wardrobe.set),
+      seed: seedPrefillFor(current, spriteTarget)
+    }))
   }
 
   const control = (target: SetTarget, onDisk: number, total: number): SetControlProps => {
@@ -450,18 +603,121 @@ export function EditCharacterModal({
       // Only the room's gate is the key; every other set is the install's.
       note: target === 'room' ? keyNote : comfyNote,
       // Generate fills the gaps, Regenerate replaces the set. Behind the
-      // dirty gate, with the CG confirm inside it.
+      // dirty gate, with the confirm over the single re-rolls inside it.
       onGenerate: () =>
         guardDirty(complete ? 'regenerate' : 'generate', () => {
           const mode: RenderMode = complete ? 'regenerate' : 'fill'
-          if (target === 'cgs' && singleCgs.length > 0) {
-            setConfirmCgs(mode)
+          if (liveSinglesOf(target).length > 0) {
+            setConfirmSet({ target, mode })
             return
           }
-          void generateSet(charId, target, mode)
+          runSet(target, mode)
         }),
       // Cancelling consumes nothing the player has written, so it skips the dirty gate.
       onCancel: () => void cancelSet(charId, target)
+    }
+  }
+
+  /**
+   * Sends one render the tag modal answered. A player-authored wardrobe's Outfit group is
+   * written onto her record first, so a later fill dresses her in the clothes it holds; a
+   * write that does not land queues nothing.
+   */
+  const sendRender = async (
+    request: RegenerateRequest,
+    edit: PromptEdit,
+    seed: number | null,
+    name?: string
+  ): Promise<void> => {
+    const target = request.target
+    if (isCustomOutfitSlot(target) && edit.kind === 'sprite') {
+      const entry = useCharacterStore.getState().characters[charId]?.customOutfits?.[target]
+      const ok = await writeCustomOutfit(charId, target, {
+        tags: edit.outfit,
+        name: name ?? entry?.name
+      })
+      if (!ok) return
+    }
+    if (isSetTarget(target)) cancelSingles(target)
+    await generateSet(charId, target, 'regenerate', { prompt: edit, seed })
+  }
+
+  /** Everything one wardrobe column is handed, stock or player-authored. */
+  const columnFor = (
+    target: SetTarget,
+    set: OutfitSet | null,
+    title: string
+  ): WardrobeColumnProps => {
+    const onDisk = wardrobeDone(set)
+    const setControl = control(target, onDisk, EMOTIONS.length)
+    // A set the setting withholds is offered no control and no repair — unless a
+    // render of it is still going, whose Cancel stays reachable.
+    const offered =
+      sfwWithholds(target, noNsfwImages) && !taskOf(target)
+        ? {}
+        : {
+            control: setControl,
+            // No per-sprite re-roll while the whole set runs — its control is
+            // where it stops — and none at all with no renderer to run it.
+            onRegenerateExpression:
+              comfyMissing || taskOf(target)
+                ? undefined
+                : (emotion: Emotion) =>
+                    guardDirty('regenerate', () =>
+                      openRegenerate((current) => ({
+                        target: expressionTargetFor(emotion, set),
+                        title: 'Regenerate expression',
+                        edit: expressionDraft(current, emotion),
+                        seed: seedPrefillFor(current, expressionTargetFor(emotion, set))
+                      }))
+                    ),
+            onCancelExpression: (emotion: Emotion) =>
+              void cancelSet(charId, expressionTargetFor(emotion, set)),
+            liveExpressions: new Set(singleExpressions(set)),
+            onFixTransparency: () => setFixing({ set, title, kind: 'fix' }),
+            fixDisabled: fixBlocked(target, set),
+            onFixFingers: () => setFixing({ set, title, kind: 'hands' }),
+            fingersDisabled: fingersBlocked(target, set),
+            fingersNote: comfyNote
+          }
+
+    /* What only a player-authored wardrobe offers: the plus that writes an empty slot, and —
+       once the record holds one — the name it is called by and the way to throw it away. */
+    const authored: Partial<WardrobeColumnProps> = {}
+    if (isCustomOutfitSlot(target)) {
+      const slot = target
+      const entry = character.customOutfits?.[slot]
+      if (onDisk === 0) {
+        authored.onAdd = setControl.onGenerate
+        // Dead on the render's own terms, and while a first run of it is already going.
+        authored.addDisabled = setBlocked(slot) || Boolean(taskOf(slot))
+      }
+      if (entry) {
+        authored.rename = {
+          value: entry.name ?? '',
+          placeholder: `Custom outfit ${customSlotNumber(slot)}`,
+          max: CUSTOM_OUTFIT_NAME_MAX,
+          onCommit: (name) => void writeCustomOutfit(charId, slot, { ...entry, name })
+        }
+        authored.onDelete = () => setDeleting(slot)
+        authored.deleteDisabled = Boolean(taskOf(slot)) || singleExpressions(slot).length > 0
+      }
+    }
+
+    return {
+      charId,
+      set,
+      title,
+      shownDone: shownDone(target, onDisk),
+      total: EMOTIONS.length,
+      present: presentOf(target, set === null ? expressions[charId] : outfits?.[set]),
+      staged: regenerating(target),
+      version,
+      spoiler: set === 'nude',
+      locked: set === 'nude' && noNsfwImages,
+      lockedReason: 'Hidden by SFW setting',
+      ...offered,
+      ...authored
     }
   }
 
@@ -472,6 +728,11 @@ export function EditCharacterModal({
   const cgsWithheld = sfwWithholds('cgs', noNsfwImages) && !taskOf('cgs')
 
   const rendering = isInFlight(progress)
+
+  /** How many of the five slots hold a whole wardrobe. */
+  const customsOnDisk = CUSTOM_OUTFIT_SLOTS.filter(
+    (slot) => wardrobeDone(slot) === EMOTIONS.length
+  ).length
 
   const { host, overlayProps } = useModalShell(requestClose)
   if (!host) return null
@@ -501,46 +762,24 @@ export function EditCharacterModal({
 
           <div className="vu-edit-images">
             <div className="vu-edit-wardrobes">
-              {WARDROBES.map(({ target, set, title }) => {
-                const onDisk = wardrobeDone(set)
-                // A set the setting withholds is offered no control and no repair — unless a
-                // render of it is still going, whose Cancel stays reachable.
-                const offered =
-                  sfwWithholds(target, noNsfwImages) && !taskOf(target)
-                    ? {}
-                    : {
-                        control: control(target, onDisk, EMOTIONS.length),
-                        onFixTransparency: () => setFixing({ set, title, kind: 'fix' }),
-                        fixDisabled: fixBlocked(target, set),
-                        onFixFingers: () => setFixing({ set, title, kind: 'hands' }),
-                        fingersDisabled: fingersBlocked(target, set),
-                        fingersNote: comfyNote
-                      }
-                return (
-                  <WardrobeColumn
-                    key={target}
-                    charId={charId}
-                    set={set}
-                    title={title}
-                    shownDone={shownDone(target, onDisk)}
-                    total={EMOTIONS.length}
-                    present={presentOf(
-                      target,
-                      set === null ? expressions[charId] : outfits?.[set]
-                    )}
-                    staged={regenerating(target)}
-                    version={version}
-                    spoiler={set === 'nude'}
-                    locked={set === 'nude' && noNsfwImages}
-                    lockedReason="Hidden by SFW setting"
-                    {...offered}
-                  />
-                )
-              })}
+              {WARDROBES.map(({ target, set, title }) => (
+                <WardrobeColumn key={target} {...columnFor(target, set, title)} />
+              ))}
             </div>
 
-            {/* The landscape-image row: room left, CGs right, each opened in its own gallery. */}
+            {/* The landscape-image row: the custom wardrobes' own panel, then the room and
+                the CGs, each opened behind its own circle. */}
             <div className="vu-edit-tiles">
+              <LandscapeTile
+                title="CUSTOM OUTFITS"
+                what="custom outfits"
+                mark="plus"
+                label="Open custom outfits"
+                auto
+                shownDone={customsOnDisk}
+                total={CUSTOM_OUTFIT_SLOTS.length}
+                onShow={() => setCustoms(true)}
+              />
               <LandscapeTile
                 title="ROOM BG"
                 what="the room"
@@ -563,6 +802,7 @@ export function EditCharacterModal({
                 onShow={() => setGallery(true)}
                 showLocked={noNsfwImages}
                 showLockedReason="Hidden by SFW setting"
+                hug
               />
             </div>
           </div>
@@ -1015,7 +1255,12 @@ export function EditCharacterModal({
             // A single CG re-roll goes through the dirty gate as a set does.
             onRegenerate={(position) =>
               guardDirty('regenerate', () =>
-                void generateSet(charId, cgTargetFor(position), 'regenerate')
+                openRegenerate((current) => ({
+                  target: cgTargetFor(position),
+                  title: 'Regenerate CG',
+                  edit: cgDraft(current, position),
+                  seed: seedPrefillFor(current, cgTargetFor(position))
+                }))
               )
             }
             onClose={() => setGallery(false)}
@@ -1028,6 +1273,17 @@ export function EditCharacterModal({
             kind="room"
             theme={theme}
             onClose={() => setRoomGallery(false)}
+          />
+        )}
+        {customs && (
+          <CustomOutfitsModal
+            key="customs"
+            theme={theme}
+            slots={CUSTOM_OUTFIT_SLOTS.map((slot) => ({
+              slot,
+              column: columnFor(slot, slot, outfitLabelOf(character, slot))
+            }))}
+            onClose={() => setCustoms(false)}
           />
         )}
         {framing && (
@@ -1074,6 +1330,20 @@ export function EditCharacterModal({
           />
         )}
 
+        {deleting !== null && (
+          <ConfirmModal
+            key="delete-outfit"
+            id="delete-outfit"
+            theme={theme}
+            title={`Delete ${outfitLabelOf(character, deleting)}?`}
+            message="Its sprites will be deleted."
+            confirmText="Delete"
+            busy={working}
+            onConfirm={runDelete}
+            onCancel={() => setDeleting(null)}
+          />
+        )}
+
         {closing && (
           <ConfirmModal
             key="discard"
@@ -1088,18 +1358,47 @@ export function EditCharacterModal({
           />
         )}
 
-        {confirmCgs !== null && (
-          <ConfirmModal
-            key="regenerate-cgs"
-            id="regenerate-cgs"
-            theme={theme}
-            title="Regenerate all CG?"
-            message={'Generations in progress will be cancelled.'}
-            confirmText="Regenerate all"
-            onConfirm={() => regenerateAllCgs(confirmCgs)}
-            onCancel={() => setConfirmCgs(null)}
-          />
-        )}
+        {/* One presence in wait mode, so the tag modal never arrives over the confirm that
+            hands it the run, still fading. */}
+        <AnimatePresence propagate mode="wait">
+          {confirmSet !== null && (
+            <ConfirmModal
+              key="confirm-set"
+              id="regenerate-set"
+              theme={theme}
+              title={`Regenerate ${setLabel(confirmSet.target)}?`}
+              message={'Generations in progress will be cancelled.'}
+              confirmText="Regenerate all"
+              onConfirm={() => {
+                const request = confirmSet
+                setConfirmSet(null)
+                runSet(request.target, request.mode)
+              }}
+              onCancel={() => setConfirmSet(null)}
+            />
+          )}
+
+          {regen !== null && (
+            <RegenerateModal
+              key="regenerate"
+              id="regenerate"
+              theme={theme}
+              title={regen.title}
+              edit={regen.edit}
+              seed={regen.seed}
+              name={regen.name}
+              requireGroup={regen.requireGroup}
+              submitLabel={regen.submitLabel}
+              onConfirm={(edit, seed, name) => {
+                const request = regen
+                setRegen(null)
+                if (request === null) return
+                void sendRender(request, edit, seed, name)
+              }}
+              onCancel={() => setRegen(null)}
+            />
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </>,
     host

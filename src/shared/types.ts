@@ -100,21 +100,35 @@ export type Position =
   | 'fellatio'
   | 'fellatio_after'
 
-/**
- * The three alternate wardrobes a character can have sprites rendered in. A set rides in
- * a `sprite:` action suffixed onto an {@link Emotion} — `happy_pe` — and picks the folder.
- */
-export type OutfitSet = 'pe' | 'swim' | 'nude'
+/** The three alternate wardrobes every character renders from her own record's tags. */
+export type StockOutfitSet = 'pe' | 'swim' | 'nude'
+
+/** The five slots a player-authored wardrobe can occupy, each with its own tags and name. */
+export type CustomOutfitSlot = 'custom1' | 'custom2' | 'custom3' | 'custom4' | 'custom5'
 
 /**
- * The optional image sets that carry a seed-provenance flag: the three wardrobes plus
+ * Every alternate wardrobe a character can have sprites rendered in. A set rides in
+ * a `sprite:` action suffixed onto an {@link Emotion} — `happy_pe` — and picks the folder.
+ */
+export type OutfitSet = StockOutfitSet | CustomOutfitSlot
+
+/** One player-authored wardrobe: the booru tags it renders from, under the name he gave it. */
+export interface CustomOutfit {
+  /** What the player called it; omitted where he left the field blank. */
+  name?: string
+  /** Booru-style outfit tags, as the stock wardrobes hold them. */
+  tags: string[]
+}
+
+/**
+ * The optional image sets that carry a seed-provenance flag: every wardrobe plus
  * the CG set, which renders with the nude wardrobe and rerolls with it.
  */
 export type SeededSet = OutfitSet | 'cg'
 
 /**
  * One set of a character's images, as the Edit modal's controls address them: the default
- * wardrobe, one of the three alternates, the CGs, or the room backgrounds.
+ * wardrobe, one of the alternates, the CGs, or the room backgrounds.
  */
 export type SetTarget = 'default' | OutfitSet | 'cgs' | 'room'
 
@@ -271,8 +285,11 @@ export interface Character {
   voicePitch?: number
   /** Fixed seed used for every ComfyUI job for this character. */
   generationSeed: number
-  /** Per optional set: does its next render use `generationSeed`, or a fresh one? */
-  seedFollowsMain: Record<SeededSet, boolean>
+  /**
+   * Per optional set: does its next render use `generationSeed`, or a fresh one? A set with
+   * no flag here follows the main seed, as a set nobody has rendered yet does.
+   */
+  seedFollowsMain: Partial<Record<SeededSet, boolean>>
   /**
    * The seed each optional set last rendered under, read when filling the gaps in a
    * partially-rendered set so every sprite of it shares one seed.
@@ -287,6 +304,8 @@ export interface Character {
   /** The PE and swimsuit wardrobes, as booru-style outfit tags. */
   peOutfit: string[]
   swimOutfit: string[]
+  /** The wardrobes the player wrote himself; omitted entirely where he wrote none. */
+  customOutfits?: Partial<Record<CustomOutfitSlot, CustomOutfit>>
   /** String arrays of booru-style expression tags keyed by emotion. */
   expressionTags: Record<Emotion, string[]>
   /**

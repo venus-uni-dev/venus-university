@@ -15,17 +15,7 @@ import {
   useCharacterStore,
   useSpriteVersion
 } from '../stores/characterStore'
-import {
-  gestures,
-  lift,
-  panelUnderTab,
-  peek,
-  press,
-  rowPress,
-  spin,
-  tuck,
-  veilIn
-} from './motion'
+import { gestures, lift, panelUnderTab, press, revealed, rowPress, spin, veilIn } from './motion'
 import '../vu_styles/ImageGallery.css'
 import type { Position, SetTarget } from '@shared/types'
 
@@ -103,11 +93,7 @@ function GalleryCell({
           {picture}
           {/* Variants rather than a `whileHover`, so focusing the cell reveals the pill
               inside it; `initial={false}` or it flashes on mount before tucking away. */}
-          <motion.span
-            className="vu-gallery-action"
-            variants={{ shown: peek, hidden: tuck }}
-            initial={false}
-          >
+          <motion.span className="vu-pic-action" variants={revealed} initial={false}>
             {live ? (
               <>
                 <motion.span className="vu-ring" animate={spin} />
@@ -133,8 +119,8 @@ export interface ImageGalleryModalProps {
   /** Whether a CG may be re-rolled by clicking it. */
   regenEnabled?: boolean
   /**
-   * Where a re-roll click goes instead of straight to the store — the Edit modal's
-   * unsaved-changes gate. Cancel clicks never route through it.
+   * Where a re-roll click goes: the Edit modal's unsaved-changes gate and the tag modal
+   * behind it. Absent where no CG is the player's to re-roll; cancel clicks never use it.
    */
   onRegenerate?: (position: Position) => void
   onClose: () => void
@@ -157,7 +143,6 @@ export function ImageGalleryModal({
   const version = useSpriteVersion(charId)
   const staged = useCharacterStore((s) => s.staged)
   const progress = useCharacterStore((s) => s.progress[charId])
-  const generateSet = useCharacterStore((s) => s.generateSet)
   const cancelSet = useCharacterStore((s) => s.cancelSet)
   // While the set regenerates, the gallery shows this run's staged images.
   const regenerating = Boolean(liveTaskFor(progress, kind)?.staged)
@@ -165,8 +150,13 @@ export function ImageGalleryModal({
     ? stagedOf(staged, charId, kind)
     : onDisk
 
-  // No per-image re-roll while the whole set runs: its control is where it stops.
-  const perImage = kind === 'cgs' && regenEnabled === true && !liveTaskFor(progress, 'cgs')
+  // No per-image re-roll while the whole set runs: its control is where it stops. The tag
+  // modal the caller opens is the only way to one, so a caller offering none offers nothing.
+  const perImage =
+    kind === 'cgs' &&
+    regenEnabled === true &&
+    onRegenerate !== undefined &&
+    !liveTaskFor(progress, 'cgs')
   const rerolling = new Set(liveCgTasks(progress))
   const done = spec.keys.filter((key) => present?.[key]).length
 
@@ -199,11 +189,7 @@ export function ImageGalleryModal({
           >
             {done}/{spec.keys.length}
           </span>
-          {perImage && (
-            <span className="vu-gallery-hint">
-              Click on a CG to re-render it with a new seed.
-            </span>
-          )}
+          {perImage && <span className="vu-hint">Click on a CG to regenerate it.</span>}
         </div>
 
         <ul className={`vu-gallery-grid${spec.pair ? ' vu-gallery-grid--pair' : ''}`}>
@@ -226,11 +212,7 @@ export function ImageGalleryModal({
                           void cancelSet(charId, cgTargetFor(key as Position))
                           return
                         }
-                        if (onRegenerate !== undefined) {
-                          onRegenerate(key as Position)
-                          return
-                        }
-                        void generateSet(charId, cgTargetFor(key as Position), 'regenerate')
+                        onRegenerate?.(key as Position)
                       }
                     : undefined
                 }

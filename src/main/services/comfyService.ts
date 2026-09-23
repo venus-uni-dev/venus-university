@@ -8,7 +8,8 @@ import {
   buildBasePrompt,
   buildCgPrompt,
   buildImagePrompt,
-  buildOutfitBasePrompt
+  buildOutfitBasePrompt,
+  type PromptEdit
 } from '@shared/imagePrompt'
 import { COMFY_HOST } from '@shared/setupManifest'
 import { appError, isAppError, messageOf, tailOf, toAppError, truncate } from '@shared/errors'
@@ -47,7 +48,7 @@ import {
 import { getPoseTags } from './assetService'
 import { assertSafeCharId } from './characterService'
 import { dropImageTwins, findImage } from './imageFiles'
-import { imageTypeOf } from '@shared/imageBytes'
+import { imageTypeOf, isRgbaPng } from '@shared/imageBytes'
 import { killStrayProcesses, killTree, listProcessIds } from './processTree'
 import { tryCutProfile } from './profileService'
 import { sleep } from '@shared/retry'
@@ -61,6 +62,15 @@ const BASE_NODE = {
   positivePrompt: '4',
   negativePrompt: '5',
   poseImage: '39',
+  saveImage: '41'
+} as const
+
+/**
+ * Node ids overwritten in `assets/workflows/characterCutout.json`; a base frame rendered
+ * before the base graph cut its own background is cut here once.
+ */
+const CUTOUT_NODE = {
+  sourceImage: '10',
   saveImage: '41'
 } as const
 
@@ -724,15 +734,16 @@ type JobOptions = { signal?: AbortSignal; onProgress?: (step: string) => void }
 
 /** Which node ids one graph exposes, and what each is for. */
 interface GenerationNodes {
-  seed: string
-  positivePrompt: string
-  negativePrompt: string
+  /** The seed and the two prompt encodes; the cutout graph samples nothing and has none. */
+  seed?: string
+  positivePrompt?: string
+  negativePrompt?: string
   saveImage: string
   /** The Face Detailer's own positive encode; the CG graph only. */
   detailerPositivePrompt?: string
   /** ControlNet skeleton `LoadImage`; every graph has one. */
   poseImage?: string
-  /** Source `LoadImage`; the expression and hands graphs. */
+  /** Source `LoadImage`; the expression, cutout and hands graphs. */
   sourceImage?: string
   /** The painted-strokes `LoadImage`; the hands graph only. */
   paintImage?: string
@@ -749,10 +760,12 @@ interface GenerationSpec {
   /** Filename under `assets/workflows`. */
   workflowFile: string
   nodes: GenerationNodes
-  prompts: { positive: string; negative: string }
+  /** Text for `nodes.positivePrompt` and `nodes.negativePrompt`, where the graph names them. */
+  prompts?: { positive: string; negative: string }
   /** Text for `nodes.detailerPositivePrompt`, if the graph has one. */
   detailerPositive?: string
-  seed: number
+  /** What `nodes.seed` is set to, where the graph names one. */
+  seed?: number
   /** Staged filename for `nodes.poseImage`, if the graph has one. */
   poseImageName?: string
   /** Staged filename for `nodes.sourceImage`, if the graph has one. */
@@ -793,6 +806,10 @@ export function assertNode(
 
 /** One log line per job, in the one format, whichever graph ran. */
 function logJob(spec: GenerationSpec): void {
+  if (!spec.prompts) {
+    console.log(`[comfy] → ${spec.label} (${spec.logContext})`)
+    return
+  }
   console.log(
     `[comfy] → ${spec.label} (${spec.logContext})\n${spec.prompts.positive.replace(/\n\n/g, ' | ')}`
   )
@@ -820,9 +837,11 @@ async function runGenerationJob(
   const node = (id: string): { inputs: Record<string, unknown> } =>
     assertNode(workflow, id, spec.workflowFile)
 
-  node(nodes.positivePrompt).inputs.text = prompts.positive
-  node(nodes.negativePrompt).inputs.text = prompts.negative
-  node(nodes.seed).inputs.seed = spec.seed
+  if (prompts) {
+    if (nodes.positivePrompt) node(nodes.positivePrompt).inputs.text = prompts.positive
+    if (nodes.negativePrompt) node(nodes.negativePrompt).inputs.text = prompts.negative
+  }
+  if (nodes.seed && spec.seed !== undefined) node(nodes.seed).inputs.seed = spec.seed
   if (nodes.detailerPositivePrompt && spec.detailerPositive) {
     node(nodes.detailerPositivePrompt).inputs.text = spec.detailerPositive
   }
@@ -922,8 +941,10 @@ async function stagePose(
 }
 
 /**
- * Copies a set's base frame — the staged one on a staged run — into ComfyUI's input
- * folder and returns the name `LoadImage` reads it under.
+ * Copies a set's base frame — the staged one on a staged run — into ComfyUI's input folder
+ * and returns the name `LoadImage` reads it under, with whether the frame already carries
+ * its cutout. A frame decoded out of another format is reported uncut: the re-encode writes
+ * an alpha channel whatever the source held.
  */
 async function stageBase(
   charId: string,
@@ -931,7 +952,7 @@ async function stageBase(
   stagedPath: string,
   staged: boolean,
   scope: string
-): Promise<string> {
+): Promise<{ sourceName: string; cut: boolean }> {
   const named = staged ? stagedPath : livePath
   const sourcePath = await findImage(named)
   if (sourcePath === null) {
@@ -949,23 +970,55 @@ async function stageBase(
   await mkdir(getComfyInputPath(), { recursive: true })
   // The graph's `LoadImage` is handed a PNG whatever the shipped cast is stored as.
   if (sourcePath.toLowerCase().endsWith('.png')) {
-    await copyFile(sourcePath, destPath)
-  } else {
-    const decoded = nativeImage.createFromBuffer(await readFile(sourcePath))
-    if (decoded.isEmpty()) {
-      throw appError(
-        'EXPRESSION_SOURCE_MISSING',
-        'The neutral expression has to be rendered before the other expressions can be.',
-        `${sourcePath} could not be read as an image.`
-      )
-    }
-    await writeFile(destPath, decoded.toPNG())
+    const bytes = await readFile(sourcePath)
+    await writeFile(destPath, bytes)
+    return { sourceName, cut: isRgbaPng(bytes) }
   }
-  return sourceName
+
+  const decoded = nativeImage.createFromBuffer(await readFile(sourcePath))
+  if (decoded.isEmpty()) {
+    throw appError(
+      'EXPRESSION_SOURCE_MISSING',
+      'The neutral expression has to be rendered before the other expressions can be.',
+      `${sourcePath} could not be read as an image.`
+    )
+  }
+  await writeFile(destPath, decoded.toPNG())
+  return { sourceName, cut: false }
 }
 
-/** Byte 25 of a PNG is its IHDR colour type; 6 is the RGBA the hand fix's mask is read from. */
-const PNG_COLOUR_TYPE_RGBA = 6
+/**
+ * The staged name of a base frame that carries its cutout. A frame rendered before the base
+ * graph cut its own background is opaque, so it is cut once here, in place, and staged again:
+ * every sprite of the set then takes its alpha from the frame instead of cutting its own.
+ */
+async function ensureCutBase(
+  charId: string,
+  livePath: string,
+  stagedPath: string,
+  staged: boolean,
+  scope: string,
+  suffix: string,
+  options: JobOptions
+): Promise<string> {
+  const { sourceName, cut } = await stageBase(charId, livePath, stagedPath, staged, scope)
+  if (cut) return sourceName
+
+  await runGenerationJob(
+    {
+      workflowFile: 'characterCutout.json',
+      nodes: CUTOUT_NODE,
+      sourceImageName: sourceName,
+      destPath: staged ? stagedPath : livePath,
+      label: `${charId} / cut${suffix}`,
+      logContext: 'base cutout'
+    },
+    options
+  )
+  throwIfCancelled(options.signal)
+
+  return (await stageBase(charId, livePath, stagedPath, staged, scope)).sourceName
+}
 
 /**
  * Writes the player's strokes where the hands graph's `LoadImage` reads them, under
@@ -973,11 +1026,11 @@ const PNG_COLOUR_TYPE_RGBA = 6
  * MASK is `1 − alpha`, so a PNG saved without one hands the graph an all-painted mask.
  */
 async function stagePaint(charId: string, scope: string, paint: Buffer): Promise<string> {
-  if (paint[25] !== PNG_COLOUR_TYPE_RGBA) {
+  if (!isRgbaPng(paint)) {
     throw appError(
       'FIX_NOT_PNG',
       'The painted layer was not readable.',
-      `the paint layer is PNG colour type ${paint[25]}, not RGBA (${PNG_COLOUR_TYPE_RGBA}).`
+      `the paint layer is not an RGBA PNG (colour type ${paint[25]}).`
     )
   }
 
@@ -997,6 +1050,7 @@ export async function generateSprite(
   emotion: Emotion,
   seedOverride?: number,
   staged = false,
+  edit?: PromptEdit,
   options: JobOptions = {}
 ): Promise<string> {
   assertSafeCharId(character.charId)
@@ -1024,34 +1078,49 @@ export async function generateSprite(
   // The portrait is cut from the default wardrobe's `neutral` and nothing else.
   const cutsProfile = emotion === 'neutral' && set === null
 
-  if (emotion === 'neutral') {
+  // A single sprite is a face pass over the frame the set already has; only a set with none
+  // renders one.
+  const faceOnly = edit?.kind === 'expression'
+
+  if (
+    emotion === 'neutral' &&
+    (!faceOnly || (await findImage(staged ? stagedPath : livePath)) === null)
+  ) {
     await runGenerationJob(
       {
         // No expression group: every sprite cut from this frame repaints its face.
         workflowFile: 'characterBase.json',
         nodes: BASE_NODE,
         prompts: set
-          ? buildOutfitBasePrompt(character, poseTags, set)
-          : buildBasePrompt(character, poseTags),
+          ? buildOutfitBasePrompt(character, poseTags, set, edit)
+          : buildBasePrompt(character, poseTags, edit),
         seed,
         poseImageName: skeletonName,
         destPath: staged ? stagedPath : livePath,
         label: `${charId} / base${suffix}`,
-        logContext: `pose=${character.pose}, seed=${seed}`
+        logContext: `pose=${character.pose}, seed=${seed}${edit !== undefined ? ', edited' : ''}`
       },
       options
     )
     throwIfCancelled(options.signal)
   }
 
-  const sourceName = await stageBase(charId, livePath, stagedPath, staged, set ?? 'default')
+  const sourceName = await ensureCutBase(
+    charId,
+    livePath,
+    stagedPath,
+    staged,
+    set ?? 'default',
+    suffix,
+    options
+  )
 
   const written = await runGenerationJob(
     {
       // The main-outfit prompt whichever the set: a face pass prompts for the face.
       workflowFile: 'characterExpression.json',
       nodes: EXPRESSION_NODE,
-      prompts: buildImagePrompt(character, poseTags, emotion),
+      prompts: buildImagePrompt(character, poseTags, emotion, edit),
       seed,
       sourceImageName: sourceName,
       poseImageName: skeletonName,
@@ -1063,14 +1132,20 @@ export async function generateSprite(
           : getCharacterFacePath(charId)
         : undefined,
       label: `${charId} / ${emotion}${suffix}`,
-      logContext: `face-pass, seed=${seed}`
+      logContext: `face-pass, seed=${seed}${edit !== undefined ? ', edited' : ''}`
     },
     options
   )
 
-  // Framed off the mask the job just saved, under the seed it actually rendered under — so a
-  // one-off render on a borrowed seed gets the default frame rather than the last one's.
-  if (cutsProfile) await tryCutProfile(charId, { ...character, generationSeed: seed }, staged)
+  // A face-only pass repaints the face on the same frame, so her stored crop still fits and is
+  // kept; every other render is framed under the seed it actually rendered under, so a one-off
+  // render on a borrowed seed gets the default frame rather than the last one's.
+  if (cutsProfile)
+    await tryCutProfile(
+      charId,
+      faceOnly ? character : { ...character, generationSeed: seed },
+      staged
+    )
 
   return written
 }
@@ -1084,6 +1159,7 @@ export async function generateCg(
   position: Position,
   seedOverride?: number,
   staged = false,
+  edit?: PromptEdit,
   options: JobOptions = {}
 ): Promise<string> {
   assertSafeCharId(character.charId)
@@ -1093,7 +1169,12 @@ export async function generateCg(
 
   const seed = seedOverride ?? character.generationSeed
   const { poseTags, skeletonName } = await stagePose(character)
-  const { positive, negative, detailerPositive } = buildCgPrompt(character, position, poseTags)
+  const { positive, negative, detailerPositive } = buildCgPrompt(
+    character,
+    position,
+    poseTags,
+    edit
+  )
 
   return runGenerationJob(
     {
@@ -1107,7 +1188,7 @@ export async function generateCg(
         ? getStagedPath(character.charId, cgRel(position))
         : getCharacterCgPath(character.charId, position),
       label: `${character.charId} / cg:${position}`,
-      logContext: `seed=${seed}`
+      logContext: `seed=${seed}${edit !== undefined ? ', edited' : ''}`
     },
     options
   )
@@ -1138,7 +1219,7 @@ export async function fixHands(
 
   const { poseTags, skeletonName } = await stagePose(character)
   // Live only: a fix repairs the set on disk, and a staged run is a different set of images.
-  const sourceName = await stageBase(charId, basePath, basePath, false, scope)
+  const { sourceName } = await stageBase(charId, basePath, basePath, false, scope)
   const paintName = await stagePaint(charId, scope, paint)
 
   // Both frames land in scratch and are read back: neither belongs in her folder, since what

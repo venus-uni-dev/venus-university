@@ -200,18 +200,16 @@
       "model_name": "segm/Anzhc%20Face%20seg%20640%20v2%20y8n.pt"
     }
   },
-  "37": {
-    "class_type": "InspyrenetRembgAdvanced",
+  "38": {
+    "class_type": "InvertMask",
     "_meta": {
-      "title": "InspyrenetRembgAdvanced"
+      "title": "Base Cut Mask"
     },
     "inputs": {
-      "image": [
-        "31",
-        0
-      ],
-      "threshold": 0.9,
-      "torchscript_jit": "on"
+      "mask": [
+        "10",
+        1
+      ]
     }
   },
   "39": {
@@ -244,8 +242,8 @@
     },
     "inputs": {
       "destination": [
-        "37",
-        1
+        "38",
+        0
       ],
       "source": [
         "60",

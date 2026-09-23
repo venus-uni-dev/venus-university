@@ -1,0 +1,23 @@
+/* The five player-authored wardrobes side by side, opened out of the Edit modal. Imported
+   from the view module after `EditCharacter.css`, which owns the column this panel is five
+   of — a screen's file must load after base.css or its overrides lose at equal specificity. */
+
+/* The chassis is `.vu-sheet--wide`'s, which lays two panes across; this is one pane of
+   columns with a hint over it and a foot under it, so it stands them in a column instead. */
+.vu-customs {
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vu-customs-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 20px;
+  gap: 16px;
+}
+
+/* Five columns, a hint and a foot on one 1080 stage: the archway gives up its own cap so the
+   panel stands inside the stage rather than the sprites standing at full height. */
+.vu-customs .vu-wardrobe-arch {
+  max-height: 520px;
+}

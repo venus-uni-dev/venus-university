@@ -30,6 +30,7 @@ import type { RoomVariant } from '@shared/room'
 import type {
   Character,
   CharacterBrief,
+  CustomOutfitSlot,
   Emotion,
   OutfitSet,
   Position,
@@ -214,6 +215,14 @@ export async function commitStagedSet(
 /** Throws away one staged set, or every staged set when `target` is omitted. */
 export async function discardStaged(charId: string, target?: SetTarget): Promise<void> {
   await db.discardStaged(charId, target)
+  forgetImages(charId)
+}
+
+/**
+ * Deletes one custom set's images, live and staged; the record is the renderer's to rewrite.
+ */
+export async function deleteCustomSet(charId: string, slot: CustomOutfitSlot): Promise<void> {
+  await db.deleteSet(charId, slot)
   forgetImages(charId)
 }
 

@@ -1,0 +1,68 @@
+/* The tag modal every regenerate opens behind: the prompt editor's frame, holding a column of
+   chip wells and the seed the render is sent with instead of one block of text. Imported from
+   the view module, never from index.css.
+
+   The veil, the wells, the checkbox, the buttons and the foot are base.css's. */
+
+.vu-regen {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1100px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  /* The head clears the tab exactly as the prompt editor's does: the title hangs 40px above
+     the panel and its lean drops the near end another ten. */
+  padding: 78px 56px 28px 100px;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The wells take whatever room the seed row and the foot leave, and scroll past that rather
+   than growing the panel. */
+.vu-regen .vu-scroll-box {
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.vu-regen-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  /* Room for what a hover lifts past a chip, which the scroller clips in both axes — the box
+     around it takes this back, so the fade at its foot lands on the scroller's own edge. */
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+/* The seed stays out of the scroller: it is the second half of what a regenerate sends. */
+.vu-regen-seed {
+  flex: none;
+}
+
+/* And so does the name, where the render is making a set rather than replacing one. */
+.vu-regen-name {
+  flex: none;
+}
+
+.vu-regen-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* A seed is a figure to be read digit by digit, so the box is mono. */
+.vu-regen-seed-row > .vu-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+
+.vu-regen-seed-row > .vu-check {
+  flex: none;
+}

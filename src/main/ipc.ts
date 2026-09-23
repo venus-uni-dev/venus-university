@@ -16,6 +16,7 @@ import type {
   Character,
   CharacterBrief,
   ComfyStatus,
+  CustomOutfitSlot,
   Emotion,
   EndingPostsResponse,
   EnrollmentDraft,
@@ -43,6 +44,7 @@ import type {
 } from '@shared/types'
 import { MAX_LOG_RECORD_CHARS } from '@shared/types'
 import type { ClassifierPromptRequest } from '@shared/classifier'
+import type { PromptEdit } from '@shared/imagePrompt'
 import type { RoomVariant } from '@shared/room'
 import { appError, toAppError, truncate } from '@shared/errors'
 import {
@@ -70,6 +72,7 @@ import {
   commitStagedSet,
   createCharacter,
   deleteCharacter,
+  deleteCustomSet,
   discardStaged,
   discardWardrobeLayer,
   getCgStatus,
@@ -342,18 +345,32 @@ export function registerIpcHandlers(): void {
   // `staged` renders into the character's staging tree instead of over the live set.
   handle(
     'comfy:generateExpression',
-    (_event, character: Character, emotion: Emotion, seed?: number, staged?: boolean) =>
+    (
+      _event,
+      character: Character,
+      emotion: Emotion,
+      seed?: number,
+      staged?: boolean,
+      edit?: PromptEdit
+    ) =>
       enqueueComfyJob(character, emotion, (options) =>
-        generateSprite(character, null, emotion, seed, staged, options)
+        generateSprite(character, null, emotion, seed, staged, edit, options)
       )
   )
 
   // One job per CG; `cg:` keeps the key out of the emotion namespace.
   handle(
     'comfy:generateCg',
-    (_event, character: Character, position: Position, seed?: number, staged?: boolean) =>
+    (
+      _event,
+      character: Character,
+      position: Position,
+      seed?: number,
+      staged?: boolean,
+      edit?: PromptEdit
+    ) =>
       enqueueComfyJob(character, `cg:${position}`, (options) =>
-        generateCg(character, position, seed, staged, options)
+        generateCg(character, position, seed, staged, edit, options)
       )
   )
 
@@ -366,10 +383,11 @@ export function registerIpcHandlers(): void {
       set: OutfitSet,
       emotion: Emotion,
       seed?: number,
-      staged?: boolean
+      staged?: boolean,
+      edit?: PromptEdit
     ) =>
       enqueueComfyJob(character, `outfit:${set}:${emotion}`, (options) =>
-        generateSprite(character, set, emotion, seed, staged, options)
+        generateSprite(character, set, emotion, seed, staged, edit, options)
       )
   )
 
@@ -478,6 +496,10 @@ export function registerIpcHandlers(): void {
   )
   handle('chars:discardStaged', (_event, charId: string, target?: SetTarget) =>
     discardStaged(charId, target)
+  )
+  // One custom wardrobe's images, live and staged; the renderer rewrites the record itself.
+  handle('chars:deleteSet', (_event, charId: string, slot: CustomOutfitSlot) =>
+    deleteCustomSet(charId, slot)
   )
   // Bytes for the repair editors; a view that only shows an image uses `charimg://`.
   handle(

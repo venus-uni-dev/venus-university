@@ -1,7 +1,7 @@
 import { slotFullLabel, yearLabel } from '@shared/classes'
 import { dormClause } from '@shared/dorms'
 import { EMOTIONS } from '@shared/emotions'
-import { OUTFIT_SETS, outfitTagsFor, spriteRefsFor } from '@shared/outfits'
+import { isCustomOutfitSlot, outfitTagsFor, spriteRefsFor, STOCK_OUTFIT_SETS } from '@shared/outfits'
 import { DEFAULT_PLAYER_STATS, STAT_KEYS, type PlayerStats } from '@shared/playerStats'
 import { fullDescriptionOf, kindSentenceOf, projectStandingLine } from '@shared/academics'
 import type { ClassKind, ProjectProgress } from '@shared/academics'
@@ -44,6 +44,7 @@ import {
   type SceneLine,
   type ShiftSlot,
   type SpriteRef,
+  type StockOutfitSet,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
@@ -264,7 +265,8 @@ export interface ScenePromptState {
   cgReady: Record<string, boolean>
   /**
    * Which alternate wardrobes each cast member has fully rendered, by charId — read once at
-   * scene start; a set counts only when all seven of its sprites exist.
+   * scene start; a set counts only when all seven of its sprites exist. It may list a custom
+   * slot, which the prompt never offers.
    */
   outfitReady: Record<string, OutfitSet[]>
   /** Which cast members have both room backgrounds on disk, by charId. */
@@ -350,7 +352,7 @@ function ledgerPersonaFor(lessNsfwText: boolean): string {
 }
 
 /** What each outfit suffix means, in RITA's terms. */
-const OUTFIT_SUFFIX_GLOSS: Record<OutfitSet, string> = {
+const OUTFIT_SUFFIX_GLOSS: Record<StockOutfitSet, string> = {
   pe: 'if she\'s in her PE clothes',
   swim: 'for swimwear',
   nude: "if her breasts or genitals have been exposed."
@@ -383,7 +385,7 @@ function bgLines(backgrounds: BackgroundSets, rule: string): string[] {
 function jsonRules(
   backgrounds: BackgroundSets,
   allowPositions: boolean,
-  outfitSets: readonly OutfitSet[],
+  outfitSets: readonly StockOutfitSet[],
   /** The first names of the cast who have CGs, said out loud only when the cast is a crowd. */
   cgNames: readonly string[]
 ): string[] {
@@ -427,8 +429,8 @@ function jsonRules(
  * The union of alternate wardrobes available to anyone in the cast — what the schema's
  * `emotion` enum may carry.
  */
-function castOutfitSets(cast: readonly Character[], state: ScenePromptState): OutfitSet[] {
-  return OUTFIT_SETS.filter((set) =>
+function castOutfitSets(cast: readonly Character[], state: ScenePromptState): StockOutfitSet[] {
+  return STOCK_OUTFIT_SETS.filter((set) =>
     cast.some((character) => state.outfitReady[character.charId]?.includes(set))
   )
 }
@@ -804,6 +806,8 @@ function actionEnum(cast: readonly Character[], state: ScenePromptState): string
     values.push(showAction('show', key), showAction('hide', key))
     for (const emotion of EMOTIONS) values.push(spriteAction(key, emotion))
     for (const set of state.outfitReady[character.charId] ?? []) {
+      // A custom wardrobe is the player's own; the model is never offered one.
+      if (isCustomOutfitSlot(set)) continue
       for (const ref of spriteRefsFor(set)) values.push(spriteAction(key, ref))
     }
   }
@@ -1485,7 +1489,7 @@ const EVENT_GLOSS: ReadonlyArray<readonly [string, string]> = [
   ['friendzoned_reader', 'she turned the reader down or made it clear they\'re just friends'],
   [
     'gave_contact_info',
-    'she gave the reader a way to reach her later or the reader gave his contact info: phone number, email, Bunnyboard or social media handle. Telling him where she lives, inviting him somewhere, mentioning Bunnyboard in passing, or a campus or professor email does not count.'
+    'she gave the reader a way to reach her later or the reader gave his contact info: a phone number, email, Bunnyboard, or social media handle. Telling him where she lives or inviting him somewhere later also counts. Mentioning Bunnyboard in passing, or a campus or professor email does not count.'
   ],
   [
     'unblocked',

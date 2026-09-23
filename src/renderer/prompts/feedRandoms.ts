@@ -1,9 +1,31 @@
+import { feedHandlePool } from '@shared/supporters'
+import { SUPPORTER_HANDLES } from './supporters'
+
 /**
  * The other four thousand students. One authored post a day from somebody the reader will
- * never meet, dealt off two tables of a hundred-odd and an emoji for a face.
+ * never meet, dealt off two tables of a hundred-odd — the handles carrying the supporters
+ * among them — and an emoji for a face.
  */
 
-/** Grab bag id for {@link FEED_HANDLES}. */
+/** A message, or one marked so it is never dealt to a supporter's name. */
+export type FeedMessage = string | { text: string; strangersOnly: true }
+
+/** Marks a line for the generated names only. */
+function strangersOnly(text: string): FeedMessage {
+  return { text, strangersOnly: true }
+}
+
+/** The line a message shows, whether or not it is marked. */
+export function feedMessageText(message: FeedMessage): string {
+  return typeof message === 'string' ? message : message.text
+}
+
+/** Whether a message is one the supporters' names never say. */
+export function isStrangersOnly(message: FeedMessage): boolean {
+  return typeof message !== 'string'
+}
+
+/** Grab bag id for {@link FEED_HANDLE_POOL}. */
 export const FEED_HANDLE_BAG = 'feed.handles'
 
 /** Grab bag id for {@link FEED_MESSAGES}. */
@@ -12,9 +34,8 @@ export const FEED_MESSAGE_BAG = 'feed.messages'
 /** Grab bag id for {@link FEED_EMOJI}. */
 export const FEED_EMOJI_BAG = 'feed.emoji'
 
-export const FEED_HANDLES: readonly string[] = [
+const FEED_HANDLES: readonly string[] = [
   'bagelhead22',
-  'notmyrealaccount',
   'marisolwave',
   'dbergstrom_',
   'twelvepercentmilk',
@@ -26,15 +47,11 @@ export const FEED_HANDLES: readonly string[] = [
   'nocturnalgremlin',
   'priyapatel44',
   'thebiglebowitz',
-  'hexadecimal_hana',
   'wesley_nap',
   'clementine.jpg',
   'bad_at_chemistry',
-  'juno_juno_juno',
-  'threehourlab',
   'devon.mp3',
   'astridnotasteroid',
-  'crumbcatcher',
   'moth_to_lamp',
   'yusuf_yawns',
   'definitely_not_freddy',
@@ -60,8 +77,7 @@ export const FEED_HANDLES: readonly string[] = [
   'blanketfortress',
   'esme_echo',
   'lostmyidagain',
-  'tommy_twoshoes',
-  'vending_machine_j',
+  'tvgamedonkey',
   'big_boss',
   'panicatthelibrary',
   'zoe_zeroes',
@@ -77,8 +93,6 @@ export const FEED_HANDLES: readonly string[] = [
   'wren_writes',
   'thirdfloorstairs',
   'omar_orbits',
-  'wake_up_samurai',
-  'beatrice_bee',
   'notcaffeinated',
   'silas_sideways',
   'twinsizemattress',
@@ -86,7 +100,7 @@ export const FEED_HANDLES: readonly string[] = [
   'overduebooks',
   'jonah_jitters',
   'let_me_solo_her',
-  'delphine.d',
+  'delphine.b',
   'lecturehallghost',
   'archie_afk',
   'salt_and_static',
@@ -97,25 +111,24 @@ export const FEED_HANDLES: readonly string[] = [
   'cassia_clove',
   'tryfingerbuthole',
   'felix_forgot',
-  'greenhouseglass',
   'yolanda_yes',
   'lastrowlurker',
   'pip_and_pop',
   'bigchungusman',
-  'rosalind_rain',
   'dundertale',
-  'dmitri_drifts',
   'velvet_room_guest',
   'imogen_ivy',
   'floorfour_fridge',
   'basil_bloom',
   'DiamondDogs80',
-  'tallulah_t',
-  'jill.stingray',
-  'quincy_quiet'
+  'tallulah_playable',
+  'jill.stingray'
 ]
 
-export const FEED_MESSAGES: readonly string[] = [
+/** The handle bag: the generated names, with every supporter's marbles spread among them. */
+export const FEED_HANDLE_POOL = feedHandlePool(FEED_HANDLES, SUPPORTER_HANDLES)
+
+export const FEED_MESSAGES: readonly FeedMessage[] = [
   'someone in the Kendall Library is eating an ENTIRE rotisserie chicken goddamn',
   'floor 4 vending machine gave me 2 bags of chips. not telling anyone which one',
   'whoever is putting googly eyes on the agora statues i love you',
@@ -155,7 +168,7 @@ export const FEED_MESSAGES: readonly string[] = [
   'just sat through 90 min of the wrong lecture. the notes are decent tho',
   'professor made a joke and looked directly at me for the laugh. i laughed. i\'m weak',
   'fast eats tacos tonight. pray for my colon',
-  'Duchess is so cute!! I want those tentacles on me!!!',
+  strangersOnly('Duchess is so cute!! I want those tentacles on me!!!'),
   'Hesitation is defeat.',
   'Cherry Concord Pino-Cola tastes like cough syrup. I have had four today. Maybe I will have a fifth',
   'midnight showing of a silent speech at future cinema had 3 people in it and all 3 of us were crying by the end. i don\'t want to talk about it',
@@ -177,11 +190,13 @@ export const FEED_MESSAGES: readonly string[] = [
   'guy took my agora study pod booking so i stood over him and said hello there. he did not get it. i sat down anyway',
   'meet me where gold crosses rose. bring my hoodie back. bring my dignity too if you find it',
   'me: im not going to club apogee tonight. me at 1am puking on the glass floor 40 stories up:',
-  'learned about the guy who cured STIs today and if i could meet one guy in history i\'d blow him. imagine having to worry about that shit',
+  strangersOnly(
+    'learned about the guy who cured STIs today and if i could meet one guy in history i\'d blow him. imagine having to worry about that shit'
+  ),
   ' i don\'t want peace. i want PROBLEMS ALWAYS',
   'the library printer is jammed AGAIN. i have class in 6 minutes YOU FRICK',
   'whoever wrote my october notes was smart. wish i could ask them',
-  'stop being insecure about ur dick. i just want it inside me shut up',
+  strangersOnly('stop being insecure about ur dick. i just want it inside me shut up'),
   'day 4 of attempting to summon my persona. per...so...na...',
   'Why are we still doing 8AMs? Just to suffer?',
   'wake the fuck up samurai. we got an essay to write',
@@ -239,7 +254,7 @@ export const FEED_MESSAGES: readonly string[] = [
   'been meaning to text back for 9 days. at this point its awkward',
   'reading day and the whole quad is at selkie. wheres your motivation!?',
   'no one TA should have all that power',
-  'after me everyone CAN WE GET MUCH HIGHER?? (so high)',
+  'CAN WE GET MUCH HIGHER?? (so high)',
   'i never thought i could get tired of an eternal spring but here we are welcome to veridan',
   'Petition for the Loop to stop at the Stalestein after 2am',
   'so your telling me thorne can book any celebrity on earth for the auditorium and he books a guy who plays the spoons',

@@ -24,7 +24,10 @@
   gap: 16px;
 }
 
+/* The row measures itself: a tile with no peek hugs its words where the row is wide, and every
+   tile stands in two rows where it is not. */
 .vu-edit-tiles {
+  container-type: inline-size;
   display: flex;
   gap: 16px;
 }
@@ -50,6 +53,23 @@
   text-transform: uppercase;
 }
 
+/* A title a click renames: a button reset to the words it already was. */
+.vu-wardrobe-title--edit {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+/* The box that takes its place, at the title's own size so the head does not jump. */
+.vu-wardrobe-rename {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 10px;
+  font: 700 14px var(--font-mono);
+  text-transform: uppercase;
+}
+
 /* The panel's 297×620 shape, as a ratio: the columns narrow with the stage between 4:3 and
    16:9, and a fixed height would leave four slivers standing 620px tall. */
 .vu-wardrobe-arch {
@@ -64,6 +84,28 @@
   justify-content: center;
 }
 
+/* A set with nothing in it is drawn as the gap it is, the same dashed cell a card's crop takes
+   where a sprite is missing. */
+.vu-wardrobe-crop--empty {
+  border: 3.5px dashed var(--vu-border);
+  background: color-mix(in srgb, var(--vu-surface) 60%, transparent);
+}
+
+/* The plus standing in that gap: the accent circle Manage Characters adds a girl with, at the
+   same size, since it is the same offer. */
+.vu-wardrobe-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
 /* Sprites are full-body: the panel shows her from the top down, cropping in CSS and never
    touching the PNG. */
 .vu-wardrobe-sprite {
@@ -73,6 +115,21 @@
   height: 112%;
   object-fit: cover;
   object-position: top;
+}
+
+/* The sprite as a control: it fills the crop and clips inside the arch's curve. The archway
+   above it stays decoration — the picture is what the click is on. Quiet, so it may clip. */
+.vu-wardrobe-pic {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  overflow: hidden;
 }
 
 .vu-wardrobe-empty {
@@ -109,7 +166,8 @@
 }
 
 .vu-wardrobe-show,
-.vu-wardrobe-hide {
+.vu-wardrobe-hide,
+.vu-wardrobe-delete {
   padding: 8px 22px;
   border: 0;
   border-radius: 999px;
@@ -118,15 +176,30 @@
   font: 700 14px var(--font-body);
 }
 
-/* It sits in the crop's square bottom corner, clear of the arch's curve, and takes the card
-   tag's outline because it lies on the sprite. */
-.vu-wardrobe-hide {
+/* The box the corner pills stand in: it sits in the crop's square bottom corner, clear of the
+   arch's curve, and its padding is dead space � the box lies over the sprite control, so a
+   cursor inside it hovers neither pill nor sprite, and the regenerate pill stays tucked while
+   the cursor closes on Hide or Delete. */
+.vu-wardrobe-corner {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 6px;
+  padding: 18px 10px 10px 18px;
+}
+
+/* They take the card tag's outline because they lie on the sprite. */
+.vu-wardrobe-hide,
+.vu-wardrobe-delete {
   padding: 4px 13px;
   border: 2px solid var(--vu-border);
   font-size: 12.5px;
+}
+
+/* Throwing a whole wardrobe away is the one thing in the column that cannot be undone. */
+.vu-wardrobe-delete {
+  color: var(--vu-danger);
 }
 
 .vu-wardrobe-stepper {
@@ -281,15 +354,53 @@
   object-fit: cover;
 }
 
-/* The peek is the first thing to go when the stage narrows to 4:3 and the two tiles have
-   378px apiece: the count, the eye and the control are what the tile owes, and the
-   thumbnails are a courtesy the gallery behind the eye repeats in full.
+/* The peek is the first thing to go where the tile is narrower than its count, its eye, its
+   control and the two stills together: the thumbnails are a courtesy the gallery behind the
+   eye repeats in full.
 
    After the rule it overrides, not beside the container that carries it: `@container`
    adds no specificity, so a later plain rule would win. */
 @container (max-width: 430px) {
   .vu-landscape-thumbs {
     display: none;
+  }
+}
+
+/* A tile that is only an offer takes the width of what it holds rather than its share of the
+   row, and its count has nothing to be short of, so it reads in the accent. */
+.vu-landscape--auto {
+  flex: 0 0 auto;
+  /* Its own size, so it has one to take: a size container has none in that axis, and this
+     tile carries no control the query above needs to stack. */
+  container-type: normal;
+}
+
+.vu-landscape--auto .vu-count {
+  color: var(--vu-accent);
+}
+
+/* A tile with a control and no peek hugs its words where the row is wide, so the room beside
+   it has the width its two stills need; it measures nothing of its own, for the same reason
+   the offer tile does not. */
+@container (min-width: 1000px) {
+  .vu-landscape--hug {
+    flex: 0 0 auto;
+    container-type: normal;
+  }
+}
+
+/* Where the row is narrower — the stage between 4:3 and 16:10 — the three tiles share it and
+   each stands in two rows rather than squeezing its pill. Both queries read the row, and sit
+   after the plain rules they override: `@container` adds no specificity, so a later plain rule
+   would win. */
+@container (max-width: 999px) {
+  .vu-landscape {
+    flex-wrap: wrap;
+  }
+
+  .vu-landscape .vu-set--compact {
+    flex-basis: 100%;
+    justify-content: center;
   }
 }
 
