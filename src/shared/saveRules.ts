@@ -38,6 +38,8 @@ const SAVE_REQUIRED: Record<
     | 'slotRumor'
     | 'bunnybotSeenTipSent'
     | 'occasionsDeclined'
+    | 'bio'
+    | 'tallies'
   >,
   true
 > = {
@@ -97,8 +99,11 @@ const RECORD_REQUIRED: Record<keyof PlaythroughRecord, true> = {
   profiles: true
 }
 
-/** What an enrollment must carry; where it is kept names the playthrough it will become. */
-const ENROLLMENT_REQUIRED: Record<keyof Enrollment, true> = {
+/**
+ * What an enrollment must carry; where it is kept names the playthrough it will become, and
+ * the field an enrollment written before it lacks is optional on the type and omitted here.
+ */
+const ENROLLMENT_REQUIRED: Record<keyof Omit<Enrollment, 'bio'>, true> = {
   schemaVersion: true,
   savedAt: true,
   chars: true,

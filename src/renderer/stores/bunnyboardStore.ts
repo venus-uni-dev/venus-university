@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 
 /**
- * Which Bunnyboard tab is showing. **There is no tab for the reader himself**: the decision
- * landing already draws his money and his three stats, and a phone that reported them a second
- * time would be the screen saying one thing twice.
+ * Which Bunnyboard tab is showing. Profile is the reader's own page — his picture, the
+ * description the prompts carry of him, his bio and the semester's tallies — and it never
+ * repeats the decision landing's balance or stat tiers.
  */
-export type BunnyboardTab = 'chats' | 'friends' | 'updates'
+export type BunnyboardTab = 'chats' | 'friends' | 'updates' | 'profile'
 
 /** An agreed hangout waiting on the player's "Begin hangout". */
 interface ArmedHangout {

@@ -13,6 +13,7 @@ import type { DormId } from './dorms'
 import type { AudioGroup } from './audio'
 import type { ComfyGpu } from './setupManifest'
 import type { Weather } from './weather'
+import type { ReaderTallies } from './tallies'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -1149,6 +1150,13 @@ export interface GameSave {
   stats: PlayerStats
   /** The reader's balance in dollars. */
   money: number
+  /**
+   * The reader's own words about himself, written at New Game and rewritten on his profile;
+   * absent in saves from before it.
+   */
+  bio?: string
+  /** What the playthrough has counted up about him; absent in saves from before them. */
+  tallies?: ReaderTallies
 
   /** Days elapsed; day 0 = January 19. */
   date: number
@@ -1515,6 +1523,8 @@ export type EnrollmentDraft = QuickstartBundle & {
   playerFirstName: string
   playerLastName: string
   stats: PlayerStats
+  /** The reader's own words about himself, as New Game took them down. */
+  bio?: string
 }
 
 /**

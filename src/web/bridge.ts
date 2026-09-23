@@ -9,6 +9,7 @@ import { generateImage } from '@shared/llm/cloudImage'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
 import { listModels, testWriter } from '@shared/llm/endpointProbe'
 import { logRecordOf } from '@shared/logRules'
+import { assertProfilePicture } from '@shared/profilePicture'
 import { ENDING_IMAGE_MODEL_ID } from '@shared/providers'
 import { assertSafePlaythroughId } from '@shared/saveRules'
 import { storedEndpointKeyFor } from '@shared/settingsRules'
@@ -273,7 +274,21 @@ export function buildApi(): VenusUniversityApi {
         result('read the graduation picture', async () => {
           const bytes = await saves.readEndingArt(playthroughId)
           return bytes === null ? null : new Uint8Array(bytes)
-        })
+        }),
+      readProfilePicture: (playthroughId) =>
+        result('read the profile picture', async () => {
+          const bytes = await saves.readProfilePicture(playthroughId)
+          return bytes === null ? null : new Uint8Array(bytes)
+        }),
+      writeProfilePicture: (playthroughId, png) =>
+        result('save the profile picture', async () => {
+          assertSafePlaythroughId(playthroughId)
+          const bytes = base64ToBytes(png)
+          assertProfilePicture(bytes)
+          await saves.writeProfilePicture(playthroughId, imageBlob(bytes))
+        }),
+      deleteProfilePicture: (playthroughId) =>
+        result('remove the profile picture', () => saves.deleteProfilePicture(playthroughId))
     },
     // Local image generation is the desktop's; no control in the browser reaches any of these.
     comfy: {

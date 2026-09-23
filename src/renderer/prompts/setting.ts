@@ -1,7 +1,9 @@
-import { describePlayer, type PlayerStats } from '@shared/playerStats'
+import { describePlayer, describeReaderProfile, type PlayerStats } from '@shared/playerStats'
 import { acedExamsLine, GRADES_BAD_LINE, GRADES_GOOD_LINE } from '@shared/academics'
 import { andList } from '@shared/sentences'
-import type { ReaderStanding } from '@shared/relationship'
+import { readerStandingOf, type ReaderStanding } from '@shared/relationship'
+import type { CharInfo, Character, ClassEntry, ClassRecord, Occasion } from '@shared/types'
+import { handedBackAcedCount } from './classProgress'
 import { formatShortGameDate } from './gameDate'
 
 /**
@@ -51,26 +53,121 @@ function exesLine(exes: ReaderStanding['exes']): string {
   return `The reader's exes: ${parts.join(', ')}.`
 }
 
+/**
+ * What he wrote about himself, on one line that completes "The reader is": the field asks for
+ * the rest of that sentence, so the opening is put in front unless he typed it himself, and a
+ * full stop closes it when he left one off. Whitespace is collapsed because a newline typed
+ * into the field would break the line the model reads in two. Null when he wrote nothing.
+ */
+function bioLine(bio: string): string | null {
+  const collapsed = bio
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^the reader is\b\s*/i, '')
+  if (!collapsed) return null
+  const closed = /[.!?]$/.test(collapsed) ? collapsed : `${collapsed}.`
+  return `The reader is ${closed}`
+}
+
 /** Who the reader is. */
 export function readerText(
   firstName: string,
   lastName: string,
   stats: PlayerStats,
-  // His reputation and his love life; with none given the block says nothing about either.
+  // His own words, his reputation and his love life; with none given the block says nothing
+  // about any of them.
   reputation: {
+    bio?: string
     aced?: number
     standing?: 'good' | 'bad' | null
     lovers?: ReaderStanding['lovers']
     exes?: ReaderStanding['exes']
   } = {}
 ): string {
+  const bio = bioLine(reputation.bio ?? '')
   return [
     `The reader is a freshman named ${firstName} ${lastName}, a male who has a single dorm in Lowrise 4.`,
     describePlayer(stats),
+    ...(bio ? [bio] : []),
     ...(reputation.aced && reputation.aced > 0 ? [acedExamsLine(reputation.aced)] : []),
     ...(reputation.standing === 'good' ? [GRADES_GOOD_LINE] : []),
     ...(reputation.standing === 'bad' ? [GRADES_BAD_LINE] : []),
     ...loveLifeLines(reputation.lovers ?? []),
     ...(reputation.exes?.length ? [exesLine(reputation.exes)] : [])
+  ].join(' ')
+}
+
+/** The store fields the reader's block and his profile line are read from. */
+export interface ReaderView {
+  playerFirstName: string
+  playerLastName: string
+  stats: PlayerStats
+  bio: string
+  classRecords: Readonly<Record<string, ClassRecord>>
+  classes: Readonly<Record<string, ClassEntry>>
+  occasions: readonly Occasion[]
+  date: number
+  finalsScoresShown: boolean
+  gradesStanding: 'good' | 'bad' | null
+  chars: readonly string[]
+  charInfo: Readonly<Record<string, CharInfo>>
+  characters: Readonly<Record<string, Character>>
+}
+
+/** Every girl the reader's standing might name, by the first name she is known by. */
+function firstNamesOf(view: ReaderView): Record<string, string> {
+  const firstNames: Record<string, string> = {}
+  for (const charId of view.chars) {
+    const character = view.characters[charId]
+    if (character) firstNames[charId] = character.firstName
+  }
+  return firstNames
+}
+
+/** The `READER` block for a playthrough; `override` is the ending's projection of stats and charInfo. */
+export function readerBlockOf(
+  view: ReaderView,
+  override?: { stats: PlayerStats; charInfo: Readonly<Record<string, CharInfo>> }
+): string {
+  return readerText(view.playerFirstName, view.playerLastName, override?.stats ?? view.stats, {
+    bio: view.bio,
+    // Known for, not merely earned: a perfect paper counts once it comes back.
+    aced: handedBackAcedCount(
+      view.classRecords,
+      view.classes,
+      view.occasions,
+      view.date,
+      view.finalsScoresShown
+    ),
+    standing: view.gradesStanding,
+    ...readerStandingOf(view.chars, override?.charInfo ?? view.charInfo, firstNamesOf(view))
+  })
+}
+
+/** Who he is with, as his own page says it: the shared sentence, one line each, or nobody. */
+function profileLoveLifeLines(lovers: ReaderStanding['lovers']): string[] {
+  if (lovers.length === 0) return ['Single.']
+  if (lovers.length >= 2 && lovers.every(({ harem }) => harem)) {
+    return [`In an open relationship with ${andList(lovers.map(({ name }) => name))}.`]
+  }
+  return lovers.map(({ name }) => `Dating ${name}.`)
+}
+
+/** The profile's one-line description: his stats with no subject, his reputation, then his love life. */
+export function profileDescriptionOf(view: ReaderView): string {
+  const aced = handedBackAcedCount(
+    view.classRecords,
+    view.classes,
+    view.occasions,
+    view.date,
+    view.finalsScoresShown
+  )
+  const { lovers } = readerStandingOf(view.chars, view.charInfo, firstNamesOf(view))
+  return [
+    describeReaderProfile(view.stats),
+    ...(aced > 0 ? [`Known for acing ${aced} exam${aced === 1 ? '' : 's'}.`] : []),
+    ...(view.gradesStanding === 'good' ? ['Exceptionally good grades.'] : []),
+    ...(view.gradesStanding === 'bad' ? ['Known for failing every exam.'] : []),
+    ...profileLoveLifeLines(lovers)
   ].join(' ')
 }

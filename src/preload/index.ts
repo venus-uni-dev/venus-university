@@ -111,7 +111,13 @@ const api: VenusUniversityApi = {
       ipcRenderer.invoke('saves:deletePlaythrough', playthroughId),
     generateEndingArt: (playthroughId, sheet, friendCount, group) =>
       ipcRenderer.invoke('saves:generateEndingArt', playthroughId, sheet, friendCount, group),
-    readEndingArt: (playthroughId) => ipcRenderer.invoke('saves:readEndingArt', playthroughId)
+    readEndingArt: (playthroughId) => ipcRenderer.invoke('saves:readEndingArt', playthroughId),
+    readProfilePicture: (playthroughId) =>
+      ipcRenderer.invoke('saves:readProfilePicture', playthroughId),
+    writeProfilePicture: (playthroughId, png) =>
+      ipcRenderer.invoke('saves:writeProfilePicture', playthroughId, png),
+    deleteProfilePicture: (playthroughId) =>
+      ipcRenderer.invoke('saves:deleteProfilePicture', playthroughId)
   },
   comfy: {
     start: () => ipcRenderer.invoke('comfy:start'),

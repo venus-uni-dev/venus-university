@@ -58,11 +58,12 @@ describe('starting a playthrough', () => {
 })
 
 describe('deleting a playthrough', () => {
-  it('takes its record, its saves and its graduation picture with it', async () => {
+  it('takes its record, its saves and both of its pictures with it', async () => {
     const { playthroughId } = await saves.writeEnrollment(enrollment())
     await saves.createPlaythrough(record(), draft(), playthroughId)
     await saves.writeAutosave(playthroughId, draft())
     await saves.writeEndingArt(playthroughId, new Blob([new Uint8Array([1, 2, 3])]))
+    await saves.writeProfilePicture(playthroughId, new Blob([new Uint8Array([4, 5, 6])]))
 
     const other = await saves.writeEnrollment(enrollment())
     await saves.deletePlaythrough(playthroughId)
@@ -72,5 +73,6 @@ describe('deleting a playthrough', () => {
     ])
     expect((await saves.listSaves(playthroughId)).saves).toEqual([])
     expect(await saves.readEndingArt(playthroughId)).toBeNull()
+    expect(await saves.readProfilePicture(playthroughId)).toBeNull()
   })
 })

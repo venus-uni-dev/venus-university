@@ -10,6 +10,7 @@ import {
   FINALS_DONE_LINE,
   FINALS_POSTED_LINE,
   gradesStandingOf,
+  gradedCourses,
   allScoresOf,
   isCourse,
   kindOf,
@@ -183,9 +184,7 @@ function freezeDueScores(): void {
 /** The reader's own non-PE classes, which are the ones that grade him. */
 function gradedClasses(): CourseEntry[] {
   const game = useGameStore.getState()
-  return [...new Set(Object.values(game.playerSchedule))]
-    .map((code) => game.classes[code])
-    .filter((entry): entry is CourseEntry => Boolean(entry) && isCourse(entry))
+  return gradedCourses(game.playerSchedule, game.classes)
 }
 
 /** What the two grade notifications leave for the slot opening to carry. */

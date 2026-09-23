@@ -71,7 +71,7 @@ export function introScrollLines(stats: PlayerStats, date: number): SceneLine[] 
     {
       text: statsMaxed(stats)
         ? `There's nothing left for this place to teach you. The question for you is how you'll turn this place into your personal playground.`
-        : `But today you're starting fresh, and you're determined to improve yourself over the long semester.`
+        : `Still, you're determined to improve yourself over the long semester.`
     },
     {
       bg: 'campus_road',

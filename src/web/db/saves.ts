@@ -357,19 +357,20 @@ export async function deleteSave(playthroughId: string, saveId: string): Promise
   )
 }
 
-/** Deletes a whole playthrough: its row, every save in it and its graduation picture. */
+/** Deletes a whole playthrough: its row, every save in it and both of its pictures. */
 export async function deletePlaythrough(playthroughId: string): Promise<void> {
   assertSafePlaythroughId(playthroughId)
 
   await storage('delete the playthrough', async () => {
     const tx = (await database()).transaction(
-      ['playthroughs', 'saves', 'endingArt'],
+      ['playthroughs', 'saves', 'endingArt', 'profilePictures'],
       'readwrite'
     )
-    // Three deletes, all database requests, so the transaction sees all of them.
+    // Four deletes, all database requests, so the transaction sees all of them.
     void tx.objectStore('playthroughs').delete(playthroughId)
     void tx.objectStore('saves').delete(partRange(playthroughId))
     void tx.objectStore('endingArt').delete(playthroughId)
+    void tx.objectStore('profilePictures').delete(playthroughId)
     await tx.done
   })
 }
@@ -388,5 +389,30 @@ export async function writeEndingArt(playthroughId: string, blob: Blob): Promise
   assertSafePlaythroughId(playthroughId)
   await storage('save the graduation picture', async () =>
     (await database()).put('endingArt', blob, playthroughId)
+  )
+}
+
+/** The reader's own picture already stored, or `null` where there is none. */
+export async function readProfilePicture(playthroughId: string): Promise<Uint8Array | null> {
+  assertSafePlaythroughId(playthroughId)
+  const blob = await storage('read the profile picture', async () =>
+    (await database()).get('profilePictures', playthroughId)
+  )
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null
+}
+
+/** Keeps the reader's own picture beside the playthrough it belongs to. */
+export async function writeProfilePicture(playthroughId: string, blob: Blob): Promise<void> {
+  assertSafePlaythroughId(playthroughId)
+  await storage('save the profile picture', async () =>
+    (await database()).put('profilePictures', blob, playthroughId)
+  )
+}
+
+/** Removes the reader's own picture; one that is already gone is success. */
+export async function deleteProfilePicture(playthroughId: string): Promise<void> {
+  assertSafePlaythroughId(playthroughId)
+  await storage('remove the profile picture', async () =>
+    (await database()).delete('profilePictures', playthroughId)
   )
 }

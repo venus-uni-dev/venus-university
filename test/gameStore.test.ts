@@ -904,6 +904,54 @@ describe('the job actions', () => {
 })
 
 /**
+ * What the reader's own page is written from. The tallies are counted by boundary
+ * passes that replay, so a double count is a figure nothing ever puts right; and a save
+ * written before either field existed has to keep loading.
+ */
+describe('the bio and the lifetime tallies', () => {
+  it('loads a save written before either field with a blank bio and nothing counted', () => {
+    const save = useGameStore.getState().toGameSave() as GameSave
+    delete save.bio
+    delete save.tallies
+    useGameStore.setState({
+      bio: 'Written by a later playthrough.',
+      tallies: { moneyEarned: 240, kisses: 3, sex: 1, shiftsWorked: 2 }
+    })
+
+    useGameStore.getState().loadSave(save, playthroughRecord(), {})
+    expect(useGameStore.getState().bio).toBe('')
+    expect(useGameStore.getState().tallies).toEqual({
+      moneyEarned: 0,
+      kisses: 0,
+      sex: 0,
+      shiftsWorked: 0
+    })
+  })
+
+  it('credits a worked shift once however often the boundary replays it', () => {
+    useGameStore.getState().takeJob('fast_eats', [0], 0)
+    useGameStore.getState().recordShiftWorked(4, 80)
+    useGameStore.getState().recordShiftWorked(4, 80)
+    useGameStore.getState().recordShiftWorked(6, 96)
+
+    const tallies = useGameStore.getState().tallies
+    expect(tallies.moneyEarned).toBe(176)
+    expect(tallies.shiftsWorked).toBe(2)
+  })
+
+  it('counts one kiss or one night per act, whoever was in it', () => {
+    useGameStore.getState().recordActs([
+      { kind: 'kiss', inPublic: false, charIds: ['a'] },
+      { kind: 'kiss', inPublic: true, charIds: ['a', 'b'] },
+      { kind: 'sex', inPublic: false, charIds: ['b'] }
+    ])
+    const tallies = useGameStore.getState().tallies
+    expect(tallies.kisses).toBe(2)
+    expect(tallies.sex).toBe(1)
+  })
+})
+
+/**
  * The feed actions. What earns tests is what a save is written from: a
  * like that landed on the wrong post, or an append that dropped the posts
  * before it, is a corrupted feed nothing ever repairs.
@@ -949,6 +997,7 @@ describe('toGameSave', () => {
     // be written into every save file and read back as part of the schema.
     expect(Object.keys(useGameStore.getState().toGameSave()).sort()).toEqual([
       'addedClasses',
+      'bio',
       'bunnyboard',
       'bunnybotContactIntroSent',
       'bunnybotDeferred',
@@ -988,6 +1037,7 @@ describe('toGameSave', () => {
       'slotRumor',
       'springBreakAway',
       'stats',
+      'tallies',
       'time',
       'venusJobIntroSent',
       'venusThrough',

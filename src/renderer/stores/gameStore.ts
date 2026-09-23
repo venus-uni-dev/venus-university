@@ -21,6 +21,7 @@ import {
   type StatTier
 } from '@shared/playerStats'
 import { STARTING_MONEY } from '@shared/money'
+import { emptyTallies, talliesAfterActs, type ReaderTallies } from '@shared/tallies'
 import { FALLBACK_DORM } from '@shared/dorms'
 import {
   giftMemoryCapFor,
@@ -72,6 +73,7 @@ import {
   type Conversation,
   type GameHistory,
   type GameSave,
+  type IntimateAct,
   type PlaythroughRecord,
   type JobState,
   type Occasion,
@@ -184,6 +186,16 @@ interface GameStoreState {
    * allowed to go negative — far enough and the playthrough ends.
    */
   money: number
+  /**
+   * The reader's own words about himself, written at New Game and rewritten on his profile.
+   * Persisted; blank where he wrote nothing.
+   */
+  bio: string
+  /**
+   * Lifetime counts about the reader — money earned, kisses, nights, shifts worked. Moved only
+   * in boundary passes, so a replay credits each of them once. Persisted.
+   */
+  tallies: ReaderTallies
   charInfo: Record<string, CharInfo>
   /** The save's class roster, keyed by class code. Generated once, never changed. */
   classes: Record<string, ClassEntry>
@@ -332,6 +344,11 @@ interface GameStoreState {
   /** The graduation picture, as an object URL, once it exists. */
   endingArt: string | null
   /**
+   * The object URL of the reader's own picture, or null where he has none. Never persisted:
+   * `loop/profilePicture.ts` owns the URL behind it.
+   */
+  profilePicture: string | null
+  /**
    * What the last goodbye said, kept for the log on the menu after the stage that held it is
    * cleared; never written to disk.
    */
@@ -466,6 +483,8 @@ interface GameStoreState {
   /** Publishes the graduation picture, or takes it away on the way out. */
   setEndingArt: (url: string | null) => void
   setEndingArtPending: (pending: boolean) => void
+  /** Hands the screen the reader's own picture as an object URL, or clears it. */
+  setProfilePicture: (url: string | null) => void
   /** Keeps the goodbye that just ended, for the log the menu reads it back from. */
   setFarewellLog: (lines: readonly SceneLine[]) => void
   setBusy: (busy: boolean) => void
@@ -541,6 +560,10 @@ interface GameStoreState {
   advanceSlot: () => void
   /** Adds a scene's resolved stat movement, flooring each stat at zero. */
   applyStatDeltas: (deltas: PlayerStats) => void
+  /** Replaces what the reader says about himself: New Game's answer, and every later rewrite. */
+  setBio: (bio: string) => void
+  /** Counts a finished scene's kisses and nights into the lifetime tallies. */
+  recordActs: (acts: readonly IntimateAct[]) => void
   /** Deducts what a scene cost the reader. No floor: the balance may go negative. */
   spendMoney: (amount: number) => void
   /** Buys one of an item: banks it in the inventory and deducts the price, with no floor. */
@@ -925,6 +948,8 @@ const initialState = {
   playerLastName: DEFAULT_PLAYER_LAST_NAME,
   stats: DEFAULT_PLAYER_STATS,
   money: STARTING_MONEY,
+  bio: '',
+  tallies: emptyTallies(),
   charInfo: {} as Record<string, CharInfo>,
   classes: {} as Record<string, ClassEntry>,
   playerSchedule: {} as Record<number, string>,
@@ -990,6 +1015,7 @@ const initialState = {
   awaitingInput: false,
   activeGameOver: null as GameOverReason | null,
   endingArt: null as string | null,
+  profilePicture: null as string | null,
   endingArtPending: false,
   farewellLog: [] as SceneLine[],
   busy: false,
@@ -1027,6 +1053,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       playerLastName: record.playerLastName,
       stats: save.stats,
       money: save.money,
+      // Both are younger than the save format, so a playthrough started before them loads blank.
+      bio: save.bio ?? '',
+      tallies: save.tallies ?? emptyTallies(),
       // The two halves rejoined; a save entry with no profile falls back to the blank one,
       // which is what a charId the record never knew about would land on.
       charInfo: Object.fromEntries(
@@ -1090,6 +1119,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   setEndingArt: (url) => set({ endingArt: url }),
 
   setEndingArtPending: (pending) => set({ endingArtPending: pending }),
+
+  setProfilePicture: (url) => set({ profilePicture: url }),
 
   setFarewellLog: (lines) => set({ farewellLog: [...lines] }),
 
@@ -1537,6 +1568,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   applyStatDeltas: (deltas) =>
     set((state) => ({ stats: applyStatDeltas(state.stats, deltas) })),
 
+  setBio: (bio) => set({ bio }),
+
+  recordActs: (acts) => set((state) => ({ tallies: talliesAfterActs(state.tallies, acts) })),
+
   spendMoney: (amount) => set((state) => ({ money: state.money - amount })),
 
   buyItem: (itemId, price) =>
@@ -1960,9 +1995,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ job: newJobState(jobId, [...shifts], settledThrough) }),
 
   recordShiftWorked: (slotId, pay) => {
-    const job = get().job
+    const { job, tallies } = get()
     if (!job) return false
-    // A slot is credited once however often the boundary is replayed.
+    // A slot is credited once however often the boundary is replayed, and the same guard is what
+    // makes the lifetime tallies below credit it once too.
     if (job.workedSlots.includes(slotId)) return false
 
     const streak = job.streak + 1
@@ -1977,6 +2013,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         streak,
         raises: raised ? job.raises + 1 : job.raises,
         workedSlots: [...job.workedSlots, slotId]
+      },
+      tallies: {
+        ...tallies,
+        moneyEarned: tallies.moneyEarned + pay,
+        shiftsWorked: tallies.shiftsWorked + 1
       }
     })
     return raised
@@ -2249,6 +2290,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       schemaVersion: 12 as const,
       stats: state.stats,
       money: state.money,
+      bio: state.bio,
+      tallies: state.tallies,
       date: state.date,
       time: state.time,
       // The settled half is the record's and is never written twice.

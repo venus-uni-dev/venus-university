@@ -194,6 +194,11 @@ export function getEndingArtPath(playthroughId: string): string {
   return join(getPlaythroughPath(playthroughId), 'ending.png')
 }
 
+/** `/data/saves/{playthroughId}/profile.png` — the reader's own picture. */
+export function getProfilePicturePath(playthroughId: string): string {
+  return join(getPlaythroughPath(playthroughId), 'profile.png')
+}
+
 /** `/data/characters` */
 export function getCharactersPath(): string {
   return join(getDataPath(), 'characters')

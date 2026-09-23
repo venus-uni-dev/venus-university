@@ -5,6 +5,9 @@ import {
   brainFactor,
   examScore,
   fullDescriptionOf,
+  gpaOf,
+  gradePointsOf,
+  gradedCourses,
   gradesStandingOf,
   kindOf,
   projectScore,
@@ -193,6 +196,60 @@ describe('allScoresOf', () => {
 
   it('collects both assessments and skips the ones not yet sat', () => {
     expect(allScoresOf(records)).toEqual([100, 40, 100])
+  })
+})
+
+describe('gradedCourses', () => {
+  it('takes each course on the timetable once, and nothing PE or unknown', () => {
+    const classes: Record<string, ClassEntry> = {
+      'BIO 210': classEntry(),
+      'PED 101': peClassEntry()
+    }
+    const schedule = { 0: 'BIO 210', 2: 'BIO 210', 4: 'PED 101', 6: 'ZZZ 999' }
+    expect(gradedCourses(schedule, classes).map((entry) => entry.code)).toEqual(['BIO 210'])
+  })
+})
+
+describe('gpaOf', () => {
+  const bio = classEntry({ code: 'BIO 210' })
+  const art = classEntry({ code: 'ART 101' })
+
+  /** `attended` of `count` meetings, on dates nothing else reads. */
+  function meetings(attended: number, count: number): ClassRecord['meetings'] {
+    return Array.from({ length: count }, (_, i) => ({ date: i, attended: i < attended }))
+  }
+
+  it('is a clean 4.0 for a semester nothing has happened in yet', () => {
+    expect(gpaOf({}, [])).toBe(4)
+    expect(gpaOf({}, [bio])).toBe(4)
+  })
+
+  it('grades a class with no scores yet on attendance alone', () => {
+    // Three of four meetings sat is 75%, which the scale reads as a C.
+    expect(gpaOf({ 'BIO 210': { meetings: meetings(3, 4) } }, [bio])).toBe(2)
+  })
+
+  it('weighs the scores against attendance once a paper has been sat', () => {
+    // 0.75 * 80 + 0.25 * 100 = 85.
+    expect(gpaOf({ 'BIO 210': { meetings: meetings(4, 4), midtermScore: 80 } }, [bio])).toBe(3)
+  })
+
+  it('counts nothing for a class off the timetable, however full its record', () => {
+    const records: Record<string, ClassRecord> = {
+      'BIO 210': { meetings: meetings(4, 4), midtermScore: 80 },
+      'ART 101': { meetings: meetings(0, 4) }
+    }
+    expect(gpaOf(records, [bio])).toBe(3)
+    expect(gpaOf(records, [bio, art])).toBe(1.5)
+  })
+})
+
+describe('gradePointsOf', () => {
+  it('turns on the whole percent the cutoff names', () => {
+    expect(gradePointsOf(93)).toBe(4)
+    expect(gradePointsOf(92)).toBe(3.7)
+    expect(gradePointsOf(60)).toBe(0.7)
+    expect(gradePointsOf(59)).toBe(0)
   })
 })
 

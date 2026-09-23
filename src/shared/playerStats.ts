@@ -147,6 +147,12 @@ export function describeReaderToPlayer(stats: PlayerStats): string {
   return describeStats(stats, "You're", "you're")
 }
 
+/** The same description with nobody named in it, as the reader's own profile reads it back. */
+export function describeReaderProfile(stats: PlayerStats): string {
+  const said = describeStats(stats, '', '')
+  return said.charAt(0).toUpperCase() + said.slice(1)
+}
+
 /** Every stat at the top of the scale — the scroll's one branch. */
 export function statsMaxed(stats: PlayerStats): boolean {
   return STAT_KEYS.every((key) => tierOf(stats[key]) === MAX_TIER)
@@ -157,12 +163,12 @@ export function statsLowestFirst(stats: PlayerStats): StatKey[] {
   return [...STAT_KEYS].sort((a, b) => stats[a] - stats[b])
 }
 
-/** The one implementation behind both descriptions above: ordering, phrases and the but/and rule. */
+/** The one implementation behind the descriptions above: ordering, phrases and the but/and rule. */
 function describeStats(stats: PlayerStats, lead: string, rest: string): string {
   const ordered = statsLowestFirst(stats)
   const clauses = ordered.map((key, i) => {
     const phrase = STAT_PHRASES[key][tierOf(stats[key]) - 1]
-    return `${i === 0 ? lead : rest} ${phrase}`
+    return [i === 0 ? lead : rest, phrase].filter(Boolean).join(' ')
   })
 
   const weakCount = ordered.filter((key) => tierOf(stats[key]) === 1).length

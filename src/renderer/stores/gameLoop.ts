@@ -194,6 +194,7 @@ import {
   writeSlotSave
 } from './loop/saves'
 import { armEpilogue, dropEndingArt } from './loop/endingArt'
+import { dropProfilePicture, loadProfilePicture } from './loop/profilePicture'
 import { farewellDisposition, seniorNames } from './loop/farewells'
 import { settleSpringBreak } from './loop/springBreak'
 import { dropHeldSceneLines, streamScene, unpark } from './loop/stream'
@@ -2170,6 +2171,8 @@ export function resetLoop(): void {
   dropHeldSceneLines()
   // A browser resource rather than loop state, so released here.
   dropEndingArt()
+  // The same, for the picture the reader's profile draws.
+  dropProfilePicture()
 }
 
 /**
@@ -2184,6 +2187,8 @@ export function enterGame(
   resetLoop()
   const game = useGameStore.getState()
   game.loadSave(save, record, characters)
+  // A read nothing on screen is waiting on: the profile is not open yet.
+  void loadProfilePicture()
   // The file a slot opening is folded back into; the autosave is never that file.
   loopState.slotSaveId = save.saveId === AUTOSAVE_ID ? null : save.saveId
 

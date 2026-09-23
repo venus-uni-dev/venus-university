@@ -120,6 +120,11 @@ import {
   setProgressSink
 } from '@shared/jobQueue'
 import { generateEndingArt, readEndingArt } from './services/endingArtService'
+import {
+  deleteProfilePicture,
+  readProfilePicture,
+  writeProfilePicture
+} from './services/profilePictureService'
 import { generateRoomImage } from './services/roomService'
 import { applySettingsPatch, getRendererSettings, getSettings } from './services/settingsService'
 import { getGrabBags, setGrabBags } from './services/grabBagService'
@@ -334,6 +339,17 @@ export function registerIpcHandlers(): void {
       runAbortable(group, (signal) => generateEndingArt(playthroughId, sheet, friendCount, signal))
   )
   handle('saves:readEndingArt', (_event, playthroughId: string) => readEndingArt(playthroughId))
+
+  // The reader's own picture.
+  handle('saves:readProfilePicture', (_event, playthroughId: string) =>
+    readProfilePicture(playthroughId)
+  )
+  handle('saves:writeProfilePicture', (_event, playthroughId: string, png: string) =>
+    writeProfilePicture(playthroughId, png)
+  )
+  handle('saves:deleteProfilePicture', (_event, playthroughId: string) =>
+    deleteProfilePicture(playthroughId)
+  )
 
   handle('saves:deletePlaythrough', (_event, playthroughId: string) =>
     deletePlaythrough(playthroughId)

@@ -8,6 +8,7 @@ import {
   charFileOf,
   classifyBackupEntry,
   endingArtEntry,
+  profilePictureEntry,
   type BackupFile,
   type BackupPlaythrough,
   type BackupSave
@@ -65,6 +66,18 @@ export async function exportBackup(): Promise<string> {
       files[endingArtEntry(key)] = await bytesOf(art)
     }
 
+    const profilePictures: string[] = []
+    for (const key of await db.getAllKeys('profilePictures')) {
+      const picture = await db.get('profilePictures', key)
+      if (!picture) continue
+      const bytes = await bytesOf(picture)
+      // The picture came off the player's own files, so anything whose bytes are not a
+      // picture's is left out rather than packed: a backup a restore would refuse is no backup.
+      if (!imageTypeOf(bytes)) continue
+      profilePictures.push(key)
+      files[profilePictureEntry(key)] = bytes
+    }
+
     for (const key of await db.getAllKeys('charFiles')) {
       const file = await db.get('charFiles', key)
       if (!file) continue
@@ -83,6 +96,7 @@ export async function exportBackup(): Promise<string> {
       playthroughs,
       saves,
       endingArt,
+      profilePictures,
       characters: await db.getAll('characters')
     }
     return backup
@@ -116,7 +130,16 @@ export async function importBackup(): Promise<boolean> {
   await storage('restore the backup', async () => {
     const db = await database()
     const tx = db.transaction(
-      ['settings', 'grabbags', 'playthroughs', 'saves', 'endingArt', 'characters', 'charFiles'],
+      [
+        'settings',
+        'grabbags',
+        'playthroughs',
+        'saves',
+        'endingArt',
+        'profilePictures',
+        'characters',
+        'charFiles'
+      ],
       'readwrite'
     )
     // Every value is in hand, so each step below is a database request and the transaction
@@ -142,6 +165,15 @@ export async function importBackup(): Promise<boolean> {
       const bytes = entries[endingArtEntry(playthroughId)]
       if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
         void art.put(imageBlob(bytes), playthroughId)
+      }
+    }
+
+    const pictures = tx.objectStore('profilePictures')
+    void pictures.clear()
+    for (const playthroughId of record.profilePictures ?? []) {
+      const bytes = entries[profilePictureEntry(playthroughId)]
+      if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
+        void pictures.put(imageBlob(bytes), playthroughId)
       }
     }
 

@@ -21,10 +21,14 @@ import {
   type TimeSlot
 } from '@shared/types'
 import type { NpcFriendship } from '@shared/npcRelationships'
+import { gpaOf, gradedCourses } from '@shared/academics'
 import { globalSlotOf, jobDefForChat, shiftSlotOf } from '@shared/jobs'
 import { locationLabel, ROOM_LOCATION } from '@shared/locations'
+import { formatMoney } from '@shared/money'
+import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
 import { yearLabel } from '@shared/classes'
 import {
@@ -34,7 +38,9 @@ import {
   shiftWeekdayOf,
   slotHalf
 } from '../prompts/gameDate'
+import { handedBackAcedCount } from '../prompts/classProgress'
 import { ADD_DROP_DATE } from '../prompts/occasions'
+import { profileDescriptionOf } from '../prompts/setting'
 import { isVenusChat, VENUS_EMOJI, VENUS_NAME, VENUS_TITLE } from '../prompts/venus'
 import { isBunnybotChat, BUNNYBOT_EMOJI, BUNNYBOT_NAME, BUNNYBOT_TITLE } from '../prompts/bunnybot'
 import { useBunnyboardStore, type BunnyboardTab } from '../stores/bunnyboardStore'
@@ -43,6 +49,8 @@ import { postsLocationUpdate } from '../stores/feedRolls'
 import { FEED_PAGE, isFeedContact, updatesFeed, type FeedEntry } from '../stores/feedView'
 import { knownWhereabouts, type Whereabouts } from '../stores/whereabouts'
 import { useGameStore } from '../stores/gameStore'
+import { pickProfilePicture, removeProfilePicture } from '../stores/loop/profilePicture'
+import { useSettingsStore } from '../stores/settingsStore'
 import {
   acceptFriendRequest,
   answerHangout,
@@ -88,7 +96,7 @@ import {
   typingDot,
   veilIn
 } from './motion'
-import { BackIcon, BunnyMark, HeartIcon, MapIcon } from './screenIcons'
+import { BackIcon, BunnyMark, CloseIcon, HeartIcon, MapIcon, PlusIcon } from './screenIcons'
 import { LettersFilter, lettersUrl } from '../components/LettersMark'
 import '../vu_styles/Bunnyboard.css'
 
@@ -165,7 +173,7 @@ function chatIdentityOf(charId: string, character: Character | undefined): ChatI
   }
 }
 
-/* ---- the rail's three marks ----------------------------------------------- */
+/* ---- the rail's four marks ------------------------------------------------- */
 /* The rail's own marks: single-screen, so they stay local rather than move to `screenIcons.tsx`. */
 
 const RAIL_MARK = {
@@ -209,11 +217,21 @@ function UpdatesIcon(): JSX.Element {
   )
 }
 
-/** The three destinations, in rail order. */
+function ProfileIcon(): JSX.Element {
+  return (
+    <svg {...RAIL_MARK}>
+      <circle cx="12" cy="7.5" r="4" />
+      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
+    </svg>
+  )
+}
+
+/** The four destinations, in rail order. */
 const TABS: ReadonlyArray<{ id: BunnyboardTab; word: string; Mark: () => JSX.Element }> = [
   { id: 'chats', word: 'CHATS', Mark: ChatsIcon },
   { id: 'friends', word: 'FRIENDS', Mark: FriendsIcon },
-  { id: 'updates', word: 'UPDATES', Mark: UpdatesIcon }
+  { id: 'updates', word: 'UPDATES', Mark: UpdatesIcon },
+  { id: 'profile', word: 'PROFILE', Mark: ProfileIcon }
 ]
 
 /** The composer's quick-bar: one tap each, short enough to sit under the field unwrapped. */
@@ -244,6 +262,7 @@ export function BunnyboardModal({
   const setTab = useBunnyboardStore((s) => s.setTab)
   const armed = useBunnyboardStore((s) => s.armedHangout)
   const bunnyboard = useGameStore((s) => s.bunnyboard)
+  const profilePicture = useGameStore((s) => s.profilePicture)
   const hiddenOf = useHiddenThreads()
   const backToList = useBunnyboardStore((s) => s.backToList)
 
@@ -319,7 +338,17 @@ export function BunnyboardModal({
                   {...gestures(Boolean(armed), on ? toggleLift : lift, press)}
                   onClick={() => setTab(entry.id)}
                 >
-                  <entry.Mark />
+                  {/* His own picture stands where the mark would, once he has one: the seat
+                      that is about him is the one place on the rail that shows a face. */}
+                  {entry.id === 'profile' && profilePicture ? (
+                    <span className="vu-arch vu-bb-tile-face">
+                      <span className="vu-crop">
+                        <img className="vu-crop-img" src={profilePicture} alt="" />
+                      </span>
+                    </span>
+                  ) : (
+                    <entry.Mark />
+                  )}
                   <span className="vu-bb-tile-word">{entry.word}</span>
                   {badge > 0 && <span className="vu-tile-badge">{badge}</span>}
                 </motion.button>
@@ -357,6 +386,7 @@ export function BunnyboardModal({
                 )}
                 {tab === 'friends' && <FriendsList />}
                 {tab === 'updates' && <UpdatesFeed />}
+                {tab === 'profile' && <ProfilePage />}
               </div>
             </div>
           </motion.div>
@@ -1315,6 +1345,187 @@ function FriendsList(): JSX.Element {
             })}
           </motion.div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The Profile tab: his own card at the head of the app everybody else is listed in, the bio that
+ * rides every prompt, and the semester counted up. Every reading below the bio is derived here
+ * from what the save already holds rather than kept beside it.
+ */
+function ProfilePage(): JSX.Element {
+  const firstName = useGameStore((s) => s.playerFirstName)
+  const lastName = useGameStore((s) => s.playerLastName)
+  const picture = useGameStore((s) => s.profilePicture)
+  const bio = useGameStore((s) => s.bio)
+  const setBio = useGameStore((s) => s.setBio)
+  const description = useGameStore((s) => profileDescriptionOf(s))
+  const counts = useGameStore((s) => s.tallies)
+  const classRecords = useGameStore((s) => s.classRecords)
+  const classes = useGameStore((s) => s.classes)
+  const playerSchedule = useGameStore((s) => s.playerSchedule)
+  const occasions = useGameStore((s) => s.occasions)
+  const date = useGameStore((s) => s.date)
+  const finalsScoresShown = useGameStore((s) => s.finalsScoresShown)
+  const chars = useGameStore((s) => s.chars)
+  const charInfo = useGameStore((s) => s.charInfo)
+  const conversations = useGameStore((s) => s.bunnyboard.conversations)
+  const lessNsfwText = useSettingsStore((s) => s.settings?.lessNsfwText === true)
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  /** Hands the pick to the store, clearing the box so the same file picked twice fires twice. */
+  const pick = (file: File | undefined): void => {
+    if (fileInput.current) fileInput.current.value = ''
+    if (!file) return
+    void pickProfilePicture(file)
+  }
+
+  // One walk of the roster, the records and the threads for the whole grid, rather than one
+  // apiece: every tile below is a count of something the save is already keeping.
+  const readings = useMemo(() => {
+    let attended = 0
+    let recorded = 0
+    for (const record of Object.values(classRecords)) {
+      for (const meeting of record.meetings) {
+        recorded += 1
+        if (meeting.attended) attended += 1
+      }
+    }
+    const met = chars.filter((charId) => charInfo[charId]?.flags?.hasMet).length
+    const contacts = chars.filter(
+      (charId) => charInfo[charId]?.flags?.gaveContactInfo && !charInfo[charId]?.flags?.blocked
+    ).length
+    const gifts = chars.reduce((total, charId) => total + (charInfo[charId]?.gifts ?? []).length, 0)
+    const texts = Object.values(conversations).reduce(
+      (total, conversation) =>
+        total + conversation.messages.filter((message) => message.sender === 'player').length,
+      0
+    )
+    return [
+      { id: 'bb-tally-girls', label: 'GIRLS MET', value: `${met} / ${chars.length}` },
+      {
+        id: 'bb-tally-gpa',
+        label: 'GPA',
+        value: gpaOf(classRecords, gradedCourses(playerSchedule, classes)).toFixed(2)
+      },
+      { id: 'bb-tally-money', label: 'MONEY EARNED', value: formatMoney(counts.moneyEarned) },
+      { id: 'bb-tally-contacts', label: 'CONTACTS', value: String(contacts) },
+      { id: 'bb-tally-kisses', label: 'KISSES', value: String(counts.kisses) },
+      { id: 'bb-tally-classes', label: 'CLASSES ATTENDED', value: `${attended} / ${recorded}` },
+      { id: 'bb-tally-gifts', label: 'GIFTS GIVEN', value: String(gifts) },
+      { id: 'bb-tally-texts', label: 'TEXTS SENT', value: String(texts) },
+      // A player who asked for less of it keeps the tile: the reading under it answers the
+      // label's other question instead of counting.
+      { id: 'bb-tally-sex', label: 'SEX', value: lessNsfwText ? 'MALE' : String(counts.sex) },
+      {
+        id: 'bb-tally-exams',
+        label: 'EXAMS ACED',
+        value: String(handedBackAcedCount(classRecords, classes, occasions, date, finalsScoresShown))
+      },
+      { id: 'bb-tally-shifts', label: 'SHIFTS WORKED', value: String(counts.shiftsWorked) }
+    ]
+  }, [
+    charInfo,
+    chars,
+    classRecords,
+    classes,
+    conversations,
+    counts,
+    date,
+    finalsScoresShown,
+    lessNsfwText,
+    occasions,
+    playerSchedule
+  ])
+
+  return (
+    <div className="vu-bb-page">
+      <div className="vu-title vu-bb-title">
+        <h2 className="vu-title-text">Profile</h2>
+      </div>
+
+      <div className="vu-bb-scroll">
+        <div className="vu-bb-me">
+          {/* The archway is the upload control: the one place in the app a face is his own, and
+              the ✕ that clears it is its sibling, never a button inside a button. */}
+          <motion.button
+            className={`vu-arch vu-bb-me-arch${picture ? '' : ' vu-bb-me-arch--empty'}`}
+            type="button"
+            aria-label={picture ? 'Change profile picture' : 'Add a profile picture'}
+            {...gestures(false, portraitLift, quietPress)}
+            onClick={() => fileInput.current?.click()}
+          >
+            {picture ? (
+              <span className="vu-crop">
+                <img className="vu-crop-img" src={picture} alt="" />
+              </span>
+            ) : (
+              <PlusIcon size={34} />
+            )}
+          </motion.button>
+          {picture && (
+            <motion.button
+              className="vu-x"
+              type="button"
+              aria-label="Remove profile picture"
+              {...gestures(false, quietLift, quietPress)}
+              onClick={() => void removeProfilePicture()}
+            >
+              <CloseIcon />
+            </motion.button>
+          )}
+          <input
+            ref={fileInput}
+            id="bb-profile-picture-input"
+            type="file"
+            accept={PROFILE_PICTURE_TYPES.join(',')}
+            hidden
+            onChange={(event) => pick(event.target.files?.[0])}
+          />
+          <div className="vu-bb-me-main">
+            <span className="vu-bb-me-name">
+              {firstName} {lastName}
+            </span>
+            <p className="vu-bb-me-line">{description}</p>
+          </div>
+        </div>
+
+        {/* Enter breaks a line here, so it is kept off the window-level handler that would
+            otherwise advance the scene under the phone; the newline itself is the field's. */}
+        <div
+          className="vu-bb-me-bio"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.stopPropagation()
+          }}
+        >
+          <TextField
+            id="bb-bio"
+            label="Bio"
+            value={bio}
+            onChange={(value) => setBio(value)}
+            multiline
+            rows={3}
+            placeholder="Optional. Can be left blank."
+            hint="This is put in every prompt so try to keep it short and sweet. Use third-person past tense and complete this paragraph: The reader is a freshman named <Name>, a male who has a single dorm in Lowrise 4. The reader is <description based on current stats>. The reader is..."
+          />
+        </div>
+
+        <div className="vu-bb-section">Stats</div>
+        <motion.div className="vu-bb-tallies" variants={LIST_DEAL}>
+          {readings.map((reading) => (
+            <motion.div
+              key={reading.id}
+              id={reading.id}
+              className="vu-bb-tally"
+              variants={slideInQuick}
+            >
+              <span className="vu-bb-tally-label">{reading.label}</span>
+              <span className="vu-bb-tally-value">{reading.value}</span>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
   )

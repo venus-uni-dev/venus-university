@@ -2,13 +2,11 @@ import { SENIOR_YEAR, slotFullLabel } from '@shared/classes'
 import { globalSlotOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
 import { POSITIONS } from '@shared/positions'
-import { readerStandingOf } from '@shared/relationship'
 import { ROOM_VARIANTS } from '@shared/room'
 import { giftLoreNote, itemDefOf } from '@shared/shop'
 import { charKeyOf, type CharInfo, type Character, type OutfitSet, type TimeSlot } from '@shared/types'
 import {
   classSceneContextOf,
-  handedBackAcedCount,
   projectSceneContextOf,
   recapOf
 } from '../../prompts/classProgress'
@@ -16,7 +14,7 @@ import { formatChatDivider } from '../../prompts/gameDate'
 import { firstMeetingAfter, meetingsBefore } from '../../prompts/occasions'
 import type { SchedulePromptInput } from '../../prompts/schedulePrompt'
 import type { AddedNotice, DroppedNotice, ScenePromptState } from '../../prompts/scenePrompt'
-import { readerText } from '../../prompts/setting'
+import { readerBlockOf } from '../../prompts/setting'
 import { composeTextingSummary, hasTexted } from '../../prompts/textingPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../../prompts/seedWords'
 import { useAssetStore } from '../assetStore'
@@ -175,24 +173,7 @@ export function reader(view?: {
   stats: PlayerStats
   charInfo: Readonly<Record<string, CharInfo>>
 }): string {
-  const game = useGameStore.getState()
-  const firstNames: Record<string, string> = {}
-  for (const charId of game.chars) {
-    const character = game.characters[charId]
-    if (character) firstNames[charId] = character.firstName
-  }
-  return readerText(game.playerFirstName, game.playerLastName, view?.stats ?? game.stats, {
-    // Known for, not merely earned: a perfect paper counts once it comes back.
-    aced: handedBackAcedCount(
-      game.classRecords,
-      game.classes,
-      game.occasions,
-      game.date,
-      game.finalsScoresShown
-    ),
-    standing: game.gradesStanding,
-    ...readerStandingOf(game.chars, view?.charInfo ?? game.charInfo, firstNames)
-  })
+  return readerBlockOf(useGameStore.getState(), view)
 }
 
 /**

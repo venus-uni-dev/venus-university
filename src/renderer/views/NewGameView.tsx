@@ -4,6 +4,7 @@ import { appError, toAppError } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
 import { STARTING_MONEY } from '@shared/money'
+import { emptyTallies } from '@shared/tallies'
 import { placeNpcShifts, rollFreshmanJobStart, rollJobClosures } from '@shared/jobs'
 import { rollSemesterWeather } from '@shared/weather'
 import { initialFlags } from '@shared/relationship'
@@ -214,6 +215,8 @@ export function NewGameView(): JSX.Element {
   const [playerStats, setPlayerStats] = useState<PlayerStats>(
     resumed?.enrollment.stats ?? DEFAULT_PLAYER_STATS
   )
+  // What the reader says about himself, as the same modal took it down; blank is an answer.
+  const [playerBio, setPlayerBio] = useState(resumed?.enrollment.bio ?? '')
   // Whether the height lineup is up — the first question the start asks; its answer
   // is written to each character, not held here.
   const [sizing, setSizing] = useState(false)
@@ -450,7 +453,8 @@ export function NewGameView(): JSX.Element {
     semester: StartResult,
     first: string,
     last: string,
-    stats: PlayerStats
+    stats: PlayerStats,
+    bio: string
   ): Promise<void> {
     const written = await useSaveStore.getState().enroll({
       chars: roster.map((c) => c.charId),
@@ -463,7 +467,8 @@ export function NewGameView(): JSX.Element {
       occasions: semester.occasions,
       playerFirstName: first,
       playerLastName: last,
-      stats
+      stats,
+      ...(bio ? { bio } : {})
     })
     if (!written.ok) {
       showError(written.error)
@@ -497,7 +502,7 @@ export function NewGameView(): JSX.Element {
     // The semester goes to disk under the curtain that is already holding with its caption, and
     // the timetable is put up under the same cover and revealed with it.
     void (async () => {
-      await enroll(outcome.data, playerName.first, playerName.last, playerStats)
+      await enroll(outcome.data, playerName.first, playerName.last, playerStats, playerBio)
       endCrossing(() => {
         setSchedules(outcome.data.schedules)
         setJobs(outcome.data.jobs)
@@ -531,15 +536,17 @@ export function NewGameView(): JSX.Element {
     endCrossing()
     setPlayerName({ first: DEFAULT_PLAYER_FIRST_NAME, last: DEFAULT_PLAYER_LAST_NAME })
     setPlayerStats(DEFAULT_PLAYER_STATS)
+    setPlayerBio('')
   }
 
   /**
    * The reader is named: the timetable follows on the canned start, and on a generated
    * one the curtain holds until the semester it is waiting on is written.
    */
-  function onNamed(first: string, last: string, stats: PlayerStats): void {
+  function onNamed(first: string, last: string, stats: PlayerStats, bio: string): void {
     setPlayerName({ first, last })
     setPlayerStats(stats)
+    setPlayerBio(bio)
     setNaming(false)
     if (quick) {
       // The canned timetable was written at mount, so the menu's crossing has only the
@@ -553,7 +560,7 @@ export function NewGameView(): JSX.Element {
       }
       void (async () => {
         const semester = { schedules, jobs, haunts, feeds, springBreakPlans, occasions }
-        await enroll(semester, first, last, stats)
+        await enroll(semester, first, last, stats, bio)
         endCrossing(() => setView('classSelect'))
       })()
       return
@@ -688,6 +695,8 @@ export function NewGameView(): JSX.Element {
         schemaVersion: 12,
         stats: playerStats,
         money: STARTING_MONEY,
+        ...(playerBio ? { bio: playerBio } : {}),
+        tallies: emptyTallies(),
         date: FIRST_SLOT.date,
         time: FIRST_SLOT.time,
         charInfo: Object.fromEntries(
@@ -809,7 +818,7 @@ export function NewGameView(): JSX.Element {
           {naming && (
             <PlayerNameModal
               key="naming"
-              askStats={false}
+              askDetails={false}
               theme={theme}
               onSubmit={onNamed}
             />

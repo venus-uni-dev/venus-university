@@ -30,12 +30,17 @@ export interface VenusUniversityDb extends DBSchema {
   playthroughs: { key: string; value: PlaythroughRow }
   saves: { key: [string, string]; value: GameSave }
   endingArt: { key: string; value: Blob }
+  profilePictures: { key: string; value: Blob }
   characters: { key: string; value: Character }
   charFiles: { key: [string, string]; value: CharFile }
   log: { key: 'log'; value: string }
 }
 
-/** The stores this version creates; there is no migration path, as on disk. */
+/**
+ * Every store this version wants; there is no migration path, as on disk. A version that
+ * appends one creates only what is missing, so a database already here gains it and keeps
+ * everything it holds.
+ */
 const STORES = [
   'settings',
   'grabbags',
@@ -44,10 +49,11 @@ const STORES = [
   'endingArt',
   'characters',
   'charFiles',
-  'log'
+  'log',
+  'profilePictures'
 ] as const
 
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

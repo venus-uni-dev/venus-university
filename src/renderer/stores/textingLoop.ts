@@ -6,21 +6,14 @@
 
 import { formatDateBanner, prevSlot } from '../prompts/gameDate'
 import type { CalendarEvent, CharInfo, EventCancellation, Occasion } from '@shared/types'
-import {
-  affectionFor,
-  dispositionOf,
-  emptyFlags,
-  isPositive,
-  readerStandingOf
-} from '@shared/relationship'
+import { affectionFor, dispositionOf, emptyFlags, isPositive } from '@shared/relationship'
 import { requestAcceptChance } from '@shared/feed'
 import {
   npcFriendsOf,
   type NpcRelationshipMap,
   type NpcSlotOverlay
 } from '@shared/npcRelationships'
-import { readerText } from '../prompts/setting'
-import { handedBackAcedCount } from '../prompts/classProgress'
+import { readerBlockOf } from '../prompts/setting'
 import {
   bossChatIdOf,
   globalSlotOf,
@@ -443,13 +436,6 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
       .map((id) => game.characters[id])
       .filter((other): other is Character => Boolean(other))
 
-    // Every girl the reader's own standing might name.
-    const firstNames: Record<string, string> = {}
-    for (const id of game.chars) {
-      const other = game.characters[id]
-      if (other) firstNames[id] = other.firstName
-    }
-
     const request = buildTextingPrompt(
       character,
       game.charInfo[charId],
@@ -477,17 +463,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         springBreakAway: game.springBreakAway
       },
       // The same reader block a scene gets, grades and all.
-      readerText(game.playerFirstName, game.playerLastName, game.stats, {
-        aced: handedBackAcedCount(
-          game.classRecords,
-          game.classes,
-          game.occasions,
-          game.date,
-          game.finalsScoresShown
-        ),
-        standing: game.gradesStanding,
-        ...readerStandingOf(game.chars, game.charInfo, firstNames)
-      })
+      readerBlockOf(game)
     )
 
     await runReply(charId, character, conversation, sent, request, 0, invited)

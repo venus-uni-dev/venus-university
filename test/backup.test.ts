@@ -38,7 +38,8 @@ const {
   CHARACTERS_DIR,
   charFileEntry,
   classifyBackupEntry,
-  endingArtEntry
+  endingArtEntry,
+  profilePictureEntry
 } = await import('../src/shared/backup')
 const { cgRel, expressionRel, STAGING_DIR } = await import('../src/shared/characterFiles')
 const { validateRecord } = await import('../src/shared/jsonValidate')
@@ -271,6 +272,8 @@ describe('classifyBackupEntry', () => {
     expect(classifyBackupEntry(`${CHARACTERS_DIR}/`)).toBe('skip')
     expect(classifyBackupEntry(endingArtEntry('1700000000000'))).toBe('image')
     expect(classifyBackupEntry(`${endingArtEntry('1700000000000')}/extra`)).toBe('reject')
+    expect(classifyBackupEntry(profilePictureEntry('1700000000000'))).toBe('image')
+    expect(classifyBackupEntry(`${profilePictureEntry('1700000000000')}/extra`)).toBe('reject')
     expect(classifyBackupEntry('evil.txt')).toBe('reject')
   })
 })

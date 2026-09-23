@@ -748,6 +748,10 @@ export function applyLedger(ledger: LedgerResponse): DatingPassOutcome {
     useGameStore.getState().applyRelationshipEvents(charId, events)
   }
 
+  // Every kiss and every night counted once per act: the boundary replays from the save before
+  // it, so this lands once however often it runs.
+  game.recordActs(ledgerActs(ledger, false))
+
   const dating = settleDating(datingInputOf(before, useGameStore.getState().charInfo, game.date))
   useGameStore.getState().applyDatingSettle(dating)
   return dating

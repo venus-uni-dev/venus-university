@@ -279,6 +279,79 @@ export function gradesStandingOf(scores: readonly number[]): 'good' | 'bad' | nu
   return null
 }
 
+/** The reader's own non-PE classes, the ones that grade him: the codes on his timetable that are courses, each once. */
+export function gradedCourses(
+  playerSchedule: Readonly<Record<number, string>>,
+  classes: Readonly<Record<string, ClassEntry>>
+): CourseEntry[] {
+  return [...new Set(Object.values(playerSchedule))]
+    .map((code) => classes[code])
+    .filter((entry): entry is CourseEntry => Boolean(entry) && isCourse(entry))
+}
+
+/** Each grade point and the whole-percent score that earns it, highest first. */
+const GRADE_POINT_SCALE: readonly { floor: number; points: number }[] = [
+  { floor: 93, points: 4 },
+  { floor: 90, points: 3.7 },
+  { floor: 87, points: 3.3 },
+  { floor: 83, points: 3 },
+  { floor: 80, points: 2.7 },
+  { floor: 77, points: 2.3 },
+  { floor: 73, points: 2 },
+  { floor: 70, points: 1.7 },
+  { floor: 67, points: 1.3 },
+  { floor: 63, points: 1 },
+  { floor: 60, points: 0.7 }
+]
+
+/** Grade points a whole-percent score earns on the standard four-point scale. */
+export function gradePointsOf(percent: number): number {
+  for (const step of GRADE_POINT_SCALE) {
+    if (percent >= step.floor) return step.points
+  }
+  return 0
+}
+
+/** How much of a class percent the papers he has sat are worth. */
+const GPA_SCORE_WEIGHT = 0.75
+
+/** How much of it turning up is worth. */
+const GPA_ATTENDANCE_WEIGHT = 0.25
+
+/**
+ * The reader's GPA off what has already happened: every course that has met or been assessed,
+ * graded on the scores it has so far against how often he was in the room, and on attendance
+ * alone until the first paper is sat. A semester with nothing behind it yet stands at 4.0.
+ */
+export function gpaOf(
+  records: Readonly<Record<string, ClassRecord>>,
+  courses: readonly CourseEntry[]
+): number {
+  const points: number[] = []
+  for (const course of courses) {
+    const record = records[course.code]
+    const meetings = record?.meetings ?? []
+    const attendance =
+      meetings.length > 0
+        ? meetings.filter((meeting) => meeting.attended).length / meetings.length
+        : null
+    const scores = [record?.midtermScore, record?.finalScore].filter(
+      (score): score is number => typeof score === 'number'
+    )
+    if (meetings.length === 0 && scores.length === 0) continue
+
+    const percent =
+      scores.length > 0
+        ? GPA_SCORE_WEIGHT * (scores.reduce((sum, score) => sum + score, 0) / scores.length) +
+          GPA_ATTENDANCE_WEIGHT * (attendance ?? 0) * 100
+        : (attendance ?? 0) * 100
+    points.push(gradePointsOf(percent))
+  }
+
+  if (points.length === 0) return 4
+  return points.reduce((sum, point) => sum + point, 0) / points.length
+}
+
 // ─── Wording: everything the player reads about a class ────────────────────────
 
 /**

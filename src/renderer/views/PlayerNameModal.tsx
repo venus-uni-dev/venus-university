@@ -57,25 +57,27 @@ const statIcons: Record<StatKey, () => JSX.Element> = {
 }
 
 export interface PlayerNameModalProps {
-  onSubmit: (firstName: string, lastName: string, stats: PlayerStats) => void
-  /** Whether the stat rows are on offer; Quickstart turns them off. */
-  askStats?: boolean
+  onSubmit: (firstName: string, lastName: string, stats: PlayerStats, bio: string) => void
+  /** Whether the bio and the stat rows are on offer; Quickstart asks the name alone. */
+  askDetails?: boolean
   /** Drawn by the screen that opened this — a portal inherits neither palette nor state rules. */
   theme: 'day' | 'night'
 }
 
 /**
- * Names the reader and sets his opening stat tiers, while the class catalog generates behind it.
- * **Dismissing it is confirming it**: every value already has an answer — blank means the name
- * shown, untouched means the floor — so the dimming, Escape and the button all commit.
+ * Names the reader, takes down what he says about himself and sets his opening stat tiers, while
+ * the class catalog generates behind it. **Dismissing it is confirming it**: every value already
+ * has an answer — blank means the name shown, untouched means the floor, and the bio is the one
+ * answer that may be blank — so the dimming, Escape and the button all commit.
  */
 export function PlayerNameModal({
   onSubmit,
-  askStats = true,
+  askDetails = true,
   theme
 }: PlayerNameModalProps): JSX.Element | null {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [bio, setBio] = useState('')
   const [tiers, setTiers] = useState<Record<StatKey, StatTier>>({
     brain: STARTING_TIER,
     body: STARTING_TIER,
@@ -91,7 +93,8 @@ export function PlayerNameModal({
     onSubmit(
       firstName.trim() || DEFAULT_PLAYER_FIRST_NAME,
       lastName.trim() || DEFAULT_PLAYER_LAST_NAME,
-      statsForTiers(tiers)
+      statsForTiers(tiers),
+      bio.trim()
     )
   }
 
@@ -148,8 +151,18 @@ export function PlayerNameModal({
         </p>
 
         {/* Dropped rather than locked on the canned start, which asks the name alone. */}
-        {askStats && (
+        {askDetails && (
           <>
+            <TextField
+              id="player-bio"
+              label="Bio"
+              value={bio}
+              onChange={setBio}
+              multiline
+              rows={3}
+              placeholder="Optional, can be left blank. You can change this at any time in-game."
+              hint="This is put in every prompt so try to keep it short and sweet. Use third-person past tense and complete this paragraph: The reader is a freshman named <Name>, a male who has a single dorm in Lowrise 4. The reader is <description based on selected stats>. The reader is..."
+            />
             <div className="vu-who-stats">
               <span className="vu-field-label">Starting stats</span>
               {STAT_KEYS.map((key) => {

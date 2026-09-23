@@ -15,30 +15,32 @@
 
 /* ---- the rail ------------------------------------------------------------- */
 
-/* The way out on top, then the three destinations, stepping down a diagonal that follows the
-   -2° the tiles are tilted at. **There is no fourth tile**: the landing already draws the
-   reader's money and stats, and a phone that reported them again would be one screen saying
-   the same thing twice. */
+/* The way out on top, then the four destinations, stepping down the -2° diagonal the tiles are
+   tilted at, at 10px a seat. */
 .vu-bb-rail {
   display: flex;
   flex: none;
   flex-direction: column;
   align-items: flex-start;
   gap: 22px;
-  width: 116px;
+  width: 126px;
 }
 
 /* The step itself, which is an index rather than a state: each seat sits 10px left of the one
    above it, so the column runs down the -2° the tiles are tilted at. */
 .vu-bb-rail > :nth-child(1) {
-  margin-left: 30px;
+  margin-left: 40px;
 }
 
 .vu-bb-rail > :nth-child(2) {
-  margin-left: 20px;
+  margin-left: 30px;
 }
 
 .vu-bb-rail > :nth-child(3) {
+  margin-left: 20px;
+}
+
+.vu-bb-rail > :nth-child(4) {
   margin-left: 10px;
 }
 
@@ -1002,4 +1004,138 @@
   color: var(--vu-text-body);
   font: 700 14px var(--font-body);
   text-align: left;
+}
+
+/* ---- Profile -------------------------------------------------------------- */
+
+/* His own card at the head of the tab, in the half-pill every reading on this app is drawn on
+   and recessed rather than papered — a sheet of paper here would out-weigh the roster behind it.
+   The left inset is deep enough that the archway seated in the round end clears the curve. */
+.vu-bb-me {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 26px;
+  height: 176px;
+  padding: 0 34px 0 46px;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+  overflow: hidden;
+}
+
+/* An archway is a person, and this one is also the control that picks his picture — 120x144 is
+   the 5:6 every profile is cut at, at the size a card reads a face from. */
+.vu-bb-me-arch {
+  display: grid;
+  flex: none;
+  place-items: stretch;
+  width: 120px;
+  height: 144px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+
+/* Nothing picked yet, drawn as the gap it is: dashed in the border tone, with the plus standing
+   where the picture would. */
+.vu-bb-me-arch.vu-bb-me-arch--empty {
+  place-items: center;
+  border: 3px dashed var(--vu-border);
+  background: none;
+  color: var(--vu-text-muted);
+}
+
+/* `.vu-x` carries no position of its own; this rides it on the archway's square bottom corner,
+   where everything that acts on a face in this app sits. */
+.vu-bb-me > .vu-x {
+  position: absolute;
+  top: 132px;
+  left: 138px;
+}
+
+.vu-bb-me-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The one name on this tab that is not an entry in a list, so it is said at a subject's weight
+   rather than a row's. */
+.vu-bb-me-name {
+  color: var(--vu-text);
+  font: 700 26px var(--font-body);
+}
+
+/* What the prompts are told about him. Italic, because it is the app describing him rather than
+   anything he wrote — the field below is the half that is his. */
+.vu-bb-me-line {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 15px/1.5 var(--font-body);
+}
+
+.vu-bb-me-bio {
+  flex: none;
+}
+
+/* The field opens at three lines and grows to five before it scrolls, so a bio that is getting
+   long says so by running out of room. `field-sizing: content` sizes it with nothing manually
+   measured; 33px is `.vu-input--multiline`'s 14px padding and `.vu-input`'s 2.5px border,
+   doubled. */
+.vu-bb-me-bio .vu-input--multiline {
+  min-height: calc(3lh + 33px);
+  max-height: calc(5lh + 33px);
+  overflow: hidden auto;
+  field-sizing: content;
+  resize: none;
+}
+
+/* The semester as a wall of readings, four across. `minmax(0, 1fr)` and no fixed width is what
+   keeps the row reflowing with the panel at the narrow stage, where the phone gives up the
+   width and the rail does not. */
+.vu-bb-tallies {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* A rounded rectangle is a container, and each of these holds exactly one figure: the same
+   quiet shape whatever it is counting. */
+.vu-bb-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: var(--vu-recessed);
+}
+
+/* What the figure under it counts, in the bookkeeping voice. */
+.vu-bb-tally-label {
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The reading itself. There is nothing for any of these to be short of, so each takes the accent
+   rather than a state's hue, and tabular figures keep a tile from jittering as its digits change
+   width under each other. */
+.vu-bb-tally-value {
+  color: var(--vu-accent);
+  font: 700 28px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* His picture standing where the rail's profile mark would, in the archway's own 5:6 at the
+   marks' size beside it. */
+.vu-bb-tile-face {
+  display: block;
+  flex: none;
+  width: 30px;
+  height: 36px;
+  overflow: hidden;
 }

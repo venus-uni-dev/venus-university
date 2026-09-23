@@ -44,6 +44,17 @@
   font: italic 500 14px/1.5 var(--font-body);
 }
 
+/* The reader's own words: three lines of well, growing with what he types to five and then
+   scrolling, with nothing measured. 33px is `.vu-input--multiline`'s 14px padding and
+   `.vu-input`'s 2.5px border doubled — the same constant the phone's composer counts in. */
+.vu-who .vu-input--multiline {
+  min-height: calc(3lh + 33px);
+  max-height: calc(5lh + 33px);
+  overflow: hidden auto;
+  field-sizing: content;
+  resize: none;
+}
+
 .vu-who-stats {
   display: flex;
   flex-direction: column;

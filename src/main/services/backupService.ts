@@ -9,6 +9,7 @@ import {
   charFileEntry,
   classifyBackupEntry,
   endingArtEntry,
+  profilePictureEntry,
   type BackupFile,
   type BackupPlaythrough,
   type BackupSave
@@ -16,6 +17,7 @@ import {
 import { isCharFileRel, STAGING_DIR } from '@shared/characterFiles'
 import { CHARACTER_NOT_FOUND, SAFE_CHAR_ID } from '@shared/characterRules'
 import { appError, messageOf } from '@shared/errors'
+import { imageTypeOf } from '@shared/imageBytes'
 import {
   ENROLLMENT_NOT_FOUND,
   RECORD_NOT_FOUND,
@@ -31,6 +33,7 @@ import {
   getEndingArtPath,
   getEnrollmentPath,
   getPlaythroughRecordPath,
+  getProfilePicturePath,
   getSaveFilePath,
   getSavesPath
 } from '../paths'
@@ -48,6 +51,7 @@ import { readEndingArt } from './endingArtService'
 import { getGrabBags, setGrabBags } from './grabBagService'
 import { sniffImageFile } from './imageFiles'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
+import { readProfilePicture } from './profilePictureService'
 import {
   loadSave,
   playthroughIds,
@@ -129,6 +133,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
     const playthroughs: Record<string, BackupPlaythrough> = {}
     const saves: BackupSave[] = []
     const endingArt: string[] = []
+    const profilePictures: string[] = []
 
     for (const playthroughId of await playthroughIds()) {
       playthroughs[playthroughId] = await backupPlaythrough(playthroughId)
@@ -147,6 +152,20 @@ export async function exportBackup(targetPath: string): Promise<void> {
         await mkdir(dirname(path), { recursive: true })
         await writeFile(path, art)
         endingArt.push(playthroughId)
+      }
+
+      const picture = await readProfilePicture(playthroughId)
+      if (picture) {
+        // It came off the player's own files, so its bytes are sniffed like a character's:
+        // a backup a restore would refuse is no backup.
+        if (imageTypeOf(picture)) {
+          const path = join(scratch, profilePictureEntry(playthroughId))
+          await mkdir(dirname(path), { recursive: true })
+          await writeFile(path, picture)
+          profilePictures.push(playthroughId)
+        } else {
+          console.warn(`[backup] leaving out ${profilePictureEntry(playthroughId)}: not an image`)
+        }
       }
     }
 
@@ -182,6 +201,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       playthroughs,
       saves,
       endingArt,
+      profilePictures,
       characters
     }
     await writeAtomicJson(join(scratch, BACKUP_NAME), record, {
@@ -280,6 +300,15 @@ async function restoreSaves(scratch: string, record: BackupFile): Promise<void> 
         await rename(join(scratch, endingArtEntry(playthroughId)), picture).catch(
           (err: unknown) => {
             console.warn(`[backup] no graduation picture for ${playthroughId}:`, err)
+          }
+        )
+      }
+
+      if ((record.profilePictures ?? []).includes(playthroughId)) {
+        const picture = join(folder, basename(getProfilePicturePath(playthroughId)))
+        await rename(join(scratch, profilePictureEntry(playthroughId)), picture).catch(
+          (err: unknown) => {
+            console.warn(`[backup] no profile picture for ${playthroughId}:`, err)
           }
         )
       }
