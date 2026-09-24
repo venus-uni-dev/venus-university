@@ -59,6 +59,11 @@ const api: VenusUniversityApi = {
         listener(group, delta)
       ipcRenderer.on('llm:textingDelta', wrapped)
       return () => ipcRenderer.removeListener('llm:textingDelta', wrapped)
+    },
+    onTokensGenerated: (listener) => {
+      const wrapped = (_event: unknown, generated: number): void => listener(generated)
+      ipcRenderer.on('llm:tokens', wrapped)
+      return () => ipcRenderer.removeListener('llm:tokens', wrapped)
     }
   },
   chars: {
@@ -77,6 +82,7 @@ const api: VenusUniversityApi = {
     deleteSet: (charId, slot) => ipcRenderer.invoke('chars:deleteSet', charId, slot),
     readWardrobeImage: (charId, target, image) =>
       ipcRenderer.invoke('chars:readWardrobeImage', charId, target, image),
+    readImage: (charId, rel) => ipcRenderer.invoke('chars:readImage', charId, rel),
     applyWardrobeFix: (charId, target, images, paintLayer, kind) =>
       ipcRenderer.invoke('chars:applyWardrobeFix', charId, target, images, paintLayer, kind),
     discardWardrobeLayer: (charId, target, kind) =>
@@ -96,6 +102,7 @@ const api: VenusUniversityApi = {
   saves: {
     playthroughs: () => ipcRenderer.invoke('saves:playthroughs'),
     list: (playthroughId) => ipcRenderer.invoke('saves:list', playthroughId),
+    read: (playthroughId, saveId) => ipcRenderer.invoke('saves:read', playthroughId, saveId),
     enroll: (draft) => ipcRenderer.invoke('saves:enroll', draft),
     enrollment: (playthroughId) => ipcRenderer.invoke('saves:enrollment', playthroughId),
     create: (playthrough, draft, playthroughId) =>
@@ -105,6 +112,8 @@ const api: VenusUniversityApi = {
       ipcRenderer.invoke('saves:overwrite', playthroughId, saveId, draft),
     autosave: (playthroughId, draft) =>
       ipcRenderer.invoke('saves:autosave', playthroughId, draft),
+    manual: (playthroughId, slot, draft) =>
+      ipcRenderer.invoke('saves:manual', playthroughId, slot, draft),
     delete: (playthroughId, saveId) =>
       ipcRenderer.invoke('saves:delete', playthroughId, saveId),
     deletePlaythrough: (playthroughId) =>

@@ -1,21 +1,28 @@
 import { appError } from '@shared/errors'
 import { validateRecord } from '@shared/jsonValidate'
 import {
+  assertManualSlot,
   assertSafePlaythroughId,
   assertSafeSaveId,
   atLocation,
+  classifySaveId,
   ENROLLMENT_NOT_FOUND,
   ENROLLMENT_READ,
+  groupSaveIds,
+  isSlotSaveId,
+  listedSaveIds,
+  manualSaveId,
   mintId,
   prunedSlotIds,
   RECORD_NOT_FOUND,
   RECORD_READ,
   SAVE_NOT_FOUND,
   SAVE_READ,
-  sortSlotIds,
   stampEnrollment,
   stampRecord,
-  stampSave
+  stampSave,
+  summaryOf,
+  type SaveIdGroups
 } from '@shared/saveRules'
 import {
   AUTOSAVE_ID,
@@ -31,7 +38,8 @@ import {
   type PlaythroughRecord,
   type PlaythroughSummary,
   type SaveDraft,
-  type SaveEntry
+  type SaveEntry,
+  type SaveReadResult
 } from '@shared/types'
 import { database, partRange, storage, type PlaythroughRow } from './open'
 
@@ -56,19 +64,12 @@ async function playthroughIds(): Promise<string[]> {
   return keys.sort((a, b) => Number(a) - Number(b))
 }
 
-/** The save ids one playthrough holds: whether it has an autosave, and its slots newest-first. */
-async function saveIdsOf(playthroughId: string): Promise<{ autosave: boolean; slots: string[] }> {
+/** The save ids one playthrough holds by kind; a key no save is written under is skipped. */
+async function saveIdsOf(playthroughId: string): Promise<SaveIdGroups> {
   const keys = await storage('read the saves', async () =>
     (await database()).getAllKeys('saves', partRange(playthroughId))
   )
-
-  const slots: string[] = []
-  let autosave = false
-  for (const [, saveId] of keys) {
-    if (saveId === AUTOSAVE_ID) autosave = true
-    else slots.push(saveId)
-  }
-  return { autosave, slots: sortSlotIds(slots) }
+  return groupSaveIds(keys.map(([, saveId]) => saveId))
 }
 
 /** Reads and validates one playthrough's record; a missing field is refused by name. */
@@ -107,9 +108,47 @@ export async function loadSave(playthroughId: string, saveId: string): Promise<G
 }
 
 /**
- * Lists every playthrough in creation order, each summarised from its newest readable save;
- * one with no readable save is listed with the reason instead, and one with no save at all
- * from the enrollment waiting in it. A row holding neither is skipped.
+ * The newest readable save of one playthrough by `saveDate`, or the first refusal met where none
+ * reads. A row the index cannot place, missing a field it is keyed on, is still read by its id.
+ */
+async function newestSave(
+  playthroughId: string,
+  saveIds: readonly string[]
+): Promise<{ save: GameSave | null; reason: string }> {
+  let reason = ''
+  const indexed = await storage('read the saves', async () => {
+    const index = (await database()).transaction('saves').store.index('byDate')
+    const range = IDBKeyRange.bound([playthroughId, -Infinity], [playthroughId, Infinity])
+    // Validation is synchronous, so the transaction stays open from one row to the next.
+    let cursor = await index.openCursor(range, 'prev')
+    for (; cursor; cursor = await cursor.continue()) {
+      const [owner, saveId] = cursor.primaryKey
+      if (owner !== playthroughId || classifySaveId(saveId) === null) continue
+      try {
+        const save = validateRecord<GameSave>(cursor.value, `${owner}/${saveId}`, SAVE_READ)
+        return atLocation(save, playthroughId, saveId)
+      } catch (err) {
+        if (!reason) reason = (err as AppError).message
+      }
+    }
+    return null
+  })
+  if (indexed) return { save: indexed, reason }
+
+  for (const saveId of saveIds) {
+    try {
+      return { save: await loadSave(playthroughId, saveId), reason }
+    } catch (err) {
+      if (!reason) reason = (err as AppError).message
+    }
+  }
+  return { save: null, reason }
+}
+
+/**
+ * Lists every playthrough in creation order, each summarised from its newest readable save of
+ * any kind; one with no readable save is listed with the reason instead, and one with no save
+ * at all from the enrollment waiting in it. A row holding neither is skipped.
  */
 export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
   const summaries: PlaythroughSummary[] = []
@@ -118,15 +157,15 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
     const row = await rowOf(playthroughId)
     if (!row) continue
 
-    const { autosave, slots } = await saveIdsOf(playthroughId)
-    // The autosave is always newer than every slot-save when it exists.
-    const saveIds = autosave ? [AUTOSAVE_ID, ...slots] : slots
+    const groups = await saveIdsOf(playthroughId)
+    const saveIds = listedSaveIds(groups)
 
     const base = {
       playthroughId,
       label: `Playthrough ${summaries.length + 1}`,
-      saveCount: slots.length,
-      hasAutosave: autosave
+      saveCount: groups.slots.length,
+      manualCount: groups.manual.length,
+      hasAutosave: groups.autosave
     }
 
     // Nothing has been played yet: the row stands for the semester still at the registrar,
@@ -167,33 +206,27 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
       reason = (err as AppError).message
     }
 
-    let summary: PlaythroughSummary | null = null
-    for (const saveId of saveIds) {
-      try {
-        const save = await loadSave(playthroughId, saveId)
-        summary = {
-          ...base,
-          chars: record?.chars ?? [],
-          date: save.date,
-          time: save.time,
-          savedAt: save.saveDate,
-          // A refused record outranks a readable save: without it nothing resolves.
-          unloadable: record ? null : reason
-        }
-        break
-      } catch (err) {
-        if (!reason) reason = (err as AppError).message
-      }
-    }
+    const newest = await newestSave(playthroughId, saveIds)
+    if (!reason) reason = newest.reason
     summaries.push(
-      summary ?? {
-        ...base,
-        chars: [],
-        date: 0,
-        time: 0,
-        savedAt: row.createdAt,
-        unloadable: reason
-      }
+      newest.save
+        ? {
+            ...base,
+            chars: record?.chars ?? [],
+            date: newest.save.date,
+            time: newest.save.time,
+            savedAt: newest.save.saveDate,
+            // A refused record outranks a readable save: without it nothing resolves.
+            unloadable: record ? null : reason
+          }
+        : {
+            ...base,
+            chars: [],
+            date: 0,
+            time: 0,
+            savedAt: row.createdAt,
+            unloadable: reason
+          }
     )
   }
 
@@ -201,12 +234,13 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
 }
 
 /**
- * Lists one playthrough's saves newest-first with the record they are read against, each
- * carrying its error where the row was refused.
+ * Lists one playthrough's saves — the autosave, the boundary saves newest-first, then the
+ * manual saves by slot — with the record they are read against, each summarised, or carrying
+ * its error where the row was refused.
  */
 export async function listSaves(playthroughId: string): Promise<PlaythroughListing> {
   assertSafePlaythroughId(playthroughId)
-  const { autosave, slots } = await saveIdsOf(playthroughId)
+  const saveIds = listedSaveIds(await saveIdsOf(playthroughId))
   const createdAt = (await rowOf(playthroughId))?.createdAt ?? 0
 
   let record: PlaythroughRecord | null = null
@@ -218,16 +252,23 @@ export async function listSaves(playthroughId: string): Promise<PlaythroughListi
   }
 
   const saves: SaveEntry[] = []
-  for (const saveId of autosave ? [AUTOSAVE_ID, ...slots] : slots) {
+  for (const saveId of saveIds) {
     try {
       const save = await loadSave(playthroughId, saveId)
-      saves.push({ saveId, savedAt: save.saveDate, save, error: null })
+      saves.push({ saveId, savedAt: save.saveDate, summary: summaryOf(save), error: null })
     } catch (err) {
-      saves.push({ saveId, savedAt: createdAt, save: null, error: err as AppError })
+      saves.push({ saveId, savedAt: createdAt, summary: null, error: err as AppError })
     }
   }
 
   return { record, error, saves }
+}
+
+/** One save with the record it is read against: everything loading it needs. */
+export async function readSave(playthroughId: string, saveId: string): Promise<SaveReadResult> {
+  const record = await readPlaythroughRecord(playthroughId)
+  const save = await loadSave(playthroughId, saveId)
+  return { record, save }
 }
 
 /** Mints the next free playthrough id. */
@@ -289,8 +330,8 @@ export async function createPlaythrough(
 }
 
 /**
- * Writes the slot-boundary save: mints a new id, clears the autosave, and prunes the slot
- * saves back to their window, all in one transaction.
+ * Writes the slot-boundary save: mints a new id and prunes the slot saves back to their window,
+ * all in one transaction. The autosave stands: only the next decision point replaces it.
  */
 export async function writeSlotSave(playthroughId: string, draft: SaveDraft): Promise<GameSave> {
   assertSafePlaythroughId(playthroughId)
@@ -300,11 +341,11 @@ export async function writeSlotSave(playthroughId: string, draft: SaveDraft): Pr
     const store = tx.store
     // Read and writes are all database requests, so the transaction lives to the end of them.
     const keys = await store.getAllKeys(partRange(playthroughId))
-    const slots = keys.map(([, saveId]) => saveId).filter((saveId) => saveId !== AUTOSAVE_ID)
+    // Boundary saves alone: the window never counts, and so never prunes, a manual save.
+    const slots = keys.map(([, saveId]) => saveId).filter(isSlotSaveId)
 
     const saved = stampSave(draft, playthroughId, mintId(new Set(slots)), Date.now())
     void store.put(saved, [playthroughId, saved.saveId])
-    void store.delete([playthroughId, AUTOSAVE_ID])
     // `slots` was read before this write, so the window is what the new save pushes out of it.
     for (const stale of prunedSlotIds(slots)) void store.delete([playthroughId, stale])
 
@@ -333,6 +374,20 @@ export async function overwriteSlotSave(
 export async function writeAutosave(playthroughId: string, draft: SaveDraft): Promise<GameSave> {
   assertSafePlaythroughId(playthroughId)
   return writeSave(playthroughId, AUTOSAVE_ID, draft)
+}
+
+/**
+ * Writes the player's own save into one manual slot, replacing whatever it held. Mints
+ * nothing, prunes nothing and leaves the autosave alone.
+ */
+export async function writeManualSave(
+  playthroughId: string,
+  slot: number,
+  draft: SaveDraft
+): Promise<GameSave> {
+  assertSafePlaythroughId(playthroughId)
+  assertManualSlot(slot)
+  return writeSave(playthroughId, manualSaveId(slot), draft)
 }
 
 /** Writes one save row, stamping the fields this module owns. */

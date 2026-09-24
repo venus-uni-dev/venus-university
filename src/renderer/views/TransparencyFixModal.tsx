@@ -22,7 +22,7 @@ export interface TransparencyFixModalProps {
   onClose: () => void
 }
 
-const HINT = 'Use the brush to paint under the sprite anywhere you see green peeking through.'
+const HINT = 'If the Remove Background node created holes in the sprite, use the brush to paint under the sprite anywhere you see green peeking through. Use the color white or a nearby color depending on what is supposed to be there.'
 
 /** The paint-under-the-sprite editor for one wardrobe. */
 export function TransparencyFixModal({
@@ -120,10 +120,10 @@ export function TransparencyFixModal({
           className="vu-sheet--wide vu-fix vu-paper"
           role="dialog"
           aria-modal="true"
-          aria-label={`Fix transparency — ${title}`}
+          aria-label={`Fix holes — ${title}`}
           variants={panelUnderTab}
         >
-          <TitleTab>Fix transparency</TitleTab>
+          <TitleTab>Fix holes</TitleTab>
 
           {/* Green under, paint over it, sprite over that: the order the file is composited in. */}
           <LayerPainter

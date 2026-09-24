@@ -16,7 +16,7 @@ import { buildQuizPrompt, normalizeQuiz, pickQuizFacts, type QuizDraft } from '.
 import { useGameStore } from '../gameStore'
 import { revealSceneOpening } from '../slotCrossing'
 import { advance, claimTextLedger, fetchEndingOpening } from './hooks'
-import { writeAutosave } from './saves'
+import { endingGameOver, writeAutosave } from './saves'
 import { currentRun, loopState, runStale, type TurnSnapshot } from './state'
 import { queueLines, unpark } from './stream'
 import { failTurn } from './turn'
@@ -170,7 +170,7 @@ function finishExam(): void {
   ])
 
   useGameStore.getState().setSceneEnding(true)
-  loopState.endingInFlight = true
+  useGameStore.getState().setEndingInFlight(true)
   loopState.endingAbandoned = false
   loopState.endBase = null
   loopState.endLines = null
@@ -205,8 +205,11 @@ async function runExamEnding(): Promise<void> {
   // Off the live capture, not `queuedScene`, which replaces the queue wholesale: what is still
   // unread is already in the capture, and is what a resume replays.
   const scene = useGameStore.getState().captureScene()
-  await writeAutosave(scene ? { ...scene, endPending: true, ledger, opening } : null)
+  // A paper sat past the debt floor ends the playthrough at its boundary, and is written nowhere.
+  if (endingGameOver() === null) {
+    await writeAutosave(scene ? { ...scene, endPending: true, ledger, opening } : null)
+  }
   if (runStale(run)) return
-  loopState.endingInFlight = false
+  useGameStore.getState().setEndingInFlight(false)
   unpark()
 }

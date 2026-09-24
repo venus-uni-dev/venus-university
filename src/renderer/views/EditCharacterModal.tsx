@@ -54,7 +54,7 @@ import type {
   SetTarget,
   WardrobeLayer
 } from '@shared/types'
-import { useAssetStore } from '../stores/assetStore'
+import { poseKeysOf, useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import {
   cgTargetFor,
@@ -82,6 +82,7 @@ import {
   GIFT_CATEGORY_OPTIONS,
   listText,
   PREFERRED_STAT_OPTIONS,
+  sheetPlaceholders,
   TAG_FIELDS,
   textList,
   TRAIT_OPTIONS,
@@ -193,6 +194,8 @@ interface Form {
   roomPrompt: string
   height: number
   voicePitch: number
+  /** The pose every sprite render stands in. */
+  pose: string
 }
 
 function formOf(character: Character): Form {
@@ -219,7 +222,8 @@ function formOf(character: Character): Form {
     negativeTags: [...(character.negativeTags ?? [])],
     roomPrompt: character.roomPrompt,
     height: character.height,
-    voicePitch: character.voicePitch ?? VOICE_PITCH_DEFAULT
+    voicePitch: character.voicePitch ?? VOICE_PITCH_DEFAULT,
+    pose: character.pose
   }
 }
 
@@ -270,6 +274,9 @@ export function EditCharacterModal({
   const setBehaviorField = (key: keyof CharacterBehavior) => (value: string) =>
     setForm((prev) => ({ ...prev, behavior: { ...prev.behavior, [key]: value } }))
 
+  // What each prose field shows while it is empty, told about her by name.
+  const placeholders = sheetPlaceholders(form.firstName.trim() || 'She')
+
   // The voice the last preview played, seeded with the one she has: a release that left the
   // slider where it was — tabbing onto it, closing the modal off it — plays nothing.
   const previewedVoice = useRef(form.voicePitch)
@@ -283,6 +290,7 @@ export function EditCharacterModal({
     useAudioStore.getState().previewVoice(pitch, breath)
   }
 
+  const poses = useAssetStore((s) => s.poses)
   const expressions = useCharacterStore((s) => s.expressions)
   const cgs = useCharacterStore((s) => s.cgs[charId])
   const rooms = useCharacterStore((s) => s.rooms[charId])
@@ -325,6 +333,14 @@ export function EditCharacterModal({
      cloud reads is not waiting on an install, so there it opens like any other panel. */
   const advancedShut = comfyMissing && !webBuild
   const keyNote = picturesReady ? null : customWriter ? 'Requires Gemini key' : 'Requires API key'
+
+  // Her own pose first, if this install's manifest carries no skeleton for it — otherwise the
+  // select would show blank for a record saved somewhere that had one.
+  const poseKeys = poseKeysOf(poses)
+  const poseOptions = [
+    ...(form.pose && !poseKeys.includes(form.pose) ? [{ value: form.pose, label: form.pose }] : []),
+    ...poseKeys.map((key) => ({ value: key, label: key }))
+  ]
 
   const defaultsPresent = doneCountOf(expressions, charId) === EMOTIONS.length
   const roomOnDisk = ROOM_VARIANTS.filter((variant) => rooms?.[variant]).length
@@ -412,7 +428,8 @@ export function EditCharacterModal({
       height: form.height,
       negativeTags: form.negativeTags,
       roomPrompt: form.roomPrompt,
-      voicePitch: form.voicePitch
+      voicePitch: form.voicePitch,
+      pose: form.pose
     }
     // Absent and empty mean the same thing, so an empty list is left out of character.json.
     if (next.negativeTags?.length === 0) delete next.negativeTags
@@ -938,6 +955,7 @@ export function EditCharacterModal({
                 label="Personality"
                 value={form.personality}
                 onChange={setField('personality')}
+                placeholder={placeholders.personality}
                 multiline
                 rows={5}
                 autoGrow
@@ -1000,6 +1018,7 @@ export function EditCharacterModal({
                     label="Backstory"
                     value={form.backstory}
                     onChange={setField('backstory')}
+                    placeholder={placeholders.backstory}
                     multiline
                     rows={3}
                     autoGrow
@@ -1009,6 +1028,7 @@ export function EditCharacterModal({
                     label="Dating history"
                     value={form.datingHistory}
                     onChange={setField('datingHistory')}
+                    placeholder={placeholders.datingHistory}
                     multiline
                     rows={2}
                     autoGrow
@@ -1018,6 +1038,7 @@ export function EditCharacterModal({
                     label="Dating preference"
                     value={form.datingPreference}
                     onChange={setField('datingPreference')}
+                    placeholder={placeholders.datingPreference}
                     multiline
                     rows={2}
                     autoGrow
@@ -1027,6 +1048,7 @@ export function EditCharacterModal({
                     label="Sexual Preferences"
                     value={form.kinks}
                     onChange={setField('kinks')}
+                    placeholder={placeholders.kinks}
                     multiline
                     rows={2}
                     autoGrow
@@ -1045,8 +1067,9 @@ export function EditCharacterModal({
                     label="Likes (one per line)"
                     value={form.likes}
                     onChange={setField('likes')}
+                    placeholder={placeholders.likes}
                     multiline
-                    rows={3}
+                    rows={4}
                     autoGrow
                   />
                   <TextField
@@ -1054,18 +1077,20 @@ export function EditCharacterModal({
                     label="Dislikes (one per line)"
                     value={form.dislikes}
                     onChange={setField('dislikes')}
+                    placeholder={placeholders.dislikes}
                     multiline
-                    rows={3}
+                    rows={4}
                     autoGrow
                   />
 
-                  {BEHAVIOR_FIELDS.map(({ key, label }) => (
+                  {BEHAVIOR_FIELDS.map(({ key, label, around }) => (
                     <TextField
                       key={key}
                       id={`edit-${key}`}
                       label={label}
                       value={form.behavior[key]}
                       onChange={setBehaviorField(key)}
+                      placeholder={placeholders.behavior(around)}
                       multiline
                       rows={2}
                       autoGrow
@@ -1143,6 +1168,18 @@ export function EditCharacterModal({
                   <div className="vu-disc-body">
                     {!webBuild && (
                       <>
+                        {/* The pose every render of her stands in, the description under it
+                            drawn from the manifest. A change here reaches the next render
+                            after Save, the same as the tags beside it. */}
+                        <SelectField
+                          id="edit-pose"
+                          label="Pose"
+                          value={form.pose}
+                          onChange={setField('pose')}
+                          options={poseOptions}
+                          hint={poses[form.pose]?.description}
+                        />
+
                         {TAG_FIELDS.map(({ key, id, label }) => (
                           <label key={key} className="vu-field" htmlFor={id}>
                             <span className="vu-field-label">{label}</span>

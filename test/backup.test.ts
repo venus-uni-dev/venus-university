@@ -25,9 +25,14 @@ const { exportBackup, importBackup } = await import('../src/main/services/backup
 const { createCharacter, getCharacter, writeCharacter } = await import(
   '../src/main/services/characterService'
 )
-const { createPlaythrough, listPlaythroughs, loadSave, writeAutosave, writeSlotSave } = await import(
-  '../src/main/services/saveService'
-)
+const {
+  createPlaythrough,
+  listPlaythroughs,
+  loadSave,
+  writeAutosave,
+  writeManualSave,
+  writeSlotSave
+} = await import('../src/main/services/saveService')
 const { getGrabBags, setGrabBags } = await import('../src/main/services/grabBagService')
 const { getSettings } = await import('../src/main/services/settingsService')
 const { createZip, extractZip, listZip } = await import('../src/main/services/archiveService')
@@ -90,15 +95,19 @@ async function seedSettings(over: Record<string, unknown> = {}): Promise<void> {
   await writeFile(getSettingsPath(), JSON.stringify(body), 'utf-8')
 }
 
-/** One playthrough with two slot saves, an autosave and a graduation picture. */
+/** One playthrough with two slot saves, an autosave, a manual save and a graduation picture. */
 async function seedPlaythrough(): Promise<{ playthroughId: string; saveIds: string[] }> {
   const opening = await createPlaythrough(record(), draft())
   const playthroughId = opening.save.playthroughId
   const second = await writeSlotSave(playthroughId, draft())
   const autosave = await writeAutosave(playthroughId, draft())
+  const manual = await writeManualSave(playthroughId, 3, draft())
 
   await writeFile(getEndingArtPath(playthroughId), ENDING_ART)
-  return { playthroughId, saveIds: [opening.save.saveId, second.saveId, autosave.saveId] }
+  return {
+    playthroughId,
+    saveIds: [opening.save.saveId, second.saveId, autosave.saveId, manual.saveId]
+  }
 }
 
 /** A character on disk with sprites, a CG and a staging tree to leave behind. */

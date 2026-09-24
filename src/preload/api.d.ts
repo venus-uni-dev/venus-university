@@ -34,6 +34,7 @@ import type {
   PlaythroughListing,
   Result,
   SaveDraft,
+  SaveReadResult,
   SceneResponse,
   SettingsPatch,
   SetTarget,
@@ -147,6 +148,8 @@ export interface VenusUniversityApi {
      * `group` is the call's cancellation group, which tells concurrent replies apart.
      */
     onTextingDelta: (listener: (group: string, delta: string) => void) => () => void
+    /** The output tokens each cloud text reply cost, thinking included; returns an unsubscribe. */
+    onTokensGenerated: (listener: (generated: number) => void) => () => void
   }
   chars: {
     list: () => Promise<Result<Character[]>>
@@ -200,6 +203,15 @@ export interface VenusUniversityApi {
       target: WardrobeTarget,
       image: string
       // Structured clone delivers the bytes over a plain `ArrayBuffer`.
+    ) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
+    /**
+     * The bytes of one of her images by the path her image URL names, or `null` where it is not
+     * on disk — what the picture a manual save carries of the stage is drawn from.
+     */
+    readImage: (
+      charId: string,
+      rel: string
+      // A plain `ArrayBuffer`, as for `readWardrobeImage`.
     ) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
     /**
      * Writes one wardrobe's repaired sprites over the set, plus the paint layer they were
@@ -258,8 +270,10 @@ export interface VenusUniversityApi {
   }
   saves: {
     playthroughs: () => Promise<Result<PlaythroughSummary[]>>
-    /** One playthrough's record and every save file in its folder. */
+    /** One playthrough's record and a summary of every save in its folder. */
     list: (playthroughId: string) => Promise<Result<PlaythroughListing>>
+    /** One save with the record it is read against — everything loading it needs. */
+    read: (playthroughId: string, saveId: string) => Promise<Result<SaveReadResult>>
     /**
      * Writes the semester the registrar is about to offer, minting the playthrough folder it
      * will belong to.
@@ -276,7 +290,7 @@ export interface VenusUniversityApi {
       draft: SaveDraft,
       playthroughId?: string
     ) => Promise<Result<CreatedPlaythrough>>
-    /** Mints a slot-boundary save, clearing the autosave and pruning the window. */
+    /** Mints a slot-boundary save and prunes the window; the autosave stands. */
     slot: (playthroughId: string, draft: SaveDraft) => Promise<Result<GameSave>>
     /** Rewrites an existing slot-save in place — mints nothing, prunes nothing. */
     overwrite: (
@@ -286,6 +300,11 @@ export interface VenusUniversityApi {
     ) => Promise<Result<GameSave>>
     /** Overwrites the scene-in-progress save. */
     autosave: (playthroughId: string, draft: SaveDraft) => Promise<Result<GameSave>>
+    /**
+     * Writes the player's own save into manual slot `slot`, 1 to `MANUAL_SAVE_SLOTS`, replacing
+     * whatever it held — mints nothing, prunes nothing, leaves the autosave alone.
+     */
+    manual: (playthroughId: string, slot: number, draft: SaveDraft) => Promise<Result<GameSave>>
     delete: (playthroughId: string, saveId: string) => Promise<Result<void>>
     deletePlaythrough: (playthroughId: string) => Promise<Result<void>>
     /**

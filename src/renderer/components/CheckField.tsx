@@ -1,4 +1,6 @@
 import type { JSX } from 'react'
+import { motion } from 'motion/react'
+import { fieldDim } from '../views/motion'
 
 export interface CheckFieldProps {
   id: string
@@ -9,6 +11,7 @@ export interface CheckFieldProps {
   note?: string
   checked: boolean
   onChange: (checked: boolean) => void
+  disabled?: boolean
 }
 
 /**
@@ -22,15 +25,24 @@ export function CheckField({
   meta,
   note,
   checked,
-  onChange
+  onChange,
+  disabled
 }: CheckFieldProps): JSX.Element {
   return (
-    <label className={`vu-check${note ? ' vu-check--noted' : ''}`} htmlFor={id}>
+    // The disabled rule in CSS reaches buttons alone, so the row dims itself here instead.
+    <motion.label
+      className={`vu-check${note ? ' vu-check--noted' : ''}`}
+      htmlFor={id}
+      variants={fieldDim}
+      initial={false}
+      animate={disabled ? 'dead' : 'live'}
+    >
       <input
         id={id}
         type="checkbox"
         className="vu-check-input"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
       <span className="vu-check-box" aria-hidden="true" />
@@ -45,6 +57,6 @@ export function CheckField({
           {meta && <span className="vu-check-meta">{meta}</span>}
         </>
       )}
-    </label>
+    </motion.label>
   )
 }

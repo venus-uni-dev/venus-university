@@ -7,6 +7,7 @@ import type { Settings } from '../types'
 import { MAX_OUTPUT_TOKENS } from './adapter'
 import { adapterFor } from './index'
 import type { LlmAdapter, StructuredRequest } from './index'
+import { reportGeneratedTokens } from './tokenPort'
 import { sendCall, startClock, writerSettings } from './transport'
 
 /**
@@ -34,13 +35,15 @@ const IGNORED_LINE_WARNINGS = 5
 
 /**
  * Drains an SSE body, forwarding deltas while buffering partial lines; malformed frames are
- * skipped but adapter-recognized failures propagate.
+ * skipped but adapter-recognized failures propagate, and each frame's token count reaches
+ * `onUsage` even when the frame itself fails.
  */
 export async function readStream(
   response: Response,
   adapter: LlmAdapter,
   label: string,
-  onDelta: (delta: string) => void
+  onDelta: (delta: string) => void,
+  onUsage?: (generated: number) => void
 ): Promise<StreamResult> {
   const result: StreamResult = { content: '', finished: false, skipped: 0, ignored: 0 }
 
@@ -64,6 +67,10 @@ export async function readStream(
       result.finished = true
       return false
     }
+
+    // Read before the delta, so a block or truncation frame that throws still reports its cost.
+    const generated = adapter.generatedTokensOf(payload)
+    if (generated !== undefined) onUsage?.(generated)
 
     try {
       const delta = adapter.deltaOf(payload, label)
@@ -241,99 +248,110 @@ export async function completeStructured<T>(
     }
 
     const elapsed = startClock()
+    // The reply's output tokens, thinking included, once any part of it has reported them.
+    let generated: number | undefined
     const response = await sendCall(call, adapter, log, elapsed, signal)
 
-    // A priority request served as standard is logged as a downgrade.
-    const servedTier = adapter.servedTierOf?.(response.headers)
-    const downgrade = servedTier && servedTier !== serviceTier ? `, served=${servedTier}` : ''
+    // A reply that fails past this point was still billed, so its count is reported on every exit.
+    try {
+      // A priority request served as standard is logged as a downgrade.
+      const servedTier = adapter.servedTierOf?.(response.headers)
+      const downgrade = servedTier && servedTier !== serviceTier ? `, served=${servedTier}` : ''
 
-    // Both modes converge on one `content` string.
-    let content: string
-    let raw: string
-    // Appended to the response log line; only the streamed mode reports a terminal reason.
-    let outcome = ''
-    if (streaming) {
-      let stream: StreamResult
-      try {
-        stream = await readStream(
-          response,
-          adapter,
-          provider.label,
-          onDelta as (delta: string) => void
-        )
-      } catch (err) {
-        console.log(`[llm] ✕ ${log.what} stream failed after ${elapsed()}ms`)
-        if (signal?.aborted) throw appError('CANCELLED', 'The job was cancelled.')
-        // An adapter-classified failure keeps its own code.
-        if (isAppError(err)) throw err
-        throw appError(
-          'LLM_NETWORK',
-          `The connection to ${provider.label} was lost mid-reply.`,
-          messageOf(err)
-        )
-      }
-
-      skipped = stream.skipped
-      ignored = stream.ignored
-      content = stream.content
-      raw = content
-      outcome = ` finishReason=${stream.finishReason ?? 'none'}${
-        stream.usage ? ` usage=${JSON.stringify(stream.usage)}` : ''
-      }`
-
-      // EOF with no finish reason is a dropped connection unless the reply salvages.
-      if (!stream.finished) {
-        if (signal?.aborted) throw appError('CANCELLED', 'The job was cancelled.')
-
-        // The salvage exception: zero skipped frames and a whole JSON document.
-        if (skipped === 0 && parsesAsJsonDocument(content)) {
-          console.warn(
-            `[llm] ⚠ ${log.what} stream ended with no finish reason after ${elapsed()}ms, ` +
-              `but the reply parses whole — accepting it (${content.length} chars)` +
-              `${headerNote(response.headers)}`
+      // Both modes converge on one `content` string.
+      let content: string
+      let raw: string
+      // Appended to the response log line; only the streamed mode reports a terminal reason.
+      let outcome = ''
+      if (streaming) {
+        let stream: StreamResult
+        try {
+          stream = await readStream(
+            response,
+            adapter,
+            provider.label,
+            onDelta as (delta: string) => void,
+            (n) => {
+              generated = n
+            }
           )
-          outcome = ` finishReason=missing(salvaged)${
-            stream.usage ? ` usage=${JSON.stringify(stream.usage)}` : ''
-          }`
-        } else {
-          console.log(`[llm] ✕ ${log.what} stream ended early after ${elapsed()}ms`)
-          // The whole body to the console, the tail to the modal.
-          console.error(
-            `[llm] ✕ stream ended without a finish reason (${content.length} chars)` +
-              `${headerNote(response.headers)}:\n`,
-            content
-          )
+        } catch (err) {
+          console.log(`[llm] ✕ ${log.what} stream failed after ${elapsed()}ms`)
+          if (signal?.aborted) throw appError('CANCELLED', 'The job was cancelled.')
+          // An adapter-classified failure keeps its own code.
+          if (isAppError(err)) throw err
           throw appError(
             'LLM_NETWORK',
             `The connection to ${provider.label} was lost mid-reply.`,
-            withSkipNote(
-              `the stream ended after ${content.length} chars without a finish reason` +
-                `${content ? ` — tail: ${tailOf(content, 500)}` : ''}`,
-              skipped,
-              ignored
-            )
+            messageOf(err)
           )
         }
+
+        skipped = stream.skipped
+        ignored = stream.ignored
+        content = stream.content
+        raw = content
+        outcome = ` finishReason=${stream.finishReason ?? 'none'}${
+          stream.usage ? ` usage=${JSON.stringify(stream.usage)}` : ''
+        }`
+
+        // EOF with no finish reason is a dropped connection unless the reply salvages.
+        if (!stream.finished) {
+          if (signal?.aborted) throw appError('CANCELLED', 'The job was cancelled.')
+
+          // The salvage exception: zero skipped frames and a whole JSON document.
+          if (skipped === 0 && parsesAsJsonDocument(content)) {
+            console.warn(
+              `[llm] ⚠ ${log.what} stream ended with no finish reason after ${elapsed()}ms, ` +
+                `but the reply parses whole — accepting it (${content.length} chars)` +
+                `${headerNote(response.headers)}`
+            )
+            outcome = ` finishReason=missing(salvaged)${
+              stream.usage ? ` usage=${JSON.stringify(stream.usage)}` : ''
+            }`
+          } else {
+            console.log(`[llm] ✕ ${log.what} stream ended early after ${elapsed()}ms`)
+            // The whole body to the console, the tail to the modal.
+            console.error(
+              `[llm] ✕ stream ended without a finish reason (${content.length} chars)` +
+                `${headerNote(response.headers)}:\n`,
+              content
+            )
+            throw appError(
+              'LLM_NETWORK',
+              `The connection to ${provider.label} was lost mid-reply.`,
+              withSkipNote(
+                `the stream ended after ${content.length} chars without a finish reason` +
+                  `${content ? ` — tail: ${tailOf(content, 500)}` : ''}`,
+                skipped,
+                ignored
+              )
+            )
+          }
+        }
+      } else {
+        raw = await response.text()
+        generated = adapter.generatedTokensOf(raw)
+        content = adapter.contentOf(raw, provider.label)
       }
-    } else {
-      raw = await response.text()
-      content = adapter.contentOf(raw, provider.label)
-    }
 
-    const responseMs = elapsed()
+      const responseMs = elapsed()
 
-    if (!content) {
-      throw appError(
-        'LLM_EMPTY',
-        'The model returned an empty response.',
-        withSkipNote(truncate(raw, 2000), skipped, ignored)
+      if (!content) {
+        throw appError(
+          'LLM_EMPTY',
+          'The model returned an empty response.',
+          withSkipNote(truncate(raw, 2000), skipped, ignored)
+        )
+      }
+      console.log(
+        `[llm] ← ${log.what} (${content.length} chars, ${responseMs}ms${downgrade}${outcome}):`,
+        content
       )
+      return content
+    } finally {
+      if (generated !== undefined) reportGeneratedTokens(generated)
     }
-    console.log(
-      `[llm] ← ${log.what} (${content.length} chars, ${responseMs}ms${downgrade}${outcome}):`,
-      content
-    )
-    return content
   }
 
   const content = await attempt()

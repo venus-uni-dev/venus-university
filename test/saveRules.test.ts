@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   assertSafeSaveId,
   atLocation,
+  classifySaveId,
   ENROLLMENT_SCHEMA_VERSION,
+  isSlotSaveId,
+  manualSaveId,
+  manualSlotOf,
   mintId,
   prunedSlotIds,
   RECORD_SCHEMA_VERSION,
@@ -10,9 +14,17 @@ import {
   sortSlotIds,
   stampEnrollment,
   stampRecord,
-  stampSave
+  stampSave,
+  summaryOf
 } from '@shared/saveRules'
-import { AUTOSAVE_ID, MAX_SLOT_SAVES, type GameSave, type SaveDraft } from '@shared/types'
+import {
+  AUTOSAVE_ID,
+  MANUAL_SAVE_SLOTS,
+  MAX_SLOT_SAVES,
+  type GameSave,
+  type SaveDraft,
+  type SceneState
+} from '@shared/types'
 
 /**
  * The rules a save is written under, apart from any store that holds them: a colliding id
@@ -56,6 +68,58 @@ describe('assertSafeSaveId', () => {
       expect(() => assertSafeSaveId(unsafe)).toThrow()
     }
   })
+
+  it('takes a manual slot inside the range and refuses one outside it', () => {
+    for (const manual of ['manual01', 'manual90', manualSaveId(MANUAL_SAVE_SLOTS)]) {
+      expect(classifySaveId(manual)).toBe('manual')
+      expect(() => assertSafeSaveId(manual)).not.toThrow()
+    }
+
+    const outside = ['manual0', 'manual00', 'manual91', 'manual007', 'manual-1']
+    for (const unsafe of [...outside, manualSaveId(MANUAL_SAVE_SLOTS + 1)]) {
+      expect(classifySaveId(unsafe)).toBeNull()
+      expect(() => assertSafeSaveId(unsafe)).toThrow()
+    }
+  })
+})
+
+describe('the save id kinds', () => {
+  it('names a slot and reads it back off its id', () => {
+    for (const slot of [1, 9, MANUAL_SAVE_SLOTS]) {
+      expect(manualSlotOf(manualSaveId(slot))).toBe(slot)
+    }
+    expect(manualSaveId(7)).toBe('manual07')
+    expect(manualSlotOf('1700000000000')).toBeNull()
+    expect(manualSlotOf(AUTOSAVE_ID)).toBeNull()
+  })
+
+  it('counts only a boundary save as the slot window’s', () => {
+    // A manual id taken for a slot id is a manual save the window prunes.
+    expect(isSlotSaveId('1700000000000')).toBe(true)
+    expect(isSlotSaveId(manualSaveId(1))).toBe(false)
+    expect(isSlotSaveId(AUTOSAVE_ID)).toBe(false)
+  })
+})
+
+describe('summaryOf', () => {
+  /** A save between scenes, or mid-scene when handed one. */
+  function save(over: Partial<GameSave> = {}): GameSave {
+    return { date: 5, time: 1, graduationSeen: false, scene: null, ...over } as GameSave
+  }
+
+  it('reads a save between scenes as having no scene and no picture', () => {
+    const summary = summaryOf(save())
+    expect(summary).toEqual({ date: 5, time: 1, graduationSeen: false, midScene: false, bg: null })
+    expect(summary).not.toHaveProperty('thumbnail')
+  })
+
+  it('takes the player’s own background over the scene’s, and the picture if any', () => {
+    const scene = { bg: 'library' } as SceneState
+    expect(summaryOf(save({ scene }))).toMatchObject({ midScene: true, bg: 'library' })
+
+    const picked = summaryOf(save({ scene: { ...scene, bgOverride: 'quad' }, thumbnail: 'AAAA' }))
+    expect(picked).toMatchObject({ midScene: true, bg: 'quad', thumbnail: 'AAAA' })
+  })
 })
 
 describe('prunedSlotIds', () => {
@@ -75,7 +139,7 @@ describe('prunedSlotIds', () => {
   it('reads age off the id rather than the order it was handed', () => {
     const shuffled = ['1005', '1000', '1003', '1001', '1004', '1002']
     expect(sortSlotIds(shuffled)).toEqual(['1005', '1004', '1003', '1002', '1001', '1000'])
-    // Ten fewer than the window, so nothing is pruned whatever the order.
+    // Fewer than the window holds, so nothing is pruned whatever the order.
     expect(prunedSlotIds(shuffled)).toEqual([])
   })
 })

@@ -72,6 +72,7 @@ export function ManageCharactersView(): JSX.Element {
   const loading = useCharacterStore((s) => s.loading)
   const load = useCharacterStore((s) => s.load)
   const generate = useCharacterStore((s) => s.generate)
+  const createBlank = useCharacterStore((s) => s.createBlank)
   const retryGeneration = useCharacterStore((s) => s.retryGeneration)
   const remove = useCharacterStore((s) => s.remove)
   const cancelAllGeneration = useCharacterStore((s) => s.cancelAllGeneration)
@@ -363,6 +364,10 @@ export function ManageCharactersView(): JSX.Element {
               setGenerating(false)
               // Not awaited: the pipeline takes minutes and reports itself through the card.
               void generate(firstName, lastName, prompt, namesAreSuggestions, options, reference)
+            }}
+            onCreateBlank={(firstName, lastName, personality) => {
+              setGenerating(false)
+              void createBlank(firstName, lastName, personality)
             }}
           />
         )}

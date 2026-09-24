@@ -23,12 +23,15 @@ interface CharFile {
   updatedAt: number
 }
 
-/** Every store, the key each one is written under, and what it holds. */
+/**
+ * Every store, the key each one is written under, and what it holds; the saves are indexed by
+ * playthrough and write time, so the newest of one playthrough is found without reading the rest.
+ */
 export interface VenusUniversityDb extends DBSchema {
   settings: { key: 'settings'; value: StoredSettings }
   grabbags: { key: 'grabbags'; value: GrabBags }
   playthroughs: { key: string; value: PlaythroughRow }
-  saves: { key: [string, string]; value: GameSave }
+  saves: { key: [string, string]; value: GameSave; indexes: { byDate: [string, number] } }
   endingArt: { key: string; value: Blob }
   profilePictures: { key: string; value: Blob }
   characters: { key: string; value: Character }
@@ -53,16 +56,21 @@ const STORES = [
   'profilePictures'
 ] as const
 
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 
 /** The one database handle, opened on first use. */
 export function database(): Promise<IDBPDatabase<VenusUniversityDb>> {
   opened ??= openDB<VenusUniversityDb>(APP_ID, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion, _newVersion, tx) {
       for (const name of STORES) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name)
+      }
+      // Every stored save carries both fields, so the index covers the rows already here.
+      const saves = tx.objectStore('saves')
+      if (oldVersion < 3 && !saves.indexNames.contains('byDate')) {
+        saves.createIndex('byDate', ['playthroughId', 'saveDate'])
       }
     }
   })

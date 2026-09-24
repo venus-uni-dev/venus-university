@@ -338,7 +338,7 @@ export function WardrobeColumn({
               {...gestures(fixDisabled, linkLift, rowPress)}
               onClick={onFixTransparency}
             >
-              Fix transparency
+              Fix holes
             </motion.button>
           )}
           {onFixFingers && (

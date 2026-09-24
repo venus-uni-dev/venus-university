@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, type AnimationPlaybackControls } from 'motion/react'
 import { toAppError } from '@shared/errors'
+import { classifySaveId, manualSlotOf } from '@shared/saveRules'
 import {
-  AUTOSAVE_ID,
+  MANUAL_SAVE_SLOTS,
   MAX_SLOT_SAVES,
   fullNameOf,
   type Character,
@@ -12,6 +13,15 @@ import {
   type PlaythroughSummary
 } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { DeleteX } from '../components/DeleteX'
+import {
+  SAVE_PAGE_CELLS,
+  SavePagesGrid,
+  wrapPage,
+  type SaveGridCard,
+  type SaveGridEntry
+} from '../components/SavePagesGrid'
+import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { formatDateBanner } from '../prompts/gameDate'
@@ -28,23 +38,21 @@ import {
 } from '../stores/saveStore'
 import { entryCrossing, menuCrossing } from '../stores/slotCrossing'
 import { useUiStore } from '../stores/uiStore'
+import { saveThumbUrl } from './bgAssets'
 import {
   dealt,
   gestures,
   lift,
   panelUnderTab,
-  peek,
   press,
   quietLift,
   quietPress,
   rowLift,
   rowPress,
   slideIn,
-  tuck,
   tweenSize,
   veilIn
 } from './motion'
-import { CloseIcon } from './screenIcons'
 import '../vu_styles/LoadGame.css'
 
 export interface LoadGameModalProps {
@@ -65,17 +73,87 @@ interface Entering {
   characters: Character[]
 }
 
+/** Pages of the second level: the autosaves, then the manual slots ten to a page. */
+const LOAD_PAGES = 1 + MANUAL_SAVE_SLOTS / SAVE_PAGE_CELLS
+
 /** When a file was written, in the machine's own locale. */
-function writtenAt(savedAt: number): string {
+export function writtenAt(savedAt: number): string {
   return new Date(savedAt).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
   })
 }
 
+/** The same moment as a card's one line carries it: the day and the time, without the year. */
+function writtenAtShort(savedAt: number): string {
+  return new Date(savedAt).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+}
+
+/** A count and the noun it counts, singular for one. */
+function countOf(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/** A save as its card draws it: where it sits in the semester, when it was written, its gate. */
+function cardOf(entry: ResolvedSave, sticker: string): SaveGridCard {
+  const { saveId, savedAt, summary, unloadable } = entry
+  return {
+    kind: 'card',
+    saveId,
+    sticker,
+    // An epilogue save is labelled by what the player is doing in it.
+    headline: summary
+      ? summary.graduationSeen
+        ? GOODBYES_SAVE_LABEL
+        : formatDateBanner(summary.date, summary.time)
+      : 'Unreadable save',
+    meta: `Saved ${writtenAtShort(savedAt)}`,
+    reason: unloadable ? `Cannot load — ${unloadable}` : null,
+    thumbSrc: summary ? saveThumbUrl(summary) : null,
+    dead: Boolean(unloadable),
+    deletable: true
+  }
+}
+
+/**
+ * One page of a playthrough's saves, ten cells in slot order, laid down the columns. Page 0 is
+ * the scene autosave and then the newest boundary autosaves; every page after it is ten manual
+ * slots in order. A slot with nothing in it is a gap wearing the same sticker.
+ */
+export function pageEntriesOf(saves: readonly ResolvedSave[], page: number): SaveGridEntry[] {
+  if (page === 0) {
+    const autosave = saves.find((entry) => classifySaveId(entry.saveId) === 'autosave')
+    const boundary = saves.filter((entry) => classifySaveId(entry.saveId) === 'boundary')
+    const cells: SaveGridEntry[] = [
+      autosave
+        ? cardOf(autosave, 'SCENE AUTOSAVE')
+        : { kind: 'empty', slot: 0, sticker: 'SCENE AUTOSAVE' }
+    ]
+    for (let i = 0; i < MAX_SLOT_SAVES; i++) {
+      const sticker = `AUTOSAVE ${i + 1}`
+      const entry = boundary[i]
+      cells.push(entry ? cardOf(entry, sticker) : { kind: 'empty', slot: i + 1, sticker })
+    }
+    return cells
+  }
+
+  const first = (page - 1) * SAVE_PAGE_CELLS + 1
+  return Array.from({ length: SAVE_PAGE_CELLS }, (_, i): SaveGridEntry => {
+    const slot = first + i
+    const sticker = String(slot)
+    const entry = saves.find((candidate) => manualSlotOf(candidate.saveId) === slot)
+    return entry ? cardOf(entry, sticker) : { kind: 'empty', slot, sticker }
+  })
+}
+
 /**
  * Load Game, in two levels on one panel: every playthrough in creation order, then the saves
- * inside the one picked, newest first with its own load gate per save.
+ * inside the one picked, a page at a time with its own load gate per save.
  */
 export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Element | null {
   const playthroughs = useSaveStore((s) => s.playthroughs)
@@ -90,6 +168,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   const removeSave = useSaveStore((s) => s.removeSave)
   const removePlaythrough = useSaveStore((s) => s.removePlaythrough)
   const resolveEnrollment = useSaveStore((s) => s.resolveEnrollment)
+  const readSave = useSaveStore((s) => s.readSave)
   const closeModal = useUiStore((s) => s.closeModal)
   const setView = useUiStore((s) => s.setView)
   const setMenuTheme = useUiStore((s) => s.setMenuTheme)
@@ -112,6 +191,8 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   const [hovered, setHovered] = useState<string | null>(null)
   // Whether the panel is the size of what is in it, and the list may deal itself out.
   const [settled, setSettled] = useState(true)
+  // Which page of the open playthrough's saves is on screen.
+  const [page, setPage] = useState(0)
 
   const panel = useRef<HTMLDivElement>(null)
   // The panel's height at rest, read after every commit that is not mid-resize.
@@ -125,6 +206,11 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
    */
   const stage = selected ? (loading ? 'loading' : selected.playthroughId) : 'root'
   const previous = useRef(stage)
+
+  // Whether the body has nothing honest to draw yet. The list already read stands while the
+  // folder is re-read, so the modal opens on the playthroughs rather than on an empty list,
+  // which would say there are none when what is happening is that nobody has counted yet.
+  const waiting = loading && (Boolean(selected) || !loaded)
 
   useEffect(() => {
     void loadPlaythroughs()
@@ -178,20 +264,23 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
     )
   })
 
-  /** The cover up and the save handed off under it: the click's body, once the player has said yes. */
-  function load(entry: ResolvedSave): void {
-    // Neither half loads without the other.
-    if (!entry.save || !entry.record) return
+  /**
+   * The save read whole, the cover up and the save handed off under it: the click's body, once
+   * the player has said yes. A refused read has reported itself.
+   */
+  async function load(playthroughId: string, entry: ResolvedSave): Promise<void> {
+    const whole = await readSave(playthroughId, entry.saveId)
+    if (!whole || whole.unloadable) return
     // The cover goes up on the click and the game is hydrated under it, wearing the hour the
     // save is set in rather than the panel's. A refused cover — only reachable from the Game
     // menu, when a game is already running — drops the click rather than racing a timing fix.
-    if (!beginCrossing(undefined, entryCrossing(theme, entry.save, entry.record))) {
+    if (!beginCrossing(undefined, entryCrossing(theme, whole.save, whole.record))) {
       return
     }
     setEntering({
-      save: entry.save,
-      record: entry.record,
-      characters: entry.characters
+      save: whole.save,
+      record: whole.record,
+      characters: whole.characters
     })
   }
 
@@ -244,14 +333,26 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   }
 
   /**
-   * Leaves a level: the rows wait for the panel to be their size, and the hover is dropped —
+   * Leaves a level: the rows wait for the panel to be their size, the hover is dropped —
    * motion never reports a hover ending on an element that unmounts under the cursor, so a
-   * row's ✕ would otherwise still be open when the list comes back.
+   * row's ✕ would otherwise still be open when the list comes back — and the saves open again
+   * on their first page.
    */
   const leave = (): void => {
     setSettled(false)
     setHovered(null)
+    setPage(0)
   }
+
+  /** Whether a question stands over the panel, which then answers no key of its own. */
+  const asking = Boolean(deletingSave || deletingPlaythrough || confirmingLoad || confirmingResume)
+
+  /** The arrow keys turn the page of saves, as the arrows beside it do. */
+  useWindowKeydown((event) => {
+    if (!selected || waiting || covered || asking || typingIn(event)) return
+    if (event.key === 'ArrowLeft') setPage((current) => wrapPage(current - 1, LOAD_PAGES))
+    else if (event.key === 'ArrowRight') setPage((current) => wrapPage(current + 1, LOAD_PAGES))
+  })
 
   /** Hydrates the held save and hands it to whoever runs it, under the cover. */
   function handOff(entry: Entering): void {
@@ -300,11 +401,6 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   const { host, overlayProps } = useModalShell(dismiss)
   if (!host) return null
 
-  // Whether the body has nothing honest to draw yet. The list already read stands while the
-  // folder is re-read, so the modal opens on the playthroughs rather than on an empty list,
-  // which would say there are none when what is happening is that nobody has counted yet.
-  const waiting = loading && (Boolean(selected) || !loaded)
-
   return createPortal(
     <>
       <motion.div
@@ -319,7 +415,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
       >
         <motion.div
           id="load-game"
-          className="vu-sheet vu-load vu-paper"
+          className="vu-sheet vu-sheet--saves vu-load vu-paper"
           ref={panel}
           role="dialog"
           aria-modal="true"
@@ -332,14 +428,39 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
         >
           <TitleTab>{selected ? selected.label : 'Load Game'}</TitleTab>
 
-          <div className="vu-load-scroll">
-            <div className="vu-load-body">
-              {/* Nothing is drawn while the folder is read: it is one local read, and a
-                  line that announces itself and is gone again says less than a panel
-                  holding still. */}
-              {waiting ? null : selected ? (
-                saves.length === 0 ? (
-                  <p className="vu-empty">No saves.</p>
+          {selected && !waiting ? (
+            // The page of saves never scrolls: every page is the same size, gaps included.
+            <div className="vu-load-pages">
+              <SavePagesGrid
+                id="save-pages"
+                mode="load"
+                entries={pageEntriesOf(saves, page)}
+                page={page}
+                pageCount={LOAD_PAGES}
+                onPage={setPage}
+                held={!settled}
+                onPick={(card) => {
+                  const entry = saves.find((candidate) => candidate.saveId === card.saveId)
+                  // Neither half loads without the other.
+                  if (!entry?.summary || !entry.record) return
+                  // Loading over a running game asks first; from the Main Menu the click loads.
+                  if (onClose) setConfirmingLoad(entry)
+                  else void load(selected.playthroughId, entry)
+                }}
+                onDelete={(card) => {
+                  const entry = saves.find((candidate) => candidate.saveId === card.saveId)
+                  if (entry) setDeletingSave(entry)
+                }}
+              />
+            </div>
+          ) : (
+            <div className="vu-load-scroll">
+              <div className="vu-load-body">
+                {/* Nothing is drawn while the folder is read: it is one local read, and a
+                    line that announces itself and is gone again says less than a panel
+                    holding still. */}
+                {waiting ? null : playthroughs.length === 0 ? (
+                  <p className="vu-empty">No saved games yet.</p>
                 ) : (
                   <motion.ul
                     className="vu-rows"
@@ -347,69 +468,42 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
                     initial="hidden"
                     animate={settled ? 'shown' : 'hidden'}
                   >
-                    {saves.map((entry) => (
-                      <SaveRow
-                        key={entry.saveId}
-                        entry={entry}
-                        hovered={hovered === entry.saveId}
-                        onHover={(on) => setHovered(on ? entry.saveId : null)}
-                        onDelete={() => setDeletingSave(entry)}
+                    {playthroughs.map((playthrough) => (
+                      <PlaythroughRow
+                        key={playthrough.playthroughId}
+                        playthrough={playthrough}
+                        cast={castOf(playthrough.chars, characters)}
+                        // An enrollment has no second level to explain a roster it can no
+                        // longer be played with, so the gate a save row gets there is on this one.
+                        unloadable={
+                          playthrough.unloadable ??
+                          (playthrough.enrolling
+                            ? unloadableReason(playthrough.chars, characters)
+                            : null)
+                        }
+                        hovered={hovered === playthrough.playthroughId}
+                        onHover={(on) => setHovered(on ? playthrough.playthroughId : null)}
+                        onDelete={() => setDeletingPlaythrough(playthrough)}
                         onClick={() => {
-                          // Neither half loads without the other.
-                          if (!entry.save || !entry.record) return
-                          // Loading over a running game asks first; from the Main Menu the
-                          // click loads.
-                          if (onClose) setConfirmingLoad(entry)
-                          else load(entry)
+                          // A folder with no timetable in it yet has a registrar to reopen
+                          // rather than saves to list; over a running game that asks first,
+                          // exactly as loading a save does.
+                          if (playthrough.enrolling) {
+                            if (onClose) setConfirmingResume(playthrough)
+                            else void beginResume(playthrough)
+                            return
+                          }
+                          leave()
+                          void open(playthrough)
                         }}
                       />
                     ))}
                   </motion.ul>
-                )
-              ) : playthroughs.length === 0 ? (
-                <p className="vu-empty">No saved games yet.</p>
-              ) : (
-                <motion.ul
-                  className="vu-rows"
-                  variants={dealt(0, 0.06)}
-                  initial="hidden"
-                  animate={settled ? 'shown' : 'hidden'}
-                >
-                  {playthroughs.map((playthrough) => (
-                    <PlaythroughRow
-                      key={playthrough.playthroughId}
-                      playthrough={playthrough}
-                      cast={castOf(playthrough.chars, characters)}
-                      // An enrollment has no second level to explain a roster it can no
-                      // longer be played with, so the gate a save row gets there is on this one.
-                      unloadable={
-                        playthrough.unloadable ??
-                        (playthrough.enrolling
-                          ? unloadableReason(playthrough.chars, characters)
-                          : null)
-                      }
-                      hovered={hovered === playthrough.playthroughId}
-                      onHover={(on) => setHovered(on ? playthrough.playthroughId : null)}
-                      onDelete={() => setDeletingPlaythrough(playthrough)}
-                      onClick={() => {
-                        // A folder with no timetable in it yet has a registrar to reopen
-                        // rather than saves to list; over a running game that asks first,
-                        // exactly as loading a save does.
-                        if (playthrough.enrolling) {
-                          if (onClose) setConfirmingResume(playthrough)
-                          else void beginResume(playthrough)
-                          return
-                        }
-                        leave()
-                        void open(playthrough)
-                      }}
-                    />
-                  ))}
-                </motion.ul>
-              )}
+                )}
+              </div>
+              <div className="vu-scroll-fade" />
             </div>
-            <div className="vu-scroll-fade" />
-          </div>
+          )}
 
           <div className="vu-foot">
             {selected && (
@@ -468,7 +562,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
             message={
               deletingPlaythrough.enrolling
                 ? 'All save will be deleted.'
-                : `All ${deletingPlaythrough.saveCount + (deletingPlaythrough.hasAutosave ? 1 : 0)} saves will be permanently deleted.`
+                : `All ${deletingPlaythrough.saveCount + deletingPlaythrough.manualCount + (deletingPlaythrough.hasAutosave ? 1 : 0)} saves will be permanently deleted.`
             }
             confirmText="Delete playthrough"
             onCancel={() => setDeletingPlaythrough(null)}
@@ -496,7 +590,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
             onConfirm={() => {
               const entry = confirmingLoad
               setConfirmingLoad(null)
-              load(entry)
+              if (selected) void load(selected.playthroughId, entry)
             }}
           />
         )}
@@ -556,10 +650,12 @@ function PlaythroughRow({
   // Reframing a portrait re-cuts the file behind its URL, so the strip reads the version.
   const versions = useCharacterStore((state) => state.spriteVersion)
   const dead = Boolean(playthrough.enrolling && unloadable)
+  // The scene autosave counts among the autosaves where there is one.
+  const autosaves = playthrough.saveCount + (playthrough.hasAutosave ? 1 : 0)
 
   const body = (
     <>
-      <span className="vu-load-sticker">{playthrough.label}</span>
+      <span className="vu-sticker vu-load-sticker">{playthrough.label}</span>
 
       <span className="vu-load-headline">
         {unloadable
@@ -588,16 +684,11 @@ function PlaythroughRow({
       </span>
 
       <span className="vu-load-meta">
-        {playthrough.enrolling ? (
-          `Registered ${writtenAt(playthrough.savedAt)}`
-        ) : (
-          <>
-            {playthrough.saveCount} of {MAX_SLOT_SAVES} saves
-            {playthrough.hasAutosave && ' + autosave'} · Played {writtenAt(playthrough.savedAt)}
-            </>
-          )}
-        </span>
-        {unloadable && <span className="vu-load-reason">Cannot load — {unloadable}</span>}
+        {playthrough.enrolling
+          ? `Registered ${writtenAt(playthrough.savedAt)}`
+          : `${countOf(playthrough.manualCount, 'save')} · ${countOf(autosaves, 'autosave')} · Played ${writtenAt(playthrough.savedAt)}`}
+      </span>
+      {unloadable && <span className="vu-load-reason">Cannot load — {unloadable}</span>}
     </>
   )
 
@@ -627,105 +718,7 @@ function PlaythroughRow({
         </motion.button>
       )}
 
-      <DeleteX hovered={hovered} label={label} onDelete={onDelete} />
+      <DeleteX className="vu-x vu-load-x" hovered={hovered} label={label} onDelete={onDelete} />
     </motion.li>
   )
 }
-
-/**
- * One save on the second level: where it sits in the semester, when it was written, and
- * the reason when it cannot be opened — a refused file included.
- */
-function SaveRow({
-  entry,
-  hovered,
-  onHover,
-  onClick,
-  onDelete
-}: RowProps & { entry: ResolvedSave }): JSX.Element {
-  const { saveId, savedAt, save, unloadable } = entry
-  const written = writtenAt(savedAt)
-  const dead = Boolean(unloadable)
-
-  const body = (
-    <>
-      <span className="vu-load-headline">
-        {/* An epilogue save is labelled by what the player is doing in it. */}
-        {save
-          ? save.graduationSeen
-            ? GOODBYES_SAVE_LABEL
-            : formatDateBanner(save.date, save.time)
-          : 'Unreadable save'}
-        {saveId === AUTOSAVE_ID && <span className="vu-load-tag">AUTOSAVE</span>}
-        {/* A slot-save carries a `scene` too — its banked opening — so only the autosave is
-            mid-scene. */}
-        {save && saveId === AUTOSAVE_ID && save.scene && (
-          <span className="vu-load-midscene">mid-scene</span>
-        )}
-      </span>
-      <span className="vu-load-meta">Saved {written}</span>
-      {unloadable && <span className="vu-load-reason">Cannot load — {unloadable}</span>}
-    </>
-  )
-
-  return (
-    <motion.li
-      className="vu-load-row"
-      variants={slideIn}
-      onHoverStart={() => onHover(true)}
-      onHoverEnd={() => onHover(false)}
-    >
-      {/* A save that cannot be opened is not a button, so it is not a tab stop either and is
-          handed no gesture — a dead control the browser would still deliver a hover to. */}
-      {dead ? (
-        <div id={`save-row-${saveId}`} className="vu-row vu-load-face vu-load-face--dead">
-          {body}
-        </div>
-      ) : (
-        <motion.button
-          id={`save-row-${saveId}`}
-          className="vu-row vu-load-face"
-          type="button"
-          {...gestures(false, rowLift, rowPress)}
-          onClick={onClick}
-        >
-          {body}
-        </motion.button>
-      )}
-
-      <DeleteX hovered={hovered} label={`Delete the save from ${written}`} onDelete={onDelete} />
-    </motion.li>
-  )
-}
-
-/**
- * The ✕ that removes a row, revealed by the row's own hover. A sibling of the face, never
- * inside it — a button in a button is invalid, and nesting is what would make a click on the ✕
- * also open the row.
- */
-function DeleteX({
-  hovered,
-  label,
-  onDelete
-}: {
-  hovered: boolean
-  label: string
-  onDelete: () => void
-}): JSX.Element {
-  return (
-    <motion.button
-      className="vu-x vu-load-x"
-      type="button"
-      aria-label={label}
-      // Or it flashes at full opacity on mount before animating away.
-      initial={false}
-      animate={hovered ? peek : tuck}
-      whileFocus={peek}
-      whileTap={quietPress}
-      onClick={onDelete}
-    >
-      <CloseIcon />
-    </motion.button>
-  )
-}
-

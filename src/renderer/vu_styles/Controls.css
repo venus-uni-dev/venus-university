@@ -1,0 +1,69 @@
+/* The Controls modal: a panel of key lists, and the scroller they live in.
+   Derived from the shape grammar and from the panels already built. Imported from the view module,
+   never from index.css.
+
+   The veil, the row, the buttons and the foot are base.css's. */
+
+.vu-controls-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+.vu-controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vu-controls-title {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 24px var(--font-display);
+}
+
+.vu-controls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vu-controls-row {
+  align-items: baseline;
+  gap: 14px;
+}
+
+/* The keys hold one fixed column, so the pills line up and the actions after them form another. */
+.vu-controls-keys {
+  display: inline-flex;
+  flex: 0 0 220px;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* A key is a neutral pill in the bookkeeping voice. */
+.vu-controls-key {
+  padding: 2px 8px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px;
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+  white-space: nowrap;
+}
+
+.vu-controls-or {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-controls-does {
+  color: var(--vu-text);
+  font: 500 15px var(--font-body);
+  line-height: 1.5;
+}

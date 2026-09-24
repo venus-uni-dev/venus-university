@@ -220,28 +220,87 @@ export function stageAt(lines: readonly SceneLine[], ctx: StageContext): StageFa
   return stage
 }
 
+/** Whether a line is the reader's own action. */
+function isReaderLine(line: SceneLine): boolean {
+  return line.speaker === READER_SPEAKER
+}
+
 /** The index of the last reader line in `lines`, or -1 when there is none. */
 export function lastReaderIndexOf(lines: readonly SceneLine[]): number {
   for (let at = lines.length - 1; at >= 0; at--) {
-    if (lines[at].speaker === READER_SPEAKER) return at
+    if (isReaderLine(lines[at])) return at
+  }
+  return -1
+}
+
+/** The index of the first reader line in `lines`, or -1 when there is none. */
+export function firstReaderIndexOf(lines: readonly SceneLine[]): number {
+  return lines.findIndex(isReaderLine)
+}
+
+/** The index of the last line in `lines` that is not the reader's, or -1 when there is none. */
+export function lastNonReaderIndexOf(lines: readonly SceneLine[]): number {
+  for (let at = lines.length - 1; at >= 0; at--) {
+    if (!isReaderLine(lines[at])) return at
+  }
+  return -1
+}
+
+/** How many of `lines` are not the reader's. */
+export function nonReaderCount(lines: readonly SceneLine[]): number {
+  return lines.filter((line) => !isReaderLine(line)).length
+}
+
+/**
+ * The line a rewind of `log` lands on: the nearest one before the line shown that says
+ * something and is not the reader's, back to the scene's first reply, or -1 when there is none.
+ */
+export function rewindTargetOf(log: readonly SceneLine[]): number {
+  const floor = firstReaderIndexOf(log)
+  for (let at = lastNonReaderIndexOf(log) - 1; at > floor; at--) {
+    if (!isReaderLine(log[at]) && log[at].text.trim() !== '') return at
   }
   return -1
 }
 
 /**
- * The line a rewind of `log` lands on: the nearest one before the last that still belongs to the
- * current reply and says something, or -1 when there is none.
+ * Whether `log[at]` may be rewritten: a reply line past the scene's first action that is neither
+ * the reader's own nor a status line.
  */
-export function rewindTargetOf(log: readonly SceneLine[]): number {
-  const floor = lastReaderIndexOf(log)
-  for (let at = log.length - 2; at > floor; at--) {
-    if (log[at].text.trim() !== '') return at
-  }
-  return -1
+export function lineEditable(log: readonly SceneLine[], at: number): boolean {
+  return (
+    at >= 0 &&
+    at < log.length &&
+    at > firstReaderIndexOf(log) &&
+    !isReaderLine(log[at]) &&
+    !log[at].status
+  )
 }
 
-/** Whether `log[at]` may be rewritten: a line of the current reply that is not a status line. */
-export function lineEditable(log: readonly SceneLine[], at: number): boolean {
-  // Every line past the reader's last is the reply's, never his own.
-  return at >= 0 && at < log.length && at > lastReaderIndexOf(log) && !log[at].status
+/**
+ * The index on `transcript` of the line `log[at]` was delivered as — as far past the same reader
+ * line on both — or -1 when the transcript holds fewer of them. A line only the log holds finds
+ * some other line, so callers match the result by value.
+ */
+export function transcriptIndexOf(
+  log: readonly SceneLine[],
+  transcript: readonly SceneLine[],
+  at: number
+): number {
+  // The reader lines up to `at`, counted: the k-th one is the anchor on both arrays.
+  let actions = 0
+  let logAnchor = -1
+  for (let i = 0; i <= at && i < log.length; i++) {
+    if (!isReaderLine(log[i])) continue
+    actions += 1
+    logAnchor = i
+  }
+  if (actions === 0) return at
+  let seen = 0
+  for (let i = 0; i < transcript.length; i++) {
+    if (!isReaderLine(transcript[i])) continue
+    seen += 1
+    if (seen === actions) return i + (at - logAnchor)
+  }
+  return -1
 }

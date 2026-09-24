@@ -25,6 +25,8 @@ const DEV_SIZES = [
 /** Fits the page to the window, so the renderer lays out on the stage and never on the window. */
 function applyStageZoom(win: BrowserWindow): void {
   const [width, height] = win.getContentSize()
+  // A minimized window resizes to 0×0 on Windows; there is nothing to fit, and a zoom of 0 throws.
+  if (width <= 0 || height <= 0) return
   win.webContents.setZoomFactor(zoomFor(width, height))
 }
 

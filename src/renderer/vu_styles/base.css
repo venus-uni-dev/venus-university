@@ -324,6 +324,24 @@ body {
   color: var(--vu-danger);
 }
 
+/* A label on the thing rather than a line about it — which playthrough a row is, which slot a
+   save sits in — worn over the thing's top edge like a sticker on a box: quiet and unaccented,
+   since it names rather than answers, and leaning the shallow lean a chip takes while the thing
+   under it does not rotate. Its side is the caller's. */
+.vu-sticker {
+  position: absolute;
+  top: -9px;
+  padding: 4px 16px 4px 12px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  rotate: -3deg;
+}
+
 /* A set's count, drawn in what it is saying about itself: complete, short, or covered —
    where the art is hidden it reports nothing, a `7/7` over a cover being a boast about
    pictures the player cannot see. */
@@ -605,6 +623,11 @@ body {
   border-radius: 90px 0 0 90px;
   color: var(--vu-text);
   font-family: var(--font-body);
+}
+
+/* The wider chassis the Load Game and Save Game panels share for a two-column grid of cards. */
+.vu-sheet--saves {
+  width: min(1400px, 100% - 60px);
 }
 
 /* The box that holds a scroller. `flex: 0 1 auto`, never `1 1 0`: it asks for its full height

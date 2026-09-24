@@ -14,3 +14,15 @@ export function useWindowKeydown(handler: (event: KeyboardEvent) => void): void 
     return () => window.removeEventListener('keydown', listener)
   }, [])
 }
+
+/**
+ * Whether the event landed in a field the reader is typing in, where a key is a character and
+ * not a command.
+ */
+export function typingIn(event: Event): boolean {
+  const target = event.target
+  return (
+    target instanceof Element &&
+    target.closest('input, textarea, select, [contenteditable]') !== null
+  )
+}

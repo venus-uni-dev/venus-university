@@ -26,7 +26,7 @@ beforeEach(async () => {
 })
 
 describe('the slot-boundary write', () => {
-  it('clears the autosave and prunes the window back', async () => {
+  it('prunes the window back and leaves the autosave standing', async () => {
     const { playthroughId } = await saves.writeEnrollment(enrollment())
     await saves.createPlaythrough(record(), draft(), playthroughId)
     await saves.writeAutosave(playthroughId, draft())
@@ -36,8 +36,62 @@ describe('the slot-boundary write', () => {
     }
 
     const listing = await saves.listSaves(playthroughId)
-    expect(listing.saves.map((entry) => entry.saveId)).not.toContain(AUTOSAVE_ID)
-    expect(listing.saves).toHaveLength(MAX_SLOT_SAVES)
+    expect(listing.saves.map((entry) => entry.saveId)).toContain(AUTOSAVE_ID)
+    expect(listing.saves).toHaveLength(MAX_SLOT_SAVES + 1)
+  })
+
+  it('never counts, and so never prunes, a manual save', async () => {
+    const { playthroughId } = await saves.writeEnrollment(enrollment())
+    await saves.createPlaythrough(record(), draft(), playthroughId)
+    await saves.writeManualSave(playthroughId, 1, draft({ date: 4 }))
+
+    for (let i = 0; i < MAX_SLOT_SAVES + 2; i++) {
+      await saves.writeSlotSave(playthroughId, draft())
+    }
+
+    await expect(saves.loadSave(playthroughId, 'manual01')).resolves.toMatchObject({ date: 4 })
+    const listing = await saves.listSaves(playthroughId)
+    expect(listing.saves).toHaveLength(MAX_SLOT_SAVES + 1)
+  })
+})
+
+describe('manual saves', () => {
+  it('round-trip through the listing, after the boundary saves', async () => {
+    const { playthroughId } = await saves.writeEnrollment(enrollment())
+    const { save } = await saves.createPlaythrough(record(), draft(), playthroughId)
+    await saves.writeManualSave(playthroughId, 12, draft({ date: 5 }))
+    await saves.writeManualSave(playthroughId, 2, draft({ date: 4 }))
+
+    const listing = await saves.listSaves(playthroughId)
+    expect(listing.saves.map((entry) => entry.saveId)).toEqual([
+      save.saveId,
+      'manual02',
+      'manual12'
+    ])
+    expect(listing.saves[1].summary).toMatchObject({ date: 4, midScene: false })
+    await expect(saves.readSave(playthroughId, 'manual12')).resolves.toMatchObject({
+      record: { chars: record().chars },
+      save: { saveId: 'manual12', date: 5 }
+    })
+  })
+
+  it('stand for the playthrough when one was written last', async () => {
+    const { playthroughId } = await saves.writeEnrollment(enrollment())
+    await saves.createPlaythrough(record(), draft({ date: 1 }), playthroughId)
+    await saves.writeSlotSave(playthroughId, draft({ date: 2 }))
+    await saves.writeAutosave(playthroughId, draft({ date: 3 }))
+    // A clock tick, so the manual save's `saveDate` is the newest.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await saves.writeManualSave(playthroughId, 4, draft({ date: 7 }))
+
+    const [summary] = await saves.listPlaythroughs()
+    expect(summary).toMatchObject({
+      date: 7,
+      saveCount: 2,
+      manualCount: 1,
+      hasAutosave: true,
+      unloadable: null
+    })
   })
 })
 

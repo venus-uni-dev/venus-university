@@ -3,6 +3,7 @@ import {
   baseRel,
   cgRel,
   expressionRel,
+  isCharFileRel,
   layerRel,
   outfitRel,
   REFERENCE_NAME,
@@ -234,6 +235,16 @@ export async function readWardrobeImage(
 ): Promise<Uint8Array | null> {
   assertSafeCharId(charId)
   return imageBytes(charId, wardrobeImageRel(target, image))
+}
+
+/**
+ * The bytes of one of her images by the path her image URL names, or `null` where there is none
+ * or the path names none of her images.
+ */
+export async function readImage(charId: string, rel: string): Promise<Uint8Array | null> {
+  assertSafeCharId(charId)
+  if (!isCharFileRel(rel)) return null
+  return imageBytes(charId, rel)
 }
 
 /** Base64 to a blob, refusing anything that is not a PNG before it can land on a sprite. */

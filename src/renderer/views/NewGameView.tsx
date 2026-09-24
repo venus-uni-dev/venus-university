@@ -40,6 +40,7 @@ import { dryOccasionDates } from '../prompts/weather'
 import { type ScheduleResult } from '../stores/classScheduler'
 import { buildHiddenSchedules, type HiddenScheduleInput } from '../stores/hiddenScheduler'
 import { enterGame } from '../stores/gameLoop'
+import { useGameStore } from '../stores/gameStore'
 import {
   cancelNewGameStart,
   clearStagedEnrollment,
@@ -217,6 +218,9 @@ export function NewGameView(): JSX.Element {
   )
   // What the reader says about himself, as the same modal took it down; blank is an answer.
   const [playerBio, setPlayerBio] = useState(resumed?.enrollment.bio ?? '')
+  // What New Game's own calls cost, kept with the enrollment so the registrar can be left and
+  // come back to.
+  const [enrolledTokens, setEnrolledTokens] = useState(resumed?.enrollment.tokensGenerated ?? 0)
   // Whether the height lineup is up — the first question the start asks; its answer
   // is written to each character, not held here.
   const [sizing, setSizing] = useState(false)
@@ -456,6 +460,8 @@ export function NewGameView(): JSX.Element {
     stats: PlayerStats,
     bio: string
   ): Promise<void> {
+    const tokensGenerated = useGameStore.getState().tallies.tokensGenerated
+    setEnrolledTokens(tokensGenerated)
     const written = await useSaveStore.getState().enroll({
       chars: roster.map((c) => c.charId),
       classes: semester.schedules.classes,
@@ -468,7 +474,8 @@ export function NewGameView(): JSX.Element {
       playerFirstName: first,
       playerLastName: last,
       stats,
-      ...(bio ? { bio } : {})
+      ...(bio ? { bio } : {}),
+      ...(tokensGenerated > 0 ? { tokensGenerated } : {})
     })
     if (!written.ok) {
       showError(written.error)
@@ -696,7 +703,7 @@ export function NewGameView(): JSX.Element {
         stats: playerStats,
         money: STARTING_MONEY,
         ...(playerBio ? { bio: playerBio } : {}),
-        tallies: emptyTallies(),
+        tallies: { ...emptyTallies(), tokensGenerated: enrolledTokens },
         date: FIRST_SLOT.date,
         time: FIRST_SLOT.time,
         charInfo: Object.fromEntries(

@@ -371,12 +371,12 @@ export function readerStandingOf(
   return standing
 }
 
-/** True for `friendly` and up — the gate for `withFriends` and the traits reveal. */
+/** True for `friendly` and up — the gate for `withFriends`, the traits and the preferred-stat reveals. */
 export function isPositive(affection: number): boolean {
   return affection > FRIENDLY_FLOOR
 }
 
-/** True for `trusted` and up — the gate for the backstory and preferred-stat reveals. */
+/** True for `trusted` and up — the gate for the backstory reveal. */
 export function isTrusted(affection: number): boolean {
   return affection > TRUSTED_FLOOR
 }

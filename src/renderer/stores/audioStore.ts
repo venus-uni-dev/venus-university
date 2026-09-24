@@ -12,7 +12,7 @@ import {
 import type { AudioKey, DayHalf, Volumes } from '@shared/audio'
 import { isPosition } from '@shared/positions'
 import type { Conversation, Position, RendererSettings } from '@shared/types'
-import { slotHalf } from '../prompts/gameDate'
+import { slotHalf, weekendSaturdayOf } from '../prompts/gameDate'
 import { isEpilogueNight } from '../prompts/graduation'
 import { slotWeather } from '../prompts/weather'
 import { SLOT_BG, bgKindOf } from '../views/bgAssets'
@@ -227,6 +227,7 @@ function gameFactsOf(): NonNullable<SoundFacts['game']> {
     narrating: !inScene && !game.awaitingInput && !game.waitingForLine,
     bg: { base, kind: bgKindOf(base) },
     half: epilogue ? 'night' : slotHalf(game.time),
+    weekend: weekendSaturdayOf(game.date) !== null,
     weather: slotWeather(game.weather, game.date, game.time, game.graduationSeen),
     epilogue,
     cg:

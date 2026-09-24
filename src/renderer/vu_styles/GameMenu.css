@@ -28,3 +28,9 @@
   align-items: flex-start;
   gap: 16px;
 }
+
+/* An answer worn inside the wrapper that hears the pointer for its note: the wrapper takes the
+   answer's place in the fan, so it leans on the flat edge the answers themselves pivot on. */
+.vu-menu-modal-actions > .vu-deadnote {
+  transform-origin: left center;
+}

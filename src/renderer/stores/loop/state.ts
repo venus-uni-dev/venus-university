@@ -2,6 +2,7 @@ import type {
   BankedOpening,
   Character,
   LedgerResponse,
+  SaveDraft,
   SceneLine,
   SceneState
 } from '@shared/types'
@@ -85,7 +86,7 @@ export const loopState = {
    */
   parkedWaiters: [] as Array<() => void>,
 
-  /** `beginSlot` is waiting on its own narration — the window `endingInFlight` misses. */
+  /** `beginSlot` is waiting on its own narration — the window the store's `endingInFlight` misses. */
   openingWait: false,
 
   /** What an ending call's failure modal is waiting on, while the player answers it. */
@@ -117,12 +118,6 @@ export const loopState = {
 
   /** The epilogue's status-update call has been made this stay; nothing waits on it. */
   endingPosts: false,
-
-  /**
-   * True from a scene resolving until its ending is written. A flag
-   * rather than the promise because `advance()` asks it synchronously.
-   */
-  endingInFlight: false,
 
   /**
    * The ending in progress; re-minted to drop it, so each of its continuations bails at its next
@@ -201,7 +196,13 @@ export const loopState = {
    * screens still to raise. Nothing between the messages and the boundary is written, so a
    * reload rebuilds the whole of it.
    */
-  statusSteps: [] as StatusStep[]
+  statusSteps: [] as StatusStep[],
+
+  /**
+   * The save the scene's ending stood at the moment its status sequence was raised, before any
+   * money moved: what a save taken anywhere inside that sequence records.
+   */
+  statusBase: null as SaveDraft | null
 }
 
 /**
@@ -218,6 +219,7 @@ export function resetTurnSlice(): void {
   loopState.decisionSave = null
   loopState.endBase = null
   loopState.endLines = null
+  loopState.statusBase = null
 }
 
 /**
@@ -254,7 +256,6 @@ export function resetLoopState(): void {
   resetTurnSlice()
   // Re-minted here, so no leave path can forget to fence what it abandoned.
   loopState.runToken = {}
-  loopState.endingInFlight = false
   loopState.endingToken = {}
   loopState.sceneCall = null
   loopState.pendingLedgerResult = null

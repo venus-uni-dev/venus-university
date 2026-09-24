@@ -310,6 +310,21 @@ export const geminiAdapter: LlmAdapter = {
     return false
   },
 
+  // A stream's frames carry running totals, so the latest frame's count is the reply's.
+  generatedTokensOf(payload: string): number | undefined {
+    let parsed: GeminiResponse | null
+    try {
+      parsed = JSON.parse(payload) as GeminiResponse | null
+    } catch {
+      return undefined
+    }
+    const usage = parsed?.usageMetadata as Record<string, unknown> | undefined
+    if (!usage || typeof usage !== 'object') return undefined
+    const answer = usage.candidatesTokenCount
+    const thoughts = usage.thoughtsTokenCount
+    return (typeof answer === 'number' ? answer : 0) + (typeof thoughts === 'number' ? thoughts : 0)
+  },
+
   // The only place a priority request served as `standard` is reported.
   servedTierOf(headers: Headers): string | undefined {
     return headers.get('x-gemini-service-tier') ?? undefined

@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, writeFile } from 'fs/promises'
+import { mkdir, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
@@ -19,12 +19,14 @@ import { CHARACTER_NOT_FOUND, SAFE_CHAR_ID } from '@shared/characterRules'
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import {
+  classifySaveId,
   ENROLLMENT_NOT_FOUND,
+  listedSaveIds,
   RECORD_NOT_FOUND,
   SAFE_NUMERIC_ID,
   SAVE_NOT_FOUND
 } from '@shared/saveRules'
-import { AUTOSAVE_ID, type AppError, type Character } from '@shared/types'
+import type { AppError, Character } from '@shared/types'
 import {
   isPregenChar,
   getCharacterFilePath,
@@ -53,6 +55,7 @@ import { sniffImageFile } from './imageFiles'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
 import { readProfilePicture } from './profilePictureService'
 import {
+  forgetParsedSaves,
   loadSave,
   playthroughIds,
   readEnrollment,
@@ -138,8 +141,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
     for (const playthroughId of await playthroughIds()) {
       playthroughs[playthroughId] = await backupPlaythrough(playthroughId)
 
-      const { autosave, slots } = await saveIdsOf(playthroughId)
-      for (const saveId of autosave ? [AUTOSAVE_ID, ...slots] : slots) {
+      for (const saveId of listedSaveIds(await saveIdsOf(playthroughId))) {
         const save = await optional(`save ${playthroughId}/${saveId}`, SAVE_NOT_FOUND.code, () =>
           loadSave(playthroughId, saveId)
         )
@@ -271,9 +273,7 @@ async function restoreSaves(scratch: string, record: BackupFile): Promise<void> 
       if (!SAFE_NUMERIC_ID.test(playthroughId)) continue
 
       const saves = record.saves.filter(
-        (entry) =>
-          entry.playthroughId === playthroughId &&
-          (entry.saveId === AUTOSAVE_ID || SAFE_NUMERIC_ID.test(entry.saveId))
+        (entry) => entry.playthroughId === playthroughId && classifySaveId(entry.saveId) !== null
       )
       // A folder with none of the three is not a playthrough anybody can be put back into.
       if (!playthrough.record && !playthrough.enrollment && saves.length === 0) continue
@@ -290,8 +290,13 @@ async function restoreSaves(scratch: string, record: BackupFile): Promise<void> 
         await writeAtomicJson(join(folder, name), playthrough.enrollment, RESTORE_FAILED)
       }
       for (const entry of saves) {
-        const name = basename(getSaveFilePath(playthroughId, entry.saveId))
-        await writeAtomicJson(join(folder, name), entry.save, RESTORE_FAILED)
+        const path = join(folder, basename(getSaveFilePath(playthroughId, entry.saveId)))
+        await writeAtomicJson(path, entry.save, RESTORE_FAILED)
+        // The file's write time is the save's own, so the newest file is still the newest save.
+        const seconds = entry.save.saveDate / 1000
+        await utimes(path, seconds, seconds).catch((err: unknown) => {
+          console.warn(`[backup] could not date ${playthroughId}/${entry.saveId}:`, err)
+        })
       }
 
       if (record.endingArt.includes(playthroughId)) {
@@ -315,6 +320,7 @@ async function restoreSaves(scratch: string, record: BackupFile): Promise<void> 
     }
 
     await swapSaves(staged)
+    forgetParsedSaves()
   } catch (err) {
     await discard(staged)
     throw err

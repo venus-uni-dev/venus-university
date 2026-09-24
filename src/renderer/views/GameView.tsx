@@ -5,7 +5,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type JSX
+  type JSX,
+  type MouseEvent as ReactMouseEvent,
+  type WheelEvent as ReactWheelEvent
 } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AUDIO_FILES, pitchSemitonesOf, VOICE_PITCH_DEFAULT } from '@shared/audio'
@@ -22,7 +24,7 @@ import { Burst } from '../components/Burst'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { isProhibited, LlmFailureModal } from '../components/LlmFailureModal'
-import { useWindowKeydown } from '../components/useWindowKeydown'
+import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
 import { slotHalf } from '../prompts/gameDate'
 import { slotWeather } from '../prompts/weather'
 import {
@@ -81,6 +83,7 @@ import {
   lastScenePromptText,
   lastTurnAuthored,
   leaveToMenu,
+  manualSaveOffer,
   quitToDesktop,
   retryClassify,
   retryEndingCall,
@@ -90,6 +93,7 @@ import {
   rewind,
   goHome,
   endInDebt,
+  forward,
   saveMemoryEdits,
   speakerNameOf,
   startFarewellScene,
@@ -108,8 +112,8 @@ import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { useGameStore } from '../stores/gameStore'
-import { replyRowOfferOf, rewindOpenOf } from '../stores/loop/playback'
-import { displaySlotsOf, displaySpriteRef } from '../stores/stageDisplay'
+import { forwardOpenOf, replyRowOfferOf, rewindOpenOf } from '../stores/loop/playback'
+import { displaySlotsOf, displaySpriteRef, wardrobeChanged } from '../stores/stageDisplay'
 import {
   beginCrossing,
   cancelCrossing,
@@ -125,6 +129,7 @@ import { useUiStore } from '../stores/uiStore'
 import { BunnyboardModal } from './BunnyboardModal'
 import { CastModal } from './CastModal'
 import { ChatLogModal } from './ChatLogModal'
+import { ControlsModal } from './ControlsModal'
 import { CalendarModal } from './CalendarModal'
 import { MapModal } from './MapModal'
 import { ClassScheduleModal } from './ClassScheduleModal'
@@ -134,6 +139,7 @@ import { GameMenuModal } from './GameMenuModal'
 import { LoadGameModal } from './LoadGameModal'
 import { MilestoneModal } from './MilestoneModal'
 import { RankUpModal } from './RankUpModal'
+import { SaveGameModal } from './SaveGameModal'
 import { SceneMemoriesModal } from './SceneMemoriesModal'
 import { JobsModal } from './JobsModal'
 import { GiftMessageModal } from './GiftMessageModal'
@@ -147,6 +153,7 @@ import mapNightUrl from '../../../assets/vu_map_night.png'
 import { bgThumbUrl, bgUrl, SLOT_BG } from './bgAssets'
 import { screenTheme } from './clockTheme'
 import { useWarmedImages } from './imagePreload'
+import { accumulateNotch, wheelNotches, type WheelTravel } from './wheel'
 import '../vu_styles/GameStage.css'
 
 /** Milliseconds per character of the typewriter reveal. */
@@ -206,8 +213,10 @@ type OpenPanel =
   | { kind: 'giftMessage'; itemId: string; charId: string }
   | { kind: 'editPrompt'; source: 'turn' | 'closing' | 'ledger' | 'textLedger' | 'intro' }
   | { kind: 'settings' }
+  | { kind: 'saveGame' }
   | { kind: 'loadGame' }
   | { kind: 'appSettings' }
+  | { kind: 'controls' }
   | { kind: 'feedback' }
   | { kind: 'leaving' }
   | { kind: 'quitting' }
@@ -276,13 +285,16 @@ function PortraitSlot({
     changed: boolean
     /** The standing half was mounted by a cut, with nothing left underneath it. */
     cut: boolean
+    /** The outgoing half fades: the change was one of wardrobe, and so of silhouette. */
+    fade: boolean
   }>(() => ({
     from: null,
     to: src,
     pose,
     side: hashString(charId) % 2 === 0 ? -1 : 1,
     changed: cut,
-    cut
+    cut,
+    fade: false
   }))
   // A change is a change of pose: the same pose under a new URL is her picture arriving, and it
   // goes into the standing half rather than crossing to it. A cut takes the new pose with no
@@ -294,7 +306,8 @@ function PortraitSlot({
       pose,
       side: pair.pose !== pose ? otherSide(pair.side) : pair.side,
       changed: true,
-      cut: true
+      cut: true,
+      fade: false
     })
   else if (pair.pose !== pose)
     setPair({
@@ -303,7 +316,8 @@ function PortraitSlot({
       pose,
       side: otherSide(pair.side),
       changed: true,
-      cut: false
+      cut: false,
+      fade: wardrobeChanged(pair.pose, pose)
     })
   else if (pair.to !== src) setPair({ ...pair, to: src })
 
@@ -359,7 +373,15 @@ function PortraitSlot({
       {/* Both halves of a change breathe as one, so a crossfade never comes apart. */}
       <motion.div className="vu-stage-breath" animate={breathing}>
         {pair.from && pair.from !== pair.to && (
-          <div className={`vu-stage-sprite vu-stage-sprite--out ${sideClass(otherSide(pair.side))}`}>
+          <div
+            className={[
+              'vu-stage-sprite vu-stage-sprite--out',
+              pair.fade ? 'vu-stage-sprite--outFade' : '',
+              sideClass(otherSide(pair.side))
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <motion.img className={imgClass} src={pair.from} alt="" animate={light} initial={false} />
           </div>
         )}
@@ -379,7 +401,8 @@ function PortraitSlot({
           ]
             .filter(Boolean)
             .join(' ')}
-          /* Drops the outgoing half once this one has covered it. */
+          /* Drops the outgoing half once this one has covered it, or, on a change of wardrobe,
+             once the two fades have ended together. */
           onAnimationEnd={(e) => {
             if (e.target === e.currentTarget) setPair((p) => ({ ...p, from: null }))
           }}
@@ -547,6 +570,8 @@ export function GameView(): JSX.Element {
   const offer = useGameStore(replyRowOfferOf)
   /** Whether an earlier line of the reply may be stepped back to. */
   const rewindOpen = useGameStore(rewindOpenOf)
+  /** Whether a line a rewind stepped back may be read forward to again. */
+  const forwardOpen = useGameStore(forwardOpenOf)
   /** Bumped by every line a rewind steps back. */
   const lineRewound = useGameStore((s) => s.lineRewound)
   /**
@@ -631,6 +656,15 @@ export function GameView(): JSX.Element {
   const showingBunnyboard = useBunnyboardStore((s) => s.open)
   const bunnyboardLocked = useBunnyboardStore((s) => s.locked)
   const bunnyboard = useGameStore((s) => s.bunnyboard)
+
+  // What the menu's Save Game is gated on besides the fields selected above, subscribed so the
+  // entry follows a reply, an ending or a text going out while the menu is open.
+  useGameStore((s) => s.streaming)
+  useGameStore((s) => s.endingInFlight)
+  useBunnyboardStore((s) => s.armedHangout)
+  useBunnyboardStore((s) => s.busyCharIds.length)
+  useBunnyboardStore((s) => s.typingCharIds.length)
+  useBunnyboardStore((s) => s.failedCharIds.length)
   const bunnyboardBadge =
     Object.values(bunnyboard.conversations).reduce(
       (total, c) =>
@@ -938,12 +972,17 @@ export function GameView(): JSX.Element {
   const [revealed, setRevealed] = useState(0)
   const [shownLine, setShownLine] = useState<typeof currentLine>(null)
 
+  /** The line the last cut landed, while it is the one shown: said whole, and never wound back. */
+  const cutLine = useRef<typeof currentLine>(null)
+
   // Reset during render: an effect runs after a paint, and the new line would flash at the
   // previous line's reveal count. A line a rewind stepped back to is said whole, with no voice.
   if (shownLine !== currentLine) {
     setShownLine(currentLine)
     setRevealed(cutting ? text.length : 0)
+    cutLine.current = cutting ? currentLine : null
   }
+  const cutLanded = cutLine.current === currentLine
 
   // And the same change of line is what raises a gift's glyphs. The box only opens on a drained
   // queue, so the first line to land under an armed burst is the one the reply to that present
@@ -957,7 +996,7 @@ export function GameView(): JSX.Element {
   // effect late, so the interval can tick a character or two into a line the chrome has not
   // begun to draw, and the box would land on a word already half said. A cut lands the box in
   // this same render, so the hold it still reports is the one it is about to drop.
-  if (typeHeld && revealed !== 0 && !cutting) setRevealed(0)
+  if (typeHeld && revealed !== 0 && !cutLanded) setRevealed(0)
 
   // Cleared during render for the reveal counter's own reason: the reply's first line and the
   // end of the wait land in one commit (`loop/stream.ts`'s `emit`), and an effect would leave
@@ -970,7 +1009,13 @@ export function GameView(): JSX.Element {
   useEffect(() => {
     // The scene chrome holds the line until the box that will hold it has arrived.
     if (!text || typeHeld) return
-
+    // A line a cut landed is said whole again here, after the commit: a tick of the interval
+    // is computed against the count last rendered, which a reset made in render can trail, and
+    // a cut to a longer line would otherwise type out its tail.
+    if (cutLanded) {
+      setRevealed(text.length)
+      return
+    }
     const timer = setInterval(() => {
       setRevealed((n) => {
         if (n >= text.length) {
@@ -981,7 +1026,7 @@ export function GameView(): JSX.Element {
       })
     }, REVEAL_MS)
     return () => clearInterval(timer)
-  }, [currentLine, text, typeHeld])
+  }, [currentLine, text, typeHeld, cutLanded])
 
   /**
    * The voice under the typewriter: a blip on every third letter or digit, at the pitch of
@@ -1097,8 +1142,8 @@ export function GameView(): JSX.Element {
   const turnFailed = Boolean(turnError) && (!authoredFailure || waitingForLine)
 
   /**
-   * A modal owns the screen: what stops the window-level Enter handler below from
-   * advancing or submitting behind one.
+   * A modal owns the screen: what stops the window-level key handler and the stage's wheel and
+   * right-click below from advancing, submitting or stepping behind one.
    */
   const blocked = Boolean(
     statusModal ||
@@ -1296,6 +1341,12 @@ export function GameView(): JSX.Element {
     rewind()
   }
 
+  /** The forward step over a line read before, with the same sound. */
+  function onForward(): void {
+    useAudioStore.getState().play('advance')
+    forward()
+  }
+
   /**
    * The slot's own buttons. Memoised: `slotActionsNow` draws at random, and a recompute
    * per render would reshuffle them under the cursor. Stats are not a dependency because
@@ -1386,6 +1437,15 @@ export function GameView(): JSX.Element {
     void submitAction(goToText(locationId, placeLabel), false, goToVerdict(locationId))
   }
 
+  /**
+   * The game menu, which Escape and a right-click both toggle: shut if it is open, and otherwise
+   * opened unless a modal owns the screen.
+   */
+  function toggleMenu(): void {
+    if (panel?.kind === 'settings') closePanel()
+    else if (!blocked) setPanel({ kind: 'settings' })
+  }
+
   function onKeyDown(event: KeyboardEvent): void {
     // A screen under the curtain answers no key, Escape included. The root's `inert` takes
     // the pointer and the focus, but no attribute reaches a listener on `window`.
@@ -1403,11 +1463,41 @@ export function GameView(): JSX.Element {
     }
     // Escape toggles the settings panel and answers nothing else.
     if (event.key === 'Escape') {
-      if (panel?.kind === 'settings') closePanel()
-      else if (!blocked) setPanel({ kind: 'settings' })
+      toggleMenu()
       return
     }
-    if (event.key !== 'Enter') return
+    // Tab puts the caret in the well, bringing it out over a reply: the well's own Tab gives the
+    // caret up (`Dialogue.tsx`), a field in a modal walks its own form, and a modal in front keeps
+    // the key. Focusing a well the row has put away pins it out; a dead well takes no focus.
+    if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (blocked || typingIn(event)) return
+      document.getElementById('game-action')?.focus()
+      return
+    }
+    // H is the eye's key, wherever the eye is on offer; the hidden branch above brings it back.
+    if (
+      (event.key === 'h' || event.key === 'H') &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.repeat &&
+      !typingIn(event) &&
+      !blocked &&
+      (sceneMode || cinematic) &&
+      shown.has('hideui')
+    ) {
+      hideUi()
+      return
+    }
+    const space = event.key === ' '
+    if (event.key !== 'Enter' && !space) return
+    // Space is Enter aimed at the scene: a character in a field, and nothing behind a modal,
+    // whose focused button it still presses.
+    if (space) {
+      if (typingIn(event) || blocked) return
+      // No page scroll, and a button still holding focus from a click does not fire on the keyup.
+      event.preventDefault()
+    }
     // The box's id is what tells a deliberate send from an Enter aimed at the scene.
     const inBox = (event.target as HTMLElement | null)?.id === 'game-action'
     // Mid-reply, Enter in the well the reader opened sends it over the lines still to come, and
@@ -1429,8 +1519,47 @@ export function GameView(): JSX.Element {
     }
   }
 
-  // The dialogue box: lines advance on click *or* enter.
+  // The dialogue box: lines advance on a click, Enter or Space.
   useWindowKeydown(onKeyDown)
+
+  /**
+   * A right-click on the stage, or on a modal portalled from it, brings hidden chrome back and
+   * otherwise toggles the game menu. The native menu never opens; the root's `inert` under the
+   * cover takes the pointer half.
+   */
+  function onContextMenu(event: ReactMouseEvent): void {
+    event.preventDefault()
+    if (typingIn(event.nativeEvent)) return
+    if (uiHidden) {
+      setUiHidden(false)
+      return
+    }
+    toggleMenu()
+  }
+
+  /** The wheel's notches since its last step, and when it last moved. */
+  const wheelTravel = useRef<WheelTravel>({ sum: 0, at: 0 })
+
+  /**
+   * The wheel steps the reply, one line a notch, whatever zoom the stage is drawn at: up back
+   * over what was read, down forward over what a rewind stepped back. A trackpad's fractions of
+   * a notch add up to one, and a flick takes one step and drops the rest.
+   */
+  function onWheel(event: ReactWheelEvent): void {
+    if (covered || blocked || !sceneMode) return
+    if (typingIn(event.nativeEvent)) return
+    if (event.target instanceof Element && event.target.closest('.vu-scroll-box')) return
+    if (uiHidden) {
+      setUiHidden(false)
+      return
+    }
+    const step = accumulateNotch(wheelTravel.current, wheelNotches(event.nativeEvent))
+    if (step < 0) {
+      if (rewindOpen) onRewind()
+    } else if (step > 0 && forwardOpen) {
+      onForward()
+    }
+  }
 
   return (
     // The crossing takes the pointer from its first frame but not the keyboard, and a screen
@@ -1439,6 +1568,8 @@ export function GameView(): JSX.Element {
       className={gameOver ? 'vu-stage vu-stage--ending' : 'vu-stage'}
       data-theme={half}
       inert={covered}
+      onContextMenu={onContextMenu}
+      onWheel={onWheel}
     >
       {/* Background crossfade: the outgoing image, and the incoming one keyed by the picture it
           shows so the CSS animation runs again on every change. Empty with no backgrounds
@@ -2118,24 +2249,32 @@ export function GameView(): JSX.Element {
         )}
       </AnimatePresence>
 
-      {/* The Game menu — the ⚙ and Escape both open it — the Feedback modal it opens,
-          Load Game re-entering under this view's own crossing rather than the Main Menu's, and
-          the leave and quit confirmations. All five wear the stage's own half rather than the
-          clock's (`half`, not `modalTheme`): it is what `toMenu()`'s crossing already carries at
-          both ends, and what Load Game's own entry crossing takes as its `from`. */}
+      {/* The Game menu — the ⚙ and Escape both open it — the Settings, Controls and Feedback
+          modals it opens, Save Game, Load Game re-entering under this view's own crossing rather
+          than the Main Menu's, and the leave and quit confirmations. Every one of them wears the stage's
+          own half rather than the clock's (`half`, not `modalTheme`): it is what `toMenu()`'s
+          crossing already carries at both ends, and what Load Game's own entry crossing takes as
+          its `from`. */}
       <AnimatePresence>
         {panel?.kind === 'settings' && (
           <GameMenuModal
             key="menu"
             theme={half}
             onClose={closePanel}
+            onSaveGame={() => setPanel({ kind: 'saveGame' })}
+            saveOffer={manualSaveOffer()}
             onLoadGame={() => setPanel({ kind: 'loadGame' })}
             onFeedback={() => setPanel({ kind: 'feedback' })}
             onSettings={() => setPanel({ kind: 'appSettings' })}
+            onControls={() => setPanel({ kind: 'controls' })}
             onLeave={() => setPanel({ kind: 'leaving' })}
             // The browser has no window of its own to close, so it is offered no way out.
             onQuit={isWebBuild() ? undefined : () => setPanel({ kind: 'quitting' })}
           />
+        )}
+
+        {panel?.kind === 'saveGame' && (
+          <SaveGameModal key="save-game" theme={half} onClose={closePanel} />
         )}
 
         {panel?.kind === 'loadGame' && (
@@ -2147,6 +2286,11 @@ export function GameView(): JSX.Element {
             cannot reach the line behind it. */}
         {panel?.kind === 'appSettings' && (
           <AppSettingsModal key="app-settings" theme={half} onClose={closePanel} />
+        )}
+
+        {/* The key list the menu opens, an arm of `OpenPanel` for the reason Settings is. */}
+        {panel?.kind === 'controls' && (
+          <ControlsModal key="controls" theme={half} onClose={closePanel} />
         )}
 
         {/* The Feedback modal, the same one the Main Menu opens, as an arm of `OpenPanel` for

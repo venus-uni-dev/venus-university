@@ -251,8 +251,7 @@ export async function streamScene(
     console.warn(
       `[scene] streamed ${streamed} lines but the reply has ${lines.length} — discarding the preview.`
     )
-    game.dropSceneTranscript(streamed)
-    game.dropPendingLines(streamed)
+    game.dropReadPreview(streamed)
     game.appendSceneLines(lines)
     game.appendPendingLines(lines)
     game.setWaitingForLine(true)

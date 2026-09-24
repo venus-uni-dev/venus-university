@@ -19,8 +19,8 @@ import {
 import { factoidLine, kindOf, projectProgress, projectProgressLine } from '@shared/academics'
 import { giftActionLine, itemDefOf } from '@shared/shop'
 import type { NpcSlotOverlay } from '@shared/npcRelationships'
+import { isSlotSaveId } from '@shared/saveRules'
 import {
-  AUTOSAVE_ID,
   charKeyOf,
   READER_SPEAKER,
   type AppError,
@@ -31,6 +31,7 @@ import {
   type PlaythroughRecord,
   type LedgerResponse,
   type SceneLine,
+  type SceneState,
   type BankedOpening,
   type BankedTextLedger,
   type SlotOpening,
@@ -91,7 +92,14 @@ import {
   shortenSceneSoFar
 } from '../prompts/scenePrompt'
 import { useGrabBagStore } from './grabBagStore'
-import { namesCharacter, PORTRAIT_SLOTS, useGameStore, type SceneKind } from './gameStore'
+import {
+  namesCharacter,
+  PORTRAIT_SLOTS,
+  summariesWithin,
+  useGameStore,
+  type SceneKind
+} from './gameStore'
+import { useCharacterStore } from './characterStore'
 import { castOf, useSaveStore } from './saveStore'
 import {
   applyLedger,
@@ -186,19 +194,22 @@ import {
 } from './loop/npc'
 import { applyRumorPass, rollRumorPass } from './loop/rumors'
 import {
-  deleteAutosave,
+  endingGameOver,
+  endingSave,
   foldOpeningIntoSlotSave,
   markDecisionPoint,
   queuedScene,
   writeAutosave,
   writeEpilogueSave,
-  writeSlotSave
+  writeSlotSave,
+  writesSettled
 } from './loop/saves'
+import { registerSpriteVersions } from './loop/thumbnail'
 import { armEpilogue, dropEndingArt } from './loop/endingArt'
 import { dropProfilePicture, loadProfilePicture } from './loop/profilePicture'
 import { farewellDisposition, seniorNames } from './loop/farewells'
 import { settleSpringBreak } from './loop/springBreak'
-import { dropHeldSceneLines, streamScene, unpark } from './loop/stream'
+import { dropHeldSceneLines, sceneInProgress, streamScene, unpark } from './loop/stream'
 import {
   announceableAdds,
   announceableDrops,
@@ -213,7 +224,7 @@ import {
   scheduleInput,
   stageCast
 } from './loop/promptState'
-import { interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
+import { forwardOpenOf, interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
 import {
   authoredTurn,
   currentRun,
@@ -247,6 +258,9 @@ registerLoopHooks({
   prefetchTextLedger,
   claimTextLedger
 })
+
+// The version a save's stage picture keys a character's images on, so a regenerated one is read afresh.
+registerSpriteVersions((charId) => useCharacterStore.getState().spriteVersion[charId] ?? 0)
 
 /** What an empty submission says instead. */
 const KEEP_GOING = 'Keep going'
@@ -803,7 +817,7 @@ async function fetchSlotIntro(
  */
 function playerBlocked(): boolean {
   const game = useGameStore.getState()
-  return game.waitingForLine && (loopState.endingInFlight || loopState.openingWait)
+  return game.waitingForLine && (game.endingInFlight || loopState.openingWait)
 }
 
 /**
@@ -1428,7 +1442,7 @@ async function runEnding(solo: boolean): Promise<void> {
     if (runStale(run) || dropped()) return
     useGameStore.getState().setBusy(false)
     if (!closed) return
-    loopState.endingInFlight = false
+    useGameStore.getState().setEndingInFlight(false)
     unpark()
     return
   }
@@ -1464,17 +1478,20 @@ async function runEnding(solo: boolean): Promise<void> {
 
   loopState.bankedOpening = opening
   // The ending is complete: one write, carrying the goodbye, the bookkeeping and
-  // the slot the player is about to walk into.
-  await writeAutosave(
-    queuedScene(loopState.endBase, loopState.endLines ?? [], {
-      endPending: true,
-      ledger: merged,
-      opening
-    })
-  )
+  // the slot the player is about to walk into. A losing ending is written nowhere: nothing in
+  // it is a place to put the player back onto.
+  if (endingGameOver() === null) {
+    await writeAutosave(
+      queuedScene(loopState.endBase, loopState.endLines ?? [], {
+        endPending: true,
+        ledger: merged,
+        opening
+      })
+    )
+  }
   // An interjection landing during the write has queued its own decision point behind it.
   if (runStale(run) || dropped()) return
-  loopState.endingInFlight = false
+  useGameStore.getState().setEndingInFlight(false)
   unpark()
 }
 
@@ -1923,7 +1940,7 @@ export function advance(): void {
   // The scene is over on screen but its ending is still being paid for; one flag
   // covers the whole window, retry modals included, until the ending is written.
   const ending = game.sceneEnding
-  if (ending && loopState.endingInFlight) {
+  if (ending && game.endingInFlight) {
     game.setWaitingForLine(true)
     return
   }
@@ -1933,6 +1950,8 @@ export function advance(): void {
   const farewell = game.sceneFarewell
   if (ending && isGraduationSlot(game.date, game.time)) {
     if (farewell && !game.statusShown) {
+      // What a save taken on the status line records: the goodbye's last line, unturned.
+      loopState.statusBase = endingSave()
       game.setStatusShown(true)
       game.appendPendingLines([
         farewellStatusLine(
@@ -1981,15 +2000,17 @@ export function advance(): void {
 function reachDecisionPoint(): void {
   const game = useGameStore.getState()
   game.setAwaitingInput(true)
+  // The beat a rewind held for this point is spent, however it was reached again.
+  game.clearReread()
   // Charged where the turn ends and before the save, so the autosave records the count.
   game.settleDepartures()
   markDecisionPoint()
 }
 
 /**
- * Steps playback back a line within the current reply — the row's rewind. Free, and it writes
- * nothing: the decision point, if one was reached, is un-reached, and reading forward to it
- * again reaches it again.
+ * Steps playback back a line — the row's rewind — through the scene's replies as far as its
+ * first, never onto the reader's own line. Free, and it writes nothing: the decision point, if
+ * one was reached, is un-reached, and reading forward to it again reaches it again.
  */
 export function rewind(): void {
   const game = useGameStore.getState()
@@ -1997,6 +2018,85 @@ export function rewind(): void {
   if (!game.rewindLine()) return
   game.setAwaitingInput(false)
   game.setWaitingForLine(false)
+}
+
+/**
+ * Steps playback forward a line over what a rewind stepped back — the wheel's forward step. Each
+ * line read again lands as a cut, the reader's own line is passed over silently, it never
+ * reaches a line not yet read, and the last beat re-reaches the decision point the rewind was
+ * taken from.
+ */
+export function forward(): void {
+  const game = useGameStore.getState()
+  if (!forwardOpenOf(game)) return
+  if (game.waitingForLine || game.statusModal) return
+  // Only the decision point is left ahead: reaching it again is an ordinary drain.
+  if (game.pendingLines.length === 0) {
+    advance()
+    return
+  }
+  // The queue ran out on the reader's own line: what follows it is still being written, or the
+  // decision point after an empty reply, and an ordinary drain reaches either.
+  if (!game.forwardLine()) {
+    advance()
+    return
+  }
+  // A line with nothing to read is a beat, not a pause: the next beat is read again as a cut
+  // while one was read before, and played on as usual once none was.
+  const landed = useGameStore.getState()
+  if (!isSilentLine(landed.currentLine)) return
+  if (landed.reread > 0) forward()
+  else advance()
+}
+
+/**
+ * `scene` with `old` rewritten to `edited` — at `at` on its log and at `tAt` on its transcript,
+ * each only where it still holds the old line, and every summary covering the transcript line
+ * dropped with it. The same object when it holds neither.
+ */
+function withLineRewritten(
+  scene: SceneState,
+  at: number,
+  tAt: number,
+  old: SceneLine,
+  edited: SceneLine
+): SceneState {
+  const holds = (line: SceneLine | undefined): boolean =>
+    line !== undefined && line.speaker === old.speaker && line.text === old.text
+  const onLog = holds(scene.sceneLog[at])
+  const onTranscript = tAt >= 0 && holds(scene.transcript[tAt])
+  if (!onLog && !onTranscript) return scene
+  const next: SceneState = { ...scene }
+  if (onLog) next.sceneLog = scene.sceneLog.map((line, i) => (i === at ? edited : line))
+  if (onTranscript) {
+    next.transcript = scene.transcript.map((line, i) => (i === tAt ? edited : line))
+    const kept = summariesWithin(scene.summaries ?? [], tAt).sceneSummaries
+    if (kept) {
+      next.summary = kept[kept.length - 1]?.summary ?? null
+      if (kept.length > 0) next.summaries = kept
+      else delete next.summaries
+    }
+  }
+  return next
+}
+
+/**
+ * The chat log's rewrite of a reply line: the store's, and in memory the held decision point's and
+ * the turn snapshot's wherever they still hold the old line, so the leave write carries it.
+ * Writes nothing; false, changing nothing, when the store refuses it.
+ */
+export function rewriteLine(at: number, text: string): boolean {
+  const game = useGameStore.getState()
+  const old = game.sceneLog[at]
+  const tAt = game.editLogLine(at, text)
+  if (tAt === null) return false
+  const edited: SceneLine = { ...old, text }
+  if (loopState.decisionSave) {
+    loopState.decisionSave = withLineRewritten(loopState.decisionSave, at, tAt, old, edited)
+  }
+  const snapshot = loopState.lastTurn
+  if (snapshot?.scene) snapshot.scene = withLineRewritten(snapshot.scene, at, tAt, old, edited)
+  return true
 }
 
 /** Aborts the live scene call; the lines it already delivered stay where they are. */
@@ -2017,7 +2117,6 @@ export function dropEnding(): void {
   const parked = loopState.parkedWaiters
   loopState.parkedWaiters = []
   for (const wake of parked) wake()
-  loopState.endingInFlight = false
   loopState.endingAbandoned = false
   loopState.pendingLedgerResult = null
   loopState.bankedOpening = null
@@ -2026,7 +2125,9 @@ export function dropEnding(): void {
   loopState.closingCast = null
   loopState.closingCastPresent = null
   loopState.statusSteps = []
+  loopState.statusBase = null
   const game = useGameStore.getState()
+  game.setEndingInFlight(false)
   game.setSceneEnding(false)
   game.setStatusShown(false)
   game.setBusy(false)
@@ -2080,6 +2181,9 @@ export function interject(action: string): boolean {
  * something to say; the ordering and line/screen split are `buildStatusSteps`'.
  */
 function showStatusLines(): boolean {
+  // What a save taken anywhere in the sequence records, taken before any money moves: the
+  // scene's last line, unturned, so a load raises the whole sequence again.
+  loopState.statusBase = endingSave()
   const game = useGameStore.getState()
   game.setStatusShown(true)
   // Money lands here, so the balance moves as the line reporting it is read.
@@ -2349,10 +2453,9 @@ async function crossSlotBoundary(): Promise<void> {
   useGameStore.getState().setSceneQuiz(null)
   useGameStore.getState().setStatusShown(false)
   resetTurnSlice()
-  // A playthrough that ended badly leaves nothing behind to load: no boundary save, and the
-  // ending call's autosave deleted.
+  // A playthrough that ended badly leaves nothing new behind: no boundary save, and its ending
+  // wrote no autosave.
   if (over) {
-    void deleteAutosave()
     void beginSlot()
     return
   }
@@ -2386,8 +2489,9 @@ export function enterGame(
   game.loadSave(save, record, characters)
   // A read nothing on screen is waiting on: the profile is not open yet.
   void loadProfilePicture()
-  // The file a slot opening is folded back into; the autosave is never that file.
-  loopState.slotSaveId = save.saveId === AUTOSAVE_ID ? null : save.saveId
+  // The file a slot opening is folded back into: a boundary's own save, never the autosave or a
+  // manual one.
+  loopState.slotSaveId = isSlotSaveId(save.saveId) ? save.saveId : null
 
   if (!save.scene) {
     void beginSlot()
@@ -2416,17 +2520,23 @@ export function enterGame(
   loopState.projectWork =
     typeof project === 'object' && project?.code === save.scene.projectClass ? project : null
 
+  // A save taken on a line the reader had not turned yet shows that line as it stands, and the
+  // next click reads on from it.
+  const onLine = save.scene.resumeOnLine === true && save.scene.currentLine !== null
   // With lines queued, `advance()` decides what happens when they run out, as in live play. It is
   // the *stripped* queue that decides: a save whose only remaining line was that question is a
   // decision point, not a slot with one line left to play.
-  const drained = queued.length === 0
+  const drained = queued.length === 0 && !onLine
   live.setAwaitingInput(drained && !ending)
-  // A drained save *is* a decision point, so leaving from one writes it back. So is a paper:
-  // its own point is the start it was written at, which is what this save holds.
-  if (!ending && (drained || save.scene.quiz)) loopState.decisionSave = save.scene
+  // A drained scene *is* a decision point, so leaving from one writes it back; a landing is not,
+  // so leaving from one writes nothing, as a live landing does. A paper is one too: its own point
+  // is the start it was written at, which is what this save holds.
+  if (!ending && (save.scene.quiz || (drained && sceneInProgress()))) {
+    loopState.decisionSave = save.scene
+  }
   // Puts the queue's first line on screen, as `beginSlot` does for a live opening; otherwise
   // the box opens on `currentLine` as the save left it.
-  if (!drained || ending) advance()
+  if ((!drained || ending) && !onLine) advance()
 
   // A save taken mid-goodbye never runs `beginSlot`, and without this a reload from one loses
   // both the picture and the posts.
@@ -2457,9 +2567,13 @@ export function enterGame(
   }
 }
 
-/** The leaving game's last word, shared by every way out. */
+/**
+ * The leaving game's last word, shared by every way out: the decision point written, and every
+ * write still queued on disk before the game is torn down.
+ */
 async function writeDecisionPoint(): Promise<void> {
   if (loopState.decisionSave) await writeAutosave(loopState.decisionSave)
+  await writesSettled()
 }
 
 /**
@@ -2513,22 +2627,21 @@ function leaveGame(keepCrossing: boolean): void {
 export async function switchGame(playthroughId: string, saveId: string): Promise<void> {
   await writeDecisionPoint()
 
-  const listing = await window.api.saves.list(playthroughId)
-  if (!listing.ok) throw listing.error
-  const { record, error: recordError, saves } = listing.data
-  if (!record) throw recordError ?? new Error('playthrough record unreadable')
-  const entry = saves.find((s) => s.saveId === saveId)
-  if (!entry?.save) throw entry?.error ?? new Error('save unreadable')
+  const read = await window.api.saves.read(playthroughId, saveId)
+  if (!read.ok) throw read.error
+  const { record, save } = read.data
 
   const characters = Object.fromEntries(
     castOf(record.chars, useSaveStore.getState().characters).map((c) => [c.charId, c])
   )
 
   leaveGame(true)
-  enterGame(entry.save, record, characters)
+  enterGame(save, record, characters)
 }
 
 /** The façade the views import from. */
 export { speakerNameOf }
 export { abandonClassify, retryClassify } from './loop/classify'
 export { submitQuizAnswer } from './loop/exams'
+export { manualSaveOffer, writeManualSave } from './loop/saves'
+export type { ManualSaveOffer } from './loop/saves'

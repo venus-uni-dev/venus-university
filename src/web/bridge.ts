@@ -47,6 +47,9 @@ import { duplicateCharacter, exportCharacter, importCharacter } from './transfer
 /** The fixed channel job progress rides, as it does on the desktop. */
 export const jobProgress = emitter<[JobProgress]>()
 
+/** The fixed channel each cloud text reply's token count rides, as it does on the desktop. */
+export const tokensGenerated = emitter<[number]>()
+
 /** The two preview channels the streamed calls write onto. */
 const sceneDelta = emitter<[string]>()
 const textingDelta = emitter<[string, string]>()
@@ -195,7 +198,8 @@ export function buildApi(): VenusUniversityApi {
           )
         ),
       onSceneDelta: (listener) => sceneDelta.on(listener),
-      onTextingDelta: (listener) => textingDelta.on(listener)
+      onTextingDelta: (listener) => textingDelta.on(listener),
+      onTokensGenerated: (listener) => tokensGenerated.on(listener)
     },
     chars: {
       list: () => result('read the characters', chars.listCharacters),
@@ -220,6 +224,11 @@ export function buildApi(): VenusUniversityApi {
       readWardrobeImage: (charId, target, image) =>
         result('read the image', async () => {
           const bytes = await chars.readWardrobeImage(charId, target, image)
+          return bytes === null ? null : new Uint8Array(bytes)
+        }),
+      readImage: (charId, rel) =>
+        result('read the image', async () => {
+          const bytes = await chars.readImage(charId, rel)
           return bytes === null ? null : new Uint8Array(bytes)
         }),
       applyWardrobeFix: (charId, target, images, paintLayer, kind) =>
@@ -247,6 +256,8 @@ export function buildApi(): VenusUniversityApi {
     saves: {
       playthroughs: () => result('read the playthroughs', saves.listPlaythroughs),
       list: (playthroughId) => result('read the saves', () => saves.listSaves(playthroughId)),
+      read: (playthroughId, saveId) =>
+        result('read the save', () => saves.readSave(playthroughId, saveId)),
       enroll: (draft) => result('save the class registration', () => saves.writeEnrollment(draft)),
       enrollment: (playthroughId) =>
         result('read the class registration', () => saves.readEnrollment(playthroughId)),
@@ -260,6 +271,8 @@ export function buildApi(): VenusUniversityApi {
         result('write the save', () => saves.overwriteSlotSave(playthroughId, saveId, draft)),
       autosave: (playthroughId, draft) =>
         result('write the save', () => saves.writeAutosave(playthroughId, draft)),
+      manual: (playthroughId, slot, draft) =>
+        result('write the save', () => saves.writeManualSave(playthroughId, slot, draft)),
       delete: (playthroughId, saveId) =>
         result('delete the save', () => saves.deleteSave(playthroughId, saveId)),
       deletePlaythrough: (playthroughId) =>

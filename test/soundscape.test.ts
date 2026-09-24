@@ -37,6 +37,7 @@ function inGame(over: Partial<NonNullable<SoundFacts['game']>> = {}): SoundFacts
       narrating: false,
       bg: { base: 'lowrise_dorm_room', kind: 'interior' },
       half: 'day',
+      weekend: false,
       weather: 'clear',
       epilogue: false,
       cg: null,
@@ -151,10 +152,18 @@ describe('a crossing', () => {
 })
 
 describe('a slot', () => {
-  it('picks the landing theme for the half of the day', () => {
+  it('picks the landing theme for the half of the day, and the alternate on a weekend', () => {
     expect(soundscapeOf(inGame()).music).toEqual({ key: 'landing_day', fade: 0.5 })
     expect(soundscapeOf(inGame({ half: 'night' })).music).toEqual({
       key: 'landing_night',
+      fade: 0.5
+    })
+    expect(soundscapeOf(inGame({ weekend: true })).music).toEqual({
+      key: 'landing_day_alt',
+      fade: 0.5
+    })
+    expect(soundscapeOf(inGame({ weekend: true, half: 'night' })).music).toEqual({
+      key: 'landing_night_alt',
       fade: 0.5
     })
   })

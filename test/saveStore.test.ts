@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GameSave, PlaythroughSummary, Result } from '@shared/types'
+import type { PlaythroughSummary, Result } from '@shared/types'
 import { useSaveStore, type ResolvedSave } from '../src/renderer/stores/saveStore'
 import { playthroughRecord, restoreApi, stubApi } from './fixtures'
 
@@ -19,6 +19,7 @@ const PLAYTHROUGH: PlaythroughSummary = {
   time: 0,
   savedAt: 0,
   saveCount: 2,
+  manualCount: 0,
   hasAutosave: false,
   unloadable: null
 }
@@ -28,7 +29,7 @@ function resolvedSaves(): ResolvedSave[] {
   return ['s1', 's2'].map((saveId) => ({
     saveId,
     savedAt: 0,
-    save: { saveId } as GameSave,
+    summary: { date: 3, time: 0, graduationSeen: false, midScene: false, bg: null },
     record: playthroughRecord({ chars: ['char-1'] }),
     characters: [],
     unloadable: null

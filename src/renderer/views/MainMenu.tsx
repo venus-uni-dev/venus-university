@@ -17,8 +17,8 @@ import {
   isEnrollment,
   newestPlaythrough,
   useSaveStore,
-  type ResolvedEnrollment,
-  type ResolvedSave
+  type LoadedSave,
+  type ResolvedEnrollment
 } from '../stores/saveStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSetupStore } from '../stores/setupStore'
@@ -63,7 +63,7 @@ interface Shot {
 }
 
 /** What the top slot's read answers with: the newest save, or a semester still at the registrar. */
-type Resumed = ResolvedSave | ResolvedEnrollment
+type Resumed = LoadedSave | ResolvedEnrollment
 
 /**
  * The version as the menu prints it. A major of 0 is still early access and says so; from 1.0.0
@@ -180,7 +180,7 @@ export function MainMenu(): JSX.Element {
     }
 
     // An unloadable save is explained by its own card too.
-    if (!resumed || !resumed.save || !resumed.record || resumed.unloadable) {
+    if (!resumed || resumed.unloadable) {
       openModal('loadGame')
       return
     }

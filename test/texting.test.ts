@@ -29,8 +29,10 @@ import {
   sceneActiveOf,
   sceneOnScreenOf,
   sendMessage,
+  textingUnsettled,
   unblockContact
 } from '../src/renderer/stores/textingLoop'
+import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { BUNNYBOT_CHAT_ID, FRIENDS_INTRO_SLOT } from '../src/renderer/prompts/bunnybot'
 import { registerHangoutEntry } from '../src/renderer/stores/loop/hooks'
 import { applyLedger } from '../src/renderer/stores/sceneSanitizer'
@@ -1095,5 +1097,23 @@ describe('sceneOnScreenOf', () => {
     expect(sceneOnScreenOf({ currentSceneTranscript: [], sceneSummary: 'sat the midterm' })).toBe(
       true
     )
+  })
+})
+
+/** What holds a manual save back while the phone is still settling a thread. */
+describe('textingUnsettled', () => {
+  it('holds while any thread is out, typing or parked on its Retry, and not otherwise', () => {
+    useBunnyboardStore.getState().reset()
+    expect(textingUnsettled()).toBe(false)
+    for (const held of [
+      { busyCharIds: ['a'] },
+      { typingCharIds: ['a'] },
+      { failedCharIds: ['a'] }
+    ]) {
+      useBunnyboardStore.getState().reset()
+      useBunnyboardStore.setState(held)
+      expect(textingUnsettled()).toBe(true)
+    }
+    useBunnyboardStore.getState().reset()
   })
 })

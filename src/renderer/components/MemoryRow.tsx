@@ -23,8 +23,8 @@ export interface MemoryRowProps {
 
 /**
  * One memory laid out as the sentence it is read as: her face, her name, a picker for how she
- * remembers it, and a field for what. The end-of-scene list and the contact page's single edit
- * both draw it.
+ * remembers it, and three lines of field for what. The end-of-scene list and the contact page's
+ * single edit both draw it.
  */
 export function MemoryRow({
   id,
@@ -67,10 +67,10 @@ export function MemoryRow({
         </select>
       </label>
       <span className="vu-memrow-that">that</span>
-      <input
+      <textarea
         id={`${id}-desc`}
-        type="text"
-        className="vu-input vu-memrow-desc"
+        className="vu-input vu-input--multiline vu-memrow-desc"
+        rows={3}
         aria-label="What she remembers"
         value={desc}
         maxLength={MEMORY_DESC_MAX}
@@ -80,7 +80,16 @@ export function MemoryRow({
           const end = e.currentTarget.value.length
           e.currentTarget.setSelectionRange(end, end)
         }}
-        onChange={(e) => onDesc(e.target.value)}
+        // A memory is one sentence, so Enter files it as the form's own submit and no Enter,
+        // shifted or not, writes a line break.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            event.currentTarget.form?.requestSubmit()
+          }
+        }}
+        // A pasted break lands as a space.
+        onChange={(e) => onDesc(e.target.value.replace(/[\r\n]+/g, ' '))}
       />
     </div>
   )

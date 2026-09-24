@@ -1,5 +1,5 @@
 import { pairBackgrounds } from '@shared/backgroundSets'
-import type { BackgroundSets } from '@shared/types'
+import type { BackgroundSets, SaveSummary } from '@shared/types'
 
 /**
  * Every shipped background and its thumbnail, resolved to bundled URLs at build time. A glob
@@ -81,4 +81,14 @@ export function bgUrl(base: string, suffix: 'day' | 'night', wet: boolean): stri
  */
 export function bgThumbUrl(base: string, suffix: 'day' | 'night'): string | null {
   return BG_THUMB_BY_STEM[`${base}_${suffix}`] ?? bgUrl(base, suffix, false)
+}
+
+/**
+ * The picture a save's card shows: the frame it was written over where it carries one, and
+ * otherwise its place's thumbnail in its half of the day, the dorm where it names none.
+ */
+export function saveThumbUrl(summary: SaveSummary): string | null {
+  if (summary.thumbnail) return `data:image/jpeg;base64,${summary.thumbnail}`
+  const half = summary.graduationSeen || summary.time === 1 ? 'night' : 'day'
+  return bgThumbUrl(summary.bg ?? SLOT_BG, half) ?? bgThumbUrl(SLOT_BG, half)
 }

@@ -23,6 +23,7 @@ import {
   ZoomOutIcon
 } from '../views/repairIcons'
 import { ColorWheel } from './ColorWheel'
+import { typingIn } from './useWindowKeydown'
 import '../vu_styles/WardrobeFix.css'
 
 /** What the brush is doing: laying paint down, taking it back, or sampling it. */
@@ -254,8 +255,7 @@ export function LayerPainter({
   keys.current = (event: KeyboardEvent): void => {
     // A job is running over these strokes: nothing may change under it.
     if (disabled) return
-    const target = event.target as HTMLElement | null
-    if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return
+    if (typingIn(event)) return
 
     const key = event.key.toLowerCase()
     if (event.ctrlKey || event.metaKey) {

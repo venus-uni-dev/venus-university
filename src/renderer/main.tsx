@@ -8,14 +8,63 @@ import './vu_styles/index.css'
 import App from './App'
 import { beginCrossing } from './stores/crossingStore'
 import { useAudioStore } from './stores/audioStore'
+import { useGameStore } from './stores/gameStore'
 
-// Tab selects nothing: the app is a window and not a page (vu_styles/window.css), and a focus
-// ring walking the screen is what is left of one. Captured as the modal shell's Escape is, but it does
-// not stop the event — GameView's "any key un-hides the UI" is a rule about keys, and Tab is one.
+/** Every control that is typed into rather than clicked or dragged. */
+const FIELD_SELECTOR = [
+  'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"])' +
+    ':not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"])' +
+    ':not([type="image"]):not([type="color"])',
+  'textarea',
+  'select'
+].join(', ')
+
+/** The part of the screen a field's Tab walks: its form, else its modal, else its veil, else the window. */
+function fieldRing(field: Element): ParentNode {
+  return (
+    field.closest('form') ??
+    field.closest('[role="dialog"]') ??
+    field.closest('.vu-veil') ??
+    document
+  )
+}
+
+/** The fields of a ring Tab can land on, in document order: none disabled, inert or out of sight. */
+function ringFields(ring: ParentNode): HTMLElement[] {
+  return Array.from(ring.querySelectorAll<HTMLElement>(FIELD_SELECTOR)).filter(
+    (field) => !field.matches(':disabled') && !field.closest('[inert]') && field.checkVisibility()
+  )
+}
+
+/**
+ * Focuses the field after this one in its ring, or the one before it, wrapping at the ends, and
+ * selects its text as a native Tab would. A lone field steps nowhere, so its text is never
+ * selected — Chromium restores a field's selection on the next focus, and a draft left selected
+ * would be replaced by the next keystroke.
+ */
+function stepField(field: HTMLElement, back: boolean): void {
+  const fields = ringFields(fieldRing(field))
+  if (fields.length < 2) return
+  const at = fields.indexOf(field)
+  if (at < 0) return
+  const next = fields[(at + (back ? fields.length - 1 : 1)) % fields.length]
+  next.focus()
+  if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) next.select()
+}
+
+// Tab walks the fields of the form it is in, steps nowhere from a lone field, and selects nothing
+// otherwise: the app is a window and not a page (vu_styles/window.css), and a focus ring walking
+// the screen is what is left of one. Captured as the modal shell's Escape is, but it does not stop
+// the event — GameView's "any key un-hides the UI" is a rule about keys, and Tab is one, and the
+// screen may answer Tab itself (GameView's well does).
 window.addEventListener(
   'keydown',
   (event) => {
-    if (event.key === 'Tab') event.preventDefault()
+    if (event.key !== 'Tab') return
+    event.preventDefault()
+    if (event.ctrlKey || event.altKey || event.metaKey) return
+    const target = event.target
+    if (target instanceof HTMLElement && target.matches(FIELD_SELECTOR)) stepField(target, event.shiftKey)
   },
   true
 )
@@ -81,6 +130,10 @@ document.addEventListener(
   },
   true
 )
+
+// Credits each cloud reply's output tokens to the playthrough's tallies. The transport broadcasts
+// the count, so the game store has it before the reply it belongs to is saved.
+window.api.llm.onTokensGenerated((generated) => useGameStore.getState().recordTokens(generated))
 
 // Raises the cover before React's first paint, drawn for the machine clock's own hour since no
 // location is known yet; `boot()` in `App.tsx` lowers it once settings are read.

@@ -293,5 +293,17 @@ export const openaiAdapter: LlmAdapter = {
   // The sentinel every chat-completions stream ends with.
   isStreamEnd(payload: string): boolean {
     return payload.trim() === '[DONE]'
+  },
+
+  // `completion_tokens` already counts the reasoning; a stream reports it once, on its last chunk.
+  generatedTokensOf(payload: string): number | undefined {
+    let parsed: OpenAiResponse | null
+    try {
+      parsed = JSON.parse(payload) as OpenAiResponse | null
+    } catch {
+      return undefined
+    }
+    const usage = parsed?.usage as { completion_tokens?: unknown } | null | undefined
+    return typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : undefined
   }
 }

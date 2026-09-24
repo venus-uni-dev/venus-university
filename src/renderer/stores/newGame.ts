@@ -1,4 +1,5 @@
 import { appError, toAppError } from '@shared/errors'
+import { emptyTallies } from '@shared/tallies'
 import {
   charKeyOf,
   type AppError,
@@ -36,6 +37,7 @@ import {
 } from '../prompts/occasionPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
+import { useGameStore } from './gameStore'
 import { useGrabBagStore } from './grabBagStore'
 import { retrySilently } from './silentRetry'
 
@@ -270,6 +272,8 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
   const mine = {}
   run = mine
   sleepers = []
+  // Clears the tokens any call since the main menu added, so the enrollment counts only this run's.
+  useGameStore.setState({ tallies: emptyTallies() })
   const occasionRequests = planOccasionSlots((count) =>
     useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count)
   )

@@ -236,6 +236,18 @@ describe('openaiAdapter.contentOf', () => {
   })
 })
 
+describe('openaiAdapter.generatedTokensOf', () => {
+  it('counts the completion tokens, reasoning already inside them', () => {
+    const body = JSON.stringify({
+      choices: [],
+      usage: { completion_tokens: 42, completion_tokens_details: { reasoning_tokens: 30 } }
+    })
+
+    expect(openaiAdapter.generatedTokensOf(body)).toBe(42)
+    expect(openaiAdapter.generatedTokensOf(JSON.stringify({ choices: [] }))).toBeUndefined()
+  })
+})
+
 describe('modelIdsOf', () => {
   it('keeps only the models that can be held to a schema, sorted and unique', () => {
     const body = JSON.stringify({

@@ -74,6 +74,8 @@ export interface SoundFacts {
     narrating: boolean
     bg: { base: string; kind: BackgroundKind | null }
     half: DayHalf
+    /** A Saturday or a Sunday, which the landing plays its alternate theme on. */
+    weekend: boolean
     /** The slot's sky, which colours the ambience wherever it is heard. */
     weather: Weather
     /** The graduation epilogue, which has a theme of its own. */
@@ -105,6 +107,20 @@ const MENU_VIEWS: readonly ViewName[] = [
   'classSelect',
   'apiKey',
   'setup'
+]
+
+/** The landing's theme for one half of one day: the weekend has a second pair of its own. */
+function landingThemeOf(half: DayHalf, weekend: boolean): AudioKey {
+  if (weekend) return half === 'night' ? 'landing_night_alt' : 'landing_day_alt'
+  return half === 'night' ? 'landing_night' : 'landing_day'
+}
+
+/** Every theme the landing plays, which a scene opening's cover keeps under it. */
+const LANDING_THEMES: readonly AudioKey[] = [
+  'landing_day',
+  'landing_night',
+  'landing_day_alt',
+  'landing_night_alt'
 ]
 
 /** What the four channels play, from the whole of what is on screen. */
@@ -164,7 +180,7 @@ function gameMix(facts: SoundFacts): Soundscape {
   // A scene opening's cover declares a wait and carries no splash, and it is the one cover that
   // keeps the landing's theme under it: a load's cover clears the stage for the save it opens.
   if (facts.crossing.phase === 'holding') {
-    const landingTheme = facts.music === 'landing_day' || facts.music === 'landing_night'
+    const landingTheme = facts.music !== null && LANDING_THEMES.includes(facts.music)
     const opening = facts.crossing.waited && !facts.crossing.splash
     return {
       music: opening && landingTheme ? 'keep' : { key: null, fade: COVER_OUT },
@@ -175,11 +191,7 @@ function gameMix(facts: SoundFacts): Soundscape {
   }
 
   const cg = facts.nsfwSound ? cgMix(game.cg) : noCg()
-  const theme: AudioKey = game.epilogue
-    ? 'ending'
-    : game.half === 'night'
-      ? 'landing_night'
-      : 'landing_day'
+  const theme: AudioKey = game.epilogue ? 'ending' : landingThemeOf(game.half, game.weekend)
 
   // The landing's own theme covers the room, but a wet sky still reaches the ambience channel:
   // the reader is indoors on his phone, so rain and thunder come through a window under it.

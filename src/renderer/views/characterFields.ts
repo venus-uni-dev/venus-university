@@ -8,13 +8,20 @@ import type { CharacterBehavior, OutfitSet, SetTarget } from '@shared/types'
  * panel.
  */
 
-/** The behaviour fields under "More settings", in relationship order. */
-export const BEHAVIOR_FIELDS: ReadonlyArray<{ key: keyof CharacterBehavior; label: string }> = [
-  { key: 'withStrangers', label: 'With strangers' },
-  { key: 'withFriends', label: 'With friends' },
-  { key: 'withCrush', label: 'With a crush' },
-  { key: 'withLover', label: 'With a lover' },
-  { key: 'withEnemy', label: 'With someone she dislikes' }
+/**
+ * The behaviour fields under "More settings", in relationship order. `around` is the noun each
+ * field's placeholder addresses her by.
+ */
+export const BEHAVIOR_FIELDS: ReadonlyArray<{
+  key: keyof CharacterBehavior
+  label: string
+  around: string
+}> = [
+  { key: 'withStrangers', label: 'With strangers', around: 'strangers' },
+  { key: 'withFriends', label: 'With friends', around: 'friends' },
+  { key: 'withCrush', label: 'With a crush', around: 'a crush' },
+  { key: 'withLover', label: 'With a lover', around: 'a lover' },
+  { key: 'withEnemy', label: 'With someone she dislikes', around: 'someone she dislikes' }
 ]
 
 /**
@@ -72,4 +79,27 @@ export function textList(value: string): string[] {
     .split('\n')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0)
+}
+
+/** What an empty field of the sheet shows: the shape its prose wants, told about her by name. */
+export function sheetPlaceholders(name: string): {
+  personality: string
+  backstory: string
+  datingHistory: string
+  datingPreference: string
+  kinks: string
+  likes: string
+  dislikes: string
+  behavior: (around: string) => string
+} {
+  return {
+    personality: `${name} presents herself as... but actually she's... She wants..., but... keeps her from getting it. She has a habit of...`,
+    backstory: `${name} grew up... As a result, she...`,
+    datingHistory: `${name} hasn't dated/has dated before... As a result, she...`,
+    datingPreference: `${name} prefers hookups/long term relationships...`,
+    kinks: `${name} has a thing for...`,
+    likes: 'favorite foods\nfavorite beverages\nactivities\nentertainment preferences',
+    dislikes: 'disliked foods\nallergies\npet peeves\nsensory experiences',
+    behavior: (around: string) => `Around ${around}, ${name}...`
+  }
 }

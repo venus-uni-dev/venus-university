@@ -125,6 +125,13 @@
   width: 360px;
 }
 
+/* The column's own gap reads as too tight once what sits above the label is a paragraph
+   rather than another checkbox — the skip note needs the extra room to stop looking joined
+   to "Also render". */
+.vu-generate-sets > .vu-field-label {
+  margin-top: 10px;
+}
+
 /* The answers sit at the foot of the column, whatever the fields above them come to. */
 .vu-generate-footer {
   margin-top: auto;

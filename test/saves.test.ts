@@ -1,31 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   READER_SPEAKER,
+  type BankedOpening,
   type GameSave,
+  type LedgerResponse,
   type QuizState,
   type Result,
   type SaveDraft,
   type SceneLine
 } from '@shared/types'
 import {
-  deleteAutosave,
+  endingGameOver,
   foldOpeningIntoSlotSave,
+  manualSaveDraft,
+  manualSaveOffer,
   markDecisionPoint,
   openingScene,
   queuedScene,
   writeAutosave,
   writeEpilogueSave,
-  writeSlotSave
+  writeManualSave,
+  writeSlotSave,
+  writesSettled
 } from '../src/renderer/stores/loop/saves'
 import { loopState, resetLoopState } from '../src/renderer/stores/loop/state'
+import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { useUiStore } from '../src/renderer/stores/uiStore'
-import { restoreApi, stubApi } from './fixtures'
+import { GRADUATION_DATE } from '../src/renderer/prompts/occasions'
+import { restoreApi, sceneLines, stubApi } from './fixtures'
 
 /**
- * Every write the slot-cycle loop makes, and the order they land in: the boundary write deletes
- * the autosave, so an autosave still in flight when it lands would recreate the file and
- * leave a finished scene resumable — a failure nothing shows until the next load.
+ * Every write the slot-cycle loop makes, and the order they land in: strictly one after another,
+ * so no write overtakes one queued before it, and none queued by a stay that has been left lands
+ * in the next game's files.
  */
 
 /** A save the way `saves:*` answers with one; only `saveId` is ever read back. */
@@ -37,24 +45,63 @@ const FAILED: Result<GameSave> = { ok: false, error: { code: 'SAVE_WRITE_FAILED'
 
 /** Every write channel, each recording what it was handed. */
 function stubSaves(
-  overrides: Partial<Record<'autosave' | 'slot' | 'overwrite' | 'delete', unknown>> = {}
+  overrides: Partial<Record<'autosave' | 'slot' | 'overwrite' | 'manual', unknown>> = {}
 ) {
   const autosave = vi.fn(async () => savedAs('auto'))
   const slot = vi.fn(async () => savedAs('slot-1'))
   const overwrite = vi.fn(async () => savedAs('slot-1'))
-  const remove = vi.fn(async (): Promise<Result<void>> => ({ ok: true, data: undefined }))
-  const saves = { autosave, slot, overwrite, delete: remove, ...overrides } as unknown as {
+  const manual = vi.fn(async () => savedAs('manual03'))
+  const saves = { autosave, slot, overwrite, manual, ...overrides } as unknown as {
     autosave: typeof autosave
     slot: typeof slot
     overwrite: typeof overwrite
-    delete: typeof remove
+    manual: typeof manual
   }
   stubApi({ saves })
   return saves
 }
 
+/** An autosave that lands only when released, recording the order writes land in. */
+function heldAutosave(order: string[]): { autosave: () => Promise<Result<GameSave>>; release: () => void } {
+  let release = (): void => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const autosave = vi.fn(async () => {
+    await held
+    order.push('autosave')
+    return savedAs('auto')
+  })
+  return { autosave, release }
+}
+
+/** A reply partway read: its first line on screen and three still queued. */
+function midReply(): void {
+  useGameStore.setState({
+    cast: ['char-1'],
+    currentSceneTranscript: sceneLines('One.', 'Two.', 'Three.', 'Four.'),
+    sceneLog: sceneLines('One.'),
+    currentLine: { speaker: '', text: 'One.' },
+    pendingLines: sceneLines('Two.', 'Three.', 'Four.'),
+    awaitingInput: false
+  })
+}
+
+/** A reply read to its end, the input open under its last line. */
+function atDecisionPoint(): void {
+  useGameStore.setState({
+    cast: ['char-1'],
+    currentSceneTranscript: sceneLines('Hello.'),
+    sceneLog: sceneLines('Hello.'),
+    currentLine: { speaker: '', text: 'Hello.' },
+    pendingLines: [],
+    awaitingInput: true
+  })
+}
+
 beforeEach(() => {
   useGameStore.getState().reset()
+  useBunnyboardStore.getState().reset()
   useUiStore.setState({ error: null })
   resetLoopState()
   useGameStore.setState({ playthroughId: 'p1' })
@@ -107,6 +154,34 @@ describe('write ordering', () => {
     await writeSlotSave()
     expect(saves.slot).toHaveBeenCalledTimes(1)
   })
+
+  it('drops a write queued by a stay that has been left before its turn came', async () => {
+    // Left unfenced, the leaving game's scene would land in whatever playthrough loads next.
+    const saves = stubSaves()
+    const write = writeAutosave(null)
+    resetLoopState()
+
+    await write
+    expect(saves.autosave).not.toHaveBeenCalled()
+  })
+
+  it('settles only once the autosave out ahead of it has landed', async () => {
+    // What leaving waits on before the game is torn down.
+    const order: string[] = []
+    const { autosave, release } = heldAutosave(order)
+    stubSaves({ autosave })
+    void writeAutosave(null)
+    let settled = false
+    const done = writesSettled().then(() => {
+      settled = true
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(settled).toBe(false)
+    release()
+    await done
+    expect(order).toEqual(['autosave'])
+  })
 })
 
 describe('writeAutosave', () => {
@@ -129,8 +204,9 @@ describe('writeSlotSave', () => {
     expect(loopState.slotSaveId).toBe('slot-1')
   })
 
-  it('leaves the fold target unset when the write failed, so nothing amends a save that is not there', async () => {
+  it('leaves the fold target unset when the write failed, so nothing amends the save before it', async () => {
     stubSaves({ slot: vi.fn(async () => FAILED) })
+    loopState.slotSaveId = 'old'
 
     await writeSlotSave()
     expect(loopState.slotSaveId).toBeNull()
@@ -156,40 +232,6 @@ describe('writeEpilogueSave', () => {
     expect(draft.scene).toBeNull()
     expect(draft.graduationSeen).toBe(true)
     expect(draft.farewellsDone).toEqual(['char-1'])
-  })
-})
-
-describe('deleteAutosave', () => {
-  // The boundary of a playthrough that ended badly writes nothing and removes
-  // this file instead. A delete that overtook the ending call's own
-  // autosave would leave the scene that finished the playthrough on disk and
-  // resumable — the same failure the chain exists to prevent, from the other end.
-  it('waits for an autosave already in flight, so it cannot delete a file written after it', async () => {
-    const order: string[] = []
-    let releaseAutosave = (): void => {}
-    const held = new Promise<void>((resolve) => {
-      releaseAutosave = resolve
-    })
-
-    const saves = stubSaves({
-      autosave: vi.fn(async () => {
-        await held
-        order.push('autosave')
-        return savedAs('auto')
-      }),
-      delete: vi.fn(async () => {
-        order.push('delete')
-        return { ok: true, data: undefined }
-      })
-    })
-
-    const first = writeAutosave(null)
-    const second = deleteAutosave()
-    expect(saves.delete).not.toHaveBeenCalled()
-
-    releaseAutosave()
-    await Promise.all([first, second])
-    expect(order).toEqual(['autosave', 'delete'])
   })
 })
 
@@ -365,6 +407,19 @@ describe('queuedScene', () => {
     expect(queuedScene(scene, lines).sceneLog).toEqual(scene.sceneLog)
   })
 
+  it('reads the same words onto the log again after a reply with no lines', () => {
+    // Taken for the one before it, the reload's log holds one action fewer than its transcript.
+    const keep: SceneLine = { speaker: READER_SPEAKER, text: 'Keep going' }
+    const base = openingScene([])
+    base.sceneLog = [{ speaker: 'Sarah', text: 'Hi.' }, keep]
+    useGameStore.setState({
+      currentSceneTranscript: [{ speaker: 'Sarah', text: 'Hi.' }, keep, { ...keep }, ...lines]
+    })
+
+    const scene = queuedScene(base, lines)
+    expect(scene.sceneLog).toEqual([{ speaker: 'Sarah', text: 'Hi.' }, keep, keep])
+  })
+
   it('carries the summary marks live, as copies, and drops stale ones from the base', () => {
     // A cut or a rewind reverts the running summary off these marks, so a reload without them
     // would keep a summary covering lines the scene no longer has.
@@ -414,5 +469,214 @@ describe('markDecisionPoint', () => {
     markDecisionPoint()
     expect(loopState.decisionSave).toBe(null)
     expect(saves.autosave).not.toHaveBeenCalled()
+  })
+})
+
+describe('manualSaveDraft', () => {
+  // A load reads these marks to decide where playback stands: a wrong one either skips the lines
+  // still queued, or opens the input over a reply the reader had not finished.
+  it('marks a save taken mid-reply to resume on the line on screen, queue and all', () => {
+    midReply()
+    const scene = manualSaveDraft()?.scene
+    expect(scene?.resumeOnLine).toBe(true)
+    expect(scene?.currentLine).toEqual({ speaker: '', text: 'One.' })
+    expect(scene?.pendingLines).toEqual(sceneLines('Two.', 'Three.', 'Four.'))
+  })
+
+  it('leaves a decision point unmarked', () => {
+    atDecisionPoint()
+    const scene = manualSaveDraft()?.scene
+    expect(scene).toBeTruthy()
+    expect(scene && 'resumeOnLine' in scene).toBe(false)
+  })
+
+  it('marks the last line of a reply that has not been turned yet', () => {
+    atDecisionPoint()
+    useGameStore.setState({ awaitingInput: false })
+    const scene = manualSaveDraft()?.scene
+    expect(scene?.resumeOnLine).toBe(true)
+    expect(scene?.pendingLines).toEqual([])
+  })
+
+  it('records a resolved scene as its ending, with whatever the ending has banked', () => {
+    midReply()
+    useGameStore.setState({ sceneEnding: true })
+    const bare = manualSaveDraft()?.scene
+    expect(bare?.endPending).toBe(true)
+    expect(bare && ('ledger' in bare || 'opening' in bare)).toBe(false)
+
+    const ledger: LedgerResponse = {}
+    const opening = { lines: [], hangouts: [], events: [] } as unknown as BankedOpening
+    loopState.pendingLedgerResult = ledger
+    loopState.bankedOpening = opening
+    const banked = manualSaveDraft()?.scene
+    expect(banked?.ledger).toBe(ledger)
+    expect(banked?.opening).toBe(opening)
+  })
+
+  it('records the status sequence as the base it was raised on, and nothing without one', () => {
+    // Money has already moved by the time the lines are read; the base is from before it did.
+    midReply()
+    useGameStore.setState({ sceneEnding: true, statusShown: true })
+    expect(manualSaveDraft()).toBeNull()
+
+    const base: SaveDraft = { ...useGameStore.getState().toGameSave(), money: 1 }
+    loopState.statusBase = base
+    expect(manualSaveDraft()).toBe(base)
+  })
+
+  it('records the goodbye menu as between scenes, whatever is still on screen', () => {
+    useGameStore.setState({
+      date: GRADUATION_DATE,
+      time: 0,
+      graduationSeen: true,
+      currentLine: { speaker: '', text: 'Mina will miss you.' },
+      awaitingInput: true
+    })
+    const draft = manualSaveDraft()
+    expect(draft).not.toBeNull()
+    expect(draft?.scene).toBeNull()
+  })
+
+  it('refuses with no scene a load could be put back onto', () => {
+    expect(manualSaveDraft()).toBeNull()
+  })
+
+  it('keeps a paper at the question it stands on', () => {
+    const quiz: QuizState = {
+      code: 'BIO 210',
+      exam: 'midterm',
+      questions: [],
+      index: 2,
+      correct: 1
+    }
+    useGameStore.setState({ sceneQuiz: quiz, awaitingInput: true })
+    expect(manualSaveDraft()?.scene?.quiz?.index).toBe(2)
+  })
+})
+
+describe('manualSaveOffer', () => {
+  it.each<[string, () => void]>([
+    [
+      'a failed turn',
+      () => useGameStore.setState({ turnError: { code: 'LLM_NETWORK', message: 'dropped' } })
+    ],
+    ['a call in flight', () => useGameStore.setState({ busy: true })],
+    ['an ending still being paid for', () => useGameStore.getState().setEndingInFlight(true)],
+    [
+      'a hangout being written behind the phone',
+      () => {
+        loopState.hangoutPrefetch = { charId: 'char-1', snapshot: { scene: null, action: '' }, scene: null }
+      }
+    ]
+  ])('waits on %s', (_, arrange) => {
+    atDecisionPoint()
+    arrange()
+    expect(manualSaveOffer()).toBe('waiting')
+  })
+
+  it('is never offered once the playthrough has ended', () => {
+    atDecisionPoint()
+    useGameStore.setState({ activeGameOver: 'debt' })
+    expect(manualSaveOffer()).toBe('none')
+  })
+
+  it('is never offered on the goodbye menu past the debt floor', () => {
+    useGameStore.setState({ date: GRADUATION_DATE, time: 0, graduationSeen: true, money: -5000 })
+    expect(manualSaveOffer()).toBe('none')
+  })
+
+  it('is never offered over a losing ending', () => {
+    atDecisionPoint()
+    useGameStore.setState({ sceneEnding: true })
+    loopState.pendingLedgerResult = { memories: [], events: [], expelled: true }
+    expect(manualSaveOffer()).toBe('none')
+  })
+
+  it('is open at a plain decision point', () => {
+    atDecisionPoint()
+    expect(manualSaveOffer()).toBe('open')
+  })
+})
+
+describe('endingGameOver', () => {
+  /** The balance at which the debt ends the playthrough. */
+  const DEBT_FLOOR = -5000
+
+  it('is nothing without a ledger', () => {
+    loopState.pendingLedgerResult = null
+    expect(endingGameOver()).toBeNull()
+  })
+
+  it('reads the expulsion off the ledger before the boundary applies it', () => {
+    loopState.pendingLedgerResult = { memories: [], events: [], expelled: true }
+    expect(endingGameOver()).toBe('expulsion')
+  })
+
+  it('takes the spend off the balance before the status lines, and not again after them', () => {
+    useGameStore.setState({ money: DEBT_FLOOR + 10, statusShown: false })
+    loopState.pendingLedgerResult = { memories: [], events: [], spent: 20 }
+    expect(endingGameOver()).toBe('debt')
+    useGameStore.setState({ money: DEBT_FLOOR + 10, statusShown: true })
+    expect(endingGameOver()).toBeNull()
+  })
+
+  it('counts the pay of a shift in, and no spend', () => {
+    useGameStore.setState({ money: DEBT_FLOOR - 5, statusShown: false })
+    loopState.pendingLedgerResult = { memories: [], events: [], spent: 20 }
+    loopState.jobShift = { slotId: 0, pay: 50, gain: { stats: [], text: '' } }
+    expect(endingGameOver()).toBeNull()
+  })
+})
+
+describe('writeManualSave', () => {
+  it('writes the game as it stood at the click, behind the autosave already out', async () => {
+    const order: string[] = []
+    const { autosave, release } = heldAutosave(order)
+    const saves = stubSaves({
+      autosave,
+      manual: vi.fn(async () => {
+        order.push('manual')
+        return savedAs('manual03')
+      })
+    })
+    atDecisionPoint()
+    useGameStore.setState({ money: 100 })
+
+    const first = writeAutosave(null)
+    const second = writeManualSave(3)
+    useGameStore.setState({ money: 5 })
+    expect(saves.manual).not.toHaveBeenCalled()
+
+    release()
+    const [, saved] = await Promise.all([first, second])
+    expect(saved).toBe(true)
+    expect(order).toEqual(['autosave', 'manual'])
+    const [playthroughId, slot, draft] = saves.manual.mock.calls[0] as unknown as [
+      string,
+      number,
+      SaveDraft
+    ]
+    expect(playthroughId).toBe('p1')
+    expect(slot).toBe(3)
+    expect(draft.money).toBe(100)
+  })
+
+  it('writes nothing while the loop is unsettled', async () => {
+    const saves = stubSaves()
+    atDecisionPoint()
+    useGameStore.setState({ busy: true })
+
+    await expect(writeManualSave(1)).resolves.toBe(false)
+    expect(saves.manual).not.toHaveBeenCalled()
+    expect(saves.autosave).not.toHaveBeenCalled()
+  })
+
+  it('reports a write that failed, and says it did not save', async () => {
+    stubSaves({ manual: vi.fn(async () => FAILED) })
+    atDecisionPoint()
+
+    await expect(writeManualSave(1)).resolves.toBe(false)
+    expect(useUiStore.getState().error?.code).toBe('SAVE_WRITE_FAILED')
   })
 })

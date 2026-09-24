@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
-import { isWritten } from '@shared/characterRules'
+import { blankSheet, isWritten } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
 import type { PromptEdit } from '@shared/imagePrompt'
 import {
@@ -47,13 +47,20 @@ import {
   type CharacterDraft
 } from '../prompts/characterPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
-import { useAssetStore } from './assetStore'
+import { poseKeysOf, useAssetStore } from './assetStore'
 import { useGrabBagStore } from './grabBagStore'
 import { useJobStore } from './jobStore'
 import { imageUrl } from './imageUrl'
 import { enqueueLlm } from './llmQueue'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
 import { useUiStore } from './uiStore'
+
+/** Raised wherever a write needs a pose and the manifest has none. */
+const NO_POSES = {
+  code: 'NO_POSES',
+  message: 'No poses are available, so characters cannot be generated.',
+  detail: 'Each pose needs an entry in pose.json and a matching skeleton PNG.'
+}
 
 /** Phase shown for character generation steps that `jobStore` cannot cover. */
 type CharacterPhase = 'queued' | 'writing' | 'rendering' | 'ready' | 'failed'
@@ -256,6 +263,11 @@ interface CharacterStoreState {
     options?: GenerateOptions,
     reference?: ReferenceImage
   ) => Promise<void>
+  /**
+   * Creates a character straight from the New Character modal's fields, with no LLM call:
+   * her sheet is the player's own words, ready to fill in by hand.
+   */
+  createBlank: (firstName: string, lastName: string, personality: string) => Promise<void>
   /**
    * Re-runs a character write that failed or was interrupted, from the brief this session
    * still holds or, failing that, the one on her record.
@@ -516,6 +528,35 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     }))
 
     await runWritePipeline(charId, request, set, get)
+  },
+
+  createBlank: async (firstName, lastName, personality) => {
+    const pose = poseKeysOf(useAssetStore.getState().poses)[0]
+    if (pose === undefined) {
+      useUiStore.getState().showError(NO_POSES)
+      return
+    }
+
+    // No brief, no reference: a blank has nothing an interrupted run could resume from.
+    const created = await window.api.chars.create(firstName.trim(), lastName.trim())
+    if (!created.ok) {
+      useUiStore.getState().showError(created.error)
+      return
+    }
+
+    const saved = await window.api.chars.update(blankSheet(created.data, personality, pose))
+    if (!saved.ok) {
+      useUiStore.getState().showError(saved.error)
+      // Nothing was ever written to her folder that a player could open, so it does not stay.
+      await window.api.chars.delete(created.data.charId)
+      return
+    }
+
+    const charId = saved.data.charId
+    set((state) => ({
+      characters: { ...state.characters, [charId]: saved.data },
+      order: [...state.order, charId]
+    }))
   },
 
   retryGeneration: async (charId) => {
@@ -1501,11 +1542,7 @@ async function runWritePipeline(
 
   const poses = useAssetStore.getState().poses
   if (Object.keys(poses).length === 0) {
-    fail({
-      code: 'NO_POSES',
-      message: 'No poses are available, so characters cannot be generated.',
-      detail: 'Each pose needs an entry in pose.json and a matching skeleton PNG.'
-    })
+    fail(NO_POSES)
     return
   }
 

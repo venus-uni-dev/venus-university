@@ -7,8 +7,8 @@ import type { StatusModal } from './statusSteps'
 
 /**
  * When the player may take playback into his own hands mid-reply — interject over the lines he
- * has not read, or step back a line — asked of one slice of the game store, so the view's
- * controls and the loop's guards read the same answer.
+ * has not read, step back a line or read forward again — asked of one slice of the game store,
+ * so the view's controls and the loop's guards read the same answer.
  */
 
 /** The game store fields the playback controls are decided on. */
@@ -29,6 +29,7 @@ export interface PlaybackSlice {
   date: number
   time: TimeSlot
   sceneSummary: string | null
+  reread: number
 }
 
 /** Whether a line is the reader's own action. */
@@ -36,10 +37,19 @@ function isReaderLine(line: SceneLine): boolean {
   return line.speaker === READER_SPEAKER
 }
 
-/** How many lines of the current reply playback has reached. */
-export function replyReach(s: PlaybackSlice): number {
+/**
+ * The transcript up to the line on screen: everything the queue does not still hold, and nothing
+ * when the queue holds more than the transcript, as an exam's and the orientation's can.
+ */
+function readPrefixOf(s: PlaybackSlice): readonly SceneLine[] {
   const transcript = s.currentSceneTranscript
-  return transcript.length - s.pendingLines.length - (lastReaderIndexOf(transcript) + 1)
+  return transcript.slice(0, Math.max(0, transcript.length - s.pendingLines.length))
+}
+
+/** How many lines of the reply on screen playback has reached. */
+export function replyReach(s: PlaybackSlice): number {
+  const read = readPrefixOf(s)
+  return read.length - (lastReaderIndexOf(read) + 1)
 }
 
 /**
@@ -58,20 +68,29 @@ export function playbackOffered(s: PlaybackSlice): boolean {
   )
 }
 
-/** Whether stepping back a line is open: the reply has an earlier line that says something. */
+/**
+ * Whether stepping back a line is open: a line of the reply on screen has been reached, and the
+ * scene has an earlier line that says something. Closed while a turn is in flight before its
+ * reply's first line shows, and at a decision point after a reply with no lines.
+ */
 export function rewindOpenOf(s: PlaybackSlice): boolean {
-  return playbackOffered(s) && replyReach(s) >= 2 && rewindTargetOf(s.sceneLog) !== -1
+  return playbackOffered(s) && replyReach(s) >= 1 && rewindTargetOf(s.sceneLog) !== -1
+}
+
+/** Whether reading forward again is open: a rewind has left beats ahead that were already read. */
+export function forwardOpenOf(s: PlaybackSlice): boolean {
+  return playbackOffered(s) && s.reread > 0
 }
 
 /** Whether interjecting is offered, and if so whether the scene lets it through. */
 export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
- * Whether the scene lets the reader through: locked in a class scene until he has acted in it
- * beyond the action that opened it.
+ * Whether the scene lets the reader through: locked in a class scene while the line on screen
+ * is no later than the reply to the action that opened it.
  */
 function lockOf(s: PlaybackSlice): 'locked' | 'open' {
-  const acted = s.currentSceneTranscript.filter(isReaderLine).length
+  const acted = readPrefixOf(s).filter(isReaderLine).length
   return s.sceneClass !== null && acted <= 1 ? 'locked' : 'open'
 }
 

@@ -1,8 +1,9 @@
-/* The Load Game modal: both of its levels, which are the same list of rows twice over.
+/* The Load Game modal: the list of playthroughs, then the pages of saves inside the one picked.
    Derived from the shape grammar and the panels already built. Imported from the view module,
    never from index.css.
 
-   The veil, the row, the ✕, the buttons and the foot are base.css's. */
+   The veil, the row, the sticker, the ✕, the buttons and the foot are base.css's, and the page
+   of saves is SavePages.css's. */
 
 /* The one veil the curtain goes over: `.vu-crossing` sits at the same tier and earlier in the
    tree, so one step below it is enough. Every other veil in the app opens above the curtain. */
@@ -41,6 +42,25 @@
    squeezed that way draws its bar — an accent thumb the full height of the body — over rows
    that are still invisible. It clips until the panel is the size of what is in it. */
 .vu-load[data-resizing] .vu-load-body {
+  overflow: hidden;
+}
+
+/* The second level's page of saves. It fills a panel held taller than it while a folder is
+   read, so the foot stays on the bottom edge, with room on every side for a card's swell and at
+   the top for the stickers the first row wears over its edge — the negative margin gives it
+   back, so the page still starts where the panel's padding puts it. */
+.vu-load-pages {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: -16px -8px -4px;
+  padding: 16px 8px 4px;
+}
+
+/* Mid-resize the panel is shorter than the page for as long as the tween takes: the page clips
+   until the panel is its size rather than hanging past the panel's edge over the foot. */
+.vu-load[data-resizing] .vu-load-pages {
   overflow: hidden;
 }
 
@@ -87,22 +107,9 @@
   background: var(--vu-surface);
 }
 
-/* The folder's own name, worn over the row's top-left corner like a sticker on a box: quiet
-   and unaccented, since it names the row rather than answering anything, and leaning the
-   shallow lean a chip takes — the row under it does not rotate. */
+/* The folder's own name, over the row's top-left corner. */
 .vu-load-sticker {
-  position: absolute;
-  top: -9px;
   left: 20px;
-  padding: 4px 16px 4px 12px;
-  border: 2px solid var(--vu-border);
-  border-radius: 999px 0 0 999px;
-  background: var(--vu-surface);
-  color: var(--vu-text-body);
-  font: 700 11px var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  rotate: -3deg;
 }
 
 /* A row that cannot be opened is not a button and takes no gesture — it is still listed, and
@@ -118,23 +125,6 @@
   gap: 10px;
   color: var(--vu-text);
   font: 700 18px var(--font-body);
-}
-
-/* Which of the two an autosave is, and which playthrough a folder is: a fact about the file,
-   so it is drawn in the bookkeeping voice. Quiet — a chip in a row carries no weight. */
-.vu-load-tag {
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: var(--vu-tint);
-  color: var(--vu-text-body);
-  font: 700 11px var(--font-mono);
-  letter-spacing: 0.12em;
-}
-
-/* A scene the player is in the middle of, said the way a flavour line is. */
-.vu-load-midscene {
-  color: var(--vu-text-muted);
-  font: italic 500 14px var(--font-body);
 }
 
 .vu-load-meta {

@@ -12,20 +12,31 @@ import {
   type PlaythroughRecord,
   type PlaythroughSummary,
   type Result,
-  type SaveDraft
+  type SaveDraft,
+  type SaveSummary
 } from '@shared/types'
 import { useUiStore } from './uiStore'
 
-/** One save as the Load Game Modal lists it: the file, its roster and its load gate. */
+/** One save as a list of saves shows it: the file's summary, its roster and its load gate. */
 export interface ResolvedSave {
   saveId: string
   /** Epoch ms — the save's own date, or the file's when it could not be read. */
   savedAt: number
-  /** The save, or null when the file was refused on read. */
-  save: GameSave | null
+  /** What the list draws of the save, or null when the file was refused on read. */
+  summary: SaveSummary | null
   /** The playthrough's record, or null when that was what was refused. */
   record: PlaythroughRecord | null
-  /** Resolved characters, in `save.chars` order. Missing ones are absent. */
+  /** Resolved characters, in `record.chars` order. Missing ones are absent. */
+  characters: Character[]
+  /** Why this save cannot be loaded, or null when it can. */
+  unloadable: string | null
+}
+
+/** One save read whole, ready to be entered: the file, its record, its roster and its gate. */
+export interface LoadedSave {
+  save: GameSave
+  record: PlaythroughRecord
+  /** Resolved characters, in `record.chars` order. Missing ones are absent. */
   characters: Character[]
   /** Why this save cannot be loaded, or null when it can. */
   unloadable: string | null
@@ -43,7 +54,7 @@ export interface ResolvedEnrollment {
 
 /** Which of the two a resume answered with: a save, or a semester still at the registrar. */
 export function isEnrollment(
-  entry: ResolvedSave | ResolvedEnrollment
+  entry: LoadedSave | ResolvedEnrollment
 ): entry is ResolvedEnrollment {
   return 'enrollment' in entry
 }
@@ -65,6 +76,16 @@ interface SaveStoreState {
   open: (playthrough: PlaythroughSummary) => Promise<void>
   /** Returns to the playthrough list. */
   back: () => void
+  /**
+   * Lists one playthrough's saves with the roster resolved, leaving the open playthrough alone.
+   * A refused listing reports itself and answers with none.
+   */
+  listSavesOf: (playthroughId: string) => Promise<ResolvedSave[]>
+  /** Reads one save whole, roster resolved and gate applied; null when the read was refused. */
+  readSave: (playthroughId: string, saveId: string) => Promise<LoadedSave | null>
+  /** Deletes one save of any playthrough; false when the delete was refused, which reports itself. */
+  removeSaveOf: (playthroughId: string, saveId: string) => Promise<boolean>
+  /** Deletes one save of the open playthrough and drops it from the list. */
   removeSave: (saveId: string) => Promise<void>
   removePlaythrough: (playthroughId: string) => Promise<void>
   /**
@@ -75,9 +96,9 @@ interface SaveStoreState {
   /**
    * What Continue opens on the most recently played playthrough: its newest save, or the
    * semester waiting at the registrar where it has none. Roster resolved and load gate
-   * applied either way; null when nothing is on disk or the read failed.
+   * applied either way; null when nothing is on disk, the newest file was refused or a read failed.
    */
-  continueNewest: () => Promise<ResolvedSave | ResolvedEnrollment | null>
+  continueNewest: () => Promise<LoadedSave | ResolvedEnrollment | null>
   /**
    * Writes the semester the registrar is about to offer, minting the playthrough folder it
    * will belong to. The caller reads the failure, which it has a screen to put back first.
@@ -147,6 +168,34 @@ export function castOf(
     .filter((c): c is Character => Boolean(c))
 }
 
+/**
+ * One playthrough's saves in the listing's own order, the roster resolved against the characters
+ * on hand once the listing is in. A save refused on read carries the refusal as its reason, and
+ * a refused record refuses all of them; a refused listing reports itself and answers null.
+ */
+async function resolvedSavesOf(playthroughId: string): Promise<ResolvedSave[] | null> {
+  const result = await window.api.saves.list(playthroughId)
+  if (!result.ok) {
+    useUiStore.getState().showError(result.error)
+    return null
+  }
+
+  const resolved = useSaveStore.getState().characters
+  const { record, error: recordError, saves } = result.data
+  return saves.map(({ saveId, savedAt, summary, error }) => ({
+    saveId,
+    savedAt,
+    summary,
+    record,
+    characters: record ? castOf(record.chars, resolved) : [],
+    unloadable: !record
+      ? (recordError?.message ?? 'unreadable')
+      : summary
+        ? unloadableReason(record.chars, resolved)
+        : (error?.message ?? 'unreadable')
+  }))
+}
+
 /** All `saves:*` IPC lives here, never in components. */
 export const useSaveStore = create<SaveStoreState>((set, get) => ({
   playthroughs: [],
@@ -179,46 +228,49 @@ export const useSaveStore = create<SaveStoreState>((set, get) => ({
 
   open: async (playthrough) => {
     set({ loading: true, selected: playthrough, saves: [] })
-    const result = await window.api.saves.list(playthrough.playthroughId)
-    if (!result.ok) {
+    const saves = await resolvedSavesOf(playthrough.playthroughId)
+    if (!saves) {
       set({ loading: false, selected: null })
-      useUiStore.getState().showError(result.error)
       return
     }
-
-    const resolved = get().characters
-    const { record, error: recordError, saves } = result.data
-
-    // `saves:list` already sorts newest-first; the resolve pass preserves it. A save refused on
-    // read carries the refusal as its reason, and a refused record refuses all of them.
-    set({
-      saves: saves.map(({ saveId, savedAt, save, error }) => ({
-        saveId,
-        savedAt,
-        save,
-        record,
-        characters: record ? castOf(record.chars, resolved) : [],
-        unloadable: !record
-          ? (recordError?.message ?? 'unreadable')
-          : save
-            ? unloadableReason(record.chars, resolved)
-            : (error?.message ?? 'unreadable')
-      })),
-      loading: false
-    })
+    set({ saves, loading: false })
   },
 
   back: () => set({ selected: null, saves: [] }),
+
+  listSavesOf: async (playthroughId) => (await resolvedSavesOf(playthroughId)) ?? [],
+
+  readSave: async (playthroughId, saveId) => {
+    const result = await window.api.saves.read(playthroughId, saveId)
+    if (!result.ok) {
+      useUiStore.getState().showError(result.error)
+      return null
+    }
+
+    const { record, save } = result.data
+    const resolved = get().characters
+    return {
+      save,
+      record,
+      characters: castOf(record.chars, resolved),
+      unloadable: unloadableReason(record.chars, resolved)
+    }
+  },
+
+  removeSaveOf: async (playthroughId, saveId) => {
+    const result = await window.api.saves.delete(playthroughId, saveId)
+    if (!result.ok) {
+      useUiStore.getState().showError(result.error)
+      return false
+    }
+    return true
+  },
 
   removeSave: async (saveId) => {
     const selected = get().selected
     if (!selected) return
 
-    const result = await window.api.saves.delete(selected.playthroughId, saveId)
-    if (!result.ok) {
-      useUiStore.getState().showError(result.error)
-      return
-    }
+    if (!(await get().removeSaveOf(selected.playthroughId, saveId))) return
     set({ saves: get().saves.filter((entry) => entry.saveId !== saveId) })
   },
 
@@ -255,10 +307,16 @@ export const useSaveStore = create<SaveStoreState>((set, get) => ({
     // A folder with no save in it has a registrar behind it rather than a game.
     if (newest.enrolling) return get().resolveEnrollment(newest)
 
-    // The same read Load Game's second level makes. `saves:list` sorts newest-first
-    // with the autosave ahead of every slot-save, so the head is the last save.
+    // The same read Load Game's second level makes. The listing orders each kind of save
+    // on its own and not against the others, so the newest is looked for across all of them.
     await get().open(newest)
-    return get().saves[0] ?? null
+    let latest: ResolvedSave | null = null
+    for (const entry of get().saves) {
+      if (!latest || entry.savedAt > latest.savedAt) latest = entry
+    }
+    // A refused file cannot be read whole; Load Game explains it on its own card.
+    if (!latest?.summary || !latest.record) return null
+    return get().readSave(newest.playthroughId, latest.saveId)
   },
 
   enroll: (draft) => window.api.saves.enroll(draft),

@@ -66,6 +66,13 @@ export const AUDIO_FILES = {
   title: { path: 'music/title.ogg', group: 'music', loop: false, trimDb: -3 },
   landing_day: { path: 'music/landing_day.ogg', group: 'music', loop: true, trimDb: -9 },
   landing_night: { path: 'music/landing_night.ogg', group: 'music', loop: true, trimDb: -9 },
+  landing_day_alt: { path: 'music/landing_day_alt.ogg', group: 'music', loop: true, trimDb: -9 },
+  landing_night_alt: {
+    path: 'music/landing_night_alt.ogg',
+    group: 'music',
+    loop: true,
+    trimDb: -9
+  },
   ending: { path: 'music/ending.ogg', group: 'music', loop: true, trimDb: -9 },
   amb_outdoor_day: { path: 'ambient/amb_outdoor_day.ogg', group: 'ambience', loop: true, trimDb: -8 },
   amb_outdoor_night: {

@@ -41,6 +41,11 @@ export function displaySpriteRef(
   return ready?.includes(lock) ? spriteRef(parsed.emotion, lock) : ref
 }
 
+/** Whether a change of sprite is a change of wardrobe, and so of her silhouette. */
+export function wardrobeChanged(from: SpriteRef, to: SpriteRef): boolean {
+  return (parseSpriteRef(from)?.set ?? null) !== (parseSpriteRef(to)?.set ?? null)
+}
+
 /**
  * What a girl wears once her CG ends: the mood the CG was for — aroused mid-sex, happy for an
  * `_after` — in the nude set when she has one rendered and images are not withheld.

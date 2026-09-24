@@ -202,7 +202,7 @@ export async function runSceneTurn(
   loopState.endLines = [...result.data.lines]
   // Raised before the first call and lowered by the write that ends it: the
   // boundary parks while it is up.
-  loopState.endingInFlight = true
+  useGameStore.getState().setEndingInFlight(true)
   loopState.endingAbandoned = false
 
   await runEnding(solo)

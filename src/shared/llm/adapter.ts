@@ -92,6 +92,12 @@ export interface LlmAdapter {
   /** True when this payload terminates the stream (OpenAI's `[DONE]`). */
   isStreamEnd(payload: string): boolean
 
+  /**
+   * The output tokens a whole reply or one stream frame reports, thinking included; undefined
+   * when it carries none. Never throws.
+   */
+  generatedTokensOf(payload: string): number | undefined
+
   /** Builds the image-model call; `image` makes it an edit rather than a render. */
   buildImageCall(context: BuildImageCallContext): LlmCall
 

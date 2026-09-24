@@ -47,13 +47,21 @@
 
 /* ---- the row -------------------------------------------------------------- */
 
-/* One memory across one line: face, name, how, `that`, what. The list owns the gap between
-   rows; the row keeps the base row's padding and states only the space between its words. */
+/* One memory across one line: face, name, how, `that`, what. The row stands on the field's
+   first line rather than its middle, now that the field is three lines. The list owns the gap
+   between rows; the row keeps the base row's padding and states only the space between its
+   words. */
 .vu-memrow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
 }
+
+/* Every other word in the sentence is centred on the field's first line rather than the row's
+   own top, now that the field runs three lines deep: the field's first line reads with its
+   centre about 27.3px down (2.5px border + 14px padding + half a 21.7px line), so the face,
+   the name, the type and `that` each carry the margin or line-height that lands their own
+   centre there too. */
 
 /* Her face, lifted onto the surface off the row's own recessed ground — the row and the
    archway's quiet fill are the same tone, and a face left at `.vu-arch`'s default would vanish
@@ -63,6 +71,7 @@
   flex: none;
   width: 48px;
   height: 58px;
+  margin-top: -2px;
   background: var(--vu-surface);
 }
 
@@ -74,6 +83,7 @@
   overflow: hidden;
   color: var(--vu-text);
   font: 700 17px var(--font-body);
+  line-height: 54px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -88,6 +98,7 @@
 .vu-memrow-type {
   flex: none;
   width: 150px;
+  margin-top: 3px;
 }
 
 /* The word joining how to what. */
@@ -95,10 +106,17 @@
   flex: none;
   color: var(--vu-text-body);
   font: 500 17px var(--font-body);
+  line-height: 54px;
 }
 
-/* What she remembers, taking whatever the line has left. */
+/* What she remembers, taking whatever the line has left. Held at three lines rather than
+   growing — a memory is one sentence, capped at 200 characters — with anything past them
+   scrolled to rather than shown. 33px is `.vu-input--multiline`'s 14px padding and
+   `.vu-input`'s 2.5px border, doubled. */
 .vu-memrow-desc {
   flex: 1;
   min-width: 0;
+  height: calc(3lh + 33px);
+  overflow: hidden auto;
+  resize: none;
 }

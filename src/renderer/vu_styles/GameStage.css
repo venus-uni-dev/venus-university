@@ -182,9 +182,10 @@
 }
 
 /* The outgoing half travels the same way as the incoming one, so the two read as a single sprite
-   gliding across — but it never fades: it stays opaque underneath while the incoming one fades in
-   on top, and is dropped when the incoming one's animation ends; `forwards` parks it at the
-   far offset until then. */
+   gliding across. On a change of expression it never fades: the silhouette is the same, so it
+   stays opaque underneath while the incoming one fades in on top and the pair never thins, and it
+   is dropped when the incoming one's animation ends; `forwards` parks it at the far offset until
+   then. */
 .vu-stage-sprite--out {
   pointer-events: none;
 }
@@ -200,6 +201,22 @@
 
 .vu-stage-sprite--out.vu-stage-sprite--posRight {
   animation: vu-stage-out-right 400ms ease-out forwards;
+}
+
+/* A change of wardrobe changes her silhouette, so the outgoing half fades out under the incoming
+   one over the same 400ms, keeping its glide: the old sleeves and hems dissolve rather than
+   standing until they are dropped. Slow-starting, so the two halves together stay near-solid
+   through the middle of the change, where a symmetric fade would show the room through her. */
+.vu-stage-sprite--out.vu-stage-sprite--outFade.vu-stage-sprite--posLeft {
+  animation:
+    vu-stage-out-left 400ms ease-out forwards,
+    vu-stage-fadeout 400ms ease-in forwards;
+}
+
+.vu-stage-sprite--out.vu-stage-sprite--outFade.vu-stage-sprite--posRight {
+  animation:
+    vu-stage-out-right 400ms ease-out forwards,
+    vu-stage-fadeout 400ms ease-in forwards;
 }
 
 @keyframes vu-stage-in-left {

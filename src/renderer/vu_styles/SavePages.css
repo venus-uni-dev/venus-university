@@ -1,0 +1,179 @@
+/* A page of saves: two columns of quiet cards between the two arrows that turn it, and a dot
+   per page under them. One object with two callers, the Load Game and Save Game panels.
+   Imported from the component, never from index.css.
+
+   The sticker, the ✕ and the crop's picture are base.css's. */
+
+/* The page over its dots. */
+.vu-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The arrows either side of the grid, standing its full height. */
+.vu-pages-row {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+
+/* The arrow that turns the page: a tall recessed column, large on purpose so it is easy to hit,
+   and flat like a square beside a value, since it adjusts the list rather than answering. */
+.vu-pages-arrow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  padding: 0;
+  border: 0;
+  border-radius: 28px;
+  background: var(--vu-recessed);
+  color: var(--vu-accent);
+}
+
+/* Two columns of five cells at a fixed height, filled down the first column and then the second,
+   so the slots read 1 4 / 2 5 / 3 6 and every page is the same size whatever it holds. */
+.vu-pages-grid {
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 112px);
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The positioning context the sticker and the ✕ hang in. */
+.vu-pages-cell {
+  position: relative;
+  min-width: 0;
+}
+
+/* A save's face, and a gap's: a quiet half-pill round on the picture's end and flat where the
+   ✕ sits. It carries no paper, so it may clip. */
+.vu-pages-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 0 56px 0 0;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--vu-recessed);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+
+/* A save that cannot be opened: still drawn, still deletable, and not a button. */
+.vu-pages-card--dead {
+  border: 2.5px solid var(--vu-danger);
+}
+
+/* A gap in the set, drawn as a gap: a dashed outline around the one word. */
+.vu-pages-card--empty {
+  justify-content: center;
+  border: 3px dashed var(--vu-border);
+  background: none;
+}
+
+/* The gap's word, in the state voice. */
+.vu-pages-empty {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+/* The picture in the card's round end, the full height of the card. */
+.vu-pages-crop {
+  display: block;
+  flex: none;
+  width: 148px;
+  height: 100%;
+  border-radius: 999px 0 0 999px;
+  overflow: hidden;
+  background: var(--vu-surface);
+}
+
+/* A frame of the stage or a place, centred rather than hung from the top as a face is. */
+.vu-pages-crop .vu-crop-img {
+  object-position: center;
+}
+
+/* The words beside the picture, stood a little low to clear the sticker over the card's edge. */
+.vu-pages-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+/* Where the save sits in the semester — the first thing the player is choosing between. It
+   wraps to a second line rather than cutting the half of the day off a long date. */
+.vu-pages-headline {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 16px/1.25 var(--font-body);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* When the file was written, on one line: the time is what tells two saves of a day apart. */
+.vu-pages-meta {
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* Why the save cannot be opened: the file on disk, which nothing else on screen could say. */
+.vu-pages-reason {
+  color: var(--vu-danger);
+  font: italic 500 13px var(--font-body);
+}
+
+/* The slot's label, hung over the card's flat corner. It takes no pointer, so a click on it
+   still reaches the card under it. */
+.vu-pages-sticker {
+  top: -9px;
+  right: 20px;
+  pointer-events: none;
+}
+
+/* Centred on the card's flat end, where the eye ends up after reading it. */
+.vu-pages-x {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  translate: 0 -50%;
+}
+
+/* One dot per page, in a row under the grid. */
+.vu-pages-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* A page's dot: a small pill the click turns to. */
+.vu-pages-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--vu-border);
+}
+
+/* The page on screen. */
+.vu-pages-dot--on {
+  background: var(--vu-accent);
+}

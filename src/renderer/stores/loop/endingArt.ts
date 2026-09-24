@@ -11,6 +11,7 @@ import {
 import { loadWardrobeImage } from '../characterStore'
 import { useGameStore } from '../gameStore'
 import { retrySilently } from '../silentRetry'
+import { canvasToBase64 } from './encode'
 import { armEndingPosts } from './endingPosts'
 import { friendCharIds } from './farewells'
 import { writeEpilogueSave } from './saves'
@@ -46,32 +47,6 @@ export function dropEndingArt(): void {
   const game = useGameStore.getState()
   game.setEndingArt(null)
   game.setEndingArtPending(false)
-}
-
-/**
- * One canvas as base64 with the `data:` prefix stripped — the form the bridge carries an image
- * in — encoded as a JPEG.
- */
-function toBase64(canvas: HTMLCanvasElement): Promise<string> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error('The reference sheet could not be encoded.'))
-          return
-        }
-        const reader = new FileReader()
-        reader.onload = () => {
-          const url = String(reader.result)
-          resolve(url.slice(url.indexOf(',') + 1))
-        }
-        reader.onerror = () => reject(reader.error ?? new Error('The sheet could not be read.'))
-        reader.readAsDataURL(blob)
-      },
-      LINEUP_MIME_TYPE,
-      LINEUP_QUALITY
-    )
-  })
 }
 
 /**
@@ -171,7 +146,10 @@ async function stitchFriendLineup(
     bitmap.close()
   }
 
-  return { data: await toBase64(sheet), count: layout.placements.length }
+  return {
+    data: await canvasToBase64(sheet, LINEUP_MIME_TYPE, LINEUP_QUALITY),
+    count: layout.placements.length
+  }
 }
 
 /** Sends the sheet, re-sending itself quietly for as long as its budget lasts. */

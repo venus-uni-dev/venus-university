@@ -174,12 +174,21 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
     if (props.inputDead) setPinned(false)
   }, [props.inputDead])
 
+  /**
+   * What the row offers, as it last stood while the row was up. A status line takes the offer
+   * away as it drops the row, and read live that would swap the well and the tips mark in under
+   * the divider while all of them fade.
+   */
+  const heldInterject = useRef(interject)
+  if (rowShown) heldInterject.current = interject
+  const rowInterject = rowShown ? interject : heldInterject.current
+
   /** The well is out: always on the turn's own row, and mid-reply only while held open. */
-  const wellOut = interject === null || (interject === 'open' && (hover || pinned))
+  const wellOut = rowInterject === null || (rowInterject === 'open' && (hover || pinned))
 
   /** Which word the divider last said, held while it fades so it does not change on the way out. */
   const dividerLocked = useRef(false)
-  if (interject !== null) dividerLocked.current = interject === 'locked'
+  if (rowInterject !== null) dividerLocked.current = rowInterject === 'locked'
 
   /**
    * The stamp landing is what lets the box come in — a completion rather than a timer, so the two
@@ -406,7 +415,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
       <motion.div
         ref={row}
         className="vu-turn vu-scene-row"
-        data-well={wellOut ? 'out' : interject === 'locked' ? 'locked' : 'away'}
+        data-well={wellOut ? 'out' : rowInterject === 'locked' ? 'locked' : 'away'}
         variants={sceneRow}
         initial="hidden"
         animate={rowShown && !dark ? 'shown' : 'hidden'}
@@ -445,7 +454,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
               revealed={wellOut}
               overlay={
                 <SceneDivider
-                  state={wellOut ? 'hidden' : interject === 'locked' ? 'dim' : 'shown'}
+                  state={wellOut ? 'hidden' : rowInterject === 'locked' ? 'dim' : 'shown'}
                   locked={dividerLocked.current}
                 />
               }

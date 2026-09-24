@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'fs/promises'
+import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,7 +18,7 @@ vi.mock('electron', () => ({
 
 const saveService = await import('../src/main/services/saveService')
 const { SAFE_NUMERIC_ID } = await import('../src/shared/saveRules')
-const { getPlaythroughPath, getSavesPath } = await import('../src/main/paths')
+const { getPlaythroughPath, getSaveFilePath, getSavesPath } = await import('../src/main/paths')
 
 const SCHEMA_VERSION = 12
 const RECORD_SCHEMA_VERSION = 3
@@ -89,8 +89,8 @@ describe('id validation', () => {
     }
   })
 
-  it('refuses a save id that is neither numeric nor the autosave', async () => {
-    for (const id of ['..', '../autosave', '', 'settings']) {
+  it('refuses a save id that names no kind of save', async () => {
+    for (const id of ['..', '../autosave', '', 'settings', 'manual91', '../manual01']) {
       await expect(saveService.loadSave('1', id)).rejects.toMatchObject({ code: 'SAVE_ID_INVALID' })
     }
   })
@@ -161,6 +161,69 @@ describe('write paths', () => {
     const entries = await readdir(getPlaythroughPath(playthroughId))
     expect(entries.some((name) => name.includes('.tmp'))).toBe(false)
   })
+
+  it('reads back each write, even two inside one millisecond at the same length', async () => {
+    // A read that trusted the file's stamp alone would answer the first of the two.
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+    await saveService.writeAutosave('1', draft({ date: 1 }))
+    await expect(saveService.loadSave('1', AUTOSAVE_ID)).resolves.toMatchObject({ date: 1 })
+    await saveService.writeAutosave('1', draft({ date: 2 }))
+    await expect(saveService.loadSave('1', AUTOSAVE_ID)).resolves.toMatchObject({ date: 2 })
+    await expect(saveService.loadSave('1', AUTOSAVE_ID)).resolves.toMatchObject({ date: 2 })
+  })
+
+  it('reads a save back with the record it is read against', async () => {
+    const { save } = await saveService.createPlaythrough(record({ chars: ['a'] }), draft())
+    await saveService.writeManualSave(save.playthroughId, 3, draft({ date: 6 }))
+
+    const read = await saveService.readSave(save.playthroughId, 'manual03')
+    expect(read.record.chars).toEqual(['a'])
+    expect(read.save).toMatchObject({
+      playthroughId: save.playthroughId,
+      saveId: 'manual03',
+      date: 6
+    })
+  })
+})
+
+describe('writeManualSave', () => {
+  it('writes one file per slot and rewrites it in place', async () => {
+    const first = await saveService.writeManualSave('1', 7, draft({ date: 1 }))
+    expect(first.saveId).toBe('manual07')
+    await saveService.writeManualSave('1', 7, draft({ date: 2 }))
+
+    const entries = await readdir(getPlaythroughPath('1'))
+    expect(entries.filter((name) => name.startsWith('manual'))).toEqual(['manual07.json'])
+    await expect(saveService.loadSave('1', 'manual07')).resolves.toMatchObject({ date: 2 })
+  })
+
+  it('refuses a slot outside the range, writing nothing', async () => {
+    for (const slot of [0, 91, 1.5]) {
+      await expect(saveService.writeManualSave('1', slot, draft())).rejects.toMatchObject({
+        code: 'SAVE_SLOT_INVALID'
+      })
+    }
+    await expect(readdir(getPlaythroughPath('1'))).rejects.toThrow()
+  })
+
+  it('touches neither the autosave nor the window, and the window never prunes it', async () => {
+    const seeded: string[] = []
+    for (let i = 0; i < MAX_SLOT_SAVES; i++) {
+      const id = String(1_000_000 + i)
+      await seed('1', id, { ...draft(), saveId: id })
+      seeded.push(id)
+    }
+    await saveService.writeAutosave('1', draft())
+
+    await saveService.writeManualSave('1', 1, draft())
+    expect(await slotIdsOnDisk('1')).toEqual(seeded)
+    await expect(saveService.loadSave('1', AUTOSAVE_ID)).resolves.toBeTruthy()
+
+    // A full window pushes out its oldest boundary save, and only that.
+    await saveService.writeSlotSave('1', draft())
+    expect(await slotIdsOnDisk('1')).toHaveLength(MAX_SLOT_SAVES)
+    await expect(saveService.loadSave('1', 'manual01')).resolves.toBeTruthy()
+  })
 })
 
 describe('writeSlotSave pruning', () => {
@@ -199,15 +262,14 @@ describe('writeSlotSave pruning', () => {
     expect(remaining).not.toContain(seeded[0])
   })
 
-  it('deletes the autosave, because the scene it held is now history', async () => {
-    // The save-schema invariant: an autosave beside a boundary save would offer to resume
-    // a scene the playthrough has already moved past.
+  it('leaves the autosave standing beside the new slot save', async () => {
+    // The autosave is the last decision point reached, and only the next one replaces it.
     await saveService.createPlaythrough(record(), draft())
     const [playthroughId] = await readdir(getSavesPath())
     await saveService.writeAutosave(playthroughId, draft())
     await saveService.writeSlotSave(playthroughId, draft())
     const entries = await readdir(getPlaythroughPath(playthroughId))
-    expect(entries).not.toContain(`${AUTOSAVE_ID}.json`)
+    expect(entries).toContain(`${AUTOSAVE_ID}.json`)
   })
 
   it('does not count the autosave, the record or stray files against the window', async () => {
@@ -289,12 +351,55 @@ describe('listing', () => {
     expect(listed).not.toBeNull()
     expect(saves.map((entry) => entry.saveId)).toEqual(['102', '101', '100'])
     const [missingField, wrongVersion, good] = saves
-    expect(missingField).toMatchObject({ save: null, error: { code: 'SAVE_MALFORMED' } })
-    expect(wrongVersion).toMatchObject({ save: null, error: { code: 'SAVE_SCHEMA_VERSION' } })
+    expect(missingField).toMatchObject({ summary: null, error: { code: 'SAVE_MALFORMED' } })
+    expect(wrongVersion).toMatchObject({ summary: null, error: { code: 'SAVE_SCHEMA_VERSION' } })
     expect(missingField.savedAt).toBeGreaterThan(0)
     expect(wrongVersion.savedAt).toBeGreaterThan(0)
     expect(good.error).toBeNull()
-    expect(good.save).toMatchObject({ playthroughId: '100', saveId: '100' })
+    expect(good.summary).toMatchObject({ date: draft().date, midScene: false })
+  })
+
+  it('lists the autosave, the boundary saves newest-first, then the manual saves', async () => {
+    await seedRecord('100', record())
+    await seed('100', '100', draft({ date: 1 }))
+    await seed('100', '200', draft({ date: 2 }))
+    await saveService.writeManualSave('100', 12, draft({ date: 3 }))
+    await saveService.writeManualSave('100', 3, draft({ date: 4 }))
+    await saveService.writeAutosave('100', draft({ date: 5 }))
+
+    const { saves } = await saveService.listSaves('100')
+    expect(saves.map((entry) => entry.saveId)).toEqual([
+      AUTOSAVE_ID,
+      '200',
+      '100',
+      'manual03',
+      'manual12'
+    ])
+    expect(saves.map((entry) => entry.summary?.date)).toEqual([5, 2, 1, 4, 3])
+    // A listing carries what the grid shows, never the saves themselves.
+    expect(saves.some((entry) => 'save' in entry)).toBe(false)
+  })
+
+  it('summarises from the file written last, a manual save included', async () => {
+    await seedRecord('100', record())
+    await seed('100', '100', draft({ date: 1 }))
+    await saveService.writeAutosave('100', draft({ date: 2 }))
+    await saveService.writeManualSave('100', 5, draft({ date: 9 }))
+
+    // Stamped apart, so the order is the files' and not the clock's resolution.
+    const now = Date.now() / 1000
+    await utimes(getSaveFilePath('100', '100'), now - 30, now - 30)
+    await utimes(getSaveFilePath('100', AUTOSAVE_ID), now - 20, now - 20)
+    await utimes(getSaveFilePath('100', 'manual05'), now - 10, now - 10)
+
+    const [summary] = await saveService.listPlaythroughs()
+    expect(summary).toMatchObject({
+      date: 9,
+      saveCount: 1,
+      manualCount: 1,
+      hasAutosave: true,
+      unloadable: null
+    })
   })
 
   it('summarises from the newest readable save, and marks a playthrough with none', async () => {
@@ -353,7 +458,7 @@ describe('the playthrough record', () => {
     expect(listing.record).toBeNull()
     expect(listing.error).toMatchObject({ code: 'PLAYTHROUGH_MALFORMED' })
     expect(listing.saves).toHaveLength(1)
-    expect(listing.saves[0].save).not.toBeNull()
+    expect(listing.saves[0].summary).not.toBeNull()
   })
 })
 

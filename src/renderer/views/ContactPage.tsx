@@ -120,8 +120,8 @@ export function ContactPage({
   const traits = (character.traits ?? []).filter(isCharacterTrait)
   const showTraits = traits.length > 0 && (flags.knowsTraits || isPositive(affection))
   const showBackstory = Boolean(character.backstory) && (flags.knowsBackstory || isTrusted(affection))
-  // Rides `knowsBackstory`: same threshold, same one-way rule.
-  const showPreferred = flags.knowsBackstory || isTrusted(affection)
+  // Rides `knowsTraits`: same threshold, same one-way rule.
+  const showPreferred = flags.knowsTraits || isPositive(affection)
   // The same paragraph the prompts are given.
   const loveLife = loveLifeBlurb(character, flags)
   const showLoveLife = Boolean(loveLife) && (flags.knowsLoveLife || flags.isLover)
@@ -219,7 +219,7 @@ export function ContactPage({
                       {character.firstName} likes guys with {STAT_ATTRACTIONS[character.preferredStat]}.
                     </p>
                   ) : (
-                    <Locked>??? — Unlocked at Best Friends</Locked>
+                    <Locked>??? — Unlocked at Friends</Locked>
                   )}
                 </Field>
 

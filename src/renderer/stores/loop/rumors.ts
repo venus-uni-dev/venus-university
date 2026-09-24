@@ -1,8 +1,9 @@
 import { globalSlotOf } from '@shared/jobs'
 import { rumorPass, upsertJealousyMemory, type RumorPassOutcome } from '@shared/rumors'
 import type { CharInfo, LedgerResponse, TimeSlot } from '@shared/types'
-import { useGameStore } from '../gameStore'
+import { stageContextOf, useGameStore } from '../gameStore'
 import { ledgerActs } from '../sceneSanitizer'
+import { stageAt } from '../stageStep'
 import { charHiddenLocationNow, charUnavailableNow } from '../timetable'
 
 /** What the campus saw, where it meets the store. */
@@ -53,7 +54,9 @@ export function rollRumorPass(
     date: game.date,
     acts: ledgerActs(ledger, false),
     cast: game.cast,
-    departed: game.departed,
+    // The scene's departures as written, read and queued alike, so a rewind that stepped back
+    // across one cannot un-settle it.
+    departed: stageAt([...game.sceneLog, ...game.pendingLines], stageContextOf(game)).departed,
     roster: game.chars,
     charInfo,
     npcRelationships: game.npcRelationships,

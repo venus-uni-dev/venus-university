@@ -3,7 +3,15 @@
  * respawn, typewriter hold and way out on both screens, with only what surrounds it differing.
  * Neither reads a store; both are handed everything, exactly as `SceneChrome` is.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent,
+  type ReactNode
+} from 'react'
 import { motion, type MotionProps } from 'motion/react'
 
 import type { TextMark } from '@shared/types'
@@ -520,12 +528,24 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
     if (props.focus && !props.inputDead) (area.current ?? line.current)?.focus()
   }, [props.focus, props.inputDead])
 
+  /** Tab in the well gives the caret up; Enter in the multiline well must not write a newline, and Shift+Enter still breaks one. */
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.currentTarget.blur()
+      return
+    }
+    if (event.key !== 'Enter') return
+    if (event.shiftKey) event.stopPropagation()
+    else event.preventDefault()
+  }
+
   return (
     <>
       <motion.div className="vu-turn-inputbox" {...props.wellMotion} {...hover}>
         {props.multiline ? (
           /* Grows upward with the box above it moving out of the way (`field-sizing: content`,
-             `Dialogue.css`). Enter must not write a newline too; Shift+Enter still breaks one. */
+             `Dialogue.css`). Tab gives the caret up; Enter must not write a newline too;
+             Shift+Enter still breaks one. */
           <motion.textarea
             ref={area}
             id="game-action"
@@ -541,11 +561,7 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
             onChange={(event) => props.onAction(event.target.value)}
             onFocus={props.onFocus}
             onBlur={props.onBlur}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
-              if (event.shiftKey) event.stopPropagation()
-              else event.preventDefault()
-            }}
+            onKeyDown={onKeyDown}
           />
         ) : (
           <motion.input
@@ -562,6 +578,7 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
             onChange={(event) => props.onAction(event.target.value)}
             onFocus={props.onFocus}
             onBlur={props.onBlur}
+            onKeyDown={onKeyDown}
           />
         )}
         {props.overlay}

@@ -938,6 +938,11 @@ export interface SceneGift {
   repeat: boolean
   /** How it landed (`shared/shop.ts`), stamped when the gift is handed over. */
   reaction: GiftReaction
+  /**
+   * The transcript index of the action that handed it over; absent on a gift stamped before the
+   * field existed.
+   */
+  at?: number
 }
 
 /** A running summary a scene reply came with, and the transcript length it covers up to. */
@@ -1055,9 +1060,16 @@ export interface SceneState {
   currentLine: SceneLine | null
   /**
    * Lines received but not yet played, oldest first. Empty means the capture was taken drained,
-   * at a decision point; a populated queue resumes at its first line.
+   * at a decision point; a populated queue resumes at its first line, unless
+   * {@link resumeOnLine} holds it on the line already shown.
    */
   pendingLines: SceneLine[]
+  /**
+   * The capture was taken with {@link currentLine} on screen and the input closed: a load shows
+   * that line as it stands and does not advance, and the next click is the same advance live
+   * play would have taken. Absent on every other capture.
+   */
+  resumeOnLine?: true
   /** The scene was already resolved when this was written: the slot ends when the queue drains. */
   endPending?: boolean
   /** The resolved bookkeeping reply held alongside {@link endPending}. */
@@ -1152,7 +1164,8 @@ export interface GameSave {
   playthroughId: string
   /**
    * `Date.now().toString()` for a slot-save, incremented on filename collision
-   * until free; the literal `autosave` for the in-progress-scene save.
+   * until free; the literal `autosave` for the in-progress-scene save; `manual01` to
+   * `manual90` for the player's own saves, one per manual slot.
    */
   saveId: string
   /** Epoch ms, last modified. */
@@ -1301,6 +1314,11 @@ export interface GameSave {
   endingArtWanted: boolean
   /** The scene in progress, or null between scenes; written at every reply and decision point. */
   scene: SceneState | null
+  /**
+   * A JPEG of the stage as the save was taken, base64 without the `data:` prefix; absent on
+   * boundary and epilogue saves.
+   */
+  thumbnail?: string
 }
 
 /** One dropped class — the record that makes the drop permanent. */
@@ -1369,12 +1387,15 @@ export const DEFAULT_PLAYER_FIRST_NAME = 'Seth'
 export const DEFAULT_PLAYER_LAST_NAME = 'Hawke'
 
 /**
- * Slot-saves a playthrough keeps. Writing the fifteenth deletes the oldest, so
- * a playthrough is a rolling window roughly a week of game time deep.
+ * Boundary saves a playthrough keeps. Writing the tenth deletes the oldest, so page 1 of the
+ * load grid is the scene autosave and these nine.
  */
-export const MAX_SLOT_SAVES = 14
+export const MAX_SLOT_SAVES = 9
 
-/** The one non-numeric save id — the scene-in-progress save. */
+/** Manual save slots a playthrough offers, numbered from 1; none is ever pruned. */
+export const MANUAL_SAVE_SLOTS = 90
+
+/** The scene-in-progress save's id. */
 export const AUTOSAVE_ID = 'autosave'
 
 /**
@@ -1401,7 +1422,12 @@ export interface PlaythroughSummary {
   savedAt: number
   /** Slot-saves held, excluding the autosave; at most {@link MAX_SLOT_SAVES}. */
   saveCount: number
-  /** True while a scene is in progress — the autosave exists only mid-scene. */
+  /** Manual saves held; at most {@link MANUAL_SAVE_SLOTS}. */
+  manualCount: number
+  /**
+   * Whether the last decision point reached is on disk: the autosave stands until the next one
+   * overwrites it.
+   */
   hasAutosave: boolean
   /**
    * The folder holds a semester and no timetable yet: it reopens the registrar rather than
@@ -1415,13 +1441,34 @@ export interface PlaythroughSummary {
   unloadable: string | null
 }
 
-/** One listed save: the file as read, or the error that refused it. */
+/** What the load grid shows of one save, read off it without shipping the save itself. */
+export interface SaveSummary {
+  /** In-game position of the save. */
+  date: number
+  time: TimeSlot
+  /** The save's {@link GameSave.graduationSeen}. */
+  graduationSeen: boolean
+  /** A scene was in progress when it was written. */
+  midScene: boolean
+  /** The scene's background base name, the player's own pick winning; null between scenes. */
+  bg: string | null
+  /** The save's {@link GameSave.thumbnail}, where it carries one. */
+  thumbnail?: string
+}
+
+/** One listed save: a summary of the file as read, or the error that refused it. */
 export interface SaveEntry {
   saveId: string
   /** Epoch ms — the save's `saveDate`, or the file's mtime when it could not be read. */
   savedAt: number
-  save: GameSave | null
+  summary: SaveSummary | null
   error: AppError | null
+}
+
+/** What `saves:read` answers with: one save and the record it is read against. */
+export interface SaveReadResult {
+  record: PlaythroughRecord
+  save: GameSave
 }
 
 /**
@@ -1539,6 +1586,8 @@ export type EnrollmentDraft = QuickstartBundle & {
   stats: PlayerStats
   /** The reader's own words about himself, as New Game took them down. */
   bio?: string
+  /** The output tokens New Game's own generation calls cost, carried onto the save at Finalize. */
+  tokensGenerated?: number
 }
 
 /**

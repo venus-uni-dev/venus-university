@@ -235,15 +235,30 @@ export async function replyFromBoss(jobId: string, kind: JobMessageKind): Promis
   const chatId = bossChatIdOf(jobId)
   const playthroughId = useGameStore.getState().playthroughId
 
-  await wait(BOT_REPLY_MS)
-  if (useGameStore.getState().playthroughId !== playthroughId) return
+  // Busy for the whole reply, its beat before the typing included, as her own turn is.
+  useBunnyboardStore.getState().setTextBusy(chatId, true)
+  try {
+    await wait(BOT_REPLY_MS)
+    if (useGameStore.getState().playthroughId !== playthroughId) return
 
-  useBunnyboardStore.getState().setTyping(chatId, true)
-  await wait(typingDelayFor(text))
-  useBunnyboardStore.getState().setTyping(chatId, false)
-  if (useGameStore.getState().playthroughId !== playthroughId) return
+    useBunnyboardStore.getState().setTyping(chatId, true)
+    await wait(typingDelayFor(text))
+    useBunnyboardStore.getState().setTyping(chatId, false)
+    if (useGameStore.getState().playthroughId !== playthroughId) return
 
-  deliver(chatId, chatMessage('contact', text))
+    deliver(chatId, chatMessage('contact', text))
+  } finally {
+    useBunnyboardStore.getState().setTextBusy(chatId, false)
+  }
+}
+
+/**
+ * Whether any thread is still settling — a reply out or typing, or a failed one parked on its
+ * Retry. Read off the Bunnyboard store, so a view subscribed to it re-renders as one settles.
+ */
+export function textingUnsettled(): boolean {
+  const { busyCharIds, typingCharIds, failedCharIds } = useBunnyboardStore.getState()
+  return busyCharIds.length > 0 || typingCharIds.length > 0 || failedCharIds.length > 0
 }
 
 /** One timer, awaited. */

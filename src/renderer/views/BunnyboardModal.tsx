@@ -26,6 +26,7 @@ import { globalSlotOf, jobDefForChat, shiftSlotOf } from '@shared/jobs'
 import { locationLabel, ROOM_LOCATION } from '@shared/locations'
 import { formatMoney } from '@shared/money'
 import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
+import { formatTokens } from '@shared/tallies'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { TextField } from '../components/TextField'
@@ -1424,7 +1425,12 @@ function ProfilePage(): JSX.Element {
         label: 'EXAMS ACED',
         value: String(handedBackAcedCount(classRecords, classes, occasions, date, finalsScoresShown))
       },
-      { id: 'bb-tally-shifts', label: 'SHIFTS WORKED', value: String(counts.shiftsWorked) }
+      { id: 'bb-tally-shifts', label: 'SHIFTS WORKED', value: String(counts.shiftsWorked) },
+      {
+        id: 'bb-tally-tokens',
+        label: 'TOKENS GENERATED',
+        value: formatTokens(counts.tokensGenerated)
+      }
     ]
   }, [
     charInfo,

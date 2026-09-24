@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rename, rm, unlink, writeFile } from 'fs/prom
 import { dirname, join } from 'path'
 import {
   baseRel,
+  isCharFileRel,
   layerRel,
   looseNamesOf,
   REFERENCE_NAME,
@@ -431,6 +432,24 @@ export async function readWardrobeImage(
 ): Promise<Uint8Array | null> {
   assertSafeCharId(charId)
   const path = await imagePath(getCharacterImagePath(charId, wardrobeImageRel(target, image)))
+
+  try {
+    return await readFile(path)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw appError('CHARACTER_UNREADABLE', 'Could not read that image.', messageOf(err))
+  }
+}
+
+/**
+ * The bytes of one of her images by the path her image URL names, or `null` where it is not on
+ * disk or the path names none of her images.
+ */
+export async function readCharacterImage(charId: string, rel: string): Promise<Uint8Array | null> {
+  assertSafeCharId(charId)
+  if (!isCharFileRel(rel)) return null
+  // The path names the PNG; the shipped cast is the same image under `.webp`.
+  const path = await imagePath(getCharacterImagePath(charId, rel))
 
   try {
     return await readFile(path)

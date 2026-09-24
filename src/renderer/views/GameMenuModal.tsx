@@ -1,11 +1,14 @@
 import type { JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
+import { DeadNote } from '../components/DeadNote'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
+import type { ManualSaveOffer } from '../stores/gameLoop'
 import {
   dealt,
   dealtItem,
+  dealtItemDead,
   gestures,
   lift,
   panelUnderTab,
@@ -20,9 +23,15 @@ export interface GameMenuModalProps {
   /** Drawn by the screen that opened this — a portal inherits neither palette nor state rules. */
   theme: 'day' | 'night'
   onClose: () => void
+  /** Opens the manual save slots in the menu's place. */
+  onSaveGame: () => void
+  /** Whether a save can be written now, only once the reply in flight lands, or not at all. */
+  saveOffer: ManualSaveOffer
   onLoadGame: () => void
   onFeedback: () => void
   onSettings: () => void
+  /** Opens the list of the keys the app answers, in the menu's place. */
+  onControls: () => void
   onLeave: () => void
   /** Absent where the app has no window of its own to close, which drops the entry. */
   onQuit?: () => void
@@ -35,14 +44,19 @@ export interface GameMenuModalProps {
 export function GameMenuModal({
   theme,
   onClose,
+  onSaveGame,
+  saveOffer,
   onLoadGame,
   onFeedback,
   onSettings,
+  onControls,
   onLeave,
   onQuit
 }: GameMenuModalProps): JSX.Element | null {
   const { host, overlayProps } = useModalShell(onClose)
   if (!host) return null
+
+  const saveDead = saveOffer === 'waiting'
 
   return createPortal(
     <motion.div
@@ -65,6 +79,33 @@ export function GameMenuModal({
         <TitleTab>Menu</TitleTab>
 
         <motion.nav className="vu-menu-modal-actions vu-fan" variants={dealt(0, 0.045)}>
+          {/* Offered only where the game has a point to save; while a reply is still on its
+              way it stands dead, the wrapper around it naming what it waits for. */}
+          {saveOffer !== 'none' && (
+            <DeadNote note={saveDead ? 'Waiting for LLM response' : null} align="center">
+              <motion.button
+                id="game-menu-save"
+                className="vu-btn vu-btn--outline vu-paper"
+                type="button"
+                variants={saveDead ? dealtItemDead : dealtItem}
+                {...gestures(saveDead, lift, press)}
+                disabled={saveDead}
+                onClick={onSaveGame}
+              >
+                Save Game
+              </motion.button>
+            </DeadNote>
+          )}
+          <motion.button
+            id="game-menu-load"
+            className="vu-btn vu-btn--outline vu-paper"
+            type="button"
+            variants={dealtItem}
+            {...gestures(false, lift, press)}
+            onClick={onLoadGame}
+          >
+            Load Game
+          </motion.button>
           <motion.button
             id="game-menu-settings"
             className="vu-btn vu-btn--outline vu-paper"
@@ -76,14 +117,14 @@ export function GameMenuModal({
             Settings
           </motion.button>
           <motion.button
-            id="game-menu-load"
+            id="game-menu-controls"
             className="vu-btn vu-btn--outline vu-paper"
             type="button"
             variants={dealtItem}
             {...gestures(false, lift, press)}
-            onClick={onLoadGame}
+            onClick={onControls}
           >
-            Load Game
+            Controls
           </motion.button>
           <motion.button
             id="game-menu-feedback"

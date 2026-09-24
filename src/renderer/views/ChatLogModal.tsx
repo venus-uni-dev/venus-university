@@ -6,7 +6,7 @@ import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { useFitToText } from '../components/useFitToText'
 import { graduationScrollLines, isEpilogueNight } from '../prompts/graduation'
-import { speakerNameOf } from '../stores/gameLoop'
+import { rewriteLine, speakerNameOf } from '../stores/gameLoop'
 import { seniorNames } from '../stores/loop/farewells'
 import { useGameStore } from '../stores/gameStore'
 import { lineEditable } from '../stores/stageStep'
@@ -24,9 +24,10 @@ export interface ChatLogModalProps {
 
 /**
  * The scene so far, as the player read it. Renders `sceneLog` and nothing else — never
- * `sceneSummary`, which is written for the model — and rewrites a line of it in place, one row
- * at a time. On the goodbye menu it holds the last goodbye instead, since the epilogue's save
- * carries no scene of its own to render, and nothing there can be rewritten.
+ * `sceneSummary`, which is written for the model — and rewrites any reply line of it in place,
+ * one row at a time, never the reader's own line or a status line, and none while the scene's
+ * ending is under way. On the goodbye menu it holds the last goodbye instead, since the
+ * epilogue's save carries no scene of its own to render, and nothing there can be rewritten.
  */
 export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element | null {
   const sceneLog = useGameStore((s) => s.sceneLog)
@@ -34,6 +35,7 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
   const graduationSeen = useGameStore((s) => s.graduationSeen)
+  const sceneEnding = useGameStore((s) => s.sceneEnding)
   const sceneActive = useGameStore(sceneActiveOf)
   const inScene = useGameStore(sceneOnScreenOf)
   const { host, overlayProps } = useModalShell(onClose)
@@ -107,7 +109,7 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
                 const reader = line.speaker === READER_SPEAKER
                 // The line's own place in `sceneLog`, which is what a rewrite is keyed on.
                 const at = start + index
-                const editable = !menu && lineEditable(sceneLog, at)
+                const editable = !menu && !sceneEnding && lineEditable(sceneLog, at)
                 const editing = editable && edit?.at === at
                 return (
                   // Lines carry no id and the list is append-only, so the index is the key.
@@ -138,7 +140,7 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
                             disabled={!edit.text.trim()}
                             {...gestures(!edit.text.trim(), quietLift, quietPress)}
                             onClick={() => {
-                              useGameStore.getState().editLogLine(edit.at, edit.text)
+                              rewriteLine(edit.at, edit.text)
                               setEdit(null)
                             }}
                           >

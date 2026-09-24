@@ -60,8 +60,10 @@ import {
   listSaves,
   overwriteSlotSave,
   readEnrollment,
+  readSave,
   writeAutosave,
   writeEnrollment,
+  writeManualSave,
   writeSlotSave
 } from './services/saveService'
 import {
@@ -84,6 +86,7 @@ import {
   getRoomStatus,
   hasBaseImage,
   listCharacters,
+  readCharacterImage,
   readReference,
   readWardrobeImage,
   restoreDefaults,
@@ -110,6 +113,7 @@ import { listModels, testWriter } from '@shared/llm/endpointProbe'
 import { backupName } from '@shared/backup'
 import { exportFileName } from '@shared/characterTransfer'
 import { useSettingsSource } from '@shared/llm/settingsPort'
+import { setTokenSink } from '@shared/llm/tokenPort'
 import { logExportName, logRecordOf } from '@shared/logRules'
 import { storedEndpointKeyFor } from '@shared/settingsRules'
 import {
@@ -220,6 +224,12 @@ export function registerIpcHandlers(): void {
       if (!window.webContents.isDestroyed()) window.webContents.send('comfy:state', sent)
     }
   })
+  // Fixed channel: the count is read in the transport, which no invoke's reply carries.
+  setTokenSink((generated) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.webContents.isDestroyed()) window.webContents.send('llm:tokens', generated)
+    }
+  })
 
   // Neither channel carries a key: out is a presence flag, in is a patch.
   handle('settings:get', () => getRendererSettings())
@@ -328,6 +338,12 @@ export function registerIpcHandlers(): void {
   )
   handle('saves:autosave', (_event, playthroughId: string, draft: SaveDraft) =>
     writeAutosave(playthroughId, draft)
+  )
+  handle('saves:manual', (_event, playthroughId: string, slot: number, draft: SaveDraft) =>
+    writeManualSave(playthroughId, slot, draft)
+  )
+  handle('saves:read', (_event, playthroughId: string, saveId: string) =>
+    readSave(playthroughId, saveId)
   )
   handle('saves:delete', (_event, playthroughId: string, saveId: string) =>
     deleteSave(playthroughId, saveId)
@@ -522,6 +538,10 @@ export function registerIpcHandlers(): void {
     'chars:readWardrobeImage',
     (_event, charId: string, target: WardrobeTarget, image: string) =>
       readWardrobeImage(charId, target, image)
+  )
+  // Bytes for the picture a manual save carries of the stage.
+  handle('chars:readImage', (_event, charId: string, rel: string) =>
+    readCharacterImage(charId, rel)
   )
   // Unqueued: it writes files the renderer has already composed.
   handle(

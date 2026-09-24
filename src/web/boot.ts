@@ -1,8 +1,9 @@
 import { setProgressSink } from '@shared/jobQueue'
 import { useSettingsSource } from '@shared/llm/settingsPort'
+import { setTokenSink } from '@shared/llm/tokenPort'
 import { STAGE_HEIGHT, STAGE_MIN_WIDTH, zoomFor } from '@shared/stageZoom'
 import { setImageResolver } from '../renderer/stores/imageUrl'
-import { buildApi, jobProgress } from './bridge'
+import { buildApi, jobProgress, tokensGenerated } from './bridge'
 import { resolveImage, setImagesLoadedSink } from './images'
 import { openLog } from './log'
 import { currentSettings } from './settings'
@@ -100,6 +101,8 @@ async function boot(): Promise<void> {
   useSettingsSource(currentSettings)
   // Fixed channel: a job can outlive the call that started it, so progress is broadcast.
   setProgressSink((progress) => jobProgress.emit(progress))
+  // Fixed channel too: the transport reads each reply's token count where no call returns it.
+  setTokenSink((generated) => tokensGenerated.emit(generated))
   setImageResolver(resolveImage)
 
   // Before anything can print: the log picks up what the last visit left behind.

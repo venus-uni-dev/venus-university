@@ -216,7 +216,7 @@ describe('an ending the player interjected over', () => {
     if (!registered.slotCycle) throw new Error('gameLoop registered no slot cycle')
     registerLoopHooks(registered.slotCycle)
     useGameStore.getState().setSceneEnding(true)
-    loopState.endingInFlight = true
+    useGameStore.getState().setEndingInFlight(true)
     return { ending: runEnding(true), answer }
   }
 
@@ -231,7 +231,7 @@ describe('an ending the player interjected over', () => {
     // with a scene the player has already talked his way out of.
     expect(autosave).not.toHaveBeenCalled()
     expect(loopState.pendingLedgerResult).toBeNull()
-    expect(loopState.endingInFlight).toBe(false)
+    expect(useGameStore.getState().endingInFlight).toBe(false)
   })
 
   it('raises no modal when its ledger fails, even over the next ending', async () => {
@@ -239,7 +239,7 @@ describe('an ending the player interjected over', () => {
 
     dropEnding()
     // The next ending has the player parked on its spinner, which is what a modal waits for.
-    loopState.endingInFlight = true
+    useGameStore.getState().setEndingInFlight(true)
     useGameStore.getState().setWaitingForLine(true)
     answer({ ok: false, error: { code: 'LLM_REQUEST_REJECTED', message: 'refused' } })
     await ending

@@ -25,6 +25,7 @@ vi.mock('../src/shared/llm/transport', () => ({
 
 const { completeStructured, readStream } = await import('../src/shared/llm/cloudLlm')
 const { geminiAdapter } = await import('../src/shared/llm/geminiAdapter')
+const { setTokenSink } = await import('../src/shared/llm/tokenPort')
 
 const LABEL = 'Google (Gemini)'
 
@@ -119,6 +120,15 @@ describe('readStream', () => {
   })
 })
 
+describe('geminiAdapter.generatedTokensOf', () => {
+  it('counts the answer and the thinking, never the prompt', () => {
+    const usageMetadata = { promptTokenCount: 10, candidatesTokenCount: 5, thoughtsTokenCount: 7 }
+
+    expect(geminiAdapter.generatedTokensOf(JSON.stringify({ usageMetadata }))).toBe(12)
+    expect(geminiAdapter.generatedTokensOf(JSON.stringify({ candidates: [] }))).toBeUndefined()
+  })
+})
+
 describe('completeStructured', () => {
   const request: StructuredRequest = {
     system: 'be brief',
@@ -158,5 +168,27 @@ describe('completeStructured', () => {
     const error = await errorOf(complete())
     expect(error.code).toBe('LLM_NETWORK')
     expect(error.detail).toContain('she wa')
+  })
+
+  it('reports the tokens a truncated reply was billed for', async () => {
+    const sink = vi.fn()
+    setTokenSink(sink)
+    responses = [
+      sseResponse([
+        textFrame('{"lines":["she wa'),
+        frame({
+          candidates: [{ content: { parts: [{ text: '' }] }, finishReason: 'MAX_TOKENS' }],
+          usageMetadata: { candidatesTokenCount: 3, thoughtsTokenCount: 4 }
+        })
+      ])
+    ]
+
+    try {
+      const error = await errorOf(complete())
+      expect(error.code).toBe('LLM_TRUNCATED')
+      expect(sink).toHaveBeenCalledWith(7)
+    } finally {
+      setTokenSink(() => {})
+    }
   })
 })

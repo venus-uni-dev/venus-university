@@ -151,6 +151,33 @@ export function isWritten(character: Character): boolean {
   return character.pose !== ''
 }
 
+/** One sensible tag per emotion, drawn only from the groups Appendix A defines. */
+export function defaultExpressionTags(): Record<Emotion, string[]> {
+  return {
+    neutral: ['expressionless'],
+    happy: ['happy', 'light_smile'],
+    sad: ['(sad:0.7)', '(frown:0.5)'],
+    angry: ['(angry:0.5)', 'furrowed_brow', 'clenched_teeth'],
+    surprised: ['(surprised:0.7)', 'raised_eyebrows', 'open_mouth', '(wide-eyed:0.6)'],
+    embarrassed: ['(embarrassed:0.5)', 'blush', 'sideways_glance'],
+    aroused: ['naughty_face', 'parted_lips', '(half-closed_eyes:0.7)', 'blush']
+  }
+}
+
+/**
+ * The sheet a Skip-LLM character is written with, which {@link isWritten} reads as written.
+ */
+export function blankSheet(character: Character, personality: string, pose: string): Character {
+  const { brief: _brief, ...rest } = character
+  return {
+    ...rest,
+    personality,
+    pose,
+    preferredStat: 'body',
+    expressionTags: defaultExpressionTags()
+  }
+}
+
 /** Every shipped charId, and which of them the player has removed; only a shipped id counts. */
 export function defaultsStatusOf(
   ids: readonly string[],
