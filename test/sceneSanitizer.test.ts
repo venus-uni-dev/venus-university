@@ -568,8 +568,12 @@ describe('applyLedger', () => {
       events: []
     })
     const info = useGameStore.getState().charInfo.a
-    expect(info.memories).toEqual([{ date: 7, type: 'liked', desc: 'you walked her home' }])
-    expect(info.textMemory).toEqual({ date: 7, type: 'loved', desc: 'you asked about her recital' })
+    expect(info.memories).toEqual([{ date: 7, type: 'liked', desc: 'the reader walked her home' }])
+    expect(info.textMemory).toEqual({
+      date: 7,
+      type: 'loved',
+      desc: 'the reader asked about her recital'
+    })
   })
 
   // JSON Schema cannot say "at most one row per enum value", so the cap is the

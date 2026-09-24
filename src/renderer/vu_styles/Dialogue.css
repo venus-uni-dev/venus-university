@@ -233,6 +233,30 @@
   height: 26px;
 }
 
+/* The back mark, in the face's round cap at the forward mark's height: the same chevron turned
+   round in the same muted ink, clear of the speaker label over the cap's top. It is a control
+   where the forward mark is a reading, so it takes its own pointer back from the layer and pads
+   round the chevron for the tint a hover lays under it; the padding comes off its seat, so the
+   chevron stands where the mirror puts it. */
+.vu-box-rewind {
+  position: absolute;
+  left: 66px;
+  bottom: 14px;
+  display: flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--vu-text-muted);
+  pointer-events: auto;
+}
+
+.vu-box-rewind svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
 /* ---- the chips ------------------------------------------------------------ */
 
 /* The screen controls, in a column half on the box's right edge and half out past it. Quiet —
@@ -276,12 +300,14 @@
 /* ---- the turn ------------------------------------------------------------- */
 
 /* The row the player answers in. **Where it sits is the screen's** — a scene centres it under
-   the box, the landing anchors it left — so this says only what a row is. */
+   the box, the landing anchors it left — so this says only what a row is. The gap is named, for
+   a screen that has to reach a part across it. */
 .vu-turn {
+  --turn-gap: 14px;
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--turn-gap);
   pointer-events: none;
 }
 

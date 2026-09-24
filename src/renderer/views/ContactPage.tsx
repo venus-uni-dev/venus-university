@@ -1,5 +1,5 @@
 import { Fragment, useState, type JSX, type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { slotPartsOf, yearLabel } from '@shared/classes'
 import { dormLabel } from '@shared/dorms'
 import { jobDefOf, WEEK_DAY_HEADERS } from '@shared/jobs'
@@ -19,7 +19,7 @@ import {
   MEMORY_CAP
 } from '@shared/relationship'
 import { isCharacterTrait } from '@shared/traits'
-import { fullNameOf, type StockOutfitSet } from '@shared/types'
+import { fullNameOf, type CharMemory, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
@@ -27,6 +27,8 @@ import { newestFirst } from '../stores/feedRolls'
 import { useGameStore } from '../stores/gameStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { sendFriendRequest } from '../stores/textingLoop'
+import type { ScreenTheme } from './clockTheme'
+import { EditMemoryModal } from './EditMemoryModal'
 import {
   breatheDecor,
   dealt,
@@ -39,7 +41,7 @@ import {
   silhouetteIn,
   slideInQuick
 } from './motion'
-import { BackIcon, MoonIcon, SunIcon } from './screenIcons'
+import { BackIcon, MoonIcon, PencilIcon, SunIcon } from './screenIcons'
 import '../vu_styles/ContactPage.css'
 
 /** The one thing a stranger's every locked slot names, since it is the one thing he can do. */
@@ -53,7 +55,13 @@ const CARDS_DEAL = dealt(0.22, 0.07)
  * A contact's page: the character is the screen, in an archway bleeding off two stage edges,
  * with three independently-scrolling half-pills carrying everything known about her.
  */
-export function ContactPage({ charId }: { charId: string }): JSX.Element {
+export function ContactPage({
+  charId,
+  theme
+}: {
+  charId: string
+  theme: ScreenTheme
+}): JSX.Element {
   const character = useGameStore((s) => s.characters[charId])
   const info = useGameStore((s) => s.charInfo[charId])
   const classes = useGameStore((s) => s.classes)
@@ -71,6 +79,8 @@ export function ContactPage({ charId }: { charId: string }): JSX.Element {
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
   // Which wardrobe she is standing in, which is the screen's own state and nothing the save keeps.
   const [outfit, setOutfit] = useState<StockOutfitSet | null>(null)
+  // The memory open in the edit panel, as the list below holds it.
+  const [editing, setEditing] = useState<CharMemory | null>(null)
 
   if (!character) return <p className="vu-contact-gone">This account no longer exists.</p>
 
@@ -343,6 +353,15 @@ export function ContactPage({ charId }: { charId: string }): JSX.Element {
                   <Fragment key={`${memory.date}-${index}`}>
                     <span className="vu-contact-when">{formatShortGameDate(memory.date)}</span>
                     <span>“{memorySentence(character.firstName, memory)}”</span>
+                    <motion.button
+                      className="vu-square vu-contact-memory-edit"
+                      type="button"
+                      aria-label="Edit memory"
+                      {...gestures(false, quietLift, quietPress)}
+                      onClick={() => setEditing(memory)}
+                    >
+                      <PencilIcon />
+                    </motion.button>
                   </Fragment>
                 ))}
               </div>
@@ -438,6 +457,21 @@ export function ContactPage({ charId }: { charId: string }): JSX.Element {
       >
         <BackIcon />
       </motion.button>
+
+      {/* Portalled, so a DOM sibling of the phone's veil; `propagate` takes it down with the
+          phone. */}
+      <AnimatePresence propagate>
+        {editing && (
+          <EditMemoryModal
+            key="edit-memory"
+            theme={theme}
+            charId={charId}
+            name={character.firstName}
+            memory={editing}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

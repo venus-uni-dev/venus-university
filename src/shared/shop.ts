@@ -1147,7 +1147,7 @@ export function giftMemoryCapFor(character: Character | undefined): number {
 
 /** What a gift she kept is remembered as — the `desc` grammar every memory uses. */
 export function giftMemoryDesc(item: ItemDef): string {
-  return `you gave her the ${item.name}`
+  return `the reader gave her the ${item.name}`
 }
 
 /** File one gift memory, evicting to stay inside the cap. */

@@ -70,7 +70,7 @@ export function EditPromptModal({
         <p className="vu-editprompt-hint">
           If the model is refusing to write due to prohibited content, try rewording "The reader's action:" first. Avoid any explicit sexual words, replacing them with vague descriptions: "make love" instead of "fuck", "use her mouth" instead of "blowjob". 
           <br/> If rewording the action doesn't work, start rewriting or removing words from THE SCENE SO FAR or the STORY SO FAR.
-          <br/> Replace specific sexual details with a vague "They shared an intimate encounter" usually unblocks the scene and allows you to continue.
+          <br/> Replacing specific sexual details with a vague "They shared an intimate encounter" usually unblocks the scene and allows you to continue.
         </p>
 
         <TextField

@@ -1,4 +1,5 @@
-import { useCallback, useLayoutEffect, useRef, type JSX } from 'react'
+import { useRef, type JSX } from 'react'
+import { useFitToText } from './useFitToText'
 
 export interface TextFieldProps {
   id: string
@@ -41,29 +42,7 @@ export function TextField({
 }: TextFieldProps): JSX.Element {
   const area = useRef<HTMLTextAreaElement | null>(null)
 
-  /** Fits the box to its text; the reset to `auto` makes `scrollHeight` report what the text needs. */
-  const fit = useCallback((): void => {
-    const el = area.current
-    if (!el || !autoGrow) return
-    el.style.height = 'auto'
-    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`
-  }, [autoGrow])
-
-  useLayoutEffect(fit, [fit, value])
-
-  // Refits on the sizes a value change misses: the field being revealed inside a disclosure,
-  // or its pane narrowing.
-  useLayoutEffect(() => {
-    const el = area.current
-    if (!el || !autoGrow || typeof ResizeObserver === 'undefined') return
-    // Observes the label around it: observing the field itself would feed the observer its
-    // own resize.
-    const box = el.parentElement
-    if (!box) return
-    const observer = new ResizeObserver(fit)
-    observer.observe(box)
-    return () => observer.disconnect()
-  }, [autoGrow, fit])
+  useFitToText(area, value, autoGrow ?? false)
 
   return (
     <label className="vu-field" htmlFor={id}>

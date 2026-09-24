@@ -128,6 +128,10 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [remember, setRemember] = useState(settings?.rememberKey === true)
   // Absent on the record means the desktop does check, so only an explicit false is off.
   const [checkUpdates, setCheckUpdates] = useState(settings?.checkUpdates !== false)
+  // Likewise absent means a scene warns before an ending is interrupted.
+  const [warnEndingInterrupt, setWarnEndingInterrupt] = useState(
+    settings?.warnEndingInterrupt !== false
+  )
 
   // The typed fields, staged until Save. The URL and the two keys outlive a provider switch,
   // so a panel switched away and back finds them as they were; the ids are the endpoint's own.
@@ -400,6 +404,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     setCheckUpdates(checked)
     void write({ checkUpdates: checked }).then(
       reseed((stored) => setCheckUpdates(stored.checkUpdates !== false))
+    )
+  }
+
+  /** Whether interjecting over a scene that has started its ending asks first. */
+  function handleWarnEndingInterruptChange(checked: boolean): void {
+    setWarnEndingInterrupt(checked)
+    void write({ warnEndingInterrupt: checked }).then(
+      reseed((stored) => setWarnEndingInterrupt(stored.warnEndingInterrupt !== false))
     )
   }
 
@@ -688,6 +700,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             {/* Each toggle carries what turning it on costs; the note is the whole of what the
                 app promises about either setting. */}
             <SfwCheckList sfw={sfw} onChange={handleSfwChange} />
+
+            <CheckField
+              id="settings-warn-ending-interrupt"
+              label="Warn when interrupting an ending scene"
+              note="Toggles the confirmation modal when interjecting at the end of a scene."
+              checked={warnEndingInterrupt}
+              onChange={handleWarnEndingInterruptChange}
+            />
 
             <span className="vu-settings-heading vu-settings-sound-heading">Sound</span>
 

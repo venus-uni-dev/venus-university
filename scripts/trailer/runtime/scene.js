@@ -215,7 +215,12 @@ Object.assign(window.__tr, (() => {
     store.getState().setCast([], { classCode: code })
     store.getState().logPlayerAction(action, false)
     store.getState().setSceneQuiz({ code, exam: 'midterm', questions, index: 0, correct: 0 })
-    store.getState().setSceneSummary('The reader sat the midterm exam for ' + entry.name + '.')
+    store
+      .getState()
+      .setSceneSummary(
+        'The reader sat the midterm exam for ' + entry.name + '.',
+        store.getState().currentSceneTranscript.length
+      )
     store.getState().appendPendingLines([
       {
         speaker: '',

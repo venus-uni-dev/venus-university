@@ -121,6 +121,17 @@ describe('mergePatch — the two keys', () => {
   })
 })
 
+describe('mergePatch — the optional switches', () => {
+  it('carries the ending warning turned off, and leaves an absent one absent', () => {
+    // Absent is warning, so a save that dropped the field would turn the warning back on.
+    const off = mergePatch(settings(), settingsPatch({ warnEndingInterrupt: false }))
+    expect(off.warnEndingInterrupt).toBe(false)
+
+    const untouched = mergePatch(settings(), settingsPatch())
+    expect(untouched.warnEndingInterrupt).toBeUndefined()
+  })
+})
+
 describe('maxOutputTokensOf', () => {
   it('takes a positive whole number under a custom endpoint and nothing else', () => {
     const custom = (cap: unknown): number | undefined =>

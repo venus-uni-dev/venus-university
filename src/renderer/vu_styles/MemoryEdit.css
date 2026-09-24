@@ -1,0 +1,104 @@
+/* A memory, read as its sentence and edited in place: the row that draws one, and the panel it
+   is edited on. One object with two callers — the end-of-scene list of everyone in the scene
+   and the contact page's single edit — so it is imported from the component and the two views,
+   never from index.css.
+
+   The veil, the row, the fields, the scroller, its fade and the foot are base.css's. */
+
+/* ---- the panel ------------------------------------------------------------ */
+
+/* The form modals' frame, wide enough for a whole sentence on one line, so it takes the very
+   wide panel's tilt. The head clears the tab hung on its corner, which drops past the top edge
+   by its own lean; the cap gives back what that tab and the paper's overhang need.
+
+   No `overflow`: the tab overhangs, and the panel's own shadow pseudo would go with it. */
+.vu-memedit {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1100px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 78px 56px 28px 100px;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* The same panel around one memory: narrower, and the row stands in it directly over the foot.
+   A form frame with one line in it, so it takes the long row's tilt. */
+.vu-memedit--one {
+  --paper-tilt: -1.2deg;
+  width: min(820px, 100% - 60px);
+}
+
+/* The scroller the rows stand in. It pads for the scroll box's own margin and for the fade at
+   its foot, so the last row can scroll clear of it. */
+.vu-memedit-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 6px 34px;
+  overflow: hidden auto;
+}
+
+/* ---- the row -------------------------------------------------------------- */
+
+/* One memory across one line: face, name, how, `that`, what. The list owns the gap between
+   rows; the row keeps the base row's padding and states only the space between its words. */
+.vu-memrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Her face, lifted onto the surface off the row's own recessed ground — the row and the
+   archway's quiet fill are the same tone, and a face left at `.vu-arch`'s default would vanish
+   into the row it sits in. */
+.vu-memrow-face {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 48px;
+  height: 58px;
+  background: var(--vu-surface);
+}
+
+/* Her name, a fixed column so the pickers line up down the list; a long one ends in an
+   ellipsis rather than pushing the sentence along. */
+.vu-memrow-name {
+  flex: none;
+  width: 150px;
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 17px var(--font-body);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Alone on its panel there is no column to line up with, so the name hugs its words. */
+.vu-memedit--one .vu-memrow-name {
+  width: auto;
+  max-width: 150px;
+}
+
+/* How she remembers it: the field holds the select alone, so its label gap never shows. */
+.vu-memrow-type {
+  flex: none;
+  width: 150px;
+}
+
+/* The word joining how to what. */
+.vu-memrow-that {
+  flex: none;
+  color: var(--vu-text-body);
+  font: 500 17px var(--font-body);
+}
+
+/* What she remembers, taking whatever the line has left. */
+.vu-memrow-desc {
+  flex: 1;
+  min-width: 0;
+}

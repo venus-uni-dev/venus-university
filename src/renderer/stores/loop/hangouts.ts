@@ -20,7 +20,7 @@ import {
   type Verdict
 } from './classify'
 import { registerHangoutEntry } from './hooks'
-import { applyCast, promptState, reader } from './promptState'
+import { applyCast, reader, scenePromptState } from './promptState'
 import { currentRun, loopState, runStale, type TurnSnapshot } from './state'
 import { deliverSceneLines, streamScene, type PreviewSink, type SceneCall } from './stream'
 import { runSceneTurn } from './turn'
@@ -79,7 +79,7 @@ async function prefetchHangoutScene(charId: string, description: string): Promis
   const castCharacters = castCharactersOf(cast)
   // Not `logPlayerAction`: the reader's line in the transcript would take the Bunnyboard's
   // composer away mid-read. Begin logs it.
-  const request = buildScenePrompt(castCharacters, action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(castCharacters, action, scenePromptState(), SETTING, reader())
   const sink: PreviewSink = { live: false, settled: false, held: [] }
   token.scene = {
     cast,
@@ -165,7 +165,13 @@ export async function startHangoutScene(
   // An opening, not a continuation: the hangout scene starts here.
   useGameStore.getState().logPlayerAction(cast.action, false)
   const castCharacters = castCharactersOf(cast.cast)
-  const request = buildScenePrompt(castCharacters, cast.action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(
+    castCharacters,
+    cast.action,
+    scenePromptState(),
+    SETTING,
+    reader()
+  )
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: true }),
     snapshot,

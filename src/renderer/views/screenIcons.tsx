@@ -47,6 +47,45 @@ export function CloseIcon(): JSX.Element {
   )
 }
 
+/** The pencil on anything the player can rewrite in place: a name, or a line of the log. */
+export function PencilIcon(): JSX.Element {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+/** The tick that keeps a rewrite, drawn at the pencil's own weight. */
+export function CheckIcon(): JSX.Element {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
 /**
  * The forward mark on a button that goes somewhere, with `back` the way it came and `down` the
  * list a pill opens under itself. A button never carries a typographic arrow: the half-pill

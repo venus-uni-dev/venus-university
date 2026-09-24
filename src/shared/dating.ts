@@ -112,7 +112,11 @@ export function settleDating(input: DatingPassInput): DatingPassOutcome {
     copy.brokeUpOn = date
     copy.leftFor = leftFor
     dumped.push(charId)
-    remember(charId, 'hated', `you broke her heart by starting to date ${startedNames} instead`)
+    remember(
+      charId,
+      'hated',
+      `the reader broke her heart by starting to date ${startedNames} instead`
+    )
     breakups.push({ charId, forCharId: leftFor })
   }
 
@@ -121,7 +125,11 @@ export function settleDating(input: DatingPassInput): DatingPassOutcome {
     if (started.includes(charId) || dumped.includes(charId)) continue
     const flags = flagsAt(after, charId)
     if (flags.hasCrush && !flags.harem) {
-      remember(charId, 'hated', `you started dating ${startedNames} when she had a crush on you`)
+      remember(
+        charId,
+        'hated',
+        `the reader started dating ${startedNames} when she had a crush on the reader`
+      )
       continue
     }
     const friends = dumped.filter((other) => areNpcFriends(npcRelationships, charId, other))
@@ -131,8 +139,8 @@ export function settleDating(input: DatingPassInput): DatingPassOutcome {
       charId,
       'disliked',
       names.length === 1
-        ? `you broke ${names[0]}'s heart`
-        : `you broke the hearts of ${andList(names)}`
+        ? `the reader broke ${names[0]}'s heart`
+        : `the reader broke the hearts of ${andList(names)}`
     )
   }
 

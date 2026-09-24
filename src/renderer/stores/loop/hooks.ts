@@ -13,8 +13,14 @@ interface SlotCycle {
   advance: () => void
   /** The whole end of a scene, as one unit. */
   runEnding: (solo: boolean) => Promise<void>
-  /** The opening for the slot this ending leads into, or null if abandoned. */
-  fetchEndingOpening: (ledger: LedgerResponse) => Promise<BankedOpening | null>
+  /**
+   * The opening for the slot this ending leads into, or null if abandoned — or dropped, once
+   * `dropped` answers true.
+   */
+  fetchEndingOpening: (
+    ledger: LedgerResponse,
+    dropped?: () => boolean
+  ) => Promise<BankedOpening | null>
   /** Re-runs a rewound turn down the path it came from — intro, hangout or typed. */
   dispatchTurn: (snapshot: TurnSnapshot) => void
   /** Fires the texting ledger for the slot's messages, at scene start. */
@@ -63,8 +69,11 @@ export function runEnding(solo: boolean): Promise<void> {
   return need(slotCycle, 'the slot cycle').runEnding(solo)
 }
 
-export function fetchEndingOpening(ledger: LedgerResponse): Promise<BankedOpening | null> {
-  return need(slotCycle, 'the slot cycle').fetchEndingOpening(ledger)
+export function fetchEndingOpening(
+  ledger: LedgerResponse,
+  dropped?: () => boolean
+): Promise<BankedOpening | null> {
+  return need(slotCycle, 'the slot cycle').fetchEndingOpening(ledger, dropped)
 }
 
 export function dispatchTurn(snapshot: TurnSnapshot): void {

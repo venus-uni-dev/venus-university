@@ -888,16 +888,16 @@ export function cancelAllTexts(): void {
 }
 
 /**
- * What an unanswered invitation costs her, second person and all: rendered inside
- * "{Name} disliked that ..." by the memory and by the ending's status line alike.
+ * What an unanswered invitation costs her, in the reader's voice: completes
+ * "{Name} disliked that ..." in the memory and in the ending's status line alike.
  */
-export const IGNORED_TEXT_DESC = 'you ignored her text'
+export const IGNORED_TEXT_DESC = 'the reader ignored her text'
 
 /**
- * What answering an invitation with a no costs a lover, in the same second person: rendered
- * inside "{Name} disliked that ..." by the memory and by the ending's status line alike.
+ * What answering an invitation with a no costs a lover, in the same voice: completes
+ * "{Name} disliked that ..." in the memory and in the ending's status line alike.
  */
-export const TURNED_DOWN_DESC = 'you turned down her request to hang out'
+export const TURNED_DOWN_DESC = 'the reader turned down her request to hang out'
 
 /**
  * Every plan the reader is standing up, every invitation he never answered and every one he
@@ -923,11 +923,11 @@ export function expireHangoutInvitations(
         live.setPendingHangout(charId, null)
         live.setIgnoredInvitation(charId, true)
       }
-      // Second person, pronoun and all: rendered inside "{Name} hated that ...".
+      // In the reader's voice, completing "{Name} hated that ...".
       live.recordMemory(charId, {
         date: live.date,
         type: 'hated',
-        desc: `you ghosted her and didn't show up for ${event.title}`
+        desc: `the reader ghosted her and didn't show up for ${event.title}`
       })
     }
 

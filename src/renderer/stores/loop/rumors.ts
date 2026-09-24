@@ -65,7 +65,8 @@ export function rollRumorPass(
 
 /**
  * Files a rolled pass. Idempotent, so the boundary can replay off its own save: every list is
- * a replacement for what she was holding, and a memory she already carries is only re-dated.
+ * a replacement for what she was holding, and a memory she already carries, in either voice, is
+ * only re-dated and reworded.
  */
 export function applyRumorPass(outcome: RumorPassOutcome): void {
   // Only what the pass touched is written, so every other `CharInfo` keeps its identity.

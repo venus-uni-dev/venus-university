@@ -89,13 +89,13 @@ describe('rumorPass sightings', () => {
       g: [{ subject: 's', slot: SLOT }]
     })
     expect(outcome.memories).toEqual([
-      { charId: 'w', memory: { date: DATE, type: 'hated', desc: 'she saw you with Sara' } },
+      { charId: 'w', memory: { date: DATE, type: 'hated', desc: 'she saw the reader with Sara' } },
       {
         charId: 'f',
         memory: {
           date: DATE,
           type: 'disliked',
-          desc: 'she heard from Wren that you were with Sara'
+          desc: 'she heard from Wren that the reader was with Sara'
         }
       }
     ])
@@ -135,7 +135,7 @@ describe('rumorPass sightings', () => {
 
     expect(outcome.sightings).toEqual([{ witness: 'w', subjects: ['s'] }])
     expect(outcome.suspicions).toEqual({ w: [{ subject: 's', slot: SLOT }] })
-    expect(outcome.memories[0].memory.desc).toBe('she saw you with Sara')
+    expect(outcome.memories[0].memory.desc).toBe('she saw the reader with Sara')
   })
 
   it('prices what she saw by the claim she has on him, and carries it to the jilted lover', () => {
@@ -158,13 +158,13 @@ describe('rumorPass sightings', () => {
     )
 
     expect(outcome.memories).toEqual([
-      { charId: 'c', memory: { date: DATE, type: 'hated', desc: 'she saw you with Sara' } },
+      { charId: 'c', memory: { date: DATE, type: 'hated', desc: 'she saw the reader with Sara' } },
       {
         charId: 'f',
         memory: {
           date: DATE,
           type: 'disliked',
-          desc: 'she saw you cheating on Lia with Sara'
+          desc: 'she saw the reader cheating on Lia with Sara'
         }
       },
       {
@@ -172,7 +172,7 @@ describe('rumorPass sightings', () => {
         memory: {
           date: DATE,
           type: 'disliked',
-          desc: 'she heard from Fay that you cheated on her with Sara'
+          desc: 'she heard from Fay that the reader cheated on her with Sara'
         }
       }
     ])
@@ -196,8 +196,8 @@ describe('rumorPass sightings', () => {
 
     // They told each other, and neither of them learned anything she had not watched happen.
     expect(outcome.memories).toEqual([
-      { charId: 'w', memory: { date: DATE, type: 'hated', desc: 'she saw you with Sara' } },
-      { charId: 'f', memory: { date: DATE, type: 'hated', desc: 'she saw you with Sara' } }
+      { charId: 'w', memory: { date: DATE, type: 'hated', desc: 'she saw the reader with Sara' } },
+      { charId: 'f', memory: { date: DATE, type: 'hated', desc: 'she saw the reader with Sara' } }
     ])
   })
 
@@ -243,7 +243,7 @@ describe('rumorPass the passerby', () => {
     expect(outcome.memories).toEqual([
       {
         charId: 'p2',
-        memory: { date: DATE, type: 'hated', desc: 'she saw you with Ana and Bea' }
+        memory: { date: DATE, type: 'hated', desc: 'she saw the reader with Ana and Bea' }
       }
     ])
   })
@@ -311,7 +311,7 @@ describe('rumorPass suspicion', () => {
         memory: {
           date: DATE,
           type: 'disliked',
-          desc: 'she heard from Wren that you were with Sara'
+          desc: 'she heard from Wren that the reader was with Sara'
         }
       }
     ])
@@ -363,7 +363,7 @@ describe('rumorPass suspicion', () => {
         memory: {
           date: DATE,
           type: 'disliked',
-          desc: 'she heard from Fay that you were with Sara'
+          desc: 'she heard from Fay that the reader was with Sara'
         }
       }
     ])
@@ -422,7 +422,11 @@ describe('rumorPass determinism', () => {
 })
 
 describe('upsertJealousyMemory', () => {
-  const entry: CharMemory = { date: 10, type: 'disliked', desc: 'she heard you were dating Gina' }
+  const entry: CharMemory = {
+    date: 10,
+    type: 'disliked',
+    desc: 'she heard the reader was dating Gina'
+  }
 
   it('moves an identical desc to the new date rather than duplicating it', () => {
     const list = upsertJealousyMemory([entry], { ...entry, date: 20 })
@@ -430,7 +434,13 @@ describe('upsertJealousyMemory', () => {
   })
 
   it('leaves a differently worded entry alone', () => {
-    const other: CharMemory = { ...entry, desc: 'she heard you were dating Hana' }
+    const other: CharMemory = { ...entry, desc: 'she heard the reader was dating Hana' }
     expect(upsertJealousyMemory([entry], other)).toEqual([entry, other])
+  })
+
+  it("rewords an older save's second-person entry in place rather than filing it twice", () => {
+    const old: CharMemory = { date: 10, type: 'hated', desc: 'she saw you with Sara' }
+    const fresh: CharMemory = { date: 20, type: 'hated', desc: 'she saw the reader with Sara' }
+    expect(upsertJealousyMemory([old, entry], fresh)).toEqual([fresh, entry])
   })
 })

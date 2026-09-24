@@ -1,16 +1,19 @@
-import { useCallback, type JSX } from 'react'
+import { useCallback, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { READER_SPEAKER } from '@shared/types'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
+import { useFitToText } from '../components/useFitToText'
 import { graduationScrollLines, isEpilogueNight } from '../prompts/graduation'
 import { speakerNameOf } from '../stores/gameLoop'
 import { seniorNames } from '../stores/loop/farewells'
 import { useGameStore } from '../stores/gameStore'
+import { lineEditable } from '../stores/stageStep'
 import { sceneActiveOf, sceneOnScreenOf } from '../stores/textingLoop'
 import type { ScreenTheme } from './clockTheme'
-import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
+import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
+import { CheckIcon, CloseIcon, PencilIcon } from './screenIcons'
 import '../vu_styles/ChatLog.css'
 
 export interface ChatLogModalProps {
@@ -21,8 +24,9 @@ export interface ChatLogModalProps {
 
 /**
  * The scene so far, as the player read it. Renders `sceneLog` and nothing else — never
- * `sceneSummary`, which is written for the model. On the goodbye menu it holds the last goodbye
- * instead, since the epilogue's save carries no scene of its own to render.
+ * `sceneSummary`, which is written for the model — and rewrites a line of it in place, one row
+ * at a time. On the goodbye menu it holds the last goodbye instead, since the epilogue's save
+ * carries no scene of its own to render, and nothing there can be rewritten.
  */
 export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element | null {
   const sceneLog = useGameStore((s) => s.sceneLog)
@@ -33,6 +37,12 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const sceneActive = useGameStore(sceneActiveOf)
   const inScene = useGameStore(sceneOnScreenOf)
   const { host, overlayProps } = useModalShell(onClose)
+
+  /**
+   * The one line being rewritten, by its place in `sceneLog`, and the words in its box so far.
+   * It lives only as long as the modal: closing mid-edit drops the rewrite without asking.
+   */
+  const [edit, setEdit] = useState<{ at: number; text: string } | null>(null)
 
   /** The goodbye menu itself, rather than one of the goodbyes it opens. */
   const menu = isEpilogueNight(date, time, graduationSeen) && !sceneActive
@@ -95,14 +105,70 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
                 const speaker = speakerNameOf(line)
                 // The player's own submissions are set apart.
                 const reader = line.speaker === READER_SPEAKER
+                // The line's own place in `sceneLog`, which is what a rewrite is keyed on.
+                const at = start + index
+                const editable = !menu && lineEditable(sceneLog, at)
+                const editing = editable && edit?.at === at
                 return (
                   // Lines carry no id and the list is append-only, so the index is the key.
                   <div
                     className={`vu-row vu-chatlog-line${reader ? ' vu-chatlog-line--reader' : ''}`}
                     key={index}
                   >
-                    {speaker && <span className="vu-chatlog-speaker">{speaker}</span>}
-                    <span className="vu-chatlog-text">{line.text}</span>
+                    <div className="vu-chatlog-line-body">
+                      {speaker && <span className="vu-chatlog-speaker">{speaker}</span>}
+                      {editing ? (
+                        <LineEditBox
+                          text={edit.text}
+                          onChange={(text) => setEdit({ at, text })}
+                        />
+                      ) : (
+                        <span className="vu-chatlog-text">{line.text}</span>
+                      )}
+                    </div>
+                    {/* Every row keeps the column, empty where the line cannot be rewritten, so
+                        the words line up down the log. */}
+                    <div className="vu-chatlog-tools">
+                      {editing ? (
+                        <>
+                          <motion.button
+                            className="vu-chatlog-tool"
+                            type="button"
+                            aria-label="Save line"
+                            disabled={!edit.text.trim()}
+                            {...gestures(!edit.text.trim(), quietLift, quietPress)}
+                            onClick={() => {
+                              useGameStore.getState().editLogLine(edit.at, edit.text)
+                              setEdit(null)
+                            }}
+                          >
+                            <CheckIcon />
+                          </motion.button>
+                          <motion.button
+                            className="vu-chatlog-tool"
+                            type="button"
+                            aria-label="Discard edit"
+                            {...gestures(false, quietLift, quietPress)}
+                            onClick={() => setEdit(null)}
+                          >
+                            <CloseIcon />
+                          </motion.button>
+                        </>
+                      ) : (
+                        editable && (
+                          // Opening one row's box drops whatever another row had in its own.
+                          <motion.button
+                            className="vu-chatlog-tool"
+                            type="button"
+                            aria-label="Edit line"
+                            {...gestures(false, quietLift, quietPress)}
+                            onClick={() => setEdit({ at, text: line.text })}
+                          >
+                            <PencilIcon />
+                          </motion.button>
+                        )
+                      )}
+                    </div>
                   </div>
                 )
               })
@@ -126,5 +192,36 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
       </motion.div>
     </motion.div>,
     host
+  )
+}
+
+/**
+ * A line's words in a box at the log's own size, grown to fit them. It opens with the caret
+ * after the last word, where a correction usually starts.
+ */
+function LineEditBox({
+  text,
+  onChange
+}: {
+  text: string
+  onChange: (text: string) => void
+}): JSX.Element {
+  const area = useRef<HTMLTextAreaElement | null>(null)
+  useFitToText(area, text, true)
+
+  return (
+    <textarea
+      ref={area}
+      className="vu-input vu-input--multiline vu-input--grow vu-chatlog-edit"
+      rows={1}
+      aria-label="Line"
+      value={text}
+      autoFocus
+      onFocus={(e) => {
+        const end = e.currentTarget.value.length
+        e.currentTarget.setSelectionRange(end, end)
+      }}
+      onChange={(e) => onChange(e.target.value)}
+    />
   )
 }

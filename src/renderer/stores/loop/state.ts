@@ -10,6 +10,7 @@ import type { ExamPeriod } from '@shared/academics'
 import type { HangoutPrefetch } from './hangouts'
 import type { Verdict } from './classify'
 import type { StatusStep } from './statusSteps'
+import type { MemoryAnswer } from './memoryEdit'
 
 /**
  * Everything the slot loop holds between calls, in one object, so {@link resetLoopState} is
@@ -90,6 +91,9 @@ export const loopState = {
   /** What an ending call's failure modal is waiting on, while the player answers it. */
   endingGate: null as ((answer: EndingAnswer) => void) | null,
 
+  /** What the boundary's memory question is waiting on, while the player answers it. */
+  memoryGate: null as ((answers: readonly MemoryAnswer[]) => void) | null,
+
   /** Serializes the ending's failure modals — two calls, one screen. */
   modalQueue: Promise.resolve() as Promise<void>,
 
@@ -114,16 +118,22 @@ export const loopState = {
   /** The epilogue's status-update call has been made this stay; nothing waits on it. */
   endingPosts: false,
 
-  /** The scene currently playing back has been resolved; the slot ends when it drains. */
-  pendingEnd: false,
-
   /**
    * True from a scene resolving until its ending is written. A flag
    * rather than the promise because `advance()` asks it synchronously.
    */
   endingInFlight: false,
 
-  /** The resolved ledger, held until playback drains alongside `pendingEnd`. */
+  /**
+   * The ending in progress; re-minted to drop it, so each of its continuations bails at its next
+   * check while the run carries on.
+   */
+  endingToken: {} as object,
+
+  /** The live scene call's token; replaced or cleared to abandon that call. */
+  sceneCall: null as object | null,
+
+  /** The resolved ledger, held until playback drains alongside the store's `sceneEnding`. */
   pendingLedgerResult: null as LedgerResponse | null,
 
   /** Everyone who was in the scene being wrapped up — the ledger's cast, kept for its retry. */
@@ -187,15 +197,9 @@ export const loopState = {
   endLines: null as SceneLine[] | null,
 
   /**
-   * This scene's status messages are queued, so the next drain is the boundary.
-   * Loop state, not save state: a reload simply plays them again.
-   */
-  statusShown: false,
-
-  /**
-   * What is left of that sequence — the runs of lines still to play and the screens still to
-   * raise. Loop state beside {@link statusShown} for the same reason: nothing between
-   * the messages and the boundary is written, so a reload rebuilds the whole of it.
+   * What is left of the scene-end status sequence — the runs of lines still to play and the
+   * screens still to raise. Nothing between the messages and the boundary is written, so a
+   * reload rebuilds the whole of it.
    */
   statusSteps: [] as StatusStep[]
 }
@@ -216,8 +220,24 @@ export function resetTurnSlice(): void {
   loopState.endLines = null
 }
 
-/** The cancellation group every loop call registers under, aborted on leaving. */
+/**
+ * The cancellation group for every loop call that is neither a scene call nor an ending's
+ * bookkeeping — an opening a slot fetches for itself, the classifier, the texting ledger, the
+ * epilogue's picture and posts. Cancelled only on leaving.
+ */
 export const LOOP_LLM_GROUP = 'loop:llm'
+
+/**
+ * The cancellation group for the scene calls — every reply and the goodbye. Cancelled on leaving
+ * and by an interjection, which aborts the call it cuts short.
+ */
+export const SCENE_LLM_GROUP = 'loop:scene'
+
+/**
+ * The cancellation group for an ending's bookkeeping — the scene ledger and the next slot's
+ * opening. Cancelled on leaving and by an interjection that interrupts the ending.
+ */
+export const ENDING_LLM_GROUP = 'loop:ending'
 
 /** The current run's identity, captured before a continuation's first `await`. */
 export function currentRun(): object {
@@ -234,8 +254,9 @@ export function resetLoopState(): void {
   resetTurnSlice()
   // Re-minted here, so no leave path can forget to fence what it abandoned.
   loopState.runToken = {}
-  loopState.pendingEnd = false
   loopState.endingInFlight = false
+  loopState.endingToken = {}
+  loopState.sceneCall = null
   loopState.pendingLedgerResult = null
   loopState.lastLedgerPrompt = null
   loopState.lastTextLedgerPrompt = null
@@ -252,13 +273,13 @@ export function resetLoopState(): void {
   loopState.closingCast = null
   loopState.closingCastPresent = null
   loopState.slotSaveId = null
-  loopState.statusShown = false
   loopState.statusSteps = []
   loopState.jobShift = null
   // A session carried across a load would be filed against another save.
   loopState.projectWork = null
   // Nothing in flight is left holding a modal open on a view that is unmounting.
   loopState.endingGate = null
+  loopState.memoryGate = null
   loopState.endingAbandoned = false
   loopState.modalQueue = Promise.resolve()
   // Whatever save is loaded next brings its own opening off disk.

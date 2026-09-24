@@ -96,6 +96,7 @@ import { castOf, useSaveStore } from './saveStore'
 import {
   applyLedger,
   bondedCharIds,
+  ledgerMemories,
   memoryStatusLines,
   milestoneReports,
   projectLedger,
@@ -104,7 +105,7 @@ import {
 } from './sceneSanitizer'
 import { retrySilently as silentRetry } from './silentRetry'
 import { boxFits } from '../views/boxRows'
-import { cancelCrossing, endCrossing, markCrossingWait } from './crossingStore'
+import { answerCrossing, cancelCrossing, endCrossing, markCrossingWait } from './crossingStore'
 import {
   coverGoodbyesCrossing,
   coverSceneOpening,
@@ -207,9 +208,12 @@ import {
   promptState,
   reader,
   recentSummaries,
+  scenePromptState,
+  sceneSoFar,
   scheduleInput,
   stageCast
 } from './loop/promptState'
+import { interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
 import {
   authoredTurn,
   currentRun,
@@ -217,11 +221,19 @@ import {
   resetLoopState,
   resetTurnSlice,
   runStale,
+  ENDING_LLM_GROUP,
   LOOP_LLM_GROUP,
+  SCENE_LLM_GROUP,
   type EndingAnswer,
   type TurnSnapshot
 } from './loop/state'
 import { buildStatusSteps, markStatusLine } from './loop/statusSteps'
+import {
+  memoryEditRows,
+  memoryEditsOf,
+  type MemoryAnswer,
+  type MemoryEditRow
+} from './loop/memoryEdit'
 
 /**
  * The slot loop. It imperatively drives `gameStore`; Game View only renders subscribed
@@ -451,7 +463,7 @@ async function startOrientationScene(): Promise<void> {
 
   const castCharacters = castCharactersOf(cast)
   const solo = cast.length === 0
-  const state = promptState()
+  const state = scenePromptState()
   const request = solo
     ? buildSoloPrompt(action, state, SETTING, reader())
     : buildScenePrompt(castCharacters, action, state, SETTING, reader())
@@ -490,7 +502,7 @@ export async function startFarewellScene(charId: string): Promise<void> {
   console.log(`[cast] farewell → ${nameOf(charId)}`)
 
   const castCharacters = castCharactersOf([charId])
-  const request = buildScenePrompt(castCharacters, action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(castCharacters, action, scenePromptState(), SETTING, reader())
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: true }),
     snapshot,
@@ -504,8 +516,8 @@ export async function startFarewellScene(charId: string): Promise<void> {
 function finishFarewell(charId: string | null): void {
   const game = useGameStore.getState()
   // The two the boundary clears, so the next thing on screen does not inherit the ending.
-  loopState.pendingEnd = false
-  loopState.statusShown = false
+  game.setSceneEnding(false)
+  game.setStatusShown(false)
   loopState.pendingLedgerResult = null
   resetTurnSlice()
   // Kept before the stage holding it goes: the menu reads the goodbye back from here.
@@ -549,8 +561,8 @@ async function openGoodbyes(): Promise<void> {
 /** Closes the epilogue on one of its two endings and plays it. */
 function endEpilogue(reason: 'gameComplete' | 'endingDebt'): void {
   const game = useGameStore.getState()
-  loopState.pendingEnd = false
-  loopState.statusShown = false
+  game.setSceneEnding(false)
+  game.setStatusShown(false)
   resetTurnSlice()
   game.setActiveGameOver(reason)
   game.clearStage()
@@ -578,7 +590,8 @@ export function endInDebt(): void {
 
 /**
  * The slot opening as playback lines, plus the invitations the call rolled and the
- * plans the ledger found.
+ * plans the ledger found. `call` names the cancel group it is sent under and what else, beside
+ * the run being left, abandons it.
  */
 async function fetchSlotIntro(
   date: number,
@@ -589,9 +602,12 @@ async function fetchSlotIntro(
   breakups: readonly IntroBreakup[] = [],
   pendingSummary?: string | null,
   npcOverlay: NpcSlotOverlay | null = null,
-  view: PostLedgerView = liveView()
+  view: PostLedgerView = liveView(),
+  call: { group?: string; stale?: () => boolean } = {}
 ): Promise<SlotOpening | null> {
   const run = currentRun()
+  const group = call.group ?? LOOP_LLM_GROUP
+  const stale = call.stale ?? ((): boolean => false)
   const opening = formatSlotOpening(date, time)
   // Split as the scene's own lines are: the narration is read in the same box, and what is
   // banked here is what the landing plays back.
@@ -741,9 +757,9 @@ async function fetchSlotIntro(
   for (;;) {
     // Tracks any hand edit, so the editor re-opens on what failed last.
     loopState.lastIntroPrompt = request.user
-    const result = await window.api.llm.completeIntro(request, LOOP_LLM_GROUP)
+    const result = await window.api.llm.completeIntro(request, group)
     // Null is the "player left" answer; it also keeps a stale failure off the menu.
-    if (runStale(run)) return null
+    if (runStale(run) || stale()) return null
     if (result.ok) {
       const written = result.data.lines.map((line) => line.text.trim()).filter(Boolean)
       // What the narration actually said about the place it was handed. A rumor about
@@ -769,12 +785,12 @@ async function fetchSlotIntro(
     // A transient failure re-sends itself until the player is blocked.
     if (await retrySilently('slot', result.error, silentSpent)) {
       silentSpent += 1
-      if (runStale(run)) return null
+      if (runStale(run) || stale()) return null
       continue
     }
-    const answer = await askToRetry(result.error, useGameStore.getState().setIntroError)
+    const answer = await askToRetry(result.error, useGameStore.getState().setIntroError, stale)
     if (!answer.retry) return null
-    if (runStale(run)) return null
+    if (runStale(run) || stale()) return null
     // Sticky, like the two ledgers'.
     if (answer.prompt !== undefined) request = { ...request, user: answer.prompt }
   }
@@ -801,9 +817,9 @@ useGameStore.subscribe((state, prev) => {
   for (const wake of parked) wake()
 })
 
-/** Resolves once the player is blocked, or the run has been left. */
-async function playerParked(run: object): Promise<void> {
-  while (!runStale(run) && !playerBlocked()) {
+/** Resolves once the player is blocked, the run has been left, or `cancelled` answers true. */
+async function playerParked(run: object, cancelled?: () => boolean): Promise<void> {
+  while (!runStale(run) && !cancelled?.() && !playerBlocked()) {
     await new Promise<void>((resolve) => loopState.parkedWaiters.push(resolve))
   }
 }
@@ -833,7 +849,7 @@ async function askToRetry(
   // every call still waiting.
   const asked = loopState.modalQueue.then(async (): Promise<EndingAnswer> => {
     if (loopState.endingAbandoned) return { retry: false }
-    await playerParked(run)
+    await playerParked(run, cancelled)
     if (runStale(run) || cancelled?.()) return { retry: false }
     setError(error)
     const answer = await new Promise<EndingAnswer>((resolve) => {
@@ -1372,7 +1388,7 @@ function buildTurnRequest(
   isContinuation: boolean,
   solo: boolean
 ): StructuredRequest {
-  const state = promptState()
+  const state = scenePromptState()
   if (!isContinuation) {
     return solo
       ? buildSoloPrompt(sceneAction, state, SETTING, reader())
@@ -1383,26 +1399,33 @@ function buildTurnRequest(
   return buildContinuationPrompt(
     castCharacters,
     sceneAction,
-    game.currentSceneTranscript,
+    sceneSoFar(),
     state,
     SETTING,
     reader(),
     game.sceneSummary,
-    // Off `sceneLog`, which a fresh summary never retires lines from; `logPlayerAction` ran
-    // above, so the count is this action's ordinal — the authored first day opens with none.
+    // `logPlayerAction` ran above, so the count off the log is this action's ordinal — the
+    // authored first day opens with none.
     game.sceneLog.filter((line) => line.speaker === READER_SPEAKER).length
   )
 }
 
-/** The whole end of a scene, as one unit. */
+/**
+ * The whole end of a scene, as one unit. It mints the ending's token first; an interjection
+ * re-mints it, and every step below bails at its next check.
+ */
 async function runEnding(solo: boolean): Promise<void> {
   const run = currentRun()
+  const ending = {}
+  loopState.endingToken = ending
+  /** The player interjected over this ending, which is thrown away whole. */
+  const dropped = (): boolean => loopState.endingToken !== ending
   const game = useGameStore.getState()
 
   // A goodbye runs the goodbye and nothing else; its one status line is `advance()`'s.
   if (isGraduationSlot(game.date, game.time)) {
-    const closed = await runClosing()
-    if (runStale(run)) return
+    const closed = await runClosing(dropped)
+    if (runStale(run) || dropped()) return
     useGameStore.getState().setBusy(false)
     if (!closed) return
     loopState.endingInFlight = false
@@ -1413,16 +1436,16 @@ async function runEnding(solo: boolean): Promise<void> {
   // Read once, synchronously, and shared by both ledgers, so the texting claim is keyed on the
   // same message set and the two calls agree on their scheduling blocks.
   const schedule = scheduleInput(game.date, game.time)
-  const ledgerCall = startLedger(schedule)
+  const ledgerCall = startLedger(schedule, dropped)
   // Usually the prefetch fired when the scene started; a resumed scene
   // or a mismatched message set pays for the call here instead.
   const textLedgerCall = claimTextLedger(game.date, game.time)
   // A solo scene wrote its own landing: no goodbye.
-  const closingCall = solo ? Promise.resolve(true) : runClosing()
+  const closingCall = solo ? Promise.resolve(true) : runClosing(dropped)
 
   const [ledger, textLedger, closed] = await Promise.all([ledgerCall, textLedgerCall, closingCall])
-  // The player walked out of this scene: nothing below may land on the save loaded now.
-  if (runStale(run)) return
+  // The player walked out of this scene, or interjected over its ending: nothing below may land.
+  if (runStale(run) || dropped()) return
   useGameStore.getState().setBusy(false)
   // Abandoned: nothing is written, and the Game View is already leaving for the menu.
   if (!closed || ledger === null || textLedger === null) return
@@ -1435,9 +1458,9 @@ async function runEnding(solo: boolean): Promise<void> {
   // `advance()` parks again at the boundary rather than crossing an ending in flight.
   unpark()
 
-  const opening = await fetchEndingOpening(merged)
+  const opening = await fetchEndingOpening(merged, dropped)
   if (!opening) return
-  if (runStale(run)) return
+  if (runStale(run) || dropped()) return
 
   loopState.bankedOpening = opening
   // The ending is complete: one write, carrying the goodbye, the bookkeeping and
@@ -1449,6 +1472,8 @@ async function runEnding(solo: boolean): Promise<void> {
       opening
     })
   )
+  // An interjection landing during the write has queued its own decision point behind it.
+  if (runStale(run) || dropped()) return
   loopState.endingInFlight = false
   unpark()
 }
@@ -1477,9 +1502,13 @@ function introBreakupsOf(projected: ProjectedLedger): IntroBreakup[] {
 }
 
 /**
- * The opening for the slot this ending leads into, or null when the player gave up on it.
+ * The opening for the slot this ending leads into, or null when the player gave up on it or
+ * `dropped` answers true. Sent as the ending's bookkeeping.
  */
-async function fetchEndingOpening(ledger: LedgerResponse): Promise<BankedOpening | null> {
+async function fetchEndingOpening(
+  ledger: LedgerResponse,
+  dropped: () => boolean = () => false
+): Promise<BankedOpening | null> {
   const game = useGameStore.getState()
   const { date, time } = nextSlot(game.date, game.time)
   const plans = settlePlans(ledger, game.date, game.time)
@@ -1538,15 +1567,20 @@ async function fetchEndingOpening(ledger: LedgerResponse): Promise<BankedOpening
     introBreakupsOf(projected),
     useGameStore.getState().sceneSummary,
     npcOverlay,
-    view
+    view,
+    { group: ENDING_LLM_GROUP, stale: dropped }
   )
   // An abandoned opening banks nothing, the rolls above included; the player replays the
   // turn.
   return opening ? { ...opening, rumorPass: rumor, crushes, npcRelationships } : null
 }
 
-/** Runs the wrap-up turn for a resolved scene. Its lines append to playback. */
-async function runClosing(): Promise<boolean> {
+/**
+ * Runs the wrap-up turn for a resolved scene. Its lines append to playback, and its summary,
+ * which takes in the goodbye, covers the transcript once they are on it. False is an abandoned
+ * or dropped ending.
+ */
+async function runClosing(dropped: () => boolean): Promise<boolean> {
   if (!loopState.closingCastPresent) return true
 
   const run = currentRun()
@@ -1555,7 +1589,7 @@ async function runClosing(): Promise<boolean> {
   // The block guard and a hand edit replace it in place.
   let request = buildClosingPrompt(
     loopState.closingCastPresent,
-    game.currentSceneTranscript,
+    sceneSoFar(),
     promptState(),
     SETTING,
     reader(),
@@ -1569,10 +1603,14 @@ async function runClosing(): Promise<boolean> {
   for (;;) {
     const result = await streamScene(request)
     // False is the abandon answer `runEnding` already reads as "write nothing".
-    if (runStale(run)) return false
+    if (runStale(run) || dropped()) return false
     if (result.ok) {
       // The goodbye joins the scene's own lines as one replayable ending.
       if (loopState.endLines) loopState.endLines.push(...result.data.lines)
+      const live = useGameStore.getState()
+      if (result.data.summary) {
+        live.setSceneSummary(result.data.summary, live.currentSceneTranscript.length)
+      }
       return true
     }
 
@@ -1581,7 +1619,7 @@ async function runClosing(): Promise<boolean> {
     // A transient failure re-sends itself until the player is blocked.
     if (await retrySilently('scene', result.error, silentSpent)) {
       silentSpent += 1
-      if (runStale(run)) return false
+      if (runStale(run) || dropped()) return false
       continue
     }
 
@@ -1597,9 +1635,9 @@ async function runClosing(): Promise<boolean> {
       }
     }
 
-    const answer = await askToRetry(result.error, useGameStore.getState().setClosingError)
+    const answer = await askToRetry(result.error, useGameStore.getState().setClosingError, dropped)
     if (!answer.retry) return false
-    if (runStale(run)) return false
+    if (runStale(run) || dropped()) return false
     // Sticky: the edit has to survive its own retries.
     if (answer.prompt !== undefined) request = { ...request, user: answer.prompt }
   }
@@ -1616,9 +1654,13 @@ function withoutLogFrom(request: StructuredRequest): StructuredRequest {
 }
 
 /**
- * Fires the end-of-scene bookkeeping call, in parallel with the closing call.
+ * Fires the end-of-scene bookkeeping call, in parallel with the closing call; null is an
+ * abandoned or dropped ending.
  */
-function startLedger(schedule: SchedulePromptInput): Promise<LedgerResponse | null> {
+function startLedger(
+  schedule: SchedulePromptInput,
+  dropped: () => boolean
+): Promise<LedgerResponse | null> {
   const run = currentRun()
   const game = useGameStore.getState()
   let request = buildLedgerPrompt(
@@ -1640,9 +1682,9 @@ function startLedger(schedule: SchedulePromptInput): Promise<LedgerResponse | nu
     for (;;) {
       // Tracks the fallback and any hand edit, so the editor opens on what failed last.
       loopState.lastLedgerPrompt = request.user
-      const result = await window.api.llm.completeLedger(request, LOOP_LLM_GROUP)
+      const result = await window.api.llm.completeLedger(request, ENDING_LLM_GROUP)
       // Null is the abandon answer; it also keeps a stale failure off a save loaded since.
-      if (runStale(run)) return null
+      if (runStale(run) || dropped()) return null
       if (result.ok) return result.data
 
       console.warn('[ledger] the bookkeeping call failed:', result.error)
@@ -1650,7 +1692,7 @@ function startLedger(schedule: SchedulePromptInput): Promise<LedgerResponse | nu
       // A transient failure re-sends itself until the player is blocked.
       if (await retrySilently('ledger', result.error, silentSpent)) {
         silentSpent += 1
-        if (runStale(run)) return null
+        if (runStale(run) || dropped()) return null
         continue
       }
 
@@ -1664,9 +1706,9 @@ function startLedger(schedule: SchedulePromptInput): Promise<LedgerResponse | nu
         }
       }
 
-      const answer = await askToRetry(result.error, useGameStore.getState().setLedgerError)
+      const answer = await askToRetry(result.error, useGameStore.getState().setLedgerError, dropped)
       if (!answer.retry) return null
-      if (runStale(run)) return null
+      if (runStale(run) || dropped()) return null
       // Sticky, like the goodbye's.
       if (answer.prompt !== undefined) {
         request = { ...withoutLogFrom(request), user: answer.prompt }
@@ -1772,26 +1814,35 @@ function prefetchTextLedger(): void {
 }
 
 /**
- * The slot's texting ledger: a reply already banked on the save, the prefetch when its key
- * still matches, a fresh call when neither does, and an empty ledger (a no-op merge) when
- * nobody texted.
+ * The slot's texting ledger: the prefetch when its key still matches, a reply already banked on
+ * the save, a fresh call when neither does, and an empty ledger (a no-op merge) when nobody
+ * texted. A claimed or fresh call stays on record, so an ending the player interjects over leaves
+ * it for the next ending to claim rather than pay for again.
  */
 function claimTextLedger(date: number, time: TimeSlot): Promise<LedgerResponse | null> {
   const prefetch = loopState.textLedgerPrefetch
-  loopState.textLedgerPrefetch = null
 
   const schedule = scheduleInput(date, time)
   if (textLedgerCharKeys(schedule).length === 0) {
     if (prefetch) prefetch.stale = true
+    loopState.textLedgerPrefetch = null
     return Promise.resolve({})
   }
   const key = textLedgerKeyOf(schedule)
   if (prefetch && prefetch.key === key) return prefetch.promise
   if (prefetch) prefetch.stale = true
+  loopState.textLedgerPrefetch = null
   // The reply a reload restored off the save, or one that landed before the ending.
   const bank = useGameStore.getState().sceneTextLedger
   if (bank && bank.key === key) return Promise.resolve(bank.reply)
-  return startTextLedger(schedule)
+  const record = {
+    key,
+    promise: Promise.resolve<LedgerResponse | null>(null),
+    stale: false
+  }
+  record.promise = startTextLedger(schedule, () => record.stale)
+  loopState.textLedgerPrefetch = record
+  return record.promise
 }
 
 /** What the finished scene did to the reader's stats, and the lines that say so. */
@@ -1871,7 +1922,8 @@ export function advance(): void {
 
   // The scene is over on screen but its ending is still being paid for; one flag
   // covers the whole window, retry modals included, until the ending is written.
-  if (loopState.pendingEnd && loopState.endingInFlight) {
+  const ending = game.sceneEnding
+  if (ending && loopState.endingInFlight) {
     game.setWaitingForLine(true)
     return
   }
@@ -1879,9 +1931,9 @@ export function advance(): void {
   // A goodbye ends on one line about how she took it, then hands the screen back to the
   // menu.
   const farewell = game.sceneFarewell
-  if (loopState.pendingEnd && isGraduationSlot(game.date, game.time)) {
-    if (farewell && !loopState.statusShown) {
-      loopState.statusShown = true
+  if (ending && isGraduationSlot(game.date, game.time)) {
+    if (farewell && !game.statusShown) {
+      game.setStatusShown(true)
       game.appendPendingLines([
         farewellStatusLine(
           game.characters[farewell]?.firstName ?? '',
@@ -1897,16 +1949,16 @@ export function advance(): void {
 
   // The bookkeeping is in: the status lines play before the day turns over. Nothing
   // is applied yet, so a reload taken on them replays rather than banks twice.
-  if (loopState.pendingEnd && !loopState.statusShown && showStatusLines()) return
+  if (ending && !game.statusShown && showStatusLines()) return
 
   // The sequence is under way and this run of lines is read out: the next beat is another run of
   // them, or one of the two screens.
-  if (loopState.pendingEnd && loopState.statusSteps.length > 0) {
+  if (ending && loopState.statusSteps.length > 0) {
     playStatusStep()
     return
   }
 
-  if (loopState.pendingEnd) {
+  if (ending) {
     void crossSlotBoundary()
     return
   }
@@ -1919,10 +1971,107 @@ export function advance(): void {
   }
 
   // The scene continues: the next message is a continuation call.
+  reachDecisionPoint()
+}
+
+/**
+ * The reader has come to the end of what there is to read mid-scene: the input opens, the
+ * absences are charged, and the scene is written as the point a reload lands on.
+ */
+function reachDecisionPoint(): void {
+  const game = useGameStore.getState()
   game.setAwaitingInput(true)
   // Charged where the turn ends and before the save, so the autosave records the count.
   game.settleDepartures()
   markDecisionPoint()
+}
+
+/**
+ * Steps playback back a line within the current reply — the row's rewind. Free, and it writes
+ * nothing: the decision point, if one was reached, is un-reached, and reading forward to it
+ * again reaches it again.
+ */
+export function rewind(): void {
+  const game = useGameStore.getState()
+  if (!rewindOpenOf(game)) return
+  if (!game.rewindLine()) return
+  game.setAwaitingInput(false)
+  game.setWaitingForLine(false)
+}
+
+/** Aborts the live scene call; the lines it already delivered stay where they are. */
+function abortSceneCall(): void {
+  loopState.sceneCall = null
+  void window.api.jobs.cancelGroup(SCENE_LLM_GROUP)
+}
+
+/**
+ * Throws away the ending in progress — its goodbye call aside, which is the scene call's to
+ * abort — and everything it banked, leaving the scene mid-way again. Writes nothing: the
+ * interjection's own decision point follows it down the write chain.
+ */
+export function dropEnding(): void {
+  loopState.endingToken = {}
+  void window.api.jobs.cancelGroup(ENDING_LLM_GROUP)
+  // Woken so each parked call sees the fresh token and bails.
+  const parked = loopState.parkedWaiters
+  loopState.parkedWaiters = []
+  for (const wake of parked) wake()
+  loopState.endingInFlight = false
+  loopState.endingAbandoned = false
+  loopState.pendingLedgerResult = null
+  loopState.bankedOpening = null
+  loopState.endBase = null
+  loopState.endLines = null
+  loopState.closingCast = null
+  loopState.closingCastPresent = null
+  loopState.statusSteps = []
+  const game = useGameStore.getState()
+  game.setSceneEnding(false)
+  game.setStatusShown(false)
+  game.setBusy(false)
+}
+
+/**
+ * The reader's words over the lines he has not read — what the view submits while its row is in
+ * interject mode. The unread lines are cut, the live scene call and any ending are dropped, the
+ * cut scene is written as a decision point and the action goes out from it. Over a reply's last
+ * line, with nothing left to cut, the line is taken as turned and the action goes out as the
+ * turn; a reply that ran out while he typed takes it as an ordinary action. False, doing nothing,
+ * when none of these applies.
+ */
+export function interject(action: string): boolean {
+  const text = action.trim()
+  if (!text) return false
+  const game = useGameStore.getState()
+  const offer = interjectOfferOf(game)
+
+  if (offer === 'open') {
+    if (game.sceneEnding) dropEnding()
+    abortSceneCall()
+    game.setStreaming(false)
+    game.setWaitingForLine(false)
+    game.setBusy(false)
+    loopState.turnStartedAt = null
+    game.truncateUnread()
+    reachDecisionPoint()
+    void submitAction(text)
+    return true
+  }
+
+  // Go from a well hovered open on the reply's last line takes the steps the click past that line
+  // would — the absences charged, the decision point written — and then sends.
+  if (offer === 'none' && replyRowOfferOf(game) === 'open') {
+    reachDecisionPoint()
+    void submitAction(text)
+    return true
+  }
+
+  if (offer === 'none' && game.awaitingInput && !game.busy && game.pendingLines.length === 0) {
+    void submitAction(text)
+    return true
+  }
+  return false
 }
 
 /**
@@ -1932,7 +2081,7 @@ export function advance(): void {
  */
 function showStatusLines(): boolean {
   const game = useGameStore.getState()
-  loopState.statusShown = true
+  game.setStatusShown(true)
   // Money lands here, so the balance moves as the line reporting it is read.
   // `game` is the pre-spend snapshot, which is what the card counts *from*.
   const shift = loopState.jobShift
@@ -2014,15 +2163,52 @@ export function dismissStatusModal(): void {
 }
 
 /**
- * Banks everything the finished slot changed, moves the clock, and opens the next one — the
- * boundary crossing recorded in the save.
+ * The boundary's memory question: a row per memory the ledger filed for the scene's girls, and
+ * a blank one for each it filed nothing for, dated with the scene's own day.
+ */
+function sceneMemoryRows(ledger: LedgerResponse | null): MemoryEditRow[] {
+  const { cast, characters, date } = useGameStore.getState()
+  const here = cast.filter((charId) => characters[charId])
+  return memoryEditRows(here, ledger ? ledgerMemories(ledger, false) : [], date)
+}
+
+/** Puts the memory question on screen and resolves with the rows as the player leaves them. */
+function askMemoryEdits(rows: readonly MemoryEditRow[]): Promise<readonly MemoryAnswer[]> {
+  return new Promise((resolve) => {
+    loopState.memoryGate = resolve
+    useGameStore.getState().setMemoryEdit(rows)
+  })
+}
+
+/** Files what the answers changed: a filed memory rewritten or dropped, a blank row recorded. */
+function fileMemoryEdits(rows: readonly MemoryEditRow[], answers: readonly MemoryAnswer[]): void {
+  const { date } = useGameStore.getState()
+  for (const { charId, match, next } of memoryEditsOf(rows, answers, date)) {
+    if (match) useGameStore.getState().replaceMemory(charId, match, next)
+    else if (next) useGameStore.getState().recordMemory(charId, next)
+  }
+}
+
+/** The memory question's one answer: Save, Escape and a click on the dimming alike. */
+export function saveMemoryEdits(answers: readonly MemoryAnswer[]): void {
+  const gate = loopState.memoryGate
+  if (!gate) return
+  loopState.memoryGate = null
+  useGameStore.getState().setMemoryEdit(null)
+  gate(answers)
+}
+
+/**
+ * Banks everything the finished slot changed, asks under the cover what each girl in the scene
+ * should remember, moves the clock, and opens the next one — the boundary recorded in the save.
  */
 async function crossSlotBoundary(): Promise<void> {
   const run = currentRun()
   const game = useGameStore.getState()
-  loopState.pendingEnd = false
-  loopState.statusShown = false
-  // The sequence is over by definition once the boundary runs.
+  // Lowered first, so no second drain can cross the same boundary.
+  game.setSceneEnding(false)
+  // The sequence is over by definition once the boundary runs. Its flag stays up until the scene
+  // is cleared below, so nothing offers to rewind the scene under the cover.
   loopState.statusSteps = []
   const ledger = loopState.pendingLedgerResult
   // Re-run: `resolveScene` is pure, so the numbers the player just read are the ones that land.
@@ -2131,11 +2317,21 @@ async function crossSlotBoundary(): Promise<void> {
   // Everything below is on screen while it happens, so the cover goes up first.
   const over = gameOverReasonOf(useGameStore.getState())
   if (!over) {
+    // What the curtain holds for once it is down: one row per memory the ledger filed for
+    // somebody in the scene, and a blank one for each girl it gave nothing.
+    const rows = sceneMemoryRows(ledger)
     // The spinner closes the input for the fade; `advance()` would otherwise hand the box back.
     useGameStore.getState().setWaitingForLine(true)
-    await coverSlotCrossing()
+    await coverSlotCrossing(rows.length > 0)
     // The player left while it closed; `cancelCrossing` has already taken the cover down.
     if (runStale(run)) return
+    if (rows.length > 0) {
+      const answers = await askMemoryEdits(rows)
+      if (runStale(run)) return
+      fileMemoryEdits(rows, answers)
+      // Only now does the curtain say its piece.
+      answerCrossing()
+    }
   }
 
   // Before the clock moves, so each text is stamped with the slot the scene ran in, and before
@@ -2151,6 +2347,7 @@ async function crossSlotBoundary(): Promise<void> {
   // Not via `setCast`, which would also wipe them on a mid-scene cast change.
   useGameStore.getState().clearSceneGifts()
   useGameStore.getState().setSceneQuiz(null)
+  useGameStore.getState().setStatusShown(false)
   resetTurnSlice()
   // A playthrough that ended badly leaves nothing behind to load: no boundary save, and the
   // ending call's autosave deleted.
@@ -2202,7 +2399,8 @@ export function enterGame(
   const queued = withoutActionPrompt(save.scene.pendingLines)
   live.restoreScene({ ...save.scene, pendingLines: queued })
   // A resolved scene resumes with its ending still to play, into the same boundary.
-  loopState.pendingEnd = save.scene.endPending === true
+  const ending = save.scene.endPending === true
+  live.setSceneEnding(ending)
   loopState.pendingLedgerResult = save.scene.ledger ?? null
   // The opening the ending already paid for; the boundary replays it, `OLD_ACTION_PROMPT`
   // stripped from its lines too.
@@ -2222,13 +2420,13 @@ export function enterGame(
   // the *stripped* queue that decides: a save whose only remaining line was that question is a
   // decision point, not a slot with one line left to play.
   const drained = queued.length === 0
-  live.setAwaitingInput(drained && !loopState.pendingEnd)
+  live.setAwaitingInput(drained && !ending)
   // A drained save *is* a decision point, so leaving from one writes it back. So is a paper:
   // its own point is the start it was written at, which is what this save holds.
-  if (!loopState.pendingEnd && (drained || save.scene.quiz)) loopState.decisionSave = save.scene
+  if (!ending && (drained || save.scene.quiz)) loopState.decisionSave = save.scene
   // Puts the queue's first line on screen, as `beginSlot` does for a live opening; otherwise
   // the box opens on `currentLine` as the save left it.
-  if (!drained || loopState.pendingEnd) advance()
+  if (!drained || ending) advance()
 
   // A save taken mid-goodbye never runs `beginSlot`, and without this a reload from one loses
   // both the picture and the posts.
@@ -2243,7 +2441,7 @@ export function enterGame(
 
   // The prefetches the reload dropped with module state; a reply already banked on the save
   // is claimed from there instead of being sent again.
-  if (!loopState.pendingEnd) {
+  if (!ending) {
     const resumed = useGameStore.getState()
     if (resumed.sceneQuiz) {
       const textCall = claimTextLedger(resumed.date, resumed.time)
@@ -2295,11 +2493,15 @@ function leaveGame(keepCrossing: boolean): void {
   // continuation.
   resetLoop()
   void window.api.jobs.cancelGroup(LOOP_LLM_GROUP)
+  void window.api.jobs.cancelGroup(SCENE_LLM_GROUP)
+  void window.api.jobs.cancelGroup(ENDING_LLM_GROUP)
   resetTextingLoop()
   // A boundary's curtain would otherwise still be on screen, with swaps written for a game
   // that no longer exists still to run — unless the curtain up is the one carrying this
-  // teardown to the menu, which the caller says.
+  // teardown to the menu, which the caller says. A question that game was asking in front of
+  // a kept curtain goes with the game, so the curtain stops holding for it.
   if (!keepCrossing) cancelCrossing()
+  else answerCrossing()
   useBunnyboardStore.getState().reset()
   useGameStore.getState().reset()
 }

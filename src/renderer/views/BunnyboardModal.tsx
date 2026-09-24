@@ -303,7 +303,7 @@ export function BunnyboardModal({
       {...overlayProps}
     >
       {contact ? (
-        <ContactPage key={contact} charId={contact} />
+        <ContactPage key={contact} charId={contact} theme={theme} />
       ) : (
         <div className="vu-bb" role="dialog" aria-modal="true" aria-label="Bunnyboard">
           <LettersFilter id="vu-bb-letters" inkClassName="vu-bb-letters-ink" />
@@ -1508,7 +1508,7 @@ function ProfilePage(): JSX.Element {
             multiline
             rows={3}
             placeholder="Optional. Can be left blank."
-            hint="This is put in every prompt so try to keep it short and sweet. Use third-person past tense and complete this paragraph: The reader is a freshman named <Name>, a male who has a single dorm in Lowrise 4. The reader is <description based on current stats>. The reader is..."
+            hint="This is put in every prompt so try to keep it short and sweet. Use third-person past tense and continue this paragraph: The reader is a freshman named <Name>, a male who has a single dorm in Lowrise 4. The reader is <description based on current stats>. The reader is..."
           />
         </div>
 

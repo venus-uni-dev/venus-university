@@ -835,40 +835,88 @@ export const boxChipLift: TargetAndTransition = { ...quietLift, opacity: 1 }
 /** How far the box drops when there is no row under it to make room for: the row's own height. */
 const SCENE_BOX_DROP = 62
 
+/**
+ * How far the box drops onto the divider's strip while the row is up but its well is away: the
+ * one-line well (70px) less the strip (28px), both `Scene.css`'s.
+ */
+const WELL_DROP = 42
+
 const BOX_SLIDE: Transition = { type: 'spring', stiffness: 300, damping: 34 }
 
 /**
- * The box's resting states: six variants for the row's position crossed with whether a CG shows
- * through it. The two glass values are percentages substituted by `Dialogue.css` into a
- * `color-mix()`; motion reads an undeclared custom property as `0`, so both are declared there too.
+ * The box's resting states: eight variants for its four seats — up over the row, dropped onto the
+ * divider's strip while the well is away, glassed through the wait for a reply, or down with no
+ * row — crossed with whether a CG shows through it. The two glass values are percentages
+ * substituted by `Dialogue.css` into a `color-mix()`; motion reads an undeclared custom property
+ * as `0`, so both are declared there too.
  */
 export const sceneBox: Variants = {
   up: { y: 0, '--glass': '75%', '--glass-shadow': '47%', transition: BOX_SLIDE },
+  reading: { y: WELL_DROP, '--glass': '75%', '--glass-shadow': '47%', transition: BOX_SLIDE },
   waiting: { y: 0, '--glass': '37.5%', '--glass-shadow': '17%', transition: GLASS },
   down: { y: SCENE_BOX_DROP, '--glass': '75%', '--glass-shadow': '47%', transition: BOX_SLIDE },
   upCg: { y: 0, '--glass': '33%', '--glass-shadow': '21%', transition: GLASS },
+  readingCg: { y: WELL_DROP, '--glass': '33%', '--glass-shadow': '21%', transition: BOX_SLIDE },
   waitingCg: { y: 0, '--glass': '10%', '--glass-shadow': '5%', transition: GLASS },
   downCg: { y: SCENE_BOX_DROP, '--glass': '33%', '--glass-shadow': '21%', transition: GLASS }
 }
 
 /**
- * Which of {@link sceneBox}'s six the box is standing in. The vocabulary is named here rather
+ * Which of {@link sceneBox}'s eight the box is standing in. The vocabulary is named here rather
  * than spelled out in the view, so the screen picks a state and never a label.
  */
-export function sceneBoxState(sending: boolean, rowShown: boolean, cg: boolean): string {
-  const state = sending ? 'waiting' : rowShown ? 'up' : 'down'
+export function sceneBoxState(
+  sending: boolean,
+  rowShown: boolean,
+  cg: boolean,
+  wellAway = false
+): string {
+  const state = sending ? 'waiting' : rowShown ? (wellAway ? 'reading' : 'up') : 'down'
   return cg ? `${state}Cg` : state
 }
 
 /**
+ * The well's reveal and the glass's clock apart: a well put away for the divider fades on
+ * {@link REVEAL}, the glass keeps {@link GLASS}.
+ */
+const WELL_SHIFT: Transition = { default: GLASS, opacity: REVEAL }
+
+/**
  * The well the player answers in, glassy as the box above it while his turn is out
  * ({@link sceneBox}'s `waiting` states, same numbers and clock). `ready` is the field he types
- * into, and only the waiting half follows the box.
+ * into, and only the waiting half follows the box. `hidden` puts it away while a reply is being
+ * read; every other label hands the pointer back to the well's box by inheriting it rather than
+ * claiming it, so a well inside a hidden row, or a box the row gives no pointer while the well is
+ * away (`Scene.css`), stays out of reach.
  */
 export const turnWell: Variants = {
-  ready: { '--well-glass': '92%', transition: GLASS },
-  waiting: { '--well-glass': '33%', transition: GLASS },
-  waitingCg: { '--well-glass': '10%', transition: GLASS }
+  ready: { '--well-glass': '92%', opacity: 1, pointerEvents: 'inherit', transition: WELL_SHIFT },
+  waiting: { '--well-glass': '33%', opacity: 1, pointerEvents: 'inherit', transition: WELL_SHIFT },
+  waitingCg: {
+    '--well-glass': '10%',
+    opacity: 1,
+    pointerEvents: 'inherit',
+    transition: WELL_SHIFT
+  },
+  hidden: { '--well-glass': '92%', opacity: 0, pointerEvents: 'none', transition: WELL_SHIFT }
+}
+
+/**
+ * What stands in the well's place while a reply is being read: the rule and its word, full while
+ * the reader may interject, at the dead dim while the scene will not let him, and gone once the
+ * well is out. Which of them hears the pointer is the row's (`Scene.css`): the strip while the
+ * well is away, the well's own box once it is out, and neither while the class is locked.
+ */
+export const sceneDivider: Variants = {
+  shown: { opacity: 1, transition: REVEAL },
+  dim: { opacity: DEAD_OPACITY, transition: REVEAL },
+  hidden: { opacity: 0, transition: REVEAL }
+}
+
+/** The tips mark's seat, standing only while the well is out, on the well's own reveal clock. */
+export const wellMark: Variants = {
+  shown: { opacity: 1, transition: REVEAL },
+  hidden: { opacity: 0, transition: REVEAL }
 }
 
 /**
@@ -926,9 +974,20 @@ export const sceneText: Variants = {
   gone: { opacity: 0, transition: { duration: 0.1, delay: SCENE_OUT_TEXT } }
 }
 
+/** The forward mark: faded in once the line is done, or standing at once on a rewind's cut. */
 export const sceneHint: Variants = {
   hidden: { opacity: 0 },
-  shown: { opacity: 1, transition: { duration: 0.2, ease: 'easeOut' } }
+  shown: { opacity: 1, transition: { duration: 0.2, ease: 'easeOut' } },
+  shownCut: { opacity: 1, transition: { duration: 0 } }
+}
+
+/**
+ * The back mark on the box's round cap: on screen and in reach while a line may be stepped back
+ * to, and out of both otherwise, an opacity of zero still being a hit target.
+ */
+export const boxRewind: Variants = {
+  shown: { opacity: 1, pointerEvents: 'auto', transition: { duration: 0.2, ease: 'easeOut' } },
+  hidden: { opacity: 0, pointerEvents: 'none', transition: { duration: 0.2, ease: 'easeOut' } }
 }
 
 export const sceneRow: Variants = {
@@ -949,13 +1008,36 @@ export const cursorOff: TargetAndTransition = { opacity: 0, transition: { durati
  * Go's three resting states, on a wrapper for {@link doubled}'s reason: the breath and the
  * gesture are both transforms, and one element can only carry one. `armed` breathes on the
  * app's own clock ({@link BREATH}); `sending` runs faster, `rest` settles on {@link PRESS}.
+ * `hidden` puts it away with the well, fading on {@link REVEAL} whatever the breath's clock; the
+ * others inherit the pointer from Go's seat, as {@link turnWell}'s do from the well's box.
  */
 export const goBreath: Variants = {
-  rest: { scale: 1, transition: PRESS },
-  armed: { scale: [1, 1.03, 1], transition: BREATH },
+  rest: {
+    scale: 1,
+    opacity: 1,
+    pointerEvents: 'inherit',
+    transition: { default: PRESS, opacity: REVEAL }
+  },
+  armed: {
+    scale: [1, 1.03, 1],
+    opacity: 1,
+    pointerEvents: 'inherit',
+    transition: { default: BREATH, opacity: REVEAL }
+  },
   sending: {
     scale: [1, 1.04, 1],
-    transition: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
+    opacity: 1,
+    pointerEvents: 'inherit',
+    transition: {
+      default: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
+      opacity: REVEAL
+    }
+  },
+  hidden: {
+    scale: 1,
+    opacity: 0,
+    pointerEvents: 'none',
+    transition: { default: PRESS, opacity: REVEAL }
   }
 }
 
@@ -1687,6 +1769,17 @@ export const spriteLit: TargetAndTransition = {
 export const spriteDim: TargetAndTransition = {
   filter: 'brightness(0.7)',
   transition: SPRITE_LIGHT
+}
+
+/** The same two lights thrown at once, for the render a rewind cuts to. */
+export const spriteLitCut: TargetAndTransition = {
+  filter: 'brightness(1)',
+  transition: { duration: 0 }
+}
+
+export const spriteDimCut: TargetAndTransition = {
+  filter: 'brightness(0.7)',
+  transition: { duration: 0 }
 }
 
 /**

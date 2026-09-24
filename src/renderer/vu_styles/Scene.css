@@ -177,6 +177,68 @@
   align-items: flex-end;
 }
 
+/* Go's seat reaches back across the row's gap to the well's edge, so the well and Go are one
+   unbroken stretch under the pointer: crossing from one to the other while a reply is being read
+   never leaves both, and the hover holding them out never drops between them. */
+.vu-scene-row .vu-turn-goslot {
+  margin-left: calc(-1 * var(--turn-gap));
+  padding-left: var(--turn-gap);
+}
+
+/* ---- the divider ---------------------------------------------------------- */
+
+/* What stands in the well's place while a reply is being read: a rule either side of the state
+   word, in a strip at the row's feet no taller than its word. The strip lies entirely inside the
+   one-line well's own box, so the pointer that hovered it is inside the well the moment the well
+   is out, and a click lands there. */
+.vu-scene-divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 28px;
+  padding: 0 12px;
+  pointer-events: none;
+}
+
+/* The row says what it is doing with its well: `out` while the well is shown, `away` while the
+   divider stands in its place and answers a hover, and `locked` while the class will not be
+   interrupted. Anywhere but `out`, the strip is the row's only hover zone: the hidden well's box,
+   Go's reach-back and the tips mark all give the pointer up, so a click above the strip falls
+   through to the stage — and the locked word takes none at all. */
+.vu-scene-row:not([data-well='out']) > .vu-turn-inputbox,
+.vu-scene-row:not([data-well='out']) > .vu-turn-goslot,
+.vu-scene-row:not([data-well='out']) > .vu-scene-help {
+  pointer-events: none;
+}
+
+.vu-scene-row[data-well='away'] .vu-scene-divider {
+  pointer-events: auto;
+}
+
+/* The rule is the gift's divider laid flat: the same weight and the same veiled surface. */
+.vu-scene-divider-rule {
+  flex: 1;
+  height: 3px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--vu-surface) 70%, transparent);
+}
+
+/* A state word over whatever the stage is showing, outlined in the surface as the tips mark is
+   so it reads on any background. */
+.vu-scene-divider-word {
+  flex: none;
+  paint-order: stroke fill;
+  color: var(--vu-text);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  -webkit-text-stroke: 3px var(--vu-surface);
+}
+
 /* ---- the tips mark and its card ------------------------------------------- */
 
 /* The mark's seat: the stamp's clearance less the row's own gap, and as tall as a one-line well,
@@ -257,7 +319,9 @@
 }
 
 /* Follows the well as it grows: `--turn-h` is the row's own measured height, set onto this root
-   by `SceneChrome`. The landing's box does not move, since the landing's well does not grow. */
+   by `SceneChrome`. While the well is away the box drops onto the divider's strip on top of this,
+   by motion's `reading` state. The landing's box does not move, since the landing's well does not
+   grow. */
 .vu-scene .vu-box {
   bottom: calc(var(--turn-h, 70px) + 56px);
 }

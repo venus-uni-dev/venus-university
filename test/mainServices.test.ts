@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,12 @@ let root = ''
 vi.mock('electron', () => ({
   app: { isPackaged: false, getAppPath: () => root, getPath: () => root }
 }))
+
+// Only `rename` is a spy; everything else in the module stays the real implementation.
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return { ...actual, rename: vi.fn(actual.rename) }
+})
 
 const { assertNode } = await import('../src/main/services/comfyService')
 const {
@@ -59,6 +65,46 @@ describe('redactUrl', () => {
 
 describe('writeAtomicJson', () => {
   const opts = { code: 'TEST_WRITE_FAILED', message: 'Could not write.' }
+
+  afterEach(async () => {
+    const real = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).rename
+    vi.mocked(rename).mockReset()
+    vi.mocked(rename).mockImplementation(real)
+  })
+
+  it('rides out a scanner holding the freshly replaced file for a few ms', async () => {
+    // Windows can answer EPERM for a rename onto a file Defender or the indexer just opened;
+    // that must land the write, not surface as the player's own save error.
+    const path = join(root, 'settings.json')
+    const held = Object.assign(new Error('EPERM: operation not permitted, rename'), {
+      code: 'EPERM'
+    })
+    const real = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).rename
+    vi.mocked(rename)
+      .mockRejectedValueOnce(held)
+      .mockRejectedValueOnce(held)
+      .mockImplementation(real)
+
+    await writeAtomicJson(path, { writer: 'a' }, opts)
+
+    expect(JSON.parse(await readFile(path, 'utf-8'))).toEqual({ writer: 'a' })
+    expect(rename).toHaveBeenCalledTimes(3)
+    expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('does not sit out the ladder for a rename failure that is not a hold', async () => {
+    // An EINVAL or similar is a real failure, not a scanner passing through; it must fail
+    // at once as the caller's own error rather than waiting out the whole ladder first.
+    const path = join(root, 'settings.json')
+    vi.mocked(rename).mockRejectedValueOnce(
+      Object.assign(new Error('EINVAL: invalid argument, rename'), { code: 'EINVAL' })
+    )
+
+    await expect(writeAtomicJson(path, { writer: 'a' }, opts)).rejects.toMatchObject(opts)
+
+    expect(rename).toHaveBeenCalledTimes(1)
+    expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
 
   it('lands one whole document when two writes of the same file overlap', async () => {
     // A temp name shared between two writers would make them rename each other's

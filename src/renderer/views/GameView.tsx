@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type JSX
+} from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AUDIO_FILES, pitchSemitonesOf, VOICE_PITCH_DEFAULT } from '@shared/audio'
 import { isPermanent } from '@shared/errors'
@@ -11,6 +19,7 @@ import { fullNameOf, roomBgIdOf, type AppError, type Position, type SpriteRef } 
 import { isWet } from '@shared/weather'
 import type { GiftReaction } from '@shared/shop'
 import { Burst } from '../components/Burst'
+import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { isProhibited, LlmFailureModal } from '../components/LlmFailureModal'
 import { useWindowKeydown } from '../components/useWindowKeydown'
@@ -46,7 +55,9 @@ import {
   flareStart,
   sceneHide,
   spriteDim,
+  spriteDimCut,
   spriteLit,
+  spriteLitCut,
   spriteBreath
 } from './motion'
 import {
@@ -63,6 +74,7 @@ import {
   advance,
   dismissStatusModal,
   hasDecisionPoint,
+  interject,
   lastLedgerPromptText,
   lastTextLedgerPromptText,
   lastIntroPromptText,
@@ -75,8 +87,10 @@ import {
   retryEndingCallWithPrompt,
   retryTurn,
   retryTurnWithPrompt,
+  rewind,
   goHome,
   endInDebt,
+  saveMemoryEdits,
   speakerNameOf,
   startFarewellScene,
   submitAction,
@@ -94,6 +108,7 @@ import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { useGameStore } from '../stores/gameStore'
+import { replyRowOfferOf, rewindOpenOf } from '../stores/loop/playback'
 import { displaySlotsOf, displaySpriteRef } from '../stores/stageDisplay'
 import {
   beginCrossing,
@@ -119,6 +134,7 @@ import { GameMenuModal } from './GameMenuModal'
 import { LoadGameModal } from './LoadGameModal'
 import { MilestoneModal } from './MilestoneModal'
 import { RankUpModal } from './RankUpModal'
+import { SceneMemoriesModal } from './SceneMemoriesModal'
 import { JobsModal } from './JobsModal'
 import { GiftMessageModal } from './GiftMessageModal'
 import { GiftTargetModal } from './GiftTargetModal'
@@ -159,6 +175,15 @@ const AUTHORED_ABANDON_HINT =
 const CLASSIFY_ABANDON_HINT =
   'Progress since the start of the timeslot will be lost.'
 
+/**
+ * The well's words as they are sent. The scene's well takes more than one line, and what is sent
+ * is a sentence: a break the reader put in to read his own words back is not a break the prompt
+ * should carry, and `Reader's action` is one line of a block every other line of which is one line.
+ */
+function sentenceOf(typed: string): string {
+  return typed.replace(/\s*\n\s*/g, ' ').trim()
+}
+
 /** The turn modal's dismiss: reword a refusal, acknowledge a rejection, cancel the rest. */
 function turnDismissLabel(error: AppError): string {
   if (isProhibited(error.code)) return 'Change it'
@@ -186,6 +211,7 @@ type OpenPanel =
   | { kind: 'feedback' }
   | { kind: 'leaving' }
   | { kind: 'quitting' }
+  | { kind: 'interruptEnding'; action: string }
 
 /** Which of the two horizontal offsets a sprite layer sits at. */
 function sideClass(side: 1 | -1): string {
@@ -219,6 +245,7 @@ function PortraitSlot({
   flipped,
   dim,
   enter,
+  cut,
   breaths,
   leaving,
   onLeft
@@ -233,29 +260,51 @@ function PortraitSlot({
   flipped: boolean
   dim: boolean
   enter: EnterKind
+  /** The render a rewind lands in: she stands as the line has her, with nothing played. */
+  cut: boolean
   breaths: Map<string, BreathRecord>
   leaving?: boolean
   onLeft?: () => void
 }): JSX.Element {
   // Crossfade pair, the pose it is showing, and the side the sprite stands on, which flips on
-  // every change from a start seeded by the id.
+  // every change from a start seeded by the id. One mounted by a cut never plays its arrival.
   const [pair, setPair] = useState<{
     from: string | null
     to: string
     pose: SpriteRef
     side: 1 | -1
     changed: boolean
+    /** The standing half was mounted by a cut, with nothing left underneath it. */
+    cut: boolean
   }>(() => ({
     from: null,
     to: src,
     pose,
     side: hashString(charId) % 2 === 0 ? -1 : 1,
-    changed: false
+    changed: cut,
+    cut
   }))
   // A change is a change of pose: the same pose under a new URL is her picture arriving, and it
-  // goes into the standing half rather than crossing to it.
-  if (pair.pose !== pose)
-    setPair({ from: pair.to, to: src, pose, side: otherSide(pair.side), changed: true })
+  // goes into the standing half rather than crossing to it. A cut takes the new pose with no
+  // half crossing, and lands whatever crossing or arrival was still playing.
+  if (cut && (pair.pose !== pose || pair.from !== null || !pair.changed))
+    setPair({
+      from: null,
+      to: src,
+      pose,
+      side: pair.pose !== pose ? otherSide(pair.side) : pair.side,
+      changed: true,
+      cut: true
+    })
+  else if (pair.pose !== pose)
+    setPair({
+      from: pair.to,
+      to: src,
+      pose,
+      side: otherSide(pair.side),
+      changed: true,
+      cut: false
+    })
   else if (pair.to !== src) setPair({ ...pair, to: src })
 
   // Her breath, minted in render rather than in an effect so that sprites arriving in the same
@@ -291,8 +340,8 @@ function PortraitSlot({
   // The mirror is a class and the light is motion's: one element gets one writer per property,
   // and these are two properties — a `transform` the stage owns and a `filter` motion does.
   const imgClass = flipped ? 'vu-stage-portrait vu-stage-portrait--flipped' : 'vu-stage-portrait'
-  /** Whoever is not speaking falls back a little ({@link spriteDim}). */
-  const light = dim ? spriteDim : spriteLit
+  /** Whoever is not speaking falls back a little ({@link spriteDim}), at once on a cut. */
+  const light = dim ? (cut ? spriteDimCut : spriteDim) : cut ? spriteLitCut : spriteLit
 
   return (
     /** How tall she stands, as a share of the maximum, and where she stands. */
@@ -335,7 +384,19 @@ function PortraitSlot({
             if (e.target === e.currentTarget) setPair((p) => ({ ...p, from: null }))
           }}
         >
-          <motion.img className={imgClass} src={pair.to} alt={alt} animate={light} initial={false} />
+          {/* A cut mounts the picture with nothing left underneath it, and Chromium defers a large
+              image's decode and paints nothing until it lands: a blank frame the crossfade never
+              shows, its outgoing half staying mounted. Decoding in step paints it whole at the
+              cost of the decode on the main thread, which a one-off cut can pay and a fade must
+              not. */}
+          <motion.img
+            className={imgClass}
+            src={pair.to}
+            alt={alt}
+            decoding={pair.cut ? 'sync' : 'async'}
+            animate={light}
+            initial={false}
+          />
         </div>
       </motion.div>
     </div>
@@ -374,6 +435,42 @@ function StageBurst({
   )
 }
 
+/**
+ * The ask in front of interjecting over a scene's ending: what the interruption throws away, and
+ * the box that stops it being asked again, which the answer carries.
+ */
+function InterruptEndingModal({
+  theme,
+  onConfirm,
+  onCancel
+}: {
+  theme: 'day' | 'night'
+  onConfirm: (mute: boolean) => void
+  onCancel: () => void
+}): JSX.Element {
+  const [mute, setMute] = useState(false)
+  return (
+    <ConfirmModal
+      id="interrupt-ending"
+      theme={theme}
+      title="Interrupt the ending?"
+      message="Bookkeeping prompts have already been sent. They'll be thrown away if you interrupt now."
+      aside={
+        <CheckField
+          id="interrupt-ending-mute"
+          label="Don't warn me again"
+          checked={mute}
+          onChange={setMute}
+        />
+      }
+      confirmText="Interrupt"
+      cancelText="Cancel"
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(mute)}
+    />
+  )
+}
+
 /** Game View: renders `gameStore`; `gameLoop.ts` owns state changes. */
 export function GameView(): JSX.Element {
   const bg = useGameStore((s) => s.bg)
@@ -404,6 +501,8 @@ export function GameView(): JSX.Element {
   const classifierError = useGameStore((s) => s.classifierError)
   /** The scene-end screen on the stage, if any — the rank-up or one girl's. */
   const statusModal = useGameStore((s) => s.statusModal)
+  /** The boundary's memory question over the curtain, while it stands. */
+  const memoryEdit = useGameStore((s) => s.memoryEdit)
   const inputDraft = useGameStore((s) => s.inputDraft)
   /** The exam being sat, if any — what swaps the text box for four buttons. */
   const quiz = useGameStore((s) => s.sceneQuiz)
@@ -441,6 +540,25 @@ export function GameView(): JSX.Element {
   const sceneMode = useGameStore(sceneOnScreenOf)
   /** The screen is under a crossing's cover — a slot opening, or the way into the game. */
   const covered = useCrossingStore((s) => s.phase !== 'idle')
+  /**
+   * Whether the row stands over the reply being read, and whether the scene lets him through it:
+   * the interjection's offer, held over a reply's last line until that line is turned.
+   */
+  const offer = useGameStore(replyRowOfferOf)
+  /** Whether an earlier line of the reply may be stepped back to. */
+  const rewindOpen = useGameStore(rewindOpenOf)
+  /** Bumped by every line a rewind steps back. */
+  const lineRewound = useGameStore((s) => s.lineRewound)
+  /**
+   * The render a rewind lands in, and only that one: every layer that would animate the change
+   * lands at once on where it settles. The count it is read against catches up after the commit,
+   * so a render-phase update that runs this body again still sees the cut.
+   */
+  const rewoundSeen = useRef(lineRewound)
+  const cutting = rewoundSeen.current !== lineRewound
+  useLayoutEffect(() => {
+    rewoundSeen.current = lineRewound
+  })
   /** How many climaxes have played this session; the stage owes a flare to each of them. */
   const climaxes = useAudioStore((s) => s.climaxes)
   /**
@@ -678,9 +796,10 @@ export function GameView(): JSX.Element {
     cut: covered
   })
   // A change to no image carries nothing out: only the incoming layer ever ends the outgoing
-  // one, so a `from` kept against a null target would sit there permanently.
+  // one, so a `from` kept against a null target would sit there permanently. A change under the
+  // cover or on a rewind draws plain.
   if (bgPair.key !== bgKey)
-    setBgPair({ from: bgSrc ? bgPair.to : null, to: bgSrc, key: bgKey, cut: covered })
+    setBgPair({ from: bgSrc ? bgPair.to : null, to: bgSrc, key: bgKey, cut: covered || cutting })
   else if (bgPair.to !== bgSrc) setBgPair({ ...bgPair, to: bgSrc })
   // Which picture the incoming layer has actually drawn — a CSS animation starts at mount
   // whether or not the bytes have arrived, so the fade below waits on this instead.
@@ -706,15 +825,22 @@ export function GameView(): JSX.Element {
   // the rest of it. Written and cleared by the slots themselves.
   const breaths = useRef(new Map<string, BreathRecord>()).current
   // Whether the row's slide waits out a background change, as the arrival that caused it
-  // does. Only read on the commit that set it: the offsets only change on a diff.
+  // does, and whether a rewind's cut takes it away. Only read on the commit that set it: the
+  // offsets only change on a diff.
   const slideAfterBg = useRef(false)
+  const rowCut = useRef(false)
   if (prevSlots.current !== shownSlots) {
     const before = prevSlots.current
     prevSlots.current = shownSlots
     // Her fade waits out a background change on the same line — unless the change landed
-    // under the cover, where she stands there when the curtain rises, exactly as after a load.
-    const kind: EnterKind =
-      bgPair.key !== bgKey ? (covered ? 'none' : 'afterBg') : 'fade'
+    // under the cover or on a rewind, where she simply stands there, exactly as after a load.
+    const kind: EnterKind = cutting
+      ? 'none'
+      : bgPair.key !== bgKey
+        ? covered
+          ? 'none'
+          : 'afterBg'
+        : 'fade'
     let arrived = false
     for (const charId of shownSlots)
       if (charId && !before.includes(charId)) {
@@ -723,16 +849,20 @@ export function GameView(): JSX.Element {
       }
     // Only an arrival waits on the camera.
     slideAfterBg.current = arrived && kind === 'afterBg'
+    rowCut.current = cutting
     const beforeRow = occupied(before)
-    const gone = before
-      .map((charId, at) => ({ charId, at }))
-      .filter(
-        (e): e is { charId: string; at: number } =>
-          Boolean(e.charId) && !shownSlots.includes(e.charId)
-      )
-      .map((e) => ({ ...e, x: slotX(beforeRow.indexOf(e.charId), beforeRow.length) }))
+    // A cut plays no departure, and lands any still fading.
+    const gone = cutting
+      ? []
+      : before
+          .map((charId, at) => ({ charId, at }))
+          .filter(
+            (e): e is { charId: string; at: number } =>
+              Boolean(e.charId) && !shownSlots.includes(e.charId)
+          )
+          .map((e) => ({ ...e, x: slotX(beforeRow.indexOf(e.charId), beforeRow.length) }))
     // A character re-shown mid-fade drops her departure.
-    const kept = leaving.filter((e) => !shownSlots.includes(e.charId))
+    const kept = cutting ? [] : leaving.filter((e) => !shownSlots.includes(e.charId))
     if (gone.length || kept.length !== leaving.length) setLeaving([...kept, ...gone])
   }
   // A CG covers the row, so anyone mid-departure under it is simply gone: nothing is mounted
@@ -776,12 +906,20 @@ export function GameView(): JSX.Element {
     from: string | null
     to: string | null
     key: string | null
+    /** The change was a rewind's cut: nothing dissolves, out or in. */
+    cut: boolean
   }>({
     from: null,
     to: cgSrc,
-    key: cgKey
+    key: cgKey,
+    cut: false
   })
-  if (cgPair.key !== cgKey) setCgPair({ from: cgPair.to, to: cgSrc, key: cgKey })
+  if (cgPair.key !== cgKey)
+    setCgPair(
+      cutting
+        ? { from: null, to: cgSrc, key: cgKey, cut: true }
+        : { from: cgPair.to, to: cgSrc, key: cgKey, cut: false }
+    )
   else if (cgPair.to !== cgSrc) setCgPair({ ...cgPair, to: cgSrc })
   // Whether a CG on screen arrived while the view was watching: a save restored mid-CG must
   // not fade in on arrival.
@@ -801,10 +939,10 @@ export function GameView(): JSX.Element {
   const [shownLine, setShownLine] = useState<typeof currentLine>(null)
 
   // Reset during render: an effect runs after a paint, and the new line would flash at the
-  // previous line's reveal count.
+  // previous line's reveal count. A line a rewind stepped back to is said whole, with no voice.
   if (shownLine !== currentLine) {
     setShownLine(currentLine)
-    setRevealed(0)
+    setRevealed(cutting ? text.length : 0)
   }
 
   // And the same change of line is what raises a gift's glyphs. The box only opens on a drained
@@ -817,8 +955,9 @@ export function GameView(): JSX.Element {
 
   // And wound back for as long as the box is still arriving: the hold reaches this counter an
   // effect late, so the interval can tick a character or two into a line the chrome has not
-  // begun to draw, and the box would land on a word already half said.
-  if (typeHeld && revealed !== 0) setRevealed(0)
+  // begun to draw, and the box would land on a word already half said. A cut lands the box in
+  // this same render, so the hold it still reports is the one it is about to drop.
+  if (typeHeld && revealed !== 0 && !cutting) setRevealed(0)
 
   // Cleared during render for the reveal counter's own reason: the reply's first line and the
   // end of the wait land in one commit (`loop/stream.ts`'s `emit`), and an effect would leave
@@ -963,6 +1102,7 @@ export function GameView(): JSX.Element {
    */
   const blocked = Boolean(
     statusModal ||
+      memoryEdit ||
       turnFailed ||
       classifierError ||
       closingError ||
@@ -1013,11 +1153,65 @@ export function GameView(): JSX.Element {
   const inputShown = awaitingInput && !gameOver && (!epilogue || sceneActive)
 
   /**
+   * The row is standing over a reply still being read, and what it offers there: the well to
+   * interject in, or the word that the class will not be interrupted yet. Null wherever the row
+   * is the turn's own, or down.
+   */
+  const interjectRow = offer !== 'none' && !inputShown && !sending ? offer : null
+
+  /**
+   * The scene's row is up: for the turn, through the wait for its reply, and over the reply for
+   * as long as it may be interrupted — so the box keeps its raised seat from Go to the next turn.
+   */
+  const rowShown = inputShown || sending || offer !== 'none'
+
+  /**
    * Whether a click on the dialogue box would do anything — finish the reveal, land the box's
    * arrival, or advance the line. {@link onAdvance}'s own early-return condition, hoisted out so
    * there's one copy of it instead of two to keep in step.
    */
   const boxAdvances = !(blocked || awaitingInput || waitingForLine || endingWait)
+
+  /**
+   * Set by a press that lands off a well the reader holds open mid-reply: the click after it only
+   * puts the well down. Read at the press, before the blur that press causes; every press sets it
+   * afresh, and the row moving into or out of a reply drops it, so it never outlives the click it
+   * was set for.
+   */
+  const unpinning = useRef(false)
+  const interjecting = interjectRow !== null
+  /** The row is standing over a reply, as the press listener registered once reads it. */
+  const interjectingRef = useRef(interjecting)
+  interjectingRef.current = interjecting
+  useEffect(() => {
+    unpinning.current = false
+  }, [interjecting])
+
+  // A press off a well holding the caret clears it. The test is the caret rather than the row:
+  // a failure modal holds the focus while it is up, so its own button leaves the words
+  // `inputDraft` seeded standing, and the landing's well, under the same id, is covered too.
+  // Registered for the view's lifetime, on the capture phase so it reads the focus before the
+  // blur that press causes.
+  useEffect(() => {
+    const onPress = (event: PointerEvent): void => {
+      const target = event.target instanceof Element ? event.target : null
+      const inWell = document.activeElement?.id === 'game-action'
+      const off = inWell && !target?.closest('#game-action, #game-submit')
+      if (off) setAction('')
+      unpinning.current = off && interjectingRef.current
+    }
+    document.addEventListener('pointerdown', onPress, true)
+    return () => document.removeEventListener('pointerdown', onPress, true)
+  }, [])
+
+  /** A click on the stage or the box: one that only put the well down does nothing else. */
+  function onAdvanceClick(): void {
+    if (unpinning.current) {
+      unpinning.current = false
+      return
+    }
+    onAdvance()
+  }
 
   /** One click either finishes the reveal or advances. */
   function onAdvance(): void {
@@ -1062,15 +1256,44 @@ export function GameView(): JSX.Element {
     // No text box during an exam.
     if (quiz) return
     if (busy || blocked || !awaitingInput) return
-    // The scene's well takes more than one line, and what is sent is a sentence: a break
-    // the reader put in to read his own words back is not a break the prompt should carry, and
-    // `Reader's action` is one line of a block every other line of which is one line.
-    const typed = action.replace(/\s*\n\s*/g, ' ').trim()
+    const typed = sentenceOf(action)
     if (!typed && (!asked || !canKeepGoing)) return
     setAction('')
     // `submitAction` raises `waitingForLine` synchronously, so the flag is never up alone.
     setSending(true)
     void submitAction(typed)
+  }
+
+  /**
+   * Sends the well over the lines still to come: Go mid-reply, or Enter in the well. An ending
+   * already under way asks first, unless the player has told it not to.
+   */
+  function onInterject(): void {
+    if (blocked || quiz || interjectRow !== 'open') return
+    const typed = sentenceOf(action)
+    if (!typed) return
+    const warns = useSettingsStore.getState().settings?.warnEndingInterrupt !== false
+    if (useGameStore.getState().sceneEnding && warns) {
+      setPanel({ kind: 'interruptEnding', action: typed })
+      return
+    }
+    sendInterjection(typed)
+  }
+
+  /**
+   * Cuts the unread lines and sends the words as the turn. The wait is reported as a turn's is,
+   * and nothing sent keeps the draft where it was.
+   */
+  function sendInterjection(typed: string): void {
+    setSending(true)
+    if (interject(typed)) setAction('')
+    else setSending(false)
+  }
+
+  /** The back mark: a line stepped back to, with the sound a line turned forward makes. */
+  function onRewind(): void {
+    useAudioStore.getState().play('advance')
+    rewind()
   }
 
   /**
@@ -1185,10 +1408,17 @@ export function GameView(): JSX.Element {
       return
     }
     if (event.key !== 'Enter') return
+    // The box's id is what tells a deliberate send from an Enter aimed at the scene.
+    const inBox = (event.target as HTMLElement | null)?.id === 'game-action'
+    // Mid-reply, Enter in the well the reader opened sends it over the lines still to come, and
+    // an empty well sends nothing; Enter anywhere else still turns the line.
+    if (interjectRow && inBox) {
+      if (action.trim()) onInterject()
+      return
+    }
     if (awaitingInput) {
-      // The box's id is what tells a deliberate send from an Enter aimed at the scene. An empty
-      // well sends nothing, so a stray key never spends the turn; Go still sends "Keep going".
-      const inBox = (event.target as HTMLElement | null)?.id === 'game-action'
+      // An empty well sends nothing, so a stray key never spends the turn; Go still sends
+      // "Keep going".
       if (inBox && !action.trim()) return
       onSubmit(inBox)
     } else {
@@ -1244,7 +1474,15 @@ export function GameView(): JSX.Element {
 
       {/* The portrait row, centred on whoever is actually on screen; a position covers it with
           that character's CG on the same layer. */}
-      <div className={slideAfterBg.current ? 'vu-stage-row vu-stage-row--slideAfterBg' : 'vu-stage-row'}>
+      <div
+        className={
+          rowCut.current
+            ? 'vu-stage-row vu-stage-row--cut'
+            : slideAfterBg.current
+              ? 'vu-stage-row vu-stage-row--slideAfterBg'
+              : 'vu-stage-row'
+        }
+      >
         {!cg &&
           stageRow.map(({ charId, leaving, x }) => {
             const pose = displaySpriteRef(
@@ -1264,6 +1502,7 @@ export function GameView(): JSX.Element {
                 flipped={Boolean(flipped[charId])}
                 dim={Boolean(speakingCharId && charId !== speakingCharId)}
                 enter={enterKindOf(charId)}
+                cut={cutting}
                 breaths={breaths}
                 leaving={leaving}
                 onLeft={leaving ? () => dropLeaving(charId) : undefined}
@@ -1287,9 +1526,14 @@ export function GameView(): JSX.Element {
             {cgPair.to && cg && (
               <img
                 key={cgKey}
-                className={cgEntering ? 'vu-stage-cg vu-stage-cg--in' : 'vu-stage-cg'}
+                className={
+                  cgEntering && !cgPair.cut ? 'vu-stage-cg vu-stage-cg--in' : 'vu-stage-cg'
+                }
                 src={cgPair.to}
                 alt={fullNameOf(characters[cg.charId])}
+                /* A cut leaves nothing under the picture, so it is decoded in step rather than
+                   painted blank until a deferred decode lands, as a cut sprite is. */
+                decoding={cgPair.cut ? 'sync' : 'async'}
               />
             )}
           </motion.div>
@@ -1326,7 +1570,7 @@ export function GameView(): JSX.Element {
 
       {/* Click-to-advance: one full-bleed surface under the UI layer. It draws the plain
           arrow — the hand is the dialogue box's, which is the thing a click is *aimed* at. */}
-      <div className="vu-stage-advance" onClick={onAdvance} />
+      <div className="vu-stage-advance" onClick={onAdvanceClick} />
 
       {/* One chrome at a time over the shared stage — the scene, the landing (with the epilogue's
           goodbye menu), or the three game overs — each wearing the slot's own half of the day. */}
@@ -1354,16 +1598,26 @@ export function GameView(): JSX.Element {
           cg={Boolean(cg)}
           onTypeHold={setTypeHeld}
           skips={arrivalSkips}
-          rowShown={inputShown || sending}
-          onAdvance={boxAdvances ? onAdvance : undefined}
+          rowShown={rowShown}
+          interject={interjectRow}
+          onAdvance={boxAdvances ? onAdvanceClick : undefined}
+          onRewind={rewindOpen && !covered && !blocked ? onRewind : undefined}
+          cuts={lineRewound}
           quiz={quizRow}
           action={action}
           onAction={setAction}
           onSubmit={() => onSubmit(true)}
+          onInterject={onInterject}
           onQuiz={submitQuizAnswer}
-          submitDead={!awaitingInput || (!action.trim() && !canKeepGoing)}
-          inputDead={!awaitingInput}
-          inputFocus={!blocked}
+          /* Mid-reply Go answers only words, and only where the scene lets them through. */
+          submitDead={
+            interjectRow
+              ? !action.trim() || interjectRow !== 'open'
+              : !awaitingInput || (!action.trim() && !canKeepGoing)
+          }
+          inputDead={interjectRow ? interjectRow !== 'open' : !awaitingInput}
+          /* Mid-reply the well takes the caret only on a click. */
+          inputFocus={!blocked && !interjectRow}
           giftShown={!cinematic && !epilogue && giftTargets.length > 0}
           giftUnlocked={bunnyshopUnlocked}
           giftDead={inventory.length === 0 || !bunnyshopUnlocked || giftSpent}
@@ -1658,6 +1912,20 @@ export function GameView(): JSX.Element {
         )}
       </AnimatePresence>
 
+      {/* The boundary's memory question, over the curtain: the modal host follows the crossing
+          in the tree, so the veil paints over the cover and takes the keys the covered stage
+          does not. */}
+      <AnimatePresence>
+        {memoryEdit && (
+          <SceneMemoriesModal
+            key="scene-memories"
+            rows={memoryEdit}
+            theme={half}
+            onSave={saveMemoryEdits}
+          />
+        )}
+      </AnimatePresence>
+
       {/* A hangout is becoming a scene: swallows every click until it takes over. */}
       {bunnyboardLocked && <div className="vu-stage-lock" />}
 
@@ -1925,6 +2193,22 @@ export function GameView(): JSX.Element {
             onConfirm={() => {
               setQuitting(true)
               void quitToDesktop()
+            }}
+          />
+        )}
+
+        {/* The ask in front of interjecting over an ending. Answered, it sends as it stands —
+            the setting is not read again, the player having just been asked. */}
+        {panel?.kind === 'interruptEnding' && (
+          <InterruptEndingModal
+            key="interrupt-ending"
+            theme={half}
+            onCancel={closePanel}
+            onConfirm={(mute) => {
+              if (mute) void useSettingsStore.getState().update({ warnEndingInterrupt: false })
+              const { action: typed } = panel
+              closePanel()
+              sendInterjection(typed)
             }}
           />
         )}

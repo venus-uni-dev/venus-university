@@ -22,7 +22,8 @@ import {
   milestoneStatusLines,
   readerStandingOf,
   refreshedFlags,
-  rollsCrush
+  rollsCrush,
+  withMemoryReplaced
 } from '@shared/relationship'
 import { pointsForTier, type PlayerStats } from '@shared/playerStats'
 import type { CharInfo, CharMemory, CrushHint, MemoryType, SocialPost } from '@shared/types'
@@ -339,6 +340,14 @@ describe('memoryStatusLine', () => {
     const mark = (line.status?.marks ?? [])[0]
     expect(line.text.slice(mark.start, mark.end)).toBe('hated')
   })
+
+  it('shows a memory filed in the reader’s voice to the player as "you", the verb agreeing', () => {
+    const line = memoryStatusLine('Sarah', { type: 'liked', desc: 'the reader was nice to her' })
+
+    expect(line.text).toBe('Sarah liked that you were nice to her.')
+    const mark = (line.status?.marks ?? [])[0]
+    expect(line.text.slice(mark.start, mark.end)).toBe('liked')
+  })
 })
 
 describe('mergedMemories', () => {
@@ -368,6 +377,60 @@ describe('memoriesFor', () => {
       giftMemories: [mem(4, 'loved', 'gift')]
     })
     expect(merged.map((m) => m.desc)).toEqual(['scene', 'text', 'heard', 'gift'])
+  })
+})
+
+/**
+ * The player's edit of one memory: a copy left behind in any of the four lists, or a
+ * same-worded memory from another day caught with it, is scored and prompted from then on.
+ */
+describe('withMemoryReplaced', () => {
+  const match = mem(3, 'liked', 'the reader was late')
+  const other = mem(5, 'liked', 'the reader was late')
+  const holders = () => ({
+    memories: [mem(1, 'loved', 'first'), match, other],
+    textMemory: match,
+    jealousyMemories: [match],
+    giftMemories: [other, match]
+  })
+
+  it('rewrites every copy in all four lists and leaves the same words on another day alone', () => {
+    const next = mem(3, 'disliked', 'the reader was very late')
+    const info = holders()
+    expect(withMemoryReplaced(info, match, next)).toEqual({
+      memories: [mem(1, 'loved', 'first'), next, other],
+      textMemory: next,
+      jealousyMemories: [next],
+      giftMemories: [other, next]
+    })
+  })
+
+  it('drops every copy for null and takes the texting memory off her', () => {
+    const forgotten = withMemoryReplaced(holders(), match, null)
+    expect(forgotten).toEqual({
+      memories: [mem(1, 'loved', 'first'), other],
+      jealousyMemories: [],
+      giftMemories: [other]
+    })
+    expect(forgotten && 'textMemory' in forgotten).toBe(false)
+  })
+
+  it('keeps an untouched list as it was', () => {
+    const info = { memories: [match], giftMemories: [other] }
+    expect(withMemoryReplaced(info, match, null)?.giftMemories).toBe(info.giftMemories)
+  })
+
+  it('answers null for a memory she does not hold and for an edit that changes nothing', () => {
+    expect(withMemoryReplaced({ memories: [other] }, match, null)).toBeNull()
+    expect(withMemoryReplaced(holders(), match, { ...match })).toBeNull()
+  })
+
+  it('never mutates what it was handed', () => {
+    const info = holders()
+    const before = structuredClone(info)
+    withMemoryReplaced(info, match, mem(3, 'hated', 'gone'))
+    withMemoryReplaced(info, match, null)
+    expect(info).toEqual(before)
   })
 })
 
@@ -517,8 +580,8 @@ describe('foldRelationshipEvents', () => {
     // Sleeping together implies the kiss, so a first time that is also a first
     // kiss says both — one memory each.
     expect(folded.memories).toEqual([
-      { date: 7, type: 'loved', desc: 'you kissed her for the first time' },
-      { date: 7, type: 'loved', desc: 'you slept with her for the first time' }
+      { date: 7, type: 'loved', desc: 'the reader kissed her for the first time' },
+      { date: 7, type: 'loved', desc: 'the reader slept with her for the first time' }
     ])
   })
 
@@ -536,7 +599,11 @@ describe('foldRelationshipEvents', () => {
     // Stacking is the one mechanism the list has for saying a thing mattered
     // more, and ending it has to outweigh whatever she hears afterwards.
     expect(folded.memories).toHaveLength(2)
-    expect(folded.memories[1]).toEqual({ date: 7, type: 'hated', desc: 'the two of you broke up' })
+    expect(folded.memories[1]).toEqual({
+      date: 7,
+      type: 'hated',
+      desc: 'things ended between the reader and her'
+    })
     expect(folded.flags.brokenUp).toBe(1)
   })
 
@@ -551,7 +618,7 @@ describe('foldRelationshipEvents', () => {
     const folded = foldRelationshipEvents(info, ['kissed'], 7)
     expect(folded.memories).toHaveLength(MEMORY_CAP)
     expect(folded.memories[0].desc).toBe('old 1')
-    expect(folded.memories.at(-1)?.desc).toBe('you kissed her for the first time')
+    expect(folded.memories.at(-1)?.desc).toBe('the reader kissed her for the first time')
   })
 
   it('dates the breakup, however the dating ended', () => {

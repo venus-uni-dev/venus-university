@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GameSave, QuizState, Result, SaveDraft, SceneLine } from '@shared/types'
+import {
+  READER_SPEAKER,
+  type GameSave,
+  type QuizState,
+  type Result,
+  type SaveDraft,
+  type SceneLine
+} from '@shared/types'
 import {
   deleteAutosave,
   foldOpeningIntoSlotSave,
@@ -339,6 +346,36 @@ describe('queuedScene', () => {
     const scene = queuedScene(null, lines)
     useGameStore.setState({ sceneMentions: ['char-2', 'char-3'] })
     expect(scene.mentions).toEqual(['char-2'])
+  })
+
+  it("reads the turn's action onto the log the base was captured without, once", () => {
+    // `base` is taken before the action is logged; without the line, a reload of the reply's
+    // autosave plays the reply with the reader's own words missing from the log.
+    const base = openingScene([])
+    base.sceneLog = [{ speaker: 'Sarah', text: 'Hi.' }]
+    const action: SceneLine = { speaker: READER_SPEAKER, text: 'I wave.' }
+    useGameStore.setState({
+      currentSceneTranscript: [{ speaker: 'Sarah', text: 'Hi.' }, action, ...lines]
+    })
+
+    const scene = queuedScene(base, lines)
+    expect(scene.sceneLog).toEqual([{ speaker: 'Sarah', text: 'Hi.' }, action])
+    expect(base.sceneLog).toEqual([{ speaker: 'Sarah', text: 'Hi.' }])
+    // A base that already ends on it is not given it twice.
+    expect(queuedScene(scene, lines).sceneLog).toEqual(scene.sceneLog)
+  })
+
+  it('carries the summary marks live, as copies, and drops stale ones from the base', () => {
+    // A cut or a rewind reverts the running summary off these marks, so a reload without them
+    // would keep a summary covering lines the scene no longer has.
+    useGameStore.setState({ sceneSummaries: [{ at: 2, summary: 'They met.' }] })
+    const scene = queuedScene(null, lines)
+    expect(scene.summaries).toEqual([{ at: 2, summary: 'They met.' }])
+    expect(scene.summaries?.[0]).not.toBe(useGameStore.getState().sceneSummaries[0])
+
+    const base = { ...openingScene([]), summaries: [{ at: 1, summary: 'Old.' }] }
+    useGameStore.setState({ sceneSummaries: [] })
+    expect('summaries' in queuedScene(base, lines)).toBe(false)
   })
 })
 

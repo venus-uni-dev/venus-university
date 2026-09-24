@@ -24,7 +24,6 @@ import { updateCaption } from './views/updateCaption'
 import { useAssetStore } from './stores/assetStore'
 import { useAudioStore } from './stores/audioStore'
 import { useCharacterStore } from './stores/characterStore'
-import { useComfyStore } from './stores/comfyStore'
 import { cancelCrossing, endCrossing, nameCrossingWait } from './stores/crossingStore'
 import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
@@ -116,9 +115,6 @@ async function boot(): Promise<void> {
 
   // The boot's own cover, raised before the first frame (`main.tsx`), opens here.
   endCrossing(() => ui.setView(bootView(firstRun, deferred || comfyInstalled, writerOk)))
-
-  // Not awaited: nothing on the menu needs it.
-  if (comfyInstalled) void useComfyStore.getState().ensureStarted()
 }
 
 function App(): JSX.Element {

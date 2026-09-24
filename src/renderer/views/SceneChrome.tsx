@@ -3,7 +3,7 @@
  * store — everything it draws is handed to it; the Game View owns the gates, this owns the
  * arrival, the wipe and the way out.
  */
-import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import type { QuizAnswer, QuizLetter } from '@shared/academics'
@@ -37,13 +37,15 @@ import {
   press,
   quietLift,
   quietPress,
+  sceneDivider,
   sceneFade,
   sceneHide,
   sceneRow,
   seat,
   stampIn,
   stampSpinDay,
-  stampSwayNight
+  stampSwayNight,
+  wellMark
 } from './motion'
 import '../vu_styles/Scene.css'
 
@@ -84,11 +86,23 @@ export interface SceneChromeProps {
   /** Bumped by a click during that arrival: the box lands at once rather than losing a line. */
   skips: number
   rowShown: boolean
+  /**
+   * The row is standing over a reply still being read rather than for the player's turn: the
+   * divider stands in the well's place, and the well answers a hover — `'open'` — or nothing at
+   * all while the scene will not be interrupted — `'locked'`. Null for the turn's own row.
+   */
+  interject: 'open' | 'locked' | null
   /** The current question's answers while an exam is being sat, which the row stands in for. */
   quiz: readonly QuizAnswer[] | null
   action: string
   onAction: (value: string) => void
   onSubmit: () => void
+  /** Sends what the well holds over the lines still to come. */
+  onInterject: () => void
+  /** Steps back a line, handed in only while one may be stepped back to. */
+  onRewind?: () => void
+  /** Bumped by every rewind, which the box lands at once on. */
+  cuts: number
   onQuiz: (letter: QuizLetter) => void
   submitDead: boolean
   inputDead: boolean
@@ -117,13 +131,55 @@ export interface SceneChromeProps {
   onAdvance?: () => void
 }
 
+/** The scene's chrome: the stamp, the rail, the box and the row under it. */
 export function SceneChrome(props: SceneChromeProps): JSX.Element {
-  const { theme, date, night, weather, covered, hidden, shown, rowShown, quiz } = props
+  const { theme, date, night, weather, covered, hidden, shown, rowShown, quiz, interject } = props
   // What the stamp wears where the sun or the crescent would be.
   const markKind = halfMarkKindOf(weather, night)
 
   /** What the whole layer answers to: the curtain and the eye each take it away entire. */
   const dark = covered || hidden
+
+  /** The row is up and answering: what every hover in it is dropped against. */
+  const rowLive = rowShown && !dark
+
+  /**
+   * The pointer has moved over the divider's strip, or is on the well's box or Go's seat once the
+   * well is out, and the well has the caret — either one holds the well out over the divider while
+   * a reply is being read. The row goes inert with the pointer still on it and reports no
+   * boundary, so the hover is dropped with the row.
+   */
+  const [hover, setHover] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  useEffect(() => {
+    if (!rowLive) setHover(false)
+  }, [rowLive])
+
+  // A reply starting to be read finds the well put down whatever the pointer is over: the caret a
+  // sent turn left in it would otherwise keep Enter from turning the lines, `pinned` can be stale
+  // because a focused field the turn disables fires no blur, and a hover the pointer never left
+  // must not hold the well out over the reply. Mid-reply the well comes back on a move over the
+  // divider and takes the caret only on a click.
+  const interjecting = interject !== null
+  useLayoutEffect(() => {
+    if (!interjecting) return
+    setHover(false)
+    setPinned(false)
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active.id === 'game-action') active.blur()
+  }, [interjecting])
+
+  // A dead well holds no caret.
+  useEffect(() => {
+    if (props.inputDead) setPinned(false)
+  }, [props.inputDead])
+
+  /** The well is out: always on the turn's own row, and mid-reply only while held open. */
+  const wellOut = interject === null || (interject === 'open' && (hover || pinned))
+
+  /** Which word the divider last said, held while it fades so it does not change on the way out. */
+  const dividerLocked = useRef(false)
+  if (interject !== null) dividerLocked.current = interject === 'locked'
 
   /**
    * The stamp landing is what lets the box come in — a completion rather than a timer, so the two
@@ -313,6 +369,10 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         onTypeHold={props.onTypeHold}
         skips={props.skips}
         rowShown={rowShown}
+        wellAway={rowShown && !wellOut}
+        turnUp={rowShown && interject === null}
+        onRewind={props.onRewind}
+        cuts={props.cuts}
         onAdvance={props.onAdvance}
         chips={
           <>
@@ -341,10 +401,12 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
       />
 
       {/* The turn, on the box's own gutters. `.vu-turn` is what a row is and `.vu-scene-row` is
-          where this screen puts one; the exam's four answers stand in the same place. */}
+          where this screen puts one; the exam's four answers stand in the same place. What the
+          row says of its well is what decides which of its parts hear the pointer. */}
       <motion.div
         ref={row}
         className="vu-turn vu-scene-row"
+        data-well={wellOut ? 'out' : interject === 'locked' ? 'locked' : 'away'}
         variants={sceneRow}
         initial="hidden"
         animate={rowShown && !dark ? 'shown' : 'hidden'}
@@ -368,20 +430,31 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
           </div>
         ) : (
           <>
-            <SceneTips live={rowShown && !dark} />
+            <SceneTips live={rowLive} shown={wellOut} />
             <TurnField
               action={props.action}
               onAction={props.onAction}
-              onSubmit={props.onSubmit}
+              onSubmit={interject === null ? props.onSubmit : props.onInterject}
               sending={props.sending}
               cg={props.cg}
               submitDead={props.submitDead}
               inputDead={props.inputDead}
-              focus={rowShown && !dark && props.inputFocus}
+              focus={rowLive && props.inputFocus}
               placeholder="What do you do?"
               multiline
+              revealed={wellOut}
+              overlay={
+                <SceneDivider
+                  state={wellOut ? 'hidden' : interject === 'locked' ? 'dim' : 'shown'}
+                  locked={dividerLocked.current}
+                />
+              }
+              onHover={setHover}
+              onFocus={() => setPinned(true)}
+              onBlur={() => setPinned(false)}
             />
-            {props.giftShown && (
+            {/* Mid-reply the row offers the well alone: a present is handed over on a turn. */}
+            {props.giftShown && interject === null && (
               <motion.div
                 className="vu-scene-gift"
                 variants={seat}
@@ -467,18 +540,23 @@ const TIPS = [
  * The mark in the margin the date stamp keeps clear — a question mark over its caption — and the
  * card of tips a hover over it raises across the box. The seat hears the pointer and the mark
  * itself takes none, so the card — which takes none either — cannot end the hover that raised it.
+ * The mark stands only with the well: the tips are about writing a turn.
  */
-function SceneTips({ live }: { live: boolean }): JSX.Element {
+function SceneTips({ live, shown }: { live: boolean; shown: boolean }): JSX.Element {
   const [hover, setHover] = useState(false)
   // The row goes inert with the pointer still on the mark and reports no boundary for it, so the
-  // hover is dropped with the row rather than found still standing when the turn comes back.
+  // hover is dropped with the row rather than found still standing when the turn comes back; a
+  // mark put away with the well drops it the same way.
   useEffect(() => {
-    if (!live) setHover(false)
-  }, [live])
+    if (!live || !shown) setHover(false)
+  }, [live, shown])
 
   return (
-    <div
+    <motion.div
       className="vu-scene-help"
+      variants={wellMark}
+      initial={false}
+      animate={shown ? 'shown' : 'hidden'}
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
     >
@@ -511,7 +589,36 @@ function SceneTips({ live }: { live: boolean }): JSX.Element {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
+  )
+}
+
+/**
+ * What stands in the well's place while a reply is being read: a rule either side of a state word
+ * saying how to bring the well out, or that the class will not be interrupted yet. It is the row's
+ * one hover target while the well is away (`Scene.css`), and the well's box it sits in hears the
+ * move that swaps the two as the strip's events bubble up to it.
+ */
+function SceneDivider({
+  state,
+  locked
+}: {
+  state: 'shown' | 'dim' | 'hidden'
+  locked: boolean
+}): JSX.Element {
+  return (
+    <motion.div
+      className="vu-scene-divider"
+      variants={sceneDivider}
+      initial={false}
+      animate={state}
+    >
+      <span className="vu-scene-divider-rule" />
+      <span className="vu-scene-divider-word">
+        {locked ? 'CLASS IN SESSION' : 'HOVER TO SHOW ACTION BOX'}
+      </span>
+      <span className="vu-scene-divider-rule" />
+    </motion.div>
   )
 }
 

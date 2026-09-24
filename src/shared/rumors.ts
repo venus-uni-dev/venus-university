@@ -1,4 +1,5 @@
 import { areNpcFriends, npcFriendsOf, type NpcRelationshipMap } from './npcRelationships'
+import { readerize } from './readerVoice'
 import { andList } from './sentences'
 import { shuffle } from './shuffle'
 import type { CharInfo, CharMemory, IntimateAct, Suspicion } from './types'
@@ -15,16 +16,20 @@ const SUSPICION_SLOTS = 14
 /** The odds one girl with nowhere to be walks past an hour nobody else was there for. */
 const PASSERBY_CHANCE = 0.25
 
-/** Files a jealousy memory, refreshing rather than duplicating. */
+/**
+ * Files a jealousy memory, refreshing rather than duplicating: one that says the same in either
+ * voice takes the new date and the new wording.
+ */
 export function upsertJealousyMemory(
   list: readonly CharMemory[] | undefined,
   entry: CharMemory
 ): CharMemory[] {
   const existing = list ?? []
-  const at = existing.findIndex((memory) => memory.desc === entry.desc)
+  const said = readerize(entry.desc)
+  const at = existing.findIndex((memory) => readerize(memory.desc) === said)
   if (at < 0) return [...existing, entry]
   const next = [...existing]
-  next[at] = { ...next[at], date: entry.date }
+  next[at] = { ...next[at], date: entry.date, desc: entry.desc }
   return next
 }
 
@@ -148,18 +153,18 @@ export function rumorPass(
       if (stake.kind === 'lover') {
         if (saw) type = 'hated'
         desc = saw
-          ? `she saw you cheating on her with ${named}`
-          : `she heard from ${teller} that you cheated on her with ${named}`
+          ? `she saw the reader cheating on her with ${named}`
+          : `she heard from ${teller} that the reader cheated on her with ${named}`
       } else if (stake.kind === 'crush') {
         if (saw) type = 'hated'
         desc = saw
-          ? `she saw you with ${named}`
-          : `she heard from ${teller} that you were with ${named}`
+          ? `she saw the reader with ${named}`
+          : `she heard from ${teller} that the reader was with ${named}`
       } else {
         const jilted = andList(stake.jilted.map(nameOf))
         desc = saw
-          ? `she saw you cheating on ${jilted} with ${named}`
-          : `she heard from ${teller} that you cheated on ${jilted} with ${named}`
+          ? `she saw the reader cheating on ${jilted} with ${named}`
+          : `she heard from ${teller} that the reader cheated on ${jilted} with ${named}`
       }
       const key = `${w}|${desc}`
       if (written.has(key)) return

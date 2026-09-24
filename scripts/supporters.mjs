@@ -14,9 +14,11 @@ const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const LEDGER = join(REPO, 'private', 'supporters.json')
 const DERIVED = join(REPO, 'assets', 'supporters.json')
 
-/** How many marbles a contribution of `dollars` earns, on a diminishing scale. */
+/** How many marbles a contribution of `dollars` earns: two, plus one for every tripling. */
 export function marblesFor(dollars) {
-  return 2 + Math.floor(Math.log2(Math.max(1, dollars)))
+  let marbles = 2
+  for (let left = Math.max(1, dollars); left >= 3; left /= 3) marbles++
+  return marbles
 }
 
 /** Sorts names case-insensitively, with the plain compare breaking a tie. */

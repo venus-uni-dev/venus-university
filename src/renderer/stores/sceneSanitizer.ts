@@ -14,10 +14,10 @@ import {
   milestoneStatusLines as milestoneLinesFor,
   overTextDesc
 } from '@shared/relationship'
+import { storedMemoryDesc } from '@shared/readerVoice'
 import { parseAction, showAction, spriteAction } from '@shared/sceneActions'
 import { splitSentences } from '@shared/sentences'
 import { giftStatusMarkedLine } from '@shared/shop'
-import { sfwCgRefOf, sfwSpriteRefOf } from '@shared/sfw'
 import {
   allBackgrounds,
   charKeyOf,
@@ -37,9 +37,14 @@ import {
 } from '@shared/types'
 import { ACT_KINDS } from '../prompts/scenePrompt'
 import { useAssetStore } from './assetStore'
-import { blankCharInfo, PORTRAIT_SLOTS, UNKNOWN_NAME, useGameStore } from './gameStore'
-import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
-import { retireCgs } from './stageDisplay'
+import {
+  blankCharInfo,
+  PORTRAIT_SLOTS,
+  stageContextOf,
+  UNKNOWN_NAME,
+  useGameStore
+} from './gameStore'
+import { stageFactsOf, stepStage } from './stageStep'
 import { addContact, IGNORED_TEXT_DESC, TURNED_DOWN_DESC, unblockContact } from './textingLoop'
 
 /**
@@ -91,77 +96,24 @@ export interface StageAsWritten {
   hidden: Set<string>
 }
 
-/** The charIds of the characters a list of charKeys names; an unknown key is dropped. */
-function idsOf(charKeys: readonly string[], charKeyToId: Record<string, string>): string[] {
-  return charKeys.flatMap((charKey) => (charKeyToId[charKey] ? [charKeyToId[charKey]] : []))
-}
-
 /**
  * The stage as *written*: the played stage, run forward through the actions still queued ahead
  * of this call's first line.
  */
 export function stageAsWritten(): StageAsWritten {
   const game = useGameStore.getState()
-  // Read once for the walk; the SFW substitution matches the one advanceLine makes per line.
-  const noNsfwImages = noNsfwImagesOf(useSettingsStore.getState())
+  // Read once for the walk, as advanceLine reads it once per line.
+  const ctx = stageContextOf(game)
+  let stage = stageFactsOf(game)
+  for (const line of game.pendingLines) stage = stepStage(stage, line, ctx).stage
 
-  const onStage: string[] = []
-  let emotions = { ...game.emotions }
-  // The retirement `advanceLine` makes when the stage stops being one girl's.
-  const retireCtx = { outfitReady: game.outfitReady, noNsfwImages }
-  const hidden = new Set([...Object.keys(game.offStage), ...game.departed])
-  let bg = game.bg
-  for (const charId of game.slots) {
+  const onStage = stage.slots.flatMap((charId) => {
     const character = charId ? game.characters[charId] : undefined
-    if (character) onStage.push(charKeyOf(character.firstName, character.lastName))
-  }
-  for (const line of game.pendingLines) {
-    if (line.bg !== undefined) bg = line.bg
-    for (const rawAction of line.actions ?? []) {
-      const action = parseAction(rawAction)
-      if (!action) continue
-      if (action.kind === 'cg') {
-        // A CG names no character: it is the lone occupant's.
-        const [only, ...others] = onStage
-        const charId = only && others.length === 0 ? game.charKeyToId[only] : undefined
-        if (charId) {
-          emotions[charId] = noNsfwImages
-            ? sfwCgRefOf(action.position, emotions[charId])
-            : action.position
-        }
-      } else if (action.kind === 'show') {
-        // The absence ends on the word, as it does in advanceLine — before the cap below, which
-        // can turn the same action away.
-        const charId = game.charKeyToId[action.charKey]
-        if (charId) hidden.delete(charId)
-        // The same cap advanceLine applies: a show past a full stage stages nobody.
-        if (!onStage.includes(action.charKey) && onStage.length < PORTRAIT_SLOTS) {
-          // A CG is one girl by herself: somebody joining her ends it, as in the store.
-          emotions = retireCgs(emotions, idsOf(onStage, game.charKeyToId), retireCtx)
-          onStage.push(action.charKey)
-        }
-      } else if (action.kind === 'hide') {
-        const at = onStage.indexOf(action.charKey)
-        if (at !== -1) onStage.splice(at, 1)
-        // Opened whether or not she held a slot, which is the entry advanceLine opens.
-        const charId = game.charKeyToId[action.charKey]
-        if (charId) {
-          hidden.add(charId)
-          // Her CG ends when she walks off, as in the store.
-          emotions = retireCgs(emotions, [charId], retireCtx)
-        }
-      } else if (action.kind === 'sprite') {
-        // Sticky, and one of the things that retires a CG, which sits in the same map.
-        const charId = game.charKeyToId[action.charKey]
-        if (charId) {
-          emotions[charId] = noNsfwImages
-            ? sfwSpriteRefOf(action.ref, emotions[charId])
-            : action.ref
-        }
-      }
-    }
-  }
-  return { onStage, emotions, bg, hidden }
+    return character ? [charKeyOf(character.firstName, character.lastName)] : []
+  })
+  // An absence still running and a departure already settled are both off it.
+  const hidden = new Set([...Object.keys(stage.offStage), ...stage.departed])
+  return { onStage, emotions: { ...stage.emotions }, bg: stage.bg, hidden }
 }
 
 /**
@@ -358,14 +310,14 @@ export function sanitizeScene(
 }
 
 /** One ledger memory that survived validation, resolved to a roster charId. */
-interface ValidMemory {
+export interface ValidMemory {
   charId: string
   type: MemoryType
   desc: string
 }
 
-/** The ledger's memories, minus the rows that cannot be filed. */
-function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
+/** The ledger's memories, minus the rows that cannot be filed, each in the reader's voice. */
+export function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
   const { charKeyToId } = useGameStore.getState()
   const kept: ValidMemory[] = []
 
@@ -383,7 +335,7 @@ function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
       if (log) console.warn('[ledger] memory entry has no description — dropping it.')
       continue
     }
-    kept.push({ charId, type: entry.type, desc: entry.desc.trim() })
+    kept.push({ charId, type: entry.type, desc: storedMemoryDesc(entry.desc) })
   }
 
   return kept
@@ -421,7 +373,7 @@ function ledgerTextMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
       continue
     }
     seen.add(charId)
-    kept.push({ charId, type: entry.type, desc: entry.desc.trim() })
+    kept.push({ charId, type: entry.type, desc: storedMemoryDesc(entry.desc) })
   }
 
   return kept

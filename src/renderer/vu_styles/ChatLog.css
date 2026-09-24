@@ -1,5 +1,6 @@
 /* The chat log: the scene so far, as the player read it. No mock — Credits' chassis, a
-   panel of rows in a scroller, with a row built for a line rather than a credit. Imported
+   panel of rows in a scroller, with a row built for a line rather than a credit: the speaker
+   over the words, and a column of tools beside them for rewriting the line in place. Imported
    from the view module, never from index.css.
 
    The veil, the row, the buttons and the foot are base.css's. */
@@ -16,11 +17,43 @@
   user-select: text;
 }
 
-/* The speaker over the line, a stack rather than the row's own single line. */
+/* The line beside its tools, both hung from the top rather than centred on a long line. */
 .vu-chatlog-line {
-  flex-direction: column;
   align-items: flex-start;
+}
+
+/* The speaker over the line, a stack rather than the row's own single line. */
+.vu-chatlog-line-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
   gap: 4px;
+}
+
+/* The row's tools, stacked. The column is there on every row, empty where the line cannot be
+   rewritten, so the words keep one width down the whole log. */
+.vu-chatlog-tools {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 38px;
+}
+
+/* Quiet on the row's recessed face, like the box's back mark: the glyph alone at rest, the
+   hover's tint giving it a face. */
+.vu-chatlog-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: none;
+  color: var(--vu-text-muted);
 }
 
 /* The reader's own words, set apart on a tint face rather than the row's own recessed one. */
@@ -33,7 +66,7 @@
   font: 700 15px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding-left:20px
+  padding-left: 20px;
 }
 
 /* The log reads at the box's own size — the words she said are the same size read twice
@@ -42,7 +75,16 @@
   color: var(--vu-text-body);
   font: 500 26px/1.5 var(--font-body);
   white-space: pre-wrap;
-  padding-left:30px
+  padding-left: 30px;
+}
+
+/* A line being rewritten, in the log's own type and at the words' own inset, so the swap moves
+   nothing. It has no cap: it grows with its text, pushing the rows below down the scroller. */
+.vu-chatlog-edit {
+  margin-left: 30px;
+  width: calc(100% - 30px);
+  color: var(--vu-text-body);
+  font: 500 26px/1.5 var(--font-body);
 }
 
 /* The log's empty line is read at the log's own size. */

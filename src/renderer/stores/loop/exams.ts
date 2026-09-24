@@ -79,7 +79,8 @@ export async function startExam(
   useGameStore
     .getState()
     .setSceneSummary(
-      `The reader sat the ${exam === 'midterm' ? 'midterm' : 'final'} exam for ${entry.name}.`
+      `The reader sat the ${exam === 'midterm' ? 'midterm' : 'final'} exam for ${entry.name}.`,
+      useGameStore.getState().currentSceneTranscript.length
     )
 
   // The exam's ending, fired as the paper lands so it runs under the questions: the
@@ -168,7 +169,7 @@ function finishExam(): void {
       : QUIZ_IMPERFECT_LINE
   ])
 
-  loopState.pendingEnd = true
+  useGameStore.getState().setSceneEnding(true)
   loopState.endingInFlight = true
   loopState.endingAbandoned = false
   loopState.endBase = null

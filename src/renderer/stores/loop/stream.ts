@@ -13,7 +13,7 @@ import { boxFits } from '../../views/boxRows'
 import { owedFloor } from '../replyFloor'
 import { sceneCoverClosing } from '../slotCrossing'
 import { advance } from './hooks'
-import { currentRun, loopState, runStale, LOOP_LLM_GROUP } from './state'
+import { currentRun, loopState, runStale, SCENE_LLM_GROUP } from './state'
 
 /** The one channel every scene call goes down. */
 
@@ -80,9 +80,15 @@ export interface PreviewSink {
   held: SceneLine[]
 }
 
-/** What one scene call comes back with, resolved. */
+/**
+ * What one scene call comes back with, resolved; `at` is the transcript length the call was
+ * made at, which is what the reply's summary covers up to.
+ */
 export type SceneCall = Promise<
-  | { ok: true; data: { lines: SceneLine[]; summary: string | null; end: boolean; applied: boolean } }
+  | {
+      ok: true
+      data: { lines: SceneLine[]; summary: string | null; end: boolean; applied: boolean; at: number }
+    }
   | { ok: false; error: AppError }
 >
 
@@ -106,7 +112,8 @@ export function sceneInProgress(): boolean {
 
 /**
  * Runs one scene request for an action or wrap-up turn. Streams sanitized preview
- * lines behind the reply floor, then reconciles with the resolved response.
+ * lines behind the reply floor, then reconciles with the resolved response. It becomes the one
+ * live scene call, and a later one or an interjection abandons it.
  */
 export async function streamScene(
   request: StructuredRequest,
@@ -114,6 +121,13 @@ export async function streamScene(
   options: SanitizerOptions = {}
 ): SceneCall {
   const run = currentRun()
+  // Claimed before the first await, so whoever starts the next call or cuts this one short
+  // abandons it from that moment.
+  const mine = {}
+  loopState.sceneCall = mine
+  const at = useGameStore.getState().currentSceneTranscript.length
+  /** The run was left, or another scene call or an interjection has taken this one's place. */
+  const abandoned = (): boolean => runStale(run) || loopState.sceneCall !== mine
 
   // The override that answers the edit modal is spent here — by no prefetch, which has no
   // failed turn of its own and must not swallow a resend's.
@@ -166,7 +180,7 @@ export async function streamScene(
   function payFloor(): void {
     if (floorPaid) return
     floorPaid = true
-    if (floorHeld.length === 0 || runStale(run)) return
+    if (floorHeld.length === 0 || abandoned()) return
     emit(floorHeld.splice(0))
   }
 
@@ -181,8 +195,8 @@ export async function streamScene(
         })
 
   const unsubscribe = window.api.llm.onSceneDelta((delta) => {
-    // The broadcast outlives the run.
-    if (runStale(run)) return
+    // The broadcast outlives the run, and the call.
+    if (abandoned()) return
 
     const fresh = extractor
       .feed(delta)
@@ -201,18 +215,19 @@ export async function streamScene(
 
   let result: Awaited<ReturnType<typeof window.api.llm.completeScene>>
   try {
-    result = await window.api.llm.completeScene(request, LOOP_LLM_GROUP)
+    result = await window.api.llm.completeScene(request, SCENE_LLM_GROUP)
     // Inside the `try`, so the flag below falls on the far side of the floor and a drained
     // queue cannot read as the end of a scene still owed lines.
-    if (floor && !runStale(run)) await floor
+    if (floor && !abandoned()) await floor
   } finally {
     unsubscribe()
     if (sink) sink.settled = true
-    // An abandoned call lowering it would clear the spinner off a scene still streaming.
-    if (!runStale(run)) useGameStore.getState().setStreaming(false)
+    // An abandoned call lowering it would clear the spinner off a scene still streaming, or off
+    // the turn that took its place.
+    if (!abandoned()) useGameStore.getState().setStreaming(false)
   }
 
-  if (runStale(run)) return { ok: false, error: appError('CANCELLED', 'The scene was abandoned.') }
+  if (abandoned()) return { ok: false, error: appError('CANCELLED', 'The scene was abandoned.') }
 
   if (!result.ok) return result
 
@@ -220,7 +235,7 @@ export async function streamScene(
   const { lines, summary, end } = sanitizeScene(result.data, options)
 
   // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole.
-  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false } }
+  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, at } }
 
   const game = useGameStore.getState()
 
@@ -243,19 +258,11 @@ export async function streamScene(
     game.setWaitingForLine(true)
   }
 
-  // Retire only authoritative lines into the new summary; without a summary,
-  // keep accumulating the transcript.
-  if (summary) {
-    const live = useGameStore.getState()
-    live.setSceneSummary(summary)
-    live.setSceneTranscript(lines)
-  }
-
   // Nothing may report itself finished while its own lines are still behind a sheet: a caller
   // that read the store here would find a scene that has not arrived yet.
   await delivered
 
-  return { ok: true, data: { lines, summary, end, applied: true } }
+  return { ok: true, data: { lines, summary, end, applied: true, at } }
 }
 
 /** Hands playback back to a player parked on the spinner at the end of the queue. */

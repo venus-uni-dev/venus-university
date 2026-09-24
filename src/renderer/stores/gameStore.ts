@@ -4,13 +4,23 @@ import {
   emptyFlags,
   foldRelationshipEvents,
   MEMORY_CAP,
-  refreshedFlags
+  refreshedFlags,
+  withMemoryReplaced
 } from '@shared/relationship'
-import { parseSpriteRef } from '@shared/outfits'
-import { parseAction } from '@shared/sceneActions'
 import { escapeRegExp } from '@shared/sentences'
-import { sfwCgRefOf, sfwSpriteRefOf } from '@shared/sfw'
 import { displaySlotsOf, retireCgs } from './stageDisplay'
+import {
+  chargeAbsences,
+  lastReaderIndexOf,
+  lineEditable,
+  PORTRAIT_SLOTS,
+  rewindTargetOf,
+  stageAt,
+  stageFactsOf,
+  stepStage,
+  type StageContext
+} from './stageStep'
+import type { MemoryEditRow } from './loop/memoryEdit'
 import type { StatusModal } from './loop/statusSteps'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
 import {
@@ -86,15 +96,13 @@ import {
   type SceneLine,
   type SpriteRef,
   type SceneState,
+  type SceneSummaryMark,
   type SlotRumor,
   type TimeSlot
 } from '@shared/types'
 
-/** Number of on-screen portrait slots — left, center, right. Fixed. */
-export const PORTRAIT_SLOTS = 3
-
-/** How many drained turns off-stage make a `hide:` a departure rather than a step outside. */
-const DEPARTURE_TURNS = 2
+/** The portrait slot count, for the callers that read it off the store. */
+export { PORTRAIT_SLOTS }
 
 /** What a character is called before the reader has learned her name. */
 export const UNKNOWN_NAME = '???'
@@ -333,10 +341,27 @@ interface GameStoreState {
   sceneGifts: SceneGift[]
   /** The exam being sat this slot, or null when the slot is an ordinary scene. */
   sceneQuiz: QuizState | null
-  /** In-memory scene transcript since the last `sceneSummary`. */
+  /** The scene as delivered: the reader's action lines and every reply line, in order. */
   currentSceneTranscript: SceneLine[]
-  /** Running in-memory scene summary; promoted to `history` at slot boundary. */
+  /**
+   * The running summary the last reply came with — the top of {@link sceneSummaries} — or null;
+   * promoted to `history` at slot boundary.
+   */
   sceneSummary: string | null
+  /** The summaries in the order they landed, each with the transcript length it covers up to. */
+  sceneSummaries: SceneSummaryMark[]
+  /**
+   * The scene has said its last word and is playing out its ending. Never captured: the loop
+   * writes the ending onto a save itself.
+   */
+  sceneEnding: boolean
+  /** The scene-end status sequence has been raised. **Transient** like {@link statusModal}. */
+  statusShown: boolean
+  /**
+   * Bumped by every cut the view lands at once rather than types out: a line {@link rewindLine}
+   * steps back to, or the shown line {@link editLogLine} rewrites. Transient.
+   */
+  lineRewound: number
   /** True while the engine is awaiting a player action. */
   awaitingInput: boolean
   /** The ending `beginSlot` opened this slot on, or null while the playthrough still runs. */
@@ -389,6 +414,13 @@ interface GameStoreState {
    */
   statusModal: StatusModal | null
 
+  /**
+   * The boundary's memory question while it stands, or null. **Transient** like
+   * {@link statusModal} and never written to a save: the boundary is replayed from the ending's
+   * save and asks again.
+   */
+  memoryEdit: readonly MemoryEditRow[] | null
+
   /** Scene lines not yet reached by playback. Consumed one per advance. */
   pendingLines: SceneLine[]
   /** The line currently on screen, or null before the first advance. */
@@ -420,7 +452,7 @@ interface GameStoreState {
   /** Sticky mirrored-sprite flag, keyed by charId; decided when she is shown. */
   flipped: Record<string, boolean>
   /**
-   * charIds who have sat out {@link DEPARTURE_TURNS} turns off-stage. They stay
+   * charIds who have sat out `DEPARTURE_TURNS` turns off-stage. They stay
    * in `cast` but drop out of every prompt the scene builds from here on.
    */
   departed: string[]
@@ -505,6 +537,8 @@ interface GameStoreState {
   restoreScene: (scene: SceneState | null) => void
   /** Raises or drops the scene-end screen; the loop owns which and when. */
   setStatusModal: (modal: StatusModal | null) => void
+  /** Raises or drops the boundary's memory question; the loop owns which rows and when. */
+  setMemoryEdit: (rows: readonly MemoryEditRow[] | null) => void
   /** Replaces the playback queue with a freshly received scene's lines. */
   setPendingLines: (lines: SceneLine[]) => void
   /** Appends to the tail of the playback queue, as streamed lines arrive. */
@@ -526,13 +560,35 @@ interface GameStoreState {
    * inside a scene already running, rather than the one that opens it.
    */
   logPlayerAction: (text: string, continues: boolean) => void
-  /** Replaces the transcript wholesale — how a fresh summary retires the lines it absorbed. */
-  setSceneTranscript: (lines: SceneLine[]) => void
-  /** Drops the last `count` transcript entries — used to unwind a discarded preview. */
+  /**
+   * Drops the last `count` transcript entries — used to unwind a discarded preview — and every
+   * summary that covered one of them.
+   */
   dropSceneTranscript: (count: number) => void
-  /** Clears the transcript *and* the running summary; the two are one unit. */
+  /** Clears the transcript *and* every summary; the two are one unit. */
   clearSceneTranscript: () => void
-  setSceneSummary: (summary: string | null) => void
+  /** Files a reply's running summary, covering the transcript up to length `at`. */
+  setSceneSummary: (summary: string, at: number) => void
+  /**
+   * Cuts the lines of the current reply the player has not reached out of the queue and the
+   * transcript alike, and every summary that covered one of them. The reader's last line stays.
+   */
+  truncateUnread: () => void
+  /**
+   * Steps playback back to the previous line of the current reply that says something, putting
+   * the lines after it back on the queue and the stage back as it stood there. Returns false,
+   * changing nothing, when the current line is the reply's first.
+   */
+  rewindLine: () => boolean
+  /**
+   * Rewrites the text of `sceneLog[at]`, a line of the current reply, on the log, on its
+   * transcript line and on screen when it is the line shown. Returns false, changing nothing,
+   * when the line is the reader's, before his last action, a status line, or already says
+   * `text`.
+   */
+  editLogLine: (at: number, text: string) => boolean
+  setSceneEnding: (ending: boolean) => void
+  setStatusShown: (shown: boolean) => void
   /** Files the running summary under the slot that just finished. */
   commitSceneToHistory: (date: number, time: TimeSlot) => void
   /**
@@ -580,6 +636,11 @@ interface GameStoreState {
   /** Empties the scene's gift list at a scene boundary or a slot opening. */
   clearSceneGifts: () => void
   recordMemory: (charId: string, entry: CharMemory) => void
+  /**
+   * Rewrites every copy of one memory she holds to `next`, or forgets it where `next` is null;
+   * a memory she does not hold changes nothing.
+   */
+  replaceMemory: (charId: string, match: CharMemory, next: CharMemory | null) => void
   /** Files what this slot's texting left her with, **replacing** the last slot's. */
   setTextMemory: (charId: string, entry: CharMemory) => void
   /** Remembers what the scene-end status lines just told him about her standards. */
@@ -920,6 +981,32 @@ const emptyStage = {
   sparkle: null as { charId: string; key: number } | null
 }
 
+/**
+ * What applying a line reads off the store and the settings. The setting is read once per call,
+ * and an unloaded settings record reads as off.
+ */
+export function stageContextOf(state: Omit<StageContext, 'noNsfwImages'>): StageContext {
+  return {
+    charKeyToId: state.charKeyToId,
+    characters: state.characters,
+    outfitReady: state.outfitReady,
+    noNsfwImages: noNsfwImagesOf(useSettingsStore.getState())
+  }
+}
+
+/**
+ * The summary marks left once the transcript is cut to `length`, with the running summary
+ * re-derived off the top one; nothing at all when every mark survives.
+ */
+function summariesWithin(
+  marks: readonly SceneSummaryMark[],
+  length: number
+): Partial<Pick<GameStoreState, 'sceneSummaries' | 'sceneSummary'>> {
+  const kept = marks.filter((mark) => mark.at <= length)
+  if (kept.length === marks.length) return {}
+  return { sceneSummaries: kept, sceneSummary: kept[kept.length - 1]?.summary ?? null }
+}
+
 /** A blank stage with its own containers — `emptyStage`'s are shared module-scope objects. */
 function freshStage(): typeof emptyStage {
   return {
@@ -1012,6 +1099,10 @@ const initialState = {
   sceneQuiz: null as QuizState | null,
   currentSceneTranscript: [] as SceneLine[],
   sceneSummary: null as string | null,
+  sceneSummaries: [] as SceneSummaryMark[],
+  sceneEnding: false,
+  statusShown: false,
+  lineRewound: 0,
   awaitingInput: false,
   activeGameOver: null as GameOverReason | null,
   endingArt: null as string | null,
@@ -1029,6 +1120,7 @@ const initialState = {
   classifierError: null as AppError | null,
   inputDraft: '',
   statusModal: null as StatusModal | null,
+  memoryEdit: null as readonly MemoryEditRow[] | null,
   pendingLines: [] as SceneLine[],
   currentLine: null as SceneLine | null,
   cgReady: {} as Record<string, boolean>,
@@ -1189,6 +1281,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         : {}),
       transcript: [...state.currentSceneTranscript],
       summary: state.sceneSummary,
+      ...(state.sceneSummaries.length > 0
+        ? { summaries: state.sceneSummaries.map((mark) => ({ ...mark })) }
+        : {}),
       bg: state.bg,
       slots: [...state.slots],
       emotions: { ...state.emotions },
@@ -1219,6 +1314,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         : null,
       currentSceneTranscript: scene ? [...scene.transcript] : [],
       sceneSummary: scene?.summary ?? null,
+      // A save from before the marks has a summary covering nothing its transcript still holds.
+      sceneSummaries:
+        scene?.summaries?.map((mark) => ({ ...mark })) ??
+        (scene?.summary ? [{ at: 0, summary: scene.summary }] : []),
       bg: scene?.bg ?? null,
       slots: scene ? [...scene.slots] : Array<string | null>(PORTRAIT_SLOTS).fill(null),
       emotions: scene ? { ...scene.emotions } : {},
@@ -1234,6 +1333,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   setStatusModal: (modal) => set({ statusModal: modal }),
+
+  setMemoryEdit: (rows) => set({ memoryEdit: rows }),
 
   setPendingLines: (lines) => set({ pendingLines: lines }),
 
@@ -1270,19 +1371,110 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       }
     }),
 
-  setSceneTranscript: (lines) => set({ currentSceneTranscript: lines }),
-
   dropSceneTranscript: (count) =>
+    set((state) => {
+      const kept = Math.max(0, state.currentSceneTranscript.length - count)
+      return {
+        currentSceneTranscript: state.currentSceneTranscript.slice(0, kept),
+        ...summariesWithin(state.sceneSummaries, kept)
+      }
+    }),
+
+  clearSceneTranscript: () =>
+    set({ currentSceneTranscript: [], sceneSummary: null, sceneSummaries: [] }),
+
+  setSceneSummary: (summary, at) =>
     set((state) => ({
-      currentSceneTranscript: state.currentSceneTranscript.slice(
-        0,
-        Math.max(0, state.currentSceneTranscript.length - count)
-      )
+      sceneSummary: summary,
+      sceneSummaries: [...state.sceneSummaries, { at, summary }]
     })),
 
-  clearSceneTranscript: () => set({ currentSceneTranscript: [], sceneSummary: null }),
+  truncateUnread: () =>
+    set((state) => {
+      const transcript = state.currentSceneTranscript
+      // Never past the reader's own last line: the unread lines are all the current reply's.
+      const kept = Math.max(
+        transcript.length - state.pendingLines.length,
+        lastReaderIndexOf(transcript) + 1
+      )
+      return {
+        currentSceneTranscript: transcript.slice(0, kept),
+        pendingLines: [],
+        ...summariesWithin(state.sceneSummaries, kept)
+      }
+    }),
 
-  setSceneSummary: (summary) => set({ sceneSummary: summary }),
+  rewindLine: () => {
+    const state = get()
+    const log = state.sceneLog
+    const target = rewindTargetOf(log)
+    if (target === -1) return false
+    const sceneLog = log.slice(0, target + 1)
+    const ctx = stageContextOf(state)
+    const stage = stageAt(sceneLog, ctx)
+    // A CG stands only for a lone girl on the stage as displayed, so one the hand ended stays
+    // ended.
+    const shown = displaySlotsOf(stage.slots, state.stageOverride).filter(
+      (id): id is string => Boolean(id)
+    )
+    const emotions = retireCgs(
+      stage.emotions,
+      Object.keys(stage.emotions).filter((id) => shown.length !== 1 || shown[0] !== id),
+      ctx
+    )
+    set({
+      pendingLines: [...log.slice(target + 1), ...state.pendingLines],
+      sceneLog,
+      currentLine: log[target],
+      bg: stage.bg,
+      slots: stage.slots,
+      emotions,
+      flipped: stage.flipped,
+      offStage: stage.offStage,
+      departed: stage.departed,
+      lineRewound: state.lineRewound + 1
+    })
+    return true
+  },
+
+  editLogLine: (at, text) => {
+    const state = get()
+    const log = state.sceneLog
+    if (!lineEditable(log, at) || text === log[at].text) return false
+    const old = log[at]
+    const edited: SceneLine = { ...old, text }
+    const sceneLog = log.map((line, i) => (i === at ? edited : line))
+    // The current reply runs from the reader's last action on the log and the transcript alike,
+    // in one order: a streamed line goes onto the transcript and the queue together, and a cut
+    // of the unread tail never reaches back past the reader's line. So the line sits as far past
+    // his action on the one as on the other. A line only the log holds (a landing's opening
+    // narration, an ending's goodbyes) finds some other line there, and the transcript is kept.
+    const transcript = state.currentSceneTranscript
+    const tAt = lastReaderIndexOf(transcript) + (at - lastReaderIndexOf(log))
+    const mirror = transcript[tAt]
+    const currentSceneTranscript =
+      mirror && mirror.speaker === old.speaker && mirror.text === old.text
+        ? transcript.map((line, i) => (i === tAt ? edited : line))
+        : transcript
+    // The line on screen is the log's last, but a restored one is a copy, so it is matched by
+    // value. Rewriting it is a cut: the new words land whole.
+    const current = state.currentLine
+    const shown =
+      at === log.length - 1 &&
+      current !== null &&
+      current.speaker === old.speaker &&
+      current.text === old.text
+    set({
+      sceneLog,
+      currentSceneTranscript,
+      ...(shown ? { currentLine: edited, lineRewound: state.lineRewound + 1 } : {})
+    })
+    return true
+  },
+
+  setSceneEnding: (ending) => set({ sceneEnding: ending }),
+
+  setStatusShown: (shown) => set({ statusShown: shown }),
 
   commitSceneToHistory: (date, time) =>
     set((state) => {
@@ -1311,104 +1503,20 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const [next, ...rest] = state.pendingLines
     if (!next) return false
 
-    // Stage mutations are applied as the line is *reached*, never eagerly on receipt.
-    const slots = [...state.slots]
-    let emotions = { ...state.emotions }
-    const flipped = { ...state.flipped }
-    let departed = state.departed
-    let offStage = state.offStage
-    let stageOverride = state.stageOverride
+    // Stage mutations are applied as the line is *reached*, never eagerly on receipt. The setting
+    // is read once per line, so a mid-scene toggle cannot split a line's actions.
+    const step = stepStage(stageFactsOf(state), next, stageContextOf(state))
+
+    // The first happy face she puts on this turn is worth a coin toss, and a won toss throws
+    // sparkles off her — only for somebody the line leaves standing on the stage at that action,
+    // and never before the reader has acted in the scene, so an opening reply never chimes.
     let brightened = state.brightened
     let sparkle = state.sparkle
-    // The one read of the setting per line, so a mid-scene toggle cannot split a line's actions.
-    // An unloaded settings record reads as off.
-    const noNsfwImages = noNsfwImagesOf(useSettingsStore.getState())
-    // What a CG the stage stops belonging to alone is swapped back to.
-    const retireCtx = { outfitReady: state.outfitReady, noNsfwImages }
-    // The wardrobes this line puts somebody in, folded into `charInfo` below.
-    const wardrobesSeen: [string, OutfitSet][] = []
-
-    // In the order written, so a `sprite:`/`cg:` behind a `show:` lands on a stage that holds her.
-    // Everything here has been through the sanitizer; this applies, never re-validates.
-    for (const rawAction of next.actions ?? []) {
-      const action = parseAction(rawAction)
-      if (!action) continue
-
-      if (action.kind === 'cg') {
-        // A CG names no character: it is the lone occupant's.
-        const [only, ...others] = slots.filter((id): id is string => Boolean(id))
-        // Withheld, the CG becomes an expression on the clothes she is already in.
-        if (only && others.length === 0) {
-          emotions[only] = noNsfwImages
-            ? sfwCgRefOf(action.position, emotions[only])
-            : action.position
-        }
-        continue
-      }
-
-      const charId = state.charKeyToId[action.charKey]
-      if (!charId) continue
-
-      // A `show:`/`hide:` for her is the scene overruling the hand; a `sprite:` is not one.
-      if ((action.kind === 'show' || action.kind === 'hide') && charId in stageOverride) {
-        stageOverride = { ...stageOverride }
-        delete stageOverride[charId]
-      }
-
-      if (action.kind === 'show') {
-        // Walking back in ends the absence outright and cancels a departure.
-        if (departed.includes(charId)) departed = departed.filter((id) => id !== charId)
-        if (charId in offStage) {
-          offStage = { ...offStage }
-          delete offStage[charId]
-        }
-        if (!slots.includes(charId)) {
-          const free = slots.indexOf(null)
-          // A fourth character is dropped by the parser before it gets here.
-          if (free !== -1) {
-            slots[free] = charId
-            // A CG is one girl by herself: somebody joining her ends it.
-            emotions = retireCgs(
-              emotions,
-              slots.filter((id): id is string => Boolean(id) && id !== charId),
-              retireCtx
-            )
-          }
-          // A newcomer sharing a pose with somebody on stage mirrors. Decided here and never
-          // revisited.
-          const pose = state.characters[charId]?.pose
-          if (pose && slots.some((id) => id && id !== charId && state.characters[id]?.pose === pose)) {
-            flipped[charId] = true
-          }
-        }
-      } else if (action.kind === 'hide') {
-        const at = slots.indexOf(charId)
-        if (at !== -1) slots[at] = null
-        // Her CG ends when she walks off, so showing her again brings back a sprite.
-        emotions = retireCgs(emotions, [charId], retireCtx)
-        // Off-stage, not gone: the absence starts at zero and is charged by the decision point.
-        // A second `hide:` on someone already off must not restart her clock.
-        if (!(charId in offStage)) offStage = { ...offStage, [charId]: 0 }
-      } else if (action.kind === 'sprite') {
-        // Sticky until another action changes it. Withheld, the nude set is dropped off the
-        // reference and she keeps the wardrobe she is in.
-        emotions[charId] = noNsfwImages
-          ? sfwSpriteRefOf(action.ref, emotions[charId])
-          : action.ref
-        // Read off the reference as *applied*, never as written: a set withheld above was never
-        // on screen, and her page offers the wardrobes she has been seen in.
-        const applied = parseSpriteRef(emotions[charId])
-        if (applied?.set) wardrobesSeen.push([charId, applied.set])
-        // The first happy face she puts on this turn is worth a coin toss, and a won toss
-        // throws sparkles off her — off the same applied reference, only for somebody this
-        // line leaves standing on the stage, and never before the reader has acted in the
-        // scene, so an opening reply never chimes.
-        if (applied?.emotion === 'happy' && !brightened.includes(charId)) {
-          brightened = [...brightened, charId]
-          if (state.sceneActed && slots.includes(charId) && rollsSparkle(Math.random)) {
-            sparkle = { charId, key: (sparkle?.key ?? 0) + 1 }
-          }
-        }
+    for (const { charId, standing } of step.happyFaces) {
+      if (brightened.includes(charId)) continue
+      brightened = [...brightened, charId]
+      if (state.sceneActed && standing && rollsSparkle(Math.random)) {
+        sparkle = { charId, key: (sparkle?.key ?? 0) + 1 }
       }
     }
 
@@ -1425,8 +1533,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     // A wardrobe is learned from the line that puts her in it, on the same copy-on-write:
-    // first-seen order, and never the same set twice.
-    for (const [charId, seen] of wardrobesSeen) {
+    // first-seen order, and never the same set twice. Her page offers the wardrobes she has been
+    // seen in.
+    for (const [charId, seen] of step.wardrobesSeen) {
       const info = charInfo[charId]
       if (!info || info.seenOutfits?.includes(seen)) continue
       if (charInfo === state.charInfo) charInfo = { ...charInfo }
@@ -1437,17 +1546,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       pendingLines: rest,
       charInfo,
       currentLine: next,
-      bg: next.bg ?? state.bg,
-      slots,
-      emotions,
-      flipped,
-      departed,
-      offStage,
-      stageOverride,
+      ...step.stage,
       brightened,
       sparkle,
       // A line that names a background ends the player's own pick — tested against `undefined`,
-      // like `bg` above.
+      // like the scene's own `bg`.
       bgOverride: next.bg !== undefined ? null : state.bgOverride,
       // Logged as reached, not as received, so the log never spoils a queued line.
       sceneLog: [...state.sceneLog, next]
@@ -1457,21 +1560,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   settleDepartures: () =>
     set((state) => {
-      const charIds = Object.keys(state.offStage)
-      if (charIds.length === 0) return {}
-      const offStage = { ...state.offStage }
-      let departed = state.departed
+      if (Object.keys(state.offStage).length === 0) return {}
+      const { offStage, departed, settled } = chargeAbsences(state.offStage, state.departed)
       let stageOverride = state.stageOverride
       let outfitLock = state.outfitLock
-      for (const charId of charIds) {
-        const away = offStage[charId] + 1
-        if (away < DEPARTURE_TURNS) {
-          offStage[charId] = away
-          continue
-        }
-        // Settled: the entry is spent and `departed` answers the prompt builders from here on.
-        delete offStage[charId]
-        if (!departed.includes(charId)) departed = [...departed, charId]
+      for (const charId of settled) {
         // The manual layer does not outlive a departure: her override and lock go too.
         if (charId in stageOverride) {
           if (stageOverride === state.stageOverride) stageOverride = { ...stageOverride }
@@ -1647,6 +1740,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         // Oldest out first.
         memories: [...info.memories, entry].slice(-MEMORY_CAP)
       }))
+    ),
+
+  replaceMemory: (charId, match, next) =>
+    set((state) =>
+      patchCharInfo(state, charId, (info) => (info ? withMemoryReplaced(info, match, next) : null))
     ),
 
   setCrush: (charId) =>
@@ -2351,8 +2449,8 @@ function conversationWith(bunnyboard: BunnyboardState, charId: string): Conversa
 function firstImpression(memories: readonly CharMemory[], date: number): CharMemory {
   const bad = memories[0]?.type === 'disliked' || memories[0]?.type === 'hated'
   return bad
-    ? { date, type: 'disliked', desc: 'you made a bad first impression on her' }
-    : { date, type: 'liked', desc: 'you made a good first impression on her' }
+    ? { date, type: 'disliked', desc: 'the reader made a bad first impression on her' }
+    : { date, type: 'liked', desc: 'the reader made a good first impression on her' }
 }
 
 /**

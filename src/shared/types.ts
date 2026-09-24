@@ -940,14 +940,28 @@ export interface SceneGift {
   reaction: GiftReaction
 }
 
+/** A running summary a scene reply came with, and the transcript length it covers up to. */
+export interface SceneSummaryMark {
+  at: number
+  summary: string
+}
+
 /** Mid-scene save/rewind snapshot — of a drained scene or a queued reply. */
 export interface SceneState {
   /** Cast charIds, fixed for the whole scene. */
   cast: string[]
-  /** The in-progress transcript — lines written since `summary` was produced. */
+  /** The scene as delivered: the reader's action lines and every reply line, in order. */
   transcript: SceneLine[]
-  /** The running summary of everything older than `transcript`, or null. */
+  /**
+   * The running summary the last reply came with, or null; it covers the transcript up to its
+   * mark's `at`.
+   */
   summary: string | null
+  /**
+   * The summaries in the order they landed, each with the transcript length it covers up to;
+   * the last is {@link summary}. Absent when none has landed.
+   */
+  summaries?: SceneSummaryMark[]
   /** Background base name, without the `_day`/`_night` suffix. */
   bg: string | null
   /** charIds occupying the three portrait slots, left to right; null = empty. */
@@ -1621,6 +1635,11 @@ export interface Settings {
    * absent meaning it does.
    */
   checkUpdates?: boolean
+  /**
+   * Whether interjecting during a scene's ending warns first. Optional on disk, absent meaning
+   * it does.
+   */
+  warnEndingInterrupt?: boolean
   /**
    * The version the update check pretends this build is. **Not a player setting** — hand-edited
    * like {@link serviceTier}, for exercising an update against a build already on itch.io.

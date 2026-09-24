@@ -12,6 +12,8 @@ export interface ConfirmModalProps {
   theme: 'day' | 'night'
   title: string
   message: ReactNode
+  /** Drawn under the message, inside the frame and above the foot — a checkbox the answer carries. */
+  aside?: ReactNode
   confirmText?: string
   /** Label for the dismiss button. */
   cancelText?: string
@@ -50,6 +52,7 @@ export function ConfirmModal({
   theme,
   title,
   message,
+  aside,
   confirmText = 'Delete',
   cancelText = 'Cancel',
   busy = false,
@@ -113,6 +116,7 @@ export function ConfirmModal({
       }
     >
       <p className="vu-note-text">{message}</p>
+      {aside}
     </DialogFrame>,
     host
   )

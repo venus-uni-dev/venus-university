@@ -48,6 +48,11 @@ interface CrossingPayload {
    * with the wait it captions.
    */
   reason: string | null
+  /**
+   * Whether a question is being put to the player in front of the curtain. While it stands the
+   * cover holds flat and owes its whole performance.
+   */
+  asking: boolean
 }
 
 const noPayload: CrossingPayload = {
@@ -55,7 +60,8 @@ const noPayload: CrossingPayload = {
   to: null,
   fade: false,
   splash: null,
-  reason: null
+  reason: null,
+  asking: false
 }
 
 /** What the layer draws. The rest of a crossing's state is module-scope below. */
@@ -198,7 +204,7 @@ let written: CrossingPayload = noPayload
 let coverSwaps: (() => void)[] = []
 let endSwap: (() => void) | null = null
 
-/** Runs what `step` released, in the order it named, each exactly once. */
+/** Runs what `step` released, in the order it named, each exactly once, and publishes it. */
 function advance(event: CrossingEvent): void {
   const next = step(core, event)
   core = next.core
@@ -218,6 +224,11 @@ function advance(event: CrossingEvent): void {
     endSwap = null
     payload = noPayload
   }
+  publish()
+}
+
+/** Hands the live core and payload to the store the layer draws from, where either has moved. */
+function publish(): void {
   const state = useCrossingStore.getState()
   if (
     state.phase !== core.phase ||
@@ -259,6 +270,11 @@ export interface CrossingOptions {
    * the app's own boot, painted behind the curtain rather than covered by one.
    */
   covered?: boolean
+  /**
+   * Whether the caller will put a question in front of the curtain once it is down, answered
+   * with {@link answerCrossing}.
+   */
+  ask?: boolean
 }
 
 /**
@@ -273,7 +289,7 @@ export function beginCrossing(swap?: () => void, opts?: CrossingOptions): boolea
   // A polarity is only crossed where both ends are known and they differ; the layer draws the
   // clock's own theme wherever a caller names neither.
   const fade = from !== null && to !== null && from !== to
-  payload = { from, to, fade, splash, reason: opts?.reason ?? null }
+  payload = { from, to, fade, splash, reason: opts?.reason ?? null, asking: opts?.ask === true }
   coverSwaps = swap ? [swap] : []
   // Set on the core before `begin` carries it over, which is what keeps `step` a function of the
   // core alone — and what lets a test seed a crossing without going through a payload.
@@ -326,6 +342,16 @@ export function nameCrossingWait(reason: string): void {
   if (core.phase === 'idle' || core.phase === 'opening') return
   payload = { ...payload, reason }
   advance('wait')
+}
+
+/**
+ * Says the question put in front of the curtain has been answered, so the cover may go on to
+ * its performance. A no-op outside a crossing that is asking one.
+ */
+export function answerCrossing(): void {
+  if (core.phase === 'idle' || !payload.asking) return
+  payload = { ...payload, asking: false }
+  publish()
 }
 
 /**

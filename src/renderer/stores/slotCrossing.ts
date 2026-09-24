@@ -110,9 +110,10 @@ function untilPhase(done: (phase: string) => boolean): Promise<void> {
 
 /**
  * Raises the curtain over the slot about to open and resolves once opaque, hiding the boundary's
- * work. Resolves through idle too, so a refused or torn-down crossing can never strand it.
+ * work. Resolves through idle too, so a refused or torn-down crossing can never strand it. With
+ * `ask`, the curtain holds flat once down until the boundary's question is answered.
  */
-export async function coverSlotCrossing(): Promise<void> {
+export async function coverSlotCrossing(ask = false): Promise<void> {
   const { date, time, occasions, weather, graduationSeen } = useGameStore.getState()
   const next = nextSlot(date, time)
   // No load is declared: the ending paid for the ledger and for the next slot's opening before
@@ -126,7 +127,8 @@ export async function coverSlotCrossing(): Promise<void> {
       next.time,
       occasions,
       slotWeather(weather, next.date, next.time, graduationSeen)
-    )
+    ),
+    ask
   })
   await untilPhase((phase) => phase === 'holding' || phase === 'idle')
 }

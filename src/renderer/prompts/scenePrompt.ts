@@ -6,6 +6,7 @@ import { DEFAULT_PLAYER_STATS, STAT_KEYS, type PlayerStats } from '@shared/playe
 import { fullDescriptionOf, kindSentenceOf, projectStandingLine } from '@shared/academics'
 import type { ClassKind, ProjectProgress } from '@shared/academics'
 import { isPosition, POSITIONS } from '@shared/positions'
+import { readerize } from '@shared/readerVoice'
 import { cgAction, showAction, spriteAction } from '@shared/sceneActions'
 import { andList } from '@shared/sentences'
 import {
@@ -139,13 +140,11 @@ export interface ProjectSceneContext {
 }
 
 /** Everything the builders read out of `gameStore`. */
-export interface ScenePromptState {
+export interface PromptState {
   /** The cloud-LLM cache key: the playthrough id, never the save's. */
   playthroughId: string
   date: number
   time: TimeSlot
-  /** The inspiration word this call carries, drawn by the caller. */
-  seedWord: string
   /** Available background base names, sorted, suffixes already stripped, by category. */
   backgrounds: BackgroundSets
   /** Per-character save state, keyed by charId. */
@@ -285,6 +284,12 @@ export interface ScenePromptState {
   hiddenCast?: readonly Character[]
   /** The player's `lessNsfwText` setting. */
   lessNsfwText: boolean
+}
+
+/** What a call that writes a scene reads: the state plus the inspiration word its caller drew. */
+export interface ScenePromptState extends PromptState {
+  /** The inspiration word this call carries, drawn by the caller. */
+  seedWord: string
 }
 
 /**
@@ -429,7 +434,7 @@ function jsonRules(
  * The union of alternate wardrobes available to anyone in the cast — what the schema's
  * `emotion` enum may carry.
  */
-function castOutfitSets(cast: readonly Character[], state: ScenePromptState): StockOutfitSet[] {
+function castOutfitSets(cast: readonly Character[], state: PromptState): StockOutfitSet[] {
   return STOCK_OUTFIT_SETS.filter((set) =>
     cast.some((character) => state.outfitReady[character.charId]?.includes(set))
   )
@@ -439,7 +444,7 @@ function castOutfitSets(cast: readonly Character[], state: ScenePromptState): St
  * True when a CG can be shown: NSFW text on, and the stage as written down to one girl with a
  * full set of CGs on disk — or still empty, where whoever ends up alone on it can be one who has.
  */
-function positionsAllowed(cast: readonly Character[], state: ScenePromptState): boolean {
+function positionsAllowed(cast: readonly Character[], state: PromptState): boolean {
   if (state.lessNsfwText) return false
   const [only, ...others] = state.onStage
   if (others.length > 0) return false
@@ -449,7 +454,7 @@ function positionsAllowed(cast: readonly Character[], state: ScenePromptState): 
 }
 
 /** The cast who have CGs, by first name — what the rules name when there is a choice of girl. */
-function cgReadyNames(cast: readonly Character[], state: ScenePromptState): string[] {
+function cgReadyNames(cast: readonly Character[], state: PromptState): string[] {
   if (cast.length < 2) return []
   return cast
     .filter((character) => state.cgReady[character.charId])
@@ -472,7 +477,7 @@ function wardrobeProse(tags: readonly string[]): string {
  * Renders a cast character's block: who she is and what she looks like, then personality
  * and relationship, then her week and what she remembers.
  */
-function castBlock(cast: readonly Character[], state: ScenePromptState): string[] {
+function castBlock(cast: readonly Character[], state: PromptState): string[] {
   const { charInfo, classes } = state
   const lines: string[] = ['CAST']
   if (cast.length === 0) {
@@ -610,7 +615,7 @@ function byCharId(characters: readonly Character[]): Record<string, Character> {
  * The cast as the ledger reads it: who was in the scene, and which milestones already
  * stand.
  */
-function ledgerCastBlock(cast: readonly Character[], state: ScenePromptState): string[] {
+function ledgerCastBlock(cast: readonly Character[], state: PromptState): string[] {
   const lines: string[] = ['CAST']
   if (cast.length === 0) {
     lines.push('No other characters.')
@@ -790,16 +795,8 @@ export function memoryLines(
   ]
 }
 
-/**
- * Rewrites a memory's second-person `desc` into the third person. Word-bounded, or
- * "young" would come back as "the readerng".
- */
-function readerize(desc: string): string {
-  return desc.replace(/\byour\b/gi, "the reader's").replace(/\byou\b/gi, 'the reader')
-}
-
 /** Every stage instruction this scene may legally carry. */
-function actionEnum(cast: readonly Character[], state: ScenePromptState): string[] {
+function actionEnum(cast: readonly Character[], state: PromptState): string[] {
   const values: string[] = []
   for (const character of cast) {
     const key = charKeyOf(character.firstName, character.lastName)
@@ -823,7 +820,7 @@ function actionEnum(cast: readonly Character[], state: ScenePromptState): string
  * The room bg ids of cast members whose rooms are fully rendered — what the schema's
  * bg enum carries beyond the shipped list.
  */
-function castRoomBgs(cast: readonly Character[], state: ScenePromptState): string[] {
+function castRoomBgs(cast: readonly Character[], state: PromptState): string[] {
   const shipped = new Set(allBackgrounds(state.backgrounds))
   return cast
     .filter((character) => state.roomReady[character.charId])
@@ -839,7 +836,7 @@ function castRoomBgs(cast: readonly Character[], state: ScenePromptState): strin
 function sceneSchema(
   backgrounds: BackgroundSets,
   cast: readonly Character[],
-  state: ScenePromptState,
+  state: PromptState,
   wantSummary: boolean,
   wantEnd: boolean
 ): { name: string; schema: Record<string, unknown> } {
@@ -888,7 +885,7 @@ function sceneSchema(
  */
 function systemPrompt(
   cast: readonly Character[],
-  state: ScenePromptState,
+  state: PromptState,
   setting: string
 ): string {
   return [
@@ -910,7 +907,7 @@ function systemPrompt(
  * Who the scene is about — the `READER` and `CAST` blocks that open every prose builder's
  * user string.
  */
-function whoBlock(cast: readonly Character[], state: ScenePromptState, reader: string): string[] {
+function whoBlock(cast: readonly Character[], state: PromptState, reader: string): string[] {
   return [
     'READER',
     reader,
@@ -930,7 +927,7 @@ function whoBlock(cast: readonly Character[], state: ScenePromptState, reader: s
 /**
  * Where the clock and the stage stand — the first block of every builder's user string.
  */
-function nowBlock(cast: readonly Character[], state: ScenePromptState): string[] {
+function nowBlock(cast: readonly Character[], state: PromptState): string[] {
   // A hide leaves the sprite ref standing, so the hidden are dropped from the lines below.
   const hidden = new Set((state.hiddenCast ?? []).map((character) => character.charId))
 
@@ -970,7 +967,7 @@ function nowBlock(cast: readonly Character[], state: ScenePromptState): string[]
       ? [
           `${andList(state.hiddenCast.map((character) => character.firstName))} ${
             state.hiddenCast.length === 1 ? 'is' : 'are'
-          } currently hidden. Use the show action if they re-enter the scene.`
+          } currently hidden. Use the show action if they re-enter the scene or talk.`
         ]
       : []),
     ''
@@ -981,7 +978,7 @@ function nowBlock(cast: readonly Character[], state: ScenePromptState): string[]
  * The `CLASS` block — everything about the course the scene is sitting in, or nothing at all
  * when it is not sitting in one.
  */
-function classBlock(state: ScenePromptState): string[] {
+function classBlock(state: PromptState): string[] {
   const entry = state.classCode ? state.classes[state.classCode] : undefined
   if (!entry) return []
 
@@ -1078,7 +1075,7 @@ function learnedSentence(meeting: ClassMeetingRecap): string {
 }
 
 /** The one instruction a lecture meeting adds to the opening call's `YOUR TURN`. */
-function lectureTurnLines(state: ScenePromptState): string[] {
+function lectureTurnLines(state: PromptState): string[] {
   const context = state.classMeeting
   if (!context || context.kind !== 'lecture') return []
   // Syllabus week teaches nothing, and a handback meeting has its own business.
@@ -1090,7 +1087,7 @@ function lectureTurnLines(state: ScenePromptState): string[] {
 }
 
 /** The rest of the always-on lines: whatever is going on in the world today. */
-function occasionLore(state: ScenePromptState): string[] {
+function occasionLore(state: PromptState): string[] {
   if (state.farewell) return []
   return occasionLoreLines(state.date, state.time, state.occasions)
 }
@@ -1099,7 +1096,7 @@ function occasionLore(state: ScenePromptState): string[] {
  * The course description for a scene the reader is spending on its coursework —
  * the `project:` verdict's counterpart to the `CLASS` block.
  */
-function projectLore(state: ScenePromptState): string[] {
+function projectLore(state: PromptState): string[] {
   const entry = state.projectClass ? state.classes[state.projectClass] : undefined
   if (!entry) return []
   const kind = kindSentenceOf(entry)
@@ -1134,7 +1131,7 @@ function workLines(code: string, context: ProjectSceneContext | undefined): stri
  * Where a shift is worked — the reader's own, or the one a character is behind
  * the counter of when he walks in.
  */
-function workplaceLore(state: ScenePromptState): string[] {
+function workplaceLore(state: PromptState): string[] {
   const jobId = state.jobId ?? state.visitJobId
   const def = jobId ? jobDefOf(jobId) : undefined
   const text = def ? loreTextForKey(def.workplaceKey) : null
@@ -1142,12 +1139,12 @@ function workplaceLore(state: ScenePromptState): string[] {
 }
 
 /** A paragraph per gift handed over this scene. */
-function giftLore(state: ScenePromptState): string[] {
+function giftLore(state: PromptState): string[] {
   return [...state.giftNotes]
 }
 
 /** Every always-on source, in the order the `LOREBOOK` block prints them. */
-function alwaysLore(state: ScenePromptState): string[] {
+function alwaysLore(state: PromptState): string[] {
   return [...occasionLore(state), ...projectLore(state), ...workplaceLore(state), ...giftLore(state)]
 }
 
@@ -1157,7 +1154,7 @@ function alwaysLore(state: ScenePromptState): string[] {
  */
 function characterLoreFor(
   scanned: string,
-  state: ScenePromptState,
+  state: PromptState,
   cast: readonly Character[]
 ): string[] {
   const mentions = (state.mentions ?? []).filter((character) =>
@@ -1183,7 +1180,7 @@ function characterLoreFor(
  * What the lorebook is matched against: the turn's own words, plus the place the classifier
  * said the scene is set in.
  */
-function loreScan(scanned: string, state: ScenePromptState): string {
+function loreScan(scanned: string, state: PromptState): string {
   if (!state.sceneLocation) return scanned
   const entry = loreEntryById(state.sceneLocation)
   return `${scanned}\n${entry ? entry.keys[0] : state.sceneLocation}`
@@ -1195,7 +1192,7 @@ function loreScan(scanned: string, state: ScenePromptState): string {
  */
 function castScenePrompt(
   cast: readonly Character[],
-  state: ScenePromptState,
+  state: PromptState,
   setting: string,
   reader: string,
   /** What the lorebook is matched against — this turn's words and whatever precedes them. */
@@ -1412,6 +1409,7 @@ export function buildContinuationPrompt(
     ...soFarBlocks(summary, stubs, true),
     'YOUR TURN',
     'Alright RITA, you can write now! Let\'s continue from where the STORY and the SCENE SO FAR have left off.',
+    'The STORY SO FAR is a recap of the whole scene so far, while the SCENE SO FAR is the word-for-word dialogue, so part of it may already be in the recap.',
     'At the very bottom of this prompt is the reader\'s action: what they just decided to do or say, in their own words.',
     '',
     'OPENING LINE',
@@ -1431,7 +1429,7 @@ export function buildContinuationPrompt(
     '',
     'SUMMARY',
     summary
-      ? 'Finally, for the "summary" field, fold the SCENE SO FAR into the STORY SO FAR and return a merged recap.'
+      ? 'Finally, for the "summary" field, fold anything new from SCENE SO FAR into the STORY SO FAR.'
       : 'Finally, for the "summary" field, condense the SCENE SO FAR into a single recap.',
     'Write the summary in third-person and refer to the MC as "the reader".',
     '',
@@ -1453,7 +1451,7 @@ export function buildContinuationPrompt(
 export function buildClosingPrompt(
   cast: readonly Character[],
   transcript: readonly SceneLine[],
-  state: ScenePromptState,
+  state: PromptState,
   setting: string,
   reader: string,
   summary: string | null
@@ -1468,7 +1466,9 @@ export function buildClosingPrompt(
     'Write a short goodbye providing closure, less than 10 lines, continuing where the SCENE SO FAR left off. Let the last feeling of the scene sit, "hide:<charKey>" everyone still on screen as they go, and close on some quiet narration.',
     'If the character is already hidden, don\'t use the "show:<charKey>" action and bring them back.',
     'If the scene isn\'t quite at the point where they say goodbye yet, do some vague narration to get them there and then close out.',
-    'Then, for the "summary" field: Combine the STORY SO FAR, the SCENE SO FAR, and the goodbye into a merged recap, using third-person and referring to the MC as "the reader".',
+    summary
+      ? 'Then, for the "summary" field: fold your goodbye, the SCENE SO FAR, and the STORY SO FAR into a single recap using third-person and referring to the MC as "the reader".'
+      : 'Then, for the "summary" field: condense the SCENE SO FAR and the goodbye into a single recap, using third-person and referring to the MC as "the reader".',
     'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.'
   ]
 
@@ -1642,7 +1642,7 @@ export function ledgerTranscriptOf(scene: readonly SceneLine[]): readonly SceneL
 export function buildLedgerPrompt(
   cast: readonly Character[],
   scene: readonly SceneLine[],
-  state: ScenePromptState,
+  state: PromptState,
   reader: string,
   schedule: SchedulePromptInput
 ): StructuredRequest {
@@ -1692,7 +1692,8 @@ export function buildLedgerPrompt(
       ? [
           'MEMORIES',
           'Write a single memory of what the character should still remember weeks from now.',
-          'Each desc completes the sentence "<Name> <type> that ...", e.g. "you helped her carry books".',
+          'Each desc completes the sentence "<Name> <type> that ...", in the past tense, e.g. "the reader helped her carry books".',
+          'Call the reader "the reader" every time, never "you", "he" or "him": "the reader lent her the reader\'s notes", not "he lent her his notes".',
           'If a scene was uneventful for someone, give her nothing.',
           '',
           'EVENTS',

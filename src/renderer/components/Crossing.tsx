@@ -107,7 +107,8 @@ function CrossingLayer({
   to,
   fade,
   splash,
-  reason
+  reason,
+  asking
 }: {
   phase: CrossingPhase
   waited: boolean
@@ -117,6 +118,7 @@ function CrossingLayer({
   fade: boolean
   splash: SlotStamp | null
   reason: string | null
+  asking: boolean
 }): JSX.Element {
   // The theme the cover goes up in: the screen's own where the caller named it, so the wipe
   // cannot disagree with what it is wiping over, and the clock everywhere else.
@@ -130,7 +132,8 @@ function CrossingLayer({
   const [rested, setRested] = useState(false)
   const [crossed, setCrossed] = useState(!fade)
   const [said, setSaid] = useState(splash === null)
-  const performing = phase === 'holding'
+  // A cover raised on a question performs nothing until it is answered.
+  const performing = phase === 'holding' && !asking
 
   // **The quiet hold, which every crossing owes**: a beat of flat colour before anything
   // happens on the curtain, so a cover that has nothing to say still reads as a curtain rather
@@ -283,6 +286,7 @@ export function Crossing(): JSX.Element | null {
   const fade = useCrossingStore((s) => s.fade)
   const splash = useCrossingStore((s) => s.splash)
   const reason = useCrossingStore((s) => s.reason)
+  const asking = useCrossingStore((s) => s.asking)
   if (phase === 'idle') return null
   return (
     <CrossingLayer
@@ -294,6 +298,7 @@ export function Crossing(): JSX.Element | null {
       fade={fade}
       splash={splash}
       reason={reason}
+      asking={asking}
     />
   )
 }

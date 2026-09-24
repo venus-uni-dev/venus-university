@@ -4,7 +4,14 @@ import type { PlayerStats } from '@shared/playerStats'
 import { POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
 import { giftLoreNote, itemDefOf } from '@shared/shop'
-import { charKeyOf, type CharInfo, type Character, type OutfitSet, type TimeSlot } from '@shared/types'
+import {
+  charKeyOf,
+  type CharInfo,
+  type Character,
+  type OutfitSet,
+  type SceneLine,
+  type TimeSlot
+} from '@shared/types'
 import {
   classSceneContextOf,
   projectSceneContextOf,
@@ -13,7 +20,13 @@ import {
 import { formatChatDivider } from '../../prompts/gameDate'
 import { firstMeetingAfter, meetingsBefore } from '../../prompts/occasions'
 import type { SchedulePromptInput } from '../../prompts/schedulePrompt'
-import type { AddedNotice, DroppedNotice, ScenePromptState } from '../../prompts/scenePrompt'
+import type {
+  AddedNotice,
+  DroppedNotice,
+  PromptState,
+  ScenePromptState
+} from '../../prompts/scenePrompt'
+import { recentLines, SCENE_WINDOW_WORDS, windowFloor } from '../../prompts/sceneWindow'
 import { readerBlockOf } from '../../prompts/setting'
 import { composeTextingSummary, hasTexted } from '../../prompts/textingPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../../prompts/seedWords'
@@ -213,13 +226,26 @@ export function announceableAdds(): AddedNotice[] {
   })
 }
 
+/**
+ * The stretch of the running scene a continuation or closing call reads word for word: the
+ * transcript's tail under the word budget, reaching back to where the running summary stops.
+ */
+export function sceneSoFar(): SceneLine[] {
+  const game = useGameStore.getState()
+  return recentLines(
+    game.currentSceneTranscript,
+    SCENE_WINDOW_WORDS,
+    windowFloor(game.sceneSummaries)
+  )
+}
+
 /** The player's `lessNsfwText` setting, for the builders that take it. */
 export function lessNsfwTextNow(): boolean {
   return useSettingsStore.getState().settings?.lessNsfwText === true
 }
 
 /** Reads the prompt-facing slice of game state. */
-export function promptState(): ScenePromptState {
+export function promptState(): PromptState {
   const game = useGameStore.getState()
 
   // The Bunnyboard recap each character carries into the scene.
@@ -267,7 +293,6 @@ export function promptState(): ScenePromptState {
     playthroughId: game.playthroughId ?? 'unsaved',
     date: game.date,
     time: game.time,
-    seedWord: useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS),
     backgrounds: useAssetStore.getState().backgrounds,
     charInfo: game.charInfo,
     npcRelationships: game.npcRelationships,
@@ -356,4 +381,9 @@ export function promptState(): ScenePromptState {
     // Whoever the prompt still carries but the stage does not; absent when nobody is.
     ...(hiddenCast.length > 0 ? { hiddenCast } : {})
   }
+}
+
+/** The state a call that writes a scene reads: the same, plus the inspiration word it carries. */
+export function scenePromptState(): ScenePromptState {
+  return { ...promptState(), seedWord: useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS) }
 }

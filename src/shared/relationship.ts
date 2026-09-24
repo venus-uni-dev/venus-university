@@ -10,6 +10,7 @@ import {
   type StatKey,
   type StatTier
 } from './playerStats'
+import { secondPerson } from './readerVoice'
 import { markedLine } from './statusMark'
 import { hasTrait } from './traits'
 import type {
@@ -84,6 +85,67 @@ export function memoriesFor(
   )
 }
 
+/** The four places on a `CharInfo` a memory can be kept. */
+export type MemoryHolders = Pick<
+  CharInfo,
+  'memories' | 'textMemory' | 'jealousyMemories' | 'giftMemories'
+>
+
+/** Whether two memories are one — the same date, verb and words, the key the fold dedupes on. */
+function sameMemory(a: CharMemory, b: CharMemory): boolean {
+  return a.date === b.date && a.type === b.type && a.desc === b.desc
+}
+
+/** `list` with every copy of `match` swapped for `next`, or dropped for null; undefined if none. */
+function replacedIn(
+  list: readonly CharMemory[] | undefined,
+  match: CharMemory,
+  next: CharMemory | null
+): CharMemory[] | undefined {
+  if (!list?.some((entry) => sameMemory(entry, match))) return undefined
+  const replaced: CharMemory[] = []
+  for (const entry of list) {
+    if (!sameMemory(entry, match)) replaced.push(entry)
+    else if (next) replaced.push(next)
+  }
+  return replaced
+}
+
+/**
+ * Her memories with every copy of `match` rewritten to `next`, or forgotten where `next` is
+ * null; null when she holds no copy or `next` changes nothing, and untouched lists keep identity.
+ */
+export function withMemoryReplaced<T extends MemoryHolders>(
+  info: T,
+  match: CharMemory,
+  next: CharMemory | null
+): T | null {
+  if (next && sameMemory(match, next)) return null
+  const out: T = { ...info }
+  let changed = false
+  const memories = replacedIn(info.memories, match, next)
+  if (memories) {
+    out.memories = memories
+    changed = true
+  }
+  const jealousy = replacedIn(info.jealousyMemories, match, next)
+  if (jealousy) {
+    out.jealousyMemories = jealousy
+    changed = true
+  }
+  const gifts = replacedIn(info.giftMemories, match, next)
+  if (gifts) {
+    out.giftMemories = gifts
+    changed = true
+  }
+  if (info.textMemory && sameMemory(info.textMemory, match)) {
+    if (next) out.textMemory = next
+    else delete out.textMemory
+    changed = true
+  }
+  return changed ? out : null
+}
+
 /**
  * The same list with exact repeats folded away — one entry per `date`/`type`/`desc`, the first
  * of each kept.
@@ -125,18 +187,21 @@ export function affectionFor(
   )
 }
 
-/** The three parts of a memory sentence, cut where the word it is coloured by begins and ends. */
+/**
+ * The three parts of a memory sentence, its desc turned to the second person, cut where the word
+ * it is coloured by begins and ends.
+ */
 function memoryParts(
   name: string,
   entry: Pick<CharMemory, 'type' | 'desc'>
 ): { before: string; run: string; after: string } {
-  const desc = sentence(entry.desc)
+  const desc = sentence(secondPerson(entry.desc))
   return { before: `${name} `, run: entry.type, after: ` that ${desc}` }
 }
 
 /**
- * `"Mika liked that you walked her home."` — the one phrasing of a memory, used by the
- * post-scene status lines and by Bunnyboard's history alike.
+ * `"Mika liked that you walked her home."` off "the reader walked her home" — the one phrasing
+ * of a memory, used by the post-scene status lines and by Bunnyboard's history alike.
  */
 export function memorySentence(name: string, entry: Pick<CharMemory, 'type' | 'desc'>): string {
   const { before, run, after } = memoryParts(name, entry)
@@ -434,14 +499,14 @@ export function foldRelationshipEvents(
   // The milestones' own memories, stacked with whatever the ledger wrote about the scene.
   const milestones: CharMemory[] = []
   if (!before.hasKissed && flags.hasKissed) {
-    milestones.push({ date, type: 'loved', desc: 'you kissed her for the first time' })
+    milestones.push({ date, type: 'loved', desc: 'the reader kissed her for the first time' })
   }
   if (!before.hadSex && flags.hadSex) {
-    milestones.push({ date, type: 'loved', desc: 'you slept with her for the first time' })
+    milestones.push({ date, type: 'loved', desc: 'the reader slept with her for the first time' })
   }
   // Keyed on the count, so a second breakup writes a second memory.
   if (flags.brokenUp > before.brokenUp) {
-    milestones.push({ date, type: 'hated', desc: 'the two of you broke up' })
+    milestones.push({ date, type: 'hated', desc: 'things ended between the reader and her' })
   }
 
   const folded: CharInfo = {

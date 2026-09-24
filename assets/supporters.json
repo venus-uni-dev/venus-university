@@ -1,5 +1,6 @@
 {
   "donors": [
+    "ElPapaDon",
     "thatmaestroguy",
     "NihilBaxter"
   ],
@@ -8,16 +9,20 @@
   ],
   "handles": [
     {
+      "name": "ElPapaDon",
+      "marbles": 6
+    },
+    {
       "name": "Maboy",
       "marbles": 2
     },
     {
       "name": "NihilBaxter",
-      "marbles": 5
+      "marbles": 4
     },
     {
       "name": "thatmaestroguy",
-      "marbles": 8
+      "marbles": 5
     }
   ]
 }

@@ -133,6 +133,11 @@
   transition-delay: 700ms;
 }
 
+/* A rewind cuts: the row stands where the line it stepped back to has it, with no slide. */
+.vu-stage-row--cut .vu-stage-slot {
+  transition: none;
+}
+
 /* The layer every standing sprite breathes on. It is an element of its own because the three
    around it each already carry a transform — the slot's place on the row, a half's weight shift,
    the image's mirror — and it sits above both halves of a change so the two breathe as one. The

@@ -1,5 +1,6 @@
 import { AUTOSAVE_ID, type AppError, type SceneLine, type SceneState } from '@shared/types'
 import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
+import { lastReaderIndexOf } from '../stageStep'
 import { useUiStore } from '../uiStore'
 import { loopState } from './state'
 import { sceneInProgress } from './stream'
@@ -121,21 +122,43 @@ export function openingScene(lines: SceneLine[]): SceneState {
   }
 }
 
-/** The scene as it stood *before* `lines` played, with them queued. */
+/**
+ * `log` with the reader's newest action in `transcript` read onto its end, unless it already
+ * ends on that line.
+ */
+function withReaderAction(log: readonly SceneLine[], transcript: readonly SceneLine[]): SceneLine[] {
+  const action = transcript[lastReaderIndexOf(transcript)]
+  const last = log[log.length - 1]
+  if (!action || (last && last.speaker === action.speaker && last.text === action.text)) {
+    return [...log]
+  }
+  return [...log, action]
+}
+
+/**
+ * The scene as it stood *before* `lines` played, with them queued. The turn's own action is read
+ * onto the log: `base` was captured before it was logged.
+ */
 export function queuedScene(
   base: SceneState | null,
   lines: SceneLine[],
   extra: Partial<SceneState> = {}
 ): SceneState {
   const game = useGameStore.getState()
+  const from = base ?? openingScene([])
   const scene: SceneState = {
-    ...(base ?? openingScene([])),
+    ...from,
     cast: [...game.cast],
     transcript: [...game.currentSceneTranscript],
     summary: game.sceneSummary,
+    sceneLog: withReaderAction(from.sceneLog, game.currentSceneTranscript),
     pendingLines: lines,
     ...extra
   }
+  // Set-or-delete, like the kinds below: the marks are the store's, never the base's.
+  if (game.sceneSummaries.length > 0) {
+    scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
+  } else delete scene.summaries
   // Set-or-delete: a scene that is not one of these kinds must carry no key at all.
   if (game.sceneClass) scene.classCode = game.sceneClass
   else delete scene.classCode

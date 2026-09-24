@@ -233,8 +233,8 @@ export interface PinnedRuntime {
 export type ComfyGpu = 'nvidia' | 'amd'
 
 /**
- * The ComfyUI portable build for each vendor, both from the same release. They nest the same
- * wrapper folder and the same embedded interpreter, and both are launched the same way:
+ * The ComfyUI portable build for each vendor, each pinned to its own release. They nest the
+ * same wrapper folder and the same embedded interpreter, and both are launched the same way:
  * ComfyUI picks CUDA or ROCm off the torch it was built against.
  */
 export const COMFY_RUNTIMES: Readonly<Record<ComfyGpu, PinnedRuntime>> = {
@@ -249,10 +249,10 @@ export const COMFY_RUNTIMES: Readonly<Record<ComfyGpu, PinnedRuntime>> = {
   amd: {
     owner: 'Comfy-Org',
     repo: 'ComfyUI',
-    tag: 'v0.34.0',
+    tag: 'v0.37.0',
     assetName: 'ComfyUI_windows_portable_amd.7z',
-    bytes: 1817392344,
-    sha256: 'DA9317B62EAB26865563B0529012799FD1F63E604D4CE81432C4E98EB6008B3F'
+    bytes: 1595844037,
+    sha256: '563DA2462A866F8FDF8CCD091A8C0E185E785394408735F8E99647593A67DD79'
   }
 }
 

@@ -81,7 +81,7 @@ export function failTurn(error: AppError, snapshot: TurnSnapshot): void {
 async function resendAuthoredTurn(
   error: AppError,
   snapshot: TurnSnapshot,
-  run: object
+  superseded: () => boolean
 ): Promise<boolean> {
   if (!authoredTurn(snapshot)) return false
 
@@ -99,7 +99,7 @@ async function resendAuthoredTurn(
     onSleep: (cancel) => loopState.parkedWaiters.push(cancel)
   })
   if (!resend) return false
-  if (runStale(run)) return true
+  if (superseded()) return true
 
   loopState.authoredRetrySpent = spent + 1
   dispatchTurn(snapshot)
@@ -137,18 +137,23 @@ export async function runSceneTurn(
   solo: boolean
 ): Promise<void> {
   const run = currentRun()
+  // The call `pending` is, claimed synchronously when it went out.
+  const call = loopState.sceneCall
+  /** The run was left, or an interjection cut this turn's call short and took its place. */
+  const superseded = (): boolean => runStale(run) || loopState.sceneCall !== call
   const result = await pending
 
-  // The reply belongs to a run the player has left.
-  if (runStale(run)) return
+  // The reply belongs to a run the player has left, or to a call he interjected over: neither
+  // may reach the failure modal or the authored resend.
+  if (superseded()) return
 
   if (!result.ok) {
     // Every failure lands here, malformed JSON included; a content block is re-sent once
     // behind the player's back, an authored scene re-sends itself behind the lines it was
     // written under, and everything else is the permanent/retryable split.
     if (retryBlockedTurn(result.error, snapshot)) return
-    if (await resendAuthoredTurn(result.error, snapshot, run)) return
-    if (runStale(run)) return
+    if (await resendAuthoredTurn(result.error, snapshot, superseded)) return
+    if (superseded()) return
     failTurn(result.error, snapshot)
     return
   }
@@ -163,24 +168,25 @@ export async function runSceneTurn(
     // Through the one delivery, so a prefetch landing behind a scene opening's curtain waits
     // that cover out exactly as a streamed line does.
     await deliverSceneLines(result.data.lines, run)
-    if (runStale(run)) return
+    if (superseded()) return
     const live = useGameStore.getState()
-    if (result.data.summary) {
-      live.setSceneSummary(result.data.summary)
-      live.setSceneTranscript(result.data.lines)
-    }
+    if (result.data.summary) live.setSceneSummary(result.data.summary, result.data.at)
     live.setStreaming(false)
+  } else if (result.data.summary) {
+    // `streamScene` has already waited out its own delivery, so the lines are on the transcript.
+    useGameStore.getState().setSceneSummary(result.data.summary, result.data.at)
   }
 
   // `end_scene` is stashed until playback reaches the last line; a solo scene is over
   // after its one turn.
-  loopState.pendingEnd = solo || result.data.end
+  const ending = solo || result.data.end
+  useGameStore.getState().setSceneEnding(ending)
 
-  if (!loopState.pendingEnd) {
+  if (!ending) {
     // Written before playback is handed back: `unpark()` can run to the next decision point,
     // whose own write has to be the later of the two.
     await writeAutosave(queuedScene(snapshot.scene, result.data.lines))
-    if (runStale(run)) return
+    if (superseded()) return
     useGameStore.getState().setBusy(false)
     unpark()
     return

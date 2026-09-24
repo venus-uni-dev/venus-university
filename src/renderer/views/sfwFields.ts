@@ -21,13 +21,13 @@ export const SFW_FIELDS: readonly SfwField[] = [
     key: 'noNsfwImages',
     id: 'settings-no-nsfw-images',
     label: 'No NSFW images',
-    note: 'The nude wardrobe and the explicit CGs are never rendered or shown.'
+    note: 'Toggles nude outfits and NSFW CG.'
   },
   {
     key: 'lessNsfwText',
     id: 'settings-less-nsfw-text',
     label: 'Less NSFW text',
-    note: 'Removes instructions encouraging the AI to generate sexual content. Adult scenes might still be generated based on your actions.'
+    note: 'Toggles instructions encouraging the AI to generate sexual content. Adult scenes might still be generated based on your actions.'
   },
   {
     key: 'noNsfwSound',

@@ -2,6 +2,14 @@ import { randomUUID } from 'crypto'
 import { readFile, rename, rm, writeFile } from 'fs/promises'
 import { appError, messageOf } from '@shared/errors'
 import { validateRecord, type ValidateRecordOptions } from '@shared/jsonValidate'
+import { sleep } from '@shared/retry'
+
+/** Error codes that mean the file is briefly held open by another process, not truly failed. */
+const HELD_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
+
+/** How long to wait between rename attempts: Windows refuses a rename while a scanner or the
+ * indexer holds the file it just saw change, and that hold lasts milliseconds. */
+const RENAME_RETRY_WAITS_MS = [10, 20, 40, 80, 160, 320, 640]
 
 /**
  * The JSON-on-disk mechanics every persisted-state service shares: read and parse, then the
@@ -46,6 +54,20 @@ export async function readValidatedJson<T extends object>(
   return validateRecord<T>(parsed, path, opts)
 }
 
+/** Renames, waiting out the ladder while the target is held by another process. */
+async function renameWithPatience(from: string, to: string): Promise<void> {
+  for (const wait of RENAME_RETRY_WAITS_MS) {
+    try {
+      await rename(from, to)
+      return
+    } catch (err) {
+      if (!HELD_CODES.has((err as NodeJS.ErrnoException).code ?? '')) throw err
+      await sleep(wait)
+    }
+  }
+  await rename(from, to)
+}
+
 /** Writes JSON through a temp file in the same folder, then renames over the target. */
 export async function writeAtomicJson(
   path: string,
@@ -55,7 +77,7 @@ export async function writeAtomicJson(
   const tempPath = `${path}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`
   try {
     await writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
-    await rename(tempPath, path)
+    await renameWithPatience(tempPath, path)
   } catch (err) {
     // A unique temp name is never reused, so a failed write cleans up its own scratch.
     await rm(tempPath, { force: true }).catch(() => {})

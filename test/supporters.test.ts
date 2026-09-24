@@ -43,14 +43,15 @@ describe('feedHandlePool', () => {
 })
 
 describe('marblesFor', () => {
-  it('starts at two and adds one every doubling', () => {
+  it('starts at two and adds one every tripling', () => {
     expect(marblesFor(0)).toBe(2)
     expect(marblesFor(1)).toBe(2)
-    expect(marblesFor(2)).toBe(3)
-    expect(marblesFor(4)).toBe(4)
-    expect(marblesFor(15)).toBe(5)
-    expect(marblesFor(70)).toBe(8)
-    expect(marblesFor(5000)).toBe(14)
+    expect(marblesFor(2)).toBe(2)
+    expect(marblesFor(3)).toBe(3)
+    expect(marblesFor(15)).toBe(4)
+    expect(marblesFor(70)).toBe(5)
+    expect(marblesFor(243)).toBe(7)
+    expect(marblesFor(5000)).toBe(9)
   })
 })
 

@@ -74,7 +74,7 @@ describe('rollRumorPass', () => {
     // Off the projection, which is what the ending actually passes.
     const projected = projectLedger(useGameStore.getState().charInfo, ledger, 7)
     expect(rollRumorPass(ledger, projected.charInfo).memories).toEqual([
-      { charId: 'b', memory: { date: 7, type: 'hated', desc: 'she saw you cheating on her with Sarah' } }
+      { charId: 'b', memory: { date: 7, type: 'hated', desc: 'she saw the reader cheating on her with Sarah' } }
     ])
   })
 

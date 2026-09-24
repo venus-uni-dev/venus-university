@@ -3,7 +3,7 @@
  * respawn, typewriter hold and way out on both screens, with only what surrounds it differing.
  * Neither reads a store; both are handed everything, exactly as `SceneChrome` is.
  */
-import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import { motion, type MotionProps } from 'motion/react'
 
 import type { TextMark } from '@shared/types'
@@ -11,6 +11,7 @@ import { profileUrl } from '../stores/characterStore'
 import { Burst } from '../components/Burst'
 import { ChevronIcon } from './screenIcons'
 import {
+  boxRewind,
   boxWipe,
   chipRow,
   cursorOff,
@@ -20,6 +21,8 @@ import {
   hintNudge,
   lift,
   press,
+  quietLift,
+  quietPress,
   sceneBox,
   sceneBoxState,
   sceneHint,
@@ -73,6 +76,23 @@ export interface DialogueBoxProps {
   skips: number
   /** There is a row under the box; without one the box drops into its place. */
   rowShown: boolean
+  /**
+   * The row under the box is up but its well is put away for the divider, so the box drops onto
+   * the divider's strip. Defaults to false.
+   */
+  wellAway?: boolean
+  /**
+   * The row under the box is the player's own turn, which puts the forward mark away. Defaults to
+   * `rowShown`; a row standing up over a reply still being read leaves the mark where it is.
+   */
+  turnUp?: boolean
+  /** Steps back a line. The back mark is on screen exactly while this is handed in. */
+  onRewind?: () => void
+  /**
+   * Bumped by every rewind. The render it changes in is a cut: a new dress is put up whole, every
+   * layer at its settled state, rather than wiped in behind the old one leaving.
+   */
+  cuts?: number
   /** The screen controls on the box's shoulder, if the screen offers any. */
   chips?: ReactNode
   /**
@@ -100,6 +120,10 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
     onTypeHold,
     skips,
     rowShown,
+    wellAway = false,
+    turnUp = rowShown,
+    onRewind,
+    cuts = 0,
     chips,
     onAdvance
   } = props
@@ -132,11 +156,40 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
    */
   const [landed, setLanded] = useState(false)
 
+  /**
+   * The dress on screen was put up by a cut, so each keyed layer of it mounted at its settled
+   * state; `cutMount` is what remounts them when the cut lands the dress already worn.
+   */
+  const [cutIn, setCutIn] = useState(false)
+  const [cutMount, setCutMount] = useState(0)
+
   /** Takes the new dress and starts its arrival. */
   const enter = (worn: string): void => {
     setShownDress(worn)
     setArrival(opensAt(worn))
     setLanded(false)
+    setCutIn(false)
+  }
+
+  /**
+   * The render a rewind lands in, and only that one. The count it is read against catches up
+   * after the commit, so a render-phase update that runs this body again still sees the cut.
+   */
+  const cutsSeen = useRef(cuts)
+  const cutting = cutsSeen.current !== cuts
+  useLayoutEffect(() => {
+    cutsSeen.current = cuts
+  })
+
+  // A rewind lands the box on the line it stepped back to at once: the dress is taken whole, with
+  // no exit before it and no chain after it. A box already standing in that dress keeps standing.
+  const settled = shownDress === EMPTY ? arrival === 'empty' : arrival === 'shown' && landed
+  if (cutting && arrival !== 'held' && (dress !== shownDress || !settled)) {
+    setShownDress(dress)
+    setArrival(dress === EMPTY ? 'empty' : 'shown')
+    setLanded(dress !== EMPTY)
+    setCutIn(true)
+    setCutMount((n) => n + 1)
   }
 
   /**
@@ -214,22 +267,31 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
     ? { onClick: onAdvance, 'data-cursor': 'hand' }
     : undefined
 
+  /** Where each keyed layer of the dress on screen starts: its settled state if a cut put it up. */
+  const layerStart = cutIn ? false : 'hidden'
+
+  /** The forward mark is up: the line is done, the box is not arriving, and the turn is not up. */
+  const hintOn = !holding && fullyRevealed && !turnUp && !boxWaiting && !sending && Boolean(text)
+
+  /** The back mark is up: a line may be stepped back to, and the box is standing to carry it. */
+  const rewindOn = Boolean(onRewind) && dressed && !holding
+
   return (
     <motion.div
       className="vu-box"
       variants={sceneBox}
       initial={false}
-      animate={sceneBoxState(sending, rowShown, cg)}
+      animate={sceneBoxState(sending, rowShown, cg, wellAway)}
     >
       {/* The face and its shadow, keyed on what the box is wearing: two labels are enough
           because the remount between them is what puts the collapsed box back on its round
           cap. Its completions are both ends of the chain. */}
       <motion.div
-        key={`face:${shownDress}`}
+        key={`face:${shownDress}:${cutMount}`}
         className="vu-box-face vu-paper"
         {...answers}
         variants={boxWipe}
-        initial="hidden"
+        initial={layerStart}
         animate={leaving ? 'out' : dressed ? 'in' : 'hidden'}
         onAnimationComplete={(label) => {
           if (label === 'in') setLanded(true)
@@ -244,11 +306,11 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
           siblings sharing one key left React holding both nodes, and the stale face — still
           wearing the end of its own exit — was the one `querySelector` found. */}
       {worn.current.charId && (
-        <div className="vu-box-label" key={`label:${shownDress}`} {...answers}>
+        <div className="vu-box-label" key={`label:${shownDress}:${cutMount}`} {...answers}>
           <motion.div
             className="vu-box-portrait vu-arch vu-paper"
             variants={speakerFace}
-            initial="hidden"
+            initial={layerStart}
             animate={leaving ? 'gone' : faced ? 'shown' : 'hidden'}
             onAnimationComplete={(label) => {
               if (label === 'shown' && arrival === 'speaker') setArrival('name')
@@ -259,6 +321,9 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
                 className="vu-crop-img"
                 src={profileUrl(worn.current.charId, speakerVersion)}
                 alt=""
+                /* A cut puts the face up at once with nothing under it, so it is decoded in step
+                   rather than painted blank until a deferred decode lands. */
+                decoding={cutIn ? 'sync' : 'async'}
               />
             </span>
           </motion.div>
@@ -270,7 +335,7 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
               <motion.span
                 className="vu-box-namepill vu-paper"
                 variants={speakerPill}
-                initial="hidden"
+                initial={layerStart}
                 animate={leaving ? 'gone' : named ? 'shown' : 'hidden'}
                 onAnimationComplete={(label) => {
                   if (label === 'shown' && arrival === 'name') setArrival('box')
@@ -280,7 +345,7 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
             <motion.span
               className="vu-box-nameink"
               variants={speakerInk}
-              initial="hidden"
+              initial={layerStart}
               animate={leaving ? 'gone' : named ? 'shown' : 'hidden'}
             >
               {worn.current.name}
@@ -314,23 +379,37 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
         )}
       </motion.div>
 
-      {/* The forward chevron, shown once the line is fully done, not arriving and not turn-held.
-          Two elements: the nudge and the fade are one property apiece, each its own `animate`. */}
+      {/* The forward chevron, shown once the line is fully done, not arriving and not turn-held;
+          a cut stands it up at once. Two elements: the nudge and the fade are one property
+          apiece, each its own `animate`. */}
       <motion.span
         className="vu-box-hint"
         variants={sceneHint}
         initial="hidden"
-        animate={
-          !holding && fullyRevealed && !rowShown && !boxWaiting && !sending && Boolean(text)
-            ? 'shown'
-            : 'hidden'
-        }
+        animate={hintOn ? (cutting ? 'shownCut' : 'shown') : 'hidden'}
         aria-hidden="true"
       >
         <motion.span className="vu-box-nudge" animate={hintNudge}>
           <ChevronIcon />
         </motion.span>
       </motion.span>
+
+      {/* The back mark on the round cap, the forward mark's mirror: a control where that one is
+          a reading, so it takes its own pointer back from the layer and wears the hand. */}
+      <motion.button
+        className="vu-box-rewind"
+        type="button"
+        aria-label="Rewind"
+        data-cursor="hand"
+        disabled={!rewindOn}
+        variants={boxRewind}
+        initial="hidden"
+        animate={rewindOn ? 'shown' : 'hidden'}
+        {...gestures(!rewindOn, quietLift, quietPress)}
+        onClick={onRewind}
+      >
+        <ChevronIcon back />
+      </motion.button>
 
       {chips && (
         <motion.div
@@ -382,6 +461,21 @@ export interface TurnFieldProps {
    */
   wellMotion?: MotionProps
   goMotion?: MotionProps
+  /**
+   * The well and Go are on show. False puts both away and out of the pointer's reach, for
+   * whatever the screen stands in the well's place; absent is true.
+   */
+  revealed?: boolean
+  /** What the screen stands in the well's place, drawn inside the well's own box. */
+  overlay?: ReactNode
+  /**
+   * The pointer moved over the well's box or Go's seat, or left both. A move rather than an
+   * entry, so a well put away under a resting pointer comes back only when the mouse moves.
+   */
+  onHover?: (over: boolean) => void
+  /** The well took the caret, or gave it up. */
+  onFocus?: () => void
+  onBlur?: () => void
 }
 
 /**
@@ -390,6 +484,30 @@ export interface TurnFieldProps {
  */
 export function TurnField(props: TurnFieldProps): JSX.Element {
   const dead = props.sending || props.submitDead
+  const revealed = props.revealed ?? true
+  /** The well's state: glassed while the turn is out, else in hand or put away. */
+  const wellState = props.sending
+    ? props.cg
+      ? 'waitingCg'
+      : 'waiting'
+    : revealed
+      ? 'ready'
+      : 'hidden'
+  /** Go's state: the wait's breath, put away with the well, or breathing once there are words. */
+  const goState = props.sending
+    ? 'sending'
+    : !revealed
+      ? 'hidden'
+      : props.action.trim()
+        ? 'armed'
+        : 'rest'
+  /** The pointer handlers both halves wear, where the screen listens for them at all. */
+  const hover = props.onHover
+    ? {
+        onPointerMove: () => props.onHover?.(true),
+        onPointerLeave: () => props.onHover?.(false)
+      }
+    : undefined
 
   /**
    * The field, one ref per shape because only one of the two is ever drawn. **The screen puts
@@ -404,7 +522,7 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
 
   return (
     <>
-      <motion.div className="vu-turn-inputbox" {...props.wellMotion}>
+      <motion.div className="vu-turn-inputbox" {...props.wellMotion} {...hover}>
         {props.multiline ? (
           /* Grows upward with the box above it moving out of the way (`field-sizing: content`,
              `Dialogue.css`). Enter must not write a newline too; Shift+Enter still breaks one. */
@@ -414,13 +532,15 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
             className="vu-input vu-turn-input vu-turn-input--multiline"
             variants={turnWell}
             initial={false}
-            animate={props.sending ? (props.cg ? 'waitingCg' : 'waiting') : 'ready'}
+            animate={wellState}
             rows={1}
             value={props.action}
             maxLength={500}
             placeholder={props.placeholder}
             disabled={props.inputDead}
             onChange={(event) => props.onAction(event.target.value)}
+            onFocus={props.onFocus}
+            onBlur={props.onBlur}
             onKeyDown={(event) => {
               if (event.key !== 'Enter') return
               if (event.shiftKey) event.stopPropagation()
@@ -434,16 +554,19 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
             className="vu-input vu-turn-input"
             variants={turnWell}
             initial={false}
-            animate={props.sending ? (props.cg ? 'waitingCg' : 'waiting') : 'ready'}
+            animate={wellState}
             value={props.action}
             maxLength={500}
             placeholder={props.placeholder}
             disabled={props.inputDead}
             onChange={(event) => props.onAction(event.target.value)}
+            onFocus={props.onFocus}
+            onBlur={props.onBlur}
           />
         )}
+        {props.overlay}
       </motion.div>
-      <motion.div className="vu-turn-goslot" {...props.goMotion}>
+      <motion.div className="vu-turn-goslot" {...props.goMotion} {...hover}>
         {/* Go rides a wrapper: the breath and the gesture are both a transform, and on one
             element the last writer wins. **The breath is the field's own state read back** —
             the button breathes the moment there are words, which is the answer arming itself
@@ -452,7 +575,7 @@ export function TurnField(props: TurnFieldProps): JSX.Element {
           className="vu-turn-go"
           variants={goBreath}
           initial={false}
-          animate={props.sending ? 'sending' : props.action.trim() ? 'armed' : 'rest'}
+          animate={goState}
         >
           <motion.button
             id="game-submit"

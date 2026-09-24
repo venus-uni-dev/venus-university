@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MEMORY_CAP } from '@shared/relationship'
 import { MAX_RAISES, RAISE_EVERY } from '@shared/jobs'
 import { giftMemoryDesc, itemDefOf, type ItemDef } from '@shared/shop'
-import type { CharMemory, GameSave, SceneState, SocialPost } from '@shared/types'
+import {
+  READER_SPEAKER,
+  type CharMemory,
+  type GameSave,
+  type SceneLine,
+  type SceneState,
+  type SocialPost
+} from '@shared/types'
 import { weatherAt } from '@shared/weather'
 import { buildCharKeyToId, useGameStore } from '../src/renderer/stores/gameStore'
 import { useSettingsStore } from '../src/renderer/stores/settingsStore'
@@ -12,7 +19,8 @@ import {
   charactersById,
   charInfo,
   charJob,
-  playthroughRecord
+  playthroughRecord,
+  sceneLines
 } from './fixtures'
 
 // The store resolves a gift by id, so the fakes the gifting tests give have to resolve too.
@@ -43,6 +51,7 @@ describe('captureScene / restoreScene', () => {
     classCode: 'BIO 210',
     transcript: [{ speaker: 'sarah_rose', text: 'Hi.' }],
     summary: 'They met.',
+    summaries: [{ at: 1, summary: 'They met.' }],
     bg: 'quad',
     slots: ['a', null, 'b'],
     emotions: { a: 'happy', b: 'sex' },
@@ -242,6 +251,28 @@ describe('captureScene / restoreScene', () => {
     useGameStore.setState({ pendingLines: [{ speaker: '', text: 'later' }] })
     useGameStore.getState().advanceLine()
     expect(captured.sceneLog).toHaveLength(2)
+  })
+
+  // The marks are what the continuation window reaches back to: one lost or shifted, and the
+  // model is handed a scene with lines neither the summary nor the window covers.
+  it('round-trips the summary marks, and seeds an older save with one covering nothing', () => {
+    const store = useGameStore.getState()
+    const marks = [
+      { at: 1, summary: 'They met.' },
+      { at: 4, summary: 'They talked.' }
+    ]
+    store.restoreScene({ ...scene, summary: 'They talked.', summaries: marks })
+    expect(useGameStore.getState().captureScene()).toMatchObject({ summaries: marks })
+
+    // Written before the marks: its transcript is exactly what its summary does not cover.
+    const older: SceneState = { ...scene }
+    delete older.summaries
+    store.restoreScene(older)
+    expect(useGameStore.getState().sceneSummaries).toEqual([{ at: 0, summary: 'They met.' }])
+
+    store.restoreScene({ ...older, summary: null })
+    expect(useGameStore.getState().sceneSummaries).toEqual([])
+    expect(useGameStore.getState().captureScene()).not.toHaveProperty('summaries')
   })
 })
 
@@ -473,6 +504,211 @@ describe('settleDepartures', () => {
     useGameStore.getState().settleDepartures()
     expect(useGameStore.getState().offStage).toEqual({})
     expect(useGameStore.getState().departed).toEqual(['a'])
+  })
+})
+
+/**
+ * An interjection autosaves where it cut: a transcript still holding the lines he never read, or
+ * a summary that covers them, puts words in the scene that were never on screen.
+ */
+describe('truncateUnread', () => {
+  it('cuts the transcript and the queue in step, with every summary past the cut', () => {
+    const reader = (text: string): SceneLine => ({ speaker: READER_SPEAKER, text })
+    const [a1, a2, b1, b2, b3, b4] = sceneLines('a1', 'a2', 'b1', 'b2', 'b3', 'b4')
+    useGameStore.setState({
+      currentSceneTranscript: [reader('I wave.'), a1, a2, reader('I sit.'), b1, b2, b3, b4],
+      pendingLines: [b3, b4],
+      sceneSummary: 'third',
+      sceneSummaries: [
+        { at: 3, summary: 'first' },
+        { at: 6, summary: 'second' },
+        { at: 8, summary: 'third' }
+      ]
+    })
+    useGameStore.getState().truncateUnread()
+    expect(useGameStore.getState()).toMatchObject({
+      currentSceneTranscript: [reader('I wave.'), a1, a2, reader('I sit.'), b1, b2],
+      pendingLines: [],
+      sceneSummary: 'second',
+      sceneSummaries: [
+        { at: 3, summary: 'first' },
+        { at: 6, summary: 'second' }
+      ]
+    })
+  })
+})
+
+/**
+ * Stepping back a line within the reply rebuilds the stage from the log. The stage is captured
+ * into every mid-scene save, so a fold that disagrees with forward play writes a scene that
+ * resumes onto somebody else's stage.
+ */
+describe('rewindLine', () => {
+  /** The stage facts a rewind rebuilds, as the store holds them now. */
+  const stageOf = () => {
+    const { bg, slots, emotions, flipped, offStage, departed } = useGameStore.getState()
+    return { bg, slots, emotions, flipped, offStage, departed }
+  }
+  /** Plays every queued line. */
+  const playAll = () => {
+    while (useGameStore.getState().advanceLine()) continue
+  }
+
+  beforeEach(() => {
+    const roster = charactersById(
+      character({ charId: 'a', firstName: 'Sarah', lastName: 'Rose' }),
+      character({ charId: 'b', firstName: 'Mina', lastName: 'Kwon', pose: 'sitting' })
+    )
+    useGameStore.setState({
+      characters: roster,
+      charKeyToId: buildCharKeyToId(roster),
+      cast: ['a', 'b']
+    })
+  })
+
+  it('puts back the stage each line left, across a show, a sprite, a bg and a hide', () => {
+    const lines: SceneLine[] = [
+      { speaker: '', bg: 'quad', actions: ['show:sarah_rose'], text: 'The quad.' },
+      { speaker: 'sarah_rose', actions: ['sprite:sarah_rose,happy'], text: 'Hi.' },
+      { speaker: '', bg: 'library', text: 'Inside.' },
+      { speaker: '', actions: ['show:mina_kwon'], text: 'Mina comes in.' },
+      { speaker: '', actions: ['hide:sarah_rose'], text: 'Sarah goes.' }
+    ]
+    const queued: SceneLine = { speaker: '', text: 'Not read yet.' }
+    useGameStore.getState().logPlayerAction('I wave.', false)
+    useGameStore.setState({ pendingLines: [...lines, queued] })
+    const stages = lines.map(() => {
+      useGameStore.getState().advanceLine()
+      return stageOf()
+    })
+
+    for (let at = lines.length - 2; at >= 0; at--) {
+      expect(useGameStore.getState().rewindLine()).toBe(true)
+      expect(useGameStore.getState().currentLine).toBe(lines[at])
+      expect(stageOf()).toEqual(stages[at])
+      // The lines stepped back over go back ahead of the ones never reached, in order.
+      expect(useGameStore.getState().pendingLines).toEqual([...lines.slice(at + 1), queued])
+    }
+    expect(useGameStore.getState().lineRewound).toBe(lines.length - 1)
+
+    // The reply's first line has nothing before it in this reply to step back to.
+    const before = useGameStore.getState()
+    expect(before.rewindLine()).toBe(false)
+    expect(useGameStore.getState()).toBe(before)
+  })
+
+  it('steps over a line that says nothing', () => {
+    const lines: SceneLine[] = [
+      { speaker: '', text: 'Hello.' },
+      { speaker: '', actions: ['show:sarah_rose'], text: ' ' },
+      { speaker: '', text: 'Bye.' }
+    ]
+    useGameStore.getState().logPlayerAction('I wave.', false)
+    useGameStore.setState({ pendingLines: [...lines] })
+    playAll()
+    expect(useGameStore.getState().rewindLine()).toBe(true)
+    expect(useGameStore.getState().currentLine).toBe(lines[0])
+    expect(useGameStore.getState().slots).toEqual([null, null, null])
+    expect(useGameStore.getState().pendingLines).toEqual(lines.slice(1))
+  })
+
+  it('keeps an absence charged across the reader’s lines exact, and never crosses one', () => {
+    const store = useGameStore.getState()
+    store.logPlayerAction('I wave.', false)
+    useGameStore.setState({
+      pendingLines: [
+        { speaker: '', actions: ['show:sarah_rose'], text: 'Sarah is here.' },
+        { speaker: '', actions: ['hide:sarah_rose'], text: 'She steps out.' }
+      ]
+    })
+    playAll()
+    store.settleDepartures()
+    store.logPlayerAction('I wait.', true)
+    useGameStore.setState({ pendingLines: sceneLines('Quiet.', 'Still quiet.') })
+    playAll()
+
+    expect(store.rewindLine()).toBe(true)
+    expect(useGameStore.getState().offStage).toEqual({ a: 1 })
+    // The reply's first line: the reader's own line is the floor.
+    expect(store.rewindLine()).toBe(false)
+
+    playAll()
+    store.settleDepartures()
+    store.logPlayerAction('I leave.', true)
+    useGameStore.setState({ pendingLines: sceneLines('Gone.', 'Long gone.') })
+    playAll()
+    expect(store.rewindLine()).toBe(true)
+    expect(useGameStore.getState()).toMatchObject({ offStage: {}, departed: ['a'] })
+  })
+})
+
+/**
+ * Rewriting a line of the reply reaches the transcript the writer is shown, which every mid-scene
+ * save captures. A rewrite that lands on the wrong transcript line, or on a line of an earlier
+ * turn, puts words in the save the player never read.
+ */
+describe('editLogLine', () => {
+  /** Plays the reader's action and then every line of the reply, as a streamed reply arrives. */
+  const playTurn = (action: string, lines: SceneLine[]) => {
+    const store = useGameStore.getState()
+    store.logPlayerAction(action, false)
+    store.appendSceneLines(lines)
+    store.appendPendingLines(lines)
+    while (useGameStore.getState().advanceLine()) continue
+  }
+
+  it('rewrites a line of the reply on the log and the transcript, and on screen when shown', () => {
+    const lines: SceneLine[] = [
+      { speaker: '', text: 'She turns.' },
+      { speaker: 'sarah_rose', text: 'Hi.' },
+      { speaker: '', text: 'She smiles.' }
+    ]
+    playTurn('I wave.', lines)
+    useGameStore.getState().setSceneSummary('They met.', 4)
+    const { sceneSummaries, pendingLines } = useGameStore.getState()
+
+    expect(useGameStore.getState().editLogLine(2, 'Hello.')).toBe(true)
+    const edited = { speaker: 'sarah_rose', text: 'Hello.' }
+    expect(useGameStore.getState()).toMatchObject({
+      sceneLog: [{ speaker: READER_SPEAKER, text: 'I wave.' }, lines[0], edited, lines[2]],
+      currentSceneTranscript: [{ speaker: READER_SPEAKER, text: 'I wave.' }, lines[0], edited, lines[2]],
+      lineRewound: 0
+    })
+    expect(useGameStore.getState().currentLine).toBe(lines[2])
+
+    expect(useGameStore.getState().editLogLine(3, 'She laughs.')).toBe(true)
+    const after = useGameStore.getState()
+    expect(after.currentLine).toEqual({ speaker: '', text: 'She laughs.' })
+    expect(after.currentSceneTranscript[3]).toBe(after.currentLine)
+    expect(after.sceneLog[3]).toBe(after.currentLine)
+    expect(after.lineRewound).toBe(1)
+    expect(after.sceneSummaries).toBe(sceneSummaries)
+    expect(after.pendingLines).toBe(pendingLines)
+  })
+
+  it('refuses the reader’s line, a line before it and a status line', () => {
+    playTurn('I wave.', sceneLines('a1', 'a2'))
+    playTurn('I sit.', [
+      { speaker: '', text: 'b1' },
+      { speaker: '', text: 'Charm +1', status: { marks: [{ start: 0, end: 8, tone: 'gain' }] } }
+    ])
+    const before = useGameStore.getState()
+    for (const at of [3, 1, 5]) {
+      expect(before.editLogLine(at, 'New words.')).toBe(false)
+      expect(useGameStore.getState()).toBe(before)
+    }
+  })
+
+  it('rewrites the shown line of a restored save, though it is a copy of the log’s', () => {
+    playTurn('I wave.', sceneLines('She turns.', 'She smiles.'))
+    const store = useGameStore.getState()
+    store.restoreScene(JSON.parse(JSON.stringify(store.captureScene())) as SceneState)
+
+    expect(store.editLogLine(2, 'She laughs.')).toBe(true)
+    const after = useGameStore.getState()
+    expect(after.currentLine).toEqual({ speaker: '', text: 'She laughs.' })
+    expect(after.currentSceneTranscript[2]).toEqual({ speaker: '', text: 'She laughs.' })
+    expect(after.lineRewound).toBe(1)
   })
 })
 

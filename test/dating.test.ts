@@ -95,13 +95,21 @@ describe('settleDating', () => {
 
     // Her own hopes outrank a friend's heartbreak, so Cleo hears about herself.
     expect(entryOf(outcome, 'a').jealousyMemories).toEqual([
-      { date: DATE, type: 'hated', desc: 'you broke her heart by starting to date Nia instead' }
+      {
+        date: DATE,
+        type: 'hated',
+        desc: 'the reader broke her heart by starting to date Nia instead'
+      }
     ])
     expect(entryOf(outcome, 'c').jealousyMemories).toEqual([
-      { date: DATE, type: 'hated', desc: 'you started dating Nia when she had a crush on you' }
+      {
+        date: DATE,
+        type: 'hated',
+        desc: 'the reader started dating Nia when she had a crush on the reader'
+      }
     ])
     expect(entryOf(outcome, 'f').jealousyMemories).toEqual([
-      { date: DATE, type: 'disliked', desc: "you broke Ana's heart" }
+      { date: DATE, type: 'disliked', desc: "the reader broke Ana's heart" }
     ])
     expect(outcome.charInfo.d).toBeUndefined()
   })
@@ -119,7 +127,7 @@ describe('settleDating', () => {
       { charId: 'b', forCharId: 'n' }
     ])
     expect(entryOf(outcome, 'f').jealousyMemories).toEqual([
-      { date: DATE, type: 'disliked', desc: 'you broke the hearts of Ana and Bea' }
+      { date: DATE, type: 'disliked', desc: 'the reader broke the hearts of Ana and Bea' }
     ])
   })
 

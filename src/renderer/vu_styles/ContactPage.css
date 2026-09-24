@@ -470,12 +470,13 @@
 }
 
 /* Newest at the top, and the date is a column of its own rather than a suffix: read down, the
-   list is the order the two of them happened in, and every date starts at the same place. */
+   list is the order the two of them happened in, and every date starts at the same place.
+   The row gap keeps the pencils ending each row clear of one another. */
 .vu-contact-memories {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: baseline;
-  gap: 12px 14px;
+  gap: 18px 14px;
   margin: 0;
   padding: 0;
   color: var(--vu-text-body);
@@ -487,6 +488,17 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* The pencil at the end of a memory that opens it for editing: the recessed square at the
+   list's own size, centred on the memory's first 21px line, the one its date is set on. The
+   margins take back its overhang, so it adds nothing to the row's height. */
+.vu-contact-memory-edit {
+  align-self: start;
+  width: 30px;
+  height: 30px;
+  margin-block: -4.5px;
+  border-radius: 11px;
 }
 
 /* The leave and the answer at the end of the row, neither wider than its own words. */
