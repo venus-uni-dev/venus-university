@@ -1,7 +1,6 @@
-import { validateRecord } from '@shared/jsonValidate'
 import { appError } from '@shared/errors'
 import { looseNamesOf, setDirRel, STAGING_DIR, stagedRel } from '@shared/characterFiles'
-import { assertSafeCharId, CHARACTER_NOT_FOUND, CHARACTER_READ } from '@shared/characterRules'
+import { assertSafeCharId, CHARACTER_NOT_FOUND, readCharacterRecord } from '@shared/characterRules'
 import type { Character, CustomOutfitSlot, SetTarget } from '@shared/types'
 import { database, partRange, storage } from './open'
 
@@ -45,12 +44,25 @@ export async function listOwn(): Promise<Character[]> {
   )
 
   const characters: Character[] = []
+  const upgraded: Character[] = []
   for (const candidate of stored) {
     try {
-      characters.push(validateRecord<Character>(candidate, candidate.charId, CHARACTER_READ))
+      const read = readCharacterRecord(candidate, candidate.charId)
+      characters.push(read.character)
+      if (read.upgraded) upgraded.push(read.character)
     } catch (err) {
       console.warn(`[characters] skipping "${candidate.charId}":`, err)
     }
+  }
+
+  // An older row is written back at once, its write time untouched, so the database is current
+  // after the first listing.
+  if (upgraded.length > 0) {
+    await storage('save the characters', async () => {
+      const tx = (await database()).transaction('characters', 'readwrite')
+      for (const character of upgraded) void tx.store.put(character, character.charId)
+      await tx.done
+    })
   }
   return characters.sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0))
 }
@@ -65,7 +77,11 @@ export async function readCharacter(charId: string): Promise<Character> {
     throw appError(CHARACTER_NOT_FOUND.code, CHARACTER_NOT_FOUND.message, charId)
   }
   // The key she is kept under is her id, whatever the record says.
-  return { ...validateRecord<Character>(stored, charId, CHARACTER_READ), charId }
+  const read = readCharacterRecord(stored, charId)
+  const character = { ...read.character, charId }
+  // An older row is written back at once, its write time untouched, so the database is current.
+  if (read.upgraded) await writeCharacter(character)
+  return character
 }
 
 /** Writes one character's record. */

@@ -18,6 +18,7 @@ import {
   CHARACTER_UNREADABLE,
   defaultsStatusOf,
   newCharacter,
+  readCharacterRecord,
   SAFE_CHAR_ID,
   withRemovedDefault
 } from '@shared/characterRules'
@@ -65,7 +66,7 @@ import {
   imagePath,
   imageStemsIn
 } from './imageFiles'
-import { readValidatedJson, writeAtomicJson } from './jsonFile'
+import { readJsonFile, writeAtomicJson } from './jsonFile'
 import { cutProfile, profileCropOf, tryCutProfile } from './profileService'
 import { getSettings, setRemovedDefaults } from './settingsService'
 
@@ -85,28 +86,47 @@ export async function assertEditableChar(charId: string): Promise<void> {
   )
 }
 
-/** Reads and validates one `character.json` at `path`; a missing field is refused by name. */
+/**
+ * Reads, upgrades and validates one `character.json` at `path`; a missing field is refused by
+ * name, and `upgraded` says the file holds an older version than the one returned.
+ */
 export async function readCharacterFile(
   path: string,
   charId: string,
   onMissing: () => never
-): Promise<Character> {
-  const candidate = await readValidatedJson<Character>(path, {
-    ...CHARACTER_READ,
+): Promise<{ character: Character; upgraded: boolean }> {
+  const read = await readJsonFile(path, {
+    malformed: CHARACTER_READ.malformed,
     unreadable: CHARACTER_UNREADABLE,
     onMissing
   })
+  if (read.kind === 'missing') return read.value
+  const { character, upgraded } = readCharacterRecord(read.parsed, path)
 
   // The folder's name is her id, whatever the file says.
-  return { ...candidate, charId }
+  return { character: { ...character, charId }, upgraded }
 }
 
 /** Reads and validates one character's `character.json` by id. */
 export async function getCharacter(charId: string): Promise<Character> {
   assertSafeCharId(charId)
-  return readCharacterFile(getCharacterFilePath(charId), charId, () => {
-    throw appError(CHARACTER_NOT_FOUND.code, CHARACTER_NOT_FOUND.message, charId)
-  })
+  const { character, upgraded } = await readCharacterFile(
+    getCharacterFilePath(charId),
+    charId,
+    () => {
+      throw appError(CHARACTER_NOT_FOUND.code, CHARACTER_NOT_FOUND.message, charId)
+    }
+  )
+
+  // An older record is written back at once, so the file on disk is current after the first
+  // listing and its updatedAt keeps the grid's order.
+  if (upgraded && !isPregenChar(charId)) {
+    await writeAtomicJson(getCharacterFilePath(charId), character, {
+      code: 'CHARACTER_UNWRITABLE',
+      message: 'Could not save the character.'
+    })
+  }
+  return character
 }
 
 /** One root's folder names; a root that is not there holds no characters. */

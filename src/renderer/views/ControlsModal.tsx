@@ -21,30 +21,27 @@ interface ControlSection {
 const SCENE: ControlSection = {
   title: 'In a scene',
   rows: [
-    { keys: ['Enter', 'Space'], does: 'Turns the line; Enter in the action box sends what is typed.' },
-    { keys: ['Shift+Enter'], does: 'Starts a new line in the action box.' },
+    { keys: ['Enter', 'Space'], does: 'Advance text' },
     {
       keys: ['Tab'],
-      does: 'Puts the caret in the action box, bringing it out over a reply; Tab in the box leaves it.'
+      does: 'Auto-focus text box'
     },
-    { keys: ['Mouse wheel'], does: 'Steps a line back, or forward again over what was stepped back.' },
-    { keys: ['H'], does: 'Hides the interface; any key or click brings it back.' },
-    { keys: ['Escape', 'Right-click'], does: 'Opens or closes the menu.' }
+    { keys: ['Mouse wheel'], does: 'Rewind or go forward' },
+    { keys: ['H'], does: 'Hide UI' },
+    { keys: ['Escape', 'Right-click'], does: 'Open/close pause menu' }
   ]
 }
 
 const EVERYWHERE: ControlSection = {
   title: 'Everywhere',
   rows: [
-    { keys: ['Escape'], does: 'Closes a panel, as a click outside it does.' },
-    { keys: ['Tab', 'Shift+Tab'], does: 'Moves to the next or the previous field of a form.' },
-    { keys: ['Enter'], does: "Gives a form's main answer." },
-    { keys: ['Left arrow', 'Right arrow', 'Mouse wheel'], does: 'Turns the page of the save list.' }
+    { keys: ['Escape'], does: 'Close a panel' },
+    { keys: ['Enter'], does: "Submit form" },
   ]
 }
 
 /** The desktop app's own window key, which a browser tab keeps for itself. */
-const FULLSCREEN: ControlRow = { keys: ['F11'], does: 'Turns fullscreen on or off.' }
+const FULLSCREEN: ControlRow = { keys: ['F11'], does: 'Fullscreen toggle' }
 
 /** The two sections, the fullscreen row dropped where the app has no window of its own. */
 function sectionsOf(web: boolean): ControlSection[] {

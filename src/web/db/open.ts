@@ -40,9 +40,9 @@ export interface VenusUniversityDb extends DBSchema {
 }
 
 /**
- * Every store this version wants; there is no migration path, as on disk. A version that
- * appends one creates only what is missing, so a database already here gains it and keeps
- * everything it holds.
+ * Every store this version wants; the store list itself has no migration path, and a character
+ * row is upgraded by its own reader when it is read. A version that appends one creates only
+ * what is missing, so a database already here gains it and keeps everything it holds.
  */
 const STORES = [
   'settings',

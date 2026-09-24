@@ -17,9 +17,7 @@ const QUALITY_TAGS: readonly string[] = ['masterpiece', 'best_quality', 'very_ae
 
 /** Composition preamble: standing full-body figure on a removable white background. */
 const BASE_TAGS: readonly string[] = [
-  '1girl',
   'solo',
-  'mature_female',
   'full_body',
   'standing',
   'simple_background',

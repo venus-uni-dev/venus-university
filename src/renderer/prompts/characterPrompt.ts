@@ -1,3 +1,4 @@
+import { SUBJECT_TAGS } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
 import {
   BREAST_SIZES,
@@ -473,19 +474,23 @@ export function draftToCharacter(
   const poseKeys = poseKeysOf(poses)
   const a = draft.appearance ?? ({} as CharacterDraft['appearance'])
 
-  const baseAppearance = cleanTags([
-    colorTag(a.hairColor, a.hairShade, 'hair'),
-    colorTag(a.eyeColor, a.eyeShade, 'eyes'),
-    suffixTag(a.hairLength, 'hair'),
-    suffixTag(a.hairTexture, 'hair'),
-    ...(a.hairStyle ?? []),
-    ...(a.hairBangs ?? []),
-    ...(a.headAccessories ?? []),
-    ...(a.makeup ?? []),
-    // One each: mutually exclusive descriptions.
-    ...(a.breastSize ?? []).slice(0, 1).map((size) => suffixTag(size, 'breasts')),
-    ...(a.skin ?? []).slice(0, 1)
-  ])
+  // The app supplies the subject tags; the model is never asked for them.
+  const baseAppearance = [
+    ...SUBJECT_TAGS,
+    ...cleanTags([
+      colorTag(a.hairColor, a.hairShade, 'hair'),
+      colorTag(a.eyeColor, a.eyeShade, 'eyes'),
+      suffixTag(a.hairLength, 'hair'),
+      suffixTag(a.hairTexture, 'hair'),
+      ...(a.hairStyle ?? []),
+      ...(a.hairBangs ?? []),
+      ...(a.headAccessories ?? []),
+      ...(a.makeup ?? []),
+      // One each: mutually exclusive descriptions.
+      ...(a.breastSize ?? []).slice(0, 1).map((size) => suffixTag(size, 'breasts')),
+      ...(a.skin ?? []).slice(0, 1)
+    ])
+  ]
 
   const expressionTags = {} as Record<Emotion, string[]>
   for (const emotion of EMOTIONS) {
@@ -573,7 +578,9 @@ export function missingRequiredFields(character: Character): string[] {
   // Only the liked half: an empty `disliked` is an ordinary answer.
   if (character.giftPreferences.liked.length === 0) missing.push('gift preferences')
   if (!character.pose) missing.push('pose')
-  if (character.baseAppearance.length === 0) missing.push('appearance')
+  if (character.baseAppearance.every((tag) => SUBJECT_TAGS.includes(tag))) {
+    missing.push('appearance')
+  }
   if (character.outfit.length === 0) missing.push('outfit')
   // Required even when unrendered, so the Edit modal can render a set later.
   if (character.peOutfit.length === 0) missing.push('PE outfit')

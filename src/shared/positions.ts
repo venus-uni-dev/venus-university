@@ -21,7 +21,7 @@ export function isPosition(value: string): value is Position {
 }
 
 /** Prefixes every CG's positive prompt, after the quality tags. */
-export const CG_BASE_PROMPT = '1girl, mature_female, sweat, breath, blush, looking_at_viewer'
+export const CG_BASE_PROMPT = 'sweat, breath, blush, looking_at_viewer'
 
 /** Booru tags describing each position; the middle of the CG positive prompt. */
 export const POSITION_TAGS: Record<Position, string> = {

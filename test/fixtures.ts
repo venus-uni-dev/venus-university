@@ -28,7 +28,7 @@ export function character(over: Partial<Character> = {}): Character {
   for (const emotion of EMOTIONS) expressionTags[emotion] = ['smile']
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     charId: 'char-1',
     firstName: 'Sarah',
     lastName: 'Rose',

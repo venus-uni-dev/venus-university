@@ -238,7 +238,7 @@ export interface CharacterBrief {
 
 /** On-disk character definition — `/data/characters/{charId}/character.json`. */
 export interface Character {
-  schemaVersion: 2
+  schemaVersion: 3
   /** crypto.randomUUID(); also the folder name under /data/characters. */
   charId: string
   firstName: string

@@ -1,7 +1,7 @@
 import { CHARACTER_FILE_NAME, isCharFileRel, STAGING_DIR } from './characterFiles'
 import { CHARACTER_SCHEMA_VERSION } from './characterRules'
 import { appError } from './errors'
-import type { ValidateRecordOptions } from './jsonValidate'
+import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import type { Character } from './types'
 
 /** Moving one character between installs: what the package carries, and what it must say. */
@@ -68,6 +68,19 @@ export function checkManifest(manifest: CharacterManifest): CharacterManifest {
     )
   }
   return manifest
+}
+
+/**
+ * One parsed manifest, a version-2 one read as this build's, checked and then refused if its
+ * `format` says the package is something else's.
+ */
+export function readManifestRecord(parsed: unknown, where: string): CharacterManifest {
+  const older =
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    (parsed as { schemaVersion?: unknown }).schemaVersion === 2
+  const current = older ? { ...parsed, schemaVersion: CHARACTER_SCHEMA_VERSION } : parsed
+  return checkManifest(validateRecord<CharacterManifest>(current, where, MANIFEST_READ))
 }
 
 /** The character record an export carries: hers minus the identity the install she leaves gave her. */

@@ -1,5 +1,6 @@
 import { unzipSync, zipSync } from 'fflate'
 import { CHARACTER_FILE_NAME, namedRel } from '@shared/characterFiles'
+import { readCharacterRecord } from '@shared/characterRules'
 import { appError, messageOf } from '@shared/errors'
 import { MANIFEST_NAME } from '@shared/characterTransfer'
 import type { Character } from '@shared/types'
@@ -94,16 +95,31 @@ export function isShipped(charId: string): boolean {
   return charId in packIndex().chars
 }
 
-/** Every shipped character's record, each carrying the id it is keyed under. */
+/**
+ * Every shipped character's record, each carrying the id it is keyed under. The bundled records
+ * are checked like any other, in memory only, so a pack built by an older release still reads
+ * as current; one that is refused is skipped.
+ */
 export function shippedCharacters(): Character[] {
   if (!shipped) missing('characters.json')
-  return shippedCharIds().map((charId) => ({ ...shipped[charId], charId }))
+  const characters: Character[] = []
+  for (const charId of shippedCharIds()) {
+    try {
+      characters.push({ ...readCharacterRecord(shipped[charId], charId).character, charId })
+    } catch (err) {
+      console.warn(`[characters] skipping "${charId}":`, err)
+    }
+  }
+  return characters
 }
 
-/** One shipped character's record. */
+/**
+ * One shipped character's record, checked like any other in memory so a pack built by an older
+ * release still reads as current.
+ */
 export function shippedCharacter(charId: string): Character {
   if (!shipped?.[charId]) missing(`characters.json has no ${charId}`)
-  return { ...shipped[charId], charId }
+  return { ...readCharacterRecord(shipped[charId], charId).character, charId }
 }
 
 /** Which images one shipped character has, under the names the app asks for them by. */

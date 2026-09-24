@@ -1,6 +1,6 @@
 import { CHARACTER_FILE_NAME } from './characterFiles'
 import { EMOTIONS } from './emotions'
-import { assertSafeId, type ValidateRecordOptions } from './jsonValidate'
+import { assertSafeId, validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import { allFollowMain } from './outfits'
 import { defaultSpriteScale } from './spriteScale'
 import {
@@ -14,12 +14,16 @@ import { randomId } from './uuid'
 
 /**
  * What a character record must be, whichever store holds it: the version this build reads,
- * the fields she carries, the id that is safe to make a key out of, the shape a new one
- * starts in, and which of the shipped cast the player has taken off the roster.
+ * how an older one is brought up to it, the fields she carries, the id that is safe to make a
+ * key out of, the shape a new one starts in, and which of the shipped cast the player has
+ * taken off the roster.
  */
 
 /** Schema version this build reads and writes. */
-export const CHARACTER_SCHEMA_VERSION = 2
+export const CHARACTER_SCHEMA_VERSION = 3
+
+/** The tags every render opens her appearance with. */
+export const SUBJECT_TAGS: readonly string[] = ['1girl', 'mature_female']
 
 /** What a character record must carry; where it is kept names her. */
 const CHARACTER_REQUIRED: Record<
@@ -70,6 +74,41 @@ export const CHARACTER_READ: ValidateRecordOptions<Character> = {
   schemaVersion: { code: 'CHARACTER_SCHEMA_VERSION' },
   expects: CHARACTER_SCHEMA_VERSION,
   required: CHARACTER_REQUIRED
+}
+
+/**
+ * A version-2 record brought up to version 3, the subject tags it lacks put in front of her
+ * appearance; anything else comes back untouched, for the record check to refuse by name.
+ */
+export function upgradeCharacterRecord(parsed: unknown): { record: unknown; upgraded: boolean } {
+  if (typeof parsed !== 'object' || parsed === null) return { record: parsed, upgraded: false }
+  const candidate = parsed as { schemaVersion?: unknown; baseAppearance?: unknown }
+  if (candidate.schemaVersion !== 2 || !Array.isArray(candidate.baseAppearance)) {
+    return { record: parsed, upgraded: false }
+  }
+
+  const held = candidate.baseAppearance.map(String)
+  const missing = SUBJECT_TAGS.filter((tag) => !held.includes(tag))
+  return {
+    record: {
+      ...candidate,
+      schemaVersion: 3,
+      baseAppearance: [...missing, ...candidate.baseAppearance]
+    },
+    upgraded: true
+  }
+}
+
+/**
+ * One parsed character record, brought up to this build's version and checked; `upgraded` says
+ * whether it was older than the version it now reads as.
+ */
+export function readCharacterRecord(
+  parsed: unknown,
+  where: string
+): { character: Character; upgraded: boolean } {
+  const { record, upgraded } = upgradeCharacterRecord(parsed)
+  return { character: validateRecord<Character>(record, where, CHARACTER_READ), upgraded }
 }
 
 /** Raised when a character record is there but cannot be read. */
@@ -135,7 +174,7 @@ export function newCharacter(
     generationSeed: randomSeed(),
     seedFollowsMain: allFollowMain(),
     setSeeds: {},
-    baseAppearance: [],
+    baseAppearance: [...SUBJECT_TAGS],
     pose: '',
     outfit: [],
     peOutfit: [],

@@ -116,6 +116,7 @@ function portableCharacter(overrides: Record<string, unknown> = {}): Record<stri
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     format: 'venus-university-character',
+    // One version behind this build, so every import also reads an older manifest.
     schemaVersion: 2,
     exportedAt: '2015-01-19T00:00:00.000Z',
     firstName: 'Mina',
@@ -166,11 +167,11 @@ describe('exportCharacter', () => {
     // The whole point of stripping it: an id is what one install calls her.
     expect(written).not.toHaveProperty('charId')
     expect(written.firstName).toBe('Mina')
-    expect(written.schemaVersion).toBe(2)
+    expect(written.schemaVersion).toBe(3)
 
     expect(JSON.parse(await readFile(join(dir, MANIFEST_NAME), 'utf8'))).toMatchObject({
       format: 'venus-university-character',
-      schemaVersion: 2,
+      schemaVersion: 3,
       firstName: 'Mina',
       lastName: 'Aoki'
     })
@@ -241,7 +242,7 @@ describe('importCharacter', () => {
     // The folder is named for the new id, and the file agrees with the folder.
     const onDisk = await getCharacter(imported.charId)
     expect(onDisk.charId).toBe(imported.charId)
-    expect(onDisk.schemaVersion).toBe(2)
+    expect(onDisk.schemaVersion).toBe(3)
 
     const sprites = getCharacterExpressionsPath(imported.charId)
     expect(await readFile(join(sprites, 'neutral.png'))).toEqual(Buffer.from(PNG_BYTES))
@@ -445,7 +446,7 @@ describe('the package rules', () => {
 
     expect(built).toEqual({
       format: 'venus-university-character',
-      schemaVersion: 2,
+      schemaVersion: 3,
       exportedAt: '2015-01-19T00:00:00.000Z',
       firstName: 'Mina',
       lastName: 'Aoki'

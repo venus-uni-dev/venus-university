@@ -1,3 +1,4 @@
+import { SUBJECT_TAGS } from '@shared/characterRules'
 import { slotFullLabel, yearLabel } from '@shared/classes'
 import { dormClause } from '@shared/dorms'
 import { EMOTIONS } from '@shared/emotions'
@@ -496,8 +497,10 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
     }
 
     // Appearance and main outfit as their booru tags.
-    if (character.baseAppearance.length > 0) {
-      lines.push(`Appearance: ${character.baseAppearance.join(', ')}`)
+    // The subject tags are the renderer's, and say nothing to the writer.
+    const appearance = character.baseAppearance.filter((tag) => !SUBJECT_TAGS.includes(tag))
+    if (appearance.length > 0) {
+      lines.push(`Appearance: ${appearance.join(', ')}`)
     }
     const mainOutfit = wardrobeProse(character.outfit)
     if (mainOutfit) {

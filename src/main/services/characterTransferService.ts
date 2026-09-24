@@ -5,13 +5,13 @@ import { assertSafeCharId } from '@shared/characterRules'
 import {
   adoptStamp,
   buildManifest,
-  checkManifest,
   classifyImportEntry,
   MANIFEST_MISSING,
   MANIFEST_NAME,
   MANIFEST_READ,
   MANIFEST_UNREADABLE,
   portableOf,
+  readManifestRecord,
   stripWrapper,
   type CharacterManifest
 } from '@shared/characterTransfer'
@@ -31,7 +31,7 @@ import {
 } from './archiveService'
 import { getCharacter, readCharacterFile } from './characterService'
 import { sniffImageFile } from './imageFiles'
-import { readValidatedJson, writeAtomicJson } from './jsonFile'
+import { readJsonFile, writeAtomicJson } from './jsonFile'
 
 /** Moving one character between installs, as a zip in the shared package format. */
 
@@ -137,15 +137,17 @@ async function copyImages(from: string, to: string): Promise<void> {
 
 /** Reads and checks the archive's manifest, or says why it is not one of ours. */
 async function readManifest(dir: string): Promise<CharacterManifest> {
-  const manifest = await readValidatedJson<CharacterManifest>(join(dir, MANIFEST_NAME), {
-    ...MANIFEST_READ,
+  const path = join(dir, MANIFEST_NAME)
+  const read = await readJsonFile(path, {
+    malformed: MANIFEST_READ.malformed,
     unreadable: MANIFEST_UNREADABLE,
-    onMissing: () => {
+    onMissing: (): never => {
       throw appError(MANIFEST_MISSING.code, MANIFEST_MISSING.message, MANIFEST_NAME)
     }
   })
+  if (read.kind === 'missing') return read.value
 
-  return checkManifest(manifest)
+  return readManifestRecord(read.parsed, path)
 }
 
 /**
@@ -167,13 +169,17 @@ export async function importCharacter(archivePath: string): Promise<Character> {
     await readManifest(tempDir)
 
     const charId = randomId()
-    const character = await readCharacterFile(join(tempDir, CHARACTER_FILE_NAME), charId, () => {
-      throw appError(
-        'IMPORT_CHARACTER_MISSING',
-        'That export holds no character.',
-        CHARACTER_FILE_NAME
-      )
-    })
+    const { character } = await readCharacterFile(
+      join(tempDir, CHARACTER_FILE_NAME),
+      charId,
+      () => {
+        throw appError(
+          'IMPORT_CHARACTER_MISSING',
+          'That export holds no character.',
+          CHARACTER_FILE_NAME
+        )
+      }
+    )
 
     // Neither is hers: staging is a dead run's images, the manifest describes the archive.
     await discard(join(tempDir, STAGING_DIR))

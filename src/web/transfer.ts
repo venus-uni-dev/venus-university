@@ -6,24 +6,21 @@ import {
   shippedRel,
   STAGING_DIR
 } from '@shared/characterFiles'
-import { CHARACTER_READ } from '@shared/characterRules'
+import { readCharacterRecord } from '@shared/characterRules'
 import {
   adoptStamp,
   buildManifest,
-  checkManifest,
   classifyImportEntry,
   exportFileName,
   MANIFEST_MISSING,
   MANIFEST_NAME,
-  MANIFEST_READ,
   MANIFEST_UNREADABLE,
   portableOf,
-  stripWrapper,
-  type CharacterManifest
+  readManifestRecord,
+  stripWrapper
 } from '@shared/characterTransfer'
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
-import { validateRecord } from '@shared/jsonValidate'
 import { randomId } from '@shared/uuid'
 import {
   checkArchiveContent,
@@ -199,23 +196,20 @@ function imagesOf(entries: Record<string, Uint8Array>): FileWrite[] {
 /** Adopts a package's character under a fresh identity and keeps every image it carries. */
 async function adoptPackage(entries: Record<string, Uint8Array>): Promise<Character> {
   const marker = entries[MANIFEST_NAME]
-  const manifest = validateRecord<CharacterManifest>(
+  readManifestRecord(
     readJsonEntry(marker, marker ? MANIFEST_UNREADABLE : MANIFEST_MISSING, MANIFEST_NAME),
-    MANIFEST_NAME,
-    MANIFEST_READ
+    MANIFEST_NAME
   )
-  checkManifest(manifest)
 
   const charId = randomId()
-  const record = validateRecord<Character>(
+  const record = readCharacterRecord(
     readJsonEntry(
       entries[CHARACTER_FILE_NAME],
       { code: 'IMPORT_CHARACTER_MISSING', message: 'That export holds no character.' },
       CHARACTER_FILE_NAME
     ),
-    CHARACTER_FILE_NAME,
-    CHARACTER_READ
-  )
+    CHARACTER_FILE_NAME
+  ).character
 
   // The id is minted here, never read off the package.
   const character = adoptStamp({ ...record, charId }, Date.now())
