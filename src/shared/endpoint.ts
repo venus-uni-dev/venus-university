@@ -1,10 +1,7 @@
 /**
- * The custom provider's endpoint URL: what the player typed made sendable, and the one rule
- * for refusing it. The transport and the Settings form call these.
+ * The custom provider's endpoint URL: what the player typed made sendable, and the check that
+ * it is a URL fetch can speak to (http or https).
  */
-
-/** The hosts an `http:` URL may be sent to: this machine and nowhere else. */
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 /** The typed URL as the adapters use it: trimmed, no trailing slash, no pasted `/chat/completions`. */
 export function normalizeEndpoint(raw: string): string {
@@ -34,7 +31,6 @@ export function endpointProblem(raw: string): string | null {
   } catch {
     return 'The endpoint URL is not a valid URL.'
   }
-  if (parsed.protocol === 'https:') return null
-  if (parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname)) return null
-  return 'The endpoint URL must use https, or http for a server on this machine.'
+  if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return null
+  return 'The endpoint URL must start with http:// or https://.'
 }

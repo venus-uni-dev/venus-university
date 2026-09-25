@@ -53,6 +53,7 @@ const CONTRACTIONS: Record<string, string> = { re: 'is', ve: 'has', ll: 'will', 
 /** "the reader" or "you" and the verb it governs, in each direction. */
 const THIRD_PERSON_VERB = subjectVerbPattern('the reader', TO_SECOND_PERSON)
 const SECOND_PERSON_VERB = subjectVerbPattern('you', TO_THIRD_PERSON)
+const HE_VERB = subjectVerbPattern('he', TO_SECOND_PERSON)
 
 /** `word` with a capital first letter when the text it replaces opens with one. */
 function matchCase(replaced: string, word: string): string {
@@ -74,15 +75,25 @@ function agreeing(subject: string, verbs: Record<string, string>) {
   }
 }
 
-/** A memory as the player reads it: "the reader" becomes "you", the verb after it agreeing. */
+/**
+ * A memory as the player reads it: "the reader" becomes "you", the verb after it agreeing —
+ * and in a memory that names him, his "he", "him" and "his" turn with him.
+ */
 export function secondPerson(text: string): string {
   if (!/\bthe reader\b/i.test(text)) return text
   // The verb agrees before the reflexive turns, so "the reader himself was" reads "you yourself
   // were"; the reflexive turns before the subject, so a bare "the reader himself" reads too.
   return text
     .replace(/\bthe reader['’]s\b/gi, (m) => matchCase(m, 'your'))
+    .replace(/\bhis\b(?=\s*(?:[.,;:!?]|$))/gi, (m) => matchCase(m, 'yours'))
+    .replace(/\bhis\b/gi, (m) => matchCase(m, 'your'))
     .replace(THIRD_PERSON_VERB, agreeing('you', TO_SECOND_PERSON))
+    .replace(HE_VERB, agreeing('you', TO_SECOND_PERSON))
     .replace(/\bhimself\b/gi, (m) => matchCase(m, 'yourself'))
+    .replace(/\bhim\b/gi, (m) => matchCase(m, 'you'))
+    // A bare "he" turns, and "he'll" and "he'd" with it; "he's" stays as written, being "he is"
+    // or "he has".
+    .replace(/\bhe\b(?!['’]s\b)/gi, (m) => matchCase(m, 'you'))
     .replace(/\bthe reader\b/gi, (m) => matchCase(m, 'you'))
 }
 

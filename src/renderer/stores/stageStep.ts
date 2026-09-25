@@ -1,7 +1,14 @@
 import { parseSpriteRef } from '@shared/outfits'
+import { openingLinesOf } from '@shared/saveRules'
 import { parseAction } from '@shared/sceneActions'
 import { sfwCgRefOf, sfwSpriteRefOf } from '@shared/sfw'
-import { READER_SPEAKER, type OutfitSet, type SceneLine, type SpriteRef } from '@shared/types'
+import {
+  READER_SPEAKER,
+  type OutfitSet,
+  type SceneLine,
+  type SceneState,
+  type SpriteRef
+} from '@shared/types'
 import { retireCgs, type CgRetireContext } from './stageDisplay'
 
 /**
@@ -218,6 +225,23 @@ export function stageAt(lines: readonly SceneLine[], ctx: StageContext): StageFa
     stage = stepStage(stage, line, ctx).stage
   }
   return stage
+}
+
+/**
+ * The stage a load of `scene` opens on: its own facts, then the lines the load plays before it
+ * waits applied in order; a line that names a background ends the hand's own pick.
+ */
+export function stageOnLoad(
+  scene: SceneState,
+  ctx: StageContext
+): { stage: StageFacts; bgOverride: string | null } {
+  let stage = stageFactsOf({ ...scene, stageOverride: scene.stageOverride ?? {} })
+  let bgOverride = scene.bgOverride ?? null
+  for (const line of openingLinesOf(scene)) {
+    stage = stepStage(stage, line, ctx).stage
+    if (line.bg !== undefined) bgOverride = null
+  }
+  return { stage, bgOverride }
 }
 
 /** Whether a line is the reader's own action. */

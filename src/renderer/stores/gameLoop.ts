@@ -19,7 +19,7 @@ import {
 import { factoidLine, kindOf, projectProgress, projectProgressLine } from '@shared/academics'
 import { giftActionLine, itemDefOf } from '@shared/shop'
 import type { NpcSlotOverlay } from '@shared/npcRelationships'
-import { isSlotSaveId } from '@shared/saveRules'
+import { isSilentLine, isSlotSaveId } from '@shared/saveRules'
 import {
   charKeyOf,
   READER_SPEAKER,
@@ -1897,11 +1897,6 @@ function projectStatusLines(): string[] {
 function factoidStatusLines(ledger: LedgerResponse | null): string[] {
   const factoid = ledger?.classFactoid?.trim()
   return factoid ? [factoidLine(factoid)] : []
-}
-
-/** A line the player has nothing to read on — whatever else it carries. */
-function isSilentLine(line: SceneLine | null): boolean {
-  return line !== null && line.text.trim() === ''
 }
 
 /**

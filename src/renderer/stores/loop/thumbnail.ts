@@ -17,8 +17,9 @@ import { roomBgIdOf, type SceneState } from '@shared/types'
 import { slotHalf } from '../../prompts/gameDate'
 import { isEpilogueNight } from '../../prompts/graduation'
 import { bgThumbUrl, SLOT_BG } from '../../views/bgAssets'
-import { useGameStore } from '../gameStore'
+import { stageContextOf, useGameStore } from '../gameStore'
 import { displaySlotsOf, displaySpriteRef } from '../stageDisplay'
+import { stageOnLoad } from '../stageStep'
 import { blobToBase64, canvasToBlob } from './encode'
 import { currentRun, runStale } from './state'
 
@@ -147,14 +148,16 @@ function leftOut(layer: string, err: unknown): void {
 }
 
 /**
- * The stage `scene` shows, as a small JPEG in base64 with no `data:` prefix. A layer that cannot
- * be read is left out; null when the picture cannot be made small enough, when the stay it was
- * started in is left, or outside a browser — the node test suite has no canvas.
+ * The stage a load of `scene` opens on, as a small JPEG in base64 with no `data:` prefix. A
+ * layer that cannot be read is left out; null when the picture cannot be made small enough,
+ * when the stay it was started in is left, or outside a browser — the node test suite has no
+ * canvas.
  */
 export async function composeStageThumbnail(scene: SceneState): Promise<string | null> {
   if (typeof document === 'undefined') return null
   const run = currentRun()
   const game = useGameStore.getState()
+  const { stage, bgOverride } = stageOnLoad(scene, stageContextOf(game))
 
   const canvas = document.createElement('canvas')
   canvas.width = STAGE_THUMB_WIDTH
@@ -169,14 +172,14 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
 
   // Nobody on the stage — the landing, an exam, a scene everyone has left — is drawn by no
   // picture: the card shows the background's own thumbnail instead, which is the same picture.
-  const shown = displaySlotsOf(scene.slots, scene.stageOverride ?? {})
+  const shown = displaySlotsOf(stage.slots, stage.stageOverride)
   const row = shown.filter(
     (charId): charId is string => charId !== null && Boolean(game.characters[charId])
   )
   if (row.length === 0) return null
 
   try {
-    const bitmap = await backgroundLayer(scene.bgOverride ?? scene.bg ?? SLOT_BG, half)
+    const bitmap = await backgroundLayer(bgOverride ?? stage.bg ?? SLOT_BG, half)
     if (runStale(run)) return null
     if (bitmap) drawCovering(ctx, bitmap)
   } catch (err) {
@@ -185,10 +188,10 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
   }
 
   // A CG stands in for the whole row, as it does on the stage.
-  const cgCharId = row.find((charId) => isPosition(scene.emotions[charId] ?? ''))
+  const cgCharId = row.find((charId) => isPosition(stage.emotions[charId] ?? ''))
   if (cgCharId) {
     try {
-      const rel = cgRel(scene.emotions[cgCharId])
+      const rel = cgRel(stage.emotions[cgCharId])
       const bitmap = await characterLayer(cgCharId, rel, stageCgPlacement(1).height)
       if (runStale(run)) return null
       if (bitmap) {
@@ -203,7 +206,7 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
       const scale = game.characters[charId].height
       try {
         const ref = displaySpriteRef(
-          scene.emotions[charId] ?? 'neutral',
+          stage.emotions[charId] ?? 'neutral',
           scene.outfitLock?.[charId],
           game.outfitReady[charId]
         )
@@ -213,7 +216,7 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
         if (runStale(run)) return null
         if (!bitmap) continue
         const at = stagePortraitPlacement(index, row.length, scale, bitmap.width / bitmap.height)
-        drawPlaced(ctx, bitmap, at, scene.flipped[charId] === true)
+        drawPlaced(ctx, bitmap, at, stage.flipped[charId] === true)
       } catch (err) {
         if (runStale(run)) return null
         leftOut('a portrait', err)

@@ -570,8 +570,6 @@ export function GameView(): JSX.Element {
   const offer = useGameStore(replyRowOfferOf)
   /** Whether an earlier line of the reply may be stepped back to. */
   const rewindOpen = useGameStore(rewindOpenOf)
-  /** Whether a line a rewind stepped back may be read forward to again. */
-  const forwardOpen = useGameStore(forwardOpenOf)
   /** Bumped by every line a rewind steps back. */
   const lineRewound = useGameStore((s) => s.lineRewound)
   /**
@@ -1348,6 +1346,19 @@ export function GameView(): JSX.Element {
   }
 
   /**
+   * Steps the reply that many lines, back negative, a line at a time, and stops where the way
+   * closes: back at the first line, forward at the one the reading stopped on.
+   */
+  function stepLines(lines: number): void {
+    for (let i = 0; i < Math.abs(lines); i++) {
+      const game = useGameStore.getState()
+      if (lines < 0 ? !rewindOpenOf(game) : !forwardOpenOf(game)) return
+      if (lines < 0) onRewind()
+      else onForward()
+    }
+  }
+
+  /**
    * The slot's own buttons. Memoised: `slotActionsNow` draws at random, and a recompute
    * per render would reshuffle them under the cursor. Stats are not a dependency because
    * they move only at the boundary, with `date` and `time`.
@@ -1438,8 +1449,8 @@ export function GameView(): JSX.Element {
   }
 
   /**
-   * The game menu, which Escape and a right-click both toggle: shut if it is open, and otherwise
-   * opened unless a modal owns the screen.
+   * The game menu, which Escape and a right-click open where no modal owns the screen, and shut
+   * where it is open.
    */
   function toggleMenu(): void {
     if (panel?.kind === 'settings') closePanel()
@@ -1489,6 +1500,22 @@ export function GameView(): JSX.Element {
       hideUi()
       return
     }
+    // The left and right arrows step the scene as the wheel does; in a well that holds words
+    // they move the caret instead, and an empty one hands them to the scene.
+    if (
+      (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      if (blocked || !sceneMode) return
+      const inBox = (event.target as HTMLElement | null)?.id === 'game-action'
+      if (typingIn(event) && !(inBox && action === '')) return
+      event.preventDefault()
+      stepLines(event.key === 'ArrowLeft' ? -1 : 1)
+      return
+    }
     const space = event.key === ' '
     if (event.key !== 'Enter' && !space) return
     // Space is Enter aimed at the scene: a character in a field, and nothing behind a modal,
@@ -1523,9 +1550,9 @@ export function GameView(): JSX.Element {
   useWindowKeydown(onKeyDown)
 
   /**
-   * A right-click on the stage, or on a modal portalled from it, brings hidden chrome back and
-   * otherwise toggles the game menu. The native menu never opens; the root's `inert` under the
-   * cover takes the pointer half.
+   * A right-click on the stage brings hidden chrome back and otherwise opens the game menu; one
+   * over a modal is taken by the modal's shell. The native menu never opens; the root's `inert`
+   * under the cover takes the pointer half.
    */
   function onContextMenu(event: ReactMouseEvent): void {
     event.preventDefault()
@@ -1537,13 +1564,12 @@ export function GameView(): JSX.Element {
     toggleMenu()
   }
 
-  /** The wheel's notches since its last step, and when it last moved. */
+  /** The wheel's fraction of a notch toward its next line, and when it last moved. */
   const wheelTravel = useRef<WheelTravel>({ sum: 0, at: 0 })
 
   /**
-   * The wheel steps the reply, one line a notch, whatever zoom the stage is drawn at: up back
-   * over what was read, down forward over what a rewind stepped back. A trackpad's fractions of
-   * a notch add up to one, and a flick takes one step and drops the rest.
+   * The wheel steps the reply a line a notch, however its notches arrive and whatever zoom the
+   * stage is drawn at: up back over what was read, down forward over what a rewind stepped back.
    */
   function onWheel(event: ReactWheelEvent): void {
     if (covered || blocked || !sceneMode) return
@@ -1553,12 +1579,7 @@ export function GameView(): JSX.Element {
       setUiHidden(false)
       return
     }
-    const step = accumulateNotch(wheelTravel.current, wheelNotches(event.nativeEvent))
-    if (step < 0) {
-      if (rewindOpen) onRewind()
-    } else if (step > 0 && forwardOpen) {
-      onForward()
-    }
+    stepLines(accumulateNotch(wheelTravel.current, wheelNotches(event.nativeEvent)))
   }
 
   return (

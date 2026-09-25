@@ -130,7 +130,7 @@ export function buildClassPrompt(roster: readonly Character[]): StructuredReques
     'Build a course catalog for a university, then enroll each student below.',
     '',
     'FOR EACH STUDENT',
-    'major: the field she studies. Pick one that fits her personality. Reuse a major across students when it fits; a cast where everyone studies something different makes for a lonely campus.',
+    'major: the field she studies. Pick one that fits her personality. Collape similar majors like Business Studies and Business Science into a single major like Business Administration.',
     'majorClassesTaken: how many classes she takes in her major, from 1 to 3.',
     'interestClass: one course this specific student would sign up for out of pure personal interest.',
     'It should read like something only she would pick.',

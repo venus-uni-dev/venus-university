@@ -35,11 +35,13 @@ const PRIVATE_DOCS = new Set(['CLAUDE.md', 'DESIGN_GUIDE.md', 'UI_STYLE_GUIDE.md
 /**
  * Whether one tracked path, as `git ls-tree` prints it, belongs in the public
  * repo. `assets/` holds gigabytes of art including explicit images, so it is
- * allowlisted: a folder added there is private until this says otherwise, and
- * `private/` is the folder for records that stay in this repo.
+ * allowlisted: a folder added there is private until this says otherwise,
+ * `private/` is the folder for records that stay in this repo, and `testsave/`
+ * is the generator harness's own fixture data.
  */
 export function isPublic(path) {
   if (path.startsWith('private/')) return false
+  if (path.startsWith('testsave/')) return false
   if (path.startsWith('.github/')) return false
   if (path.startsWith('build/itch-page/')) return false
   if (PRIVATE_DOCS.has(path)) return false
@@ -163,6 +165,7 @@ function assertNothingPrivate(paths) {
     if (
       PRIVATE_DOCS.has(path) ||
       path.startsWith('private/') ||
+      path.startsWith('testsave/') ||
       path.startsWith('.github/') ||
       path.startsWith('build/itch-page/') ||
       (underAssets && !allowedAsset)

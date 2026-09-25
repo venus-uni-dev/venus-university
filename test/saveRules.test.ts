@@ -114,11 +114,20 @@ describe('summaryOf', () => {
   })
 
   it('takes the player’s own background over the scene’s, and the picture if any', () => {
-    const scene = { bg: 'library' } as SceneState
+    const scene = { bg: 'library', currentLine: null, pendingLines: [] } as unknown as SceneState
     expect(summaryOf(save({ scene }))).toMatchObject({ midScene: true, bg: 'library' })
 
     const picked = summaryOf(save({ scene: { ...scene, bgOverride: 'quad' }, thumbnail: 'AAAA' }))
     expect(picked).toMatchObject({ midScene: true, bg: 'quad', thumbnail: 'AAAA' })
+  })
+
+  it('reads a queued reply’s own background over the scene’s at rest', () => {
+    const scene = {
+      bg: null,
+      currentLine: null,
+      pendingLines: [{ speaker: '', text: 'The bell over the door rings.', bg: 'cafe' }]
+    } as unknown as SceneState
+    expect(summaryOf(save({ scene }))).toMatchObject({ midScene: true, bg: 'cafe' })
   })
 })
 

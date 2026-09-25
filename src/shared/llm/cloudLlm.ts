@@ -2,7 +2,7 @@ import { appError, isAppError, messageOf, tailOf, truncate } from '../errors'
 import { modelFor, providerToRun, reasoningToSend, serviceTierFor } from '../providers'
 import type { ModelConfig } from '../providers'
 import { DEFAULT_SECONDARY_KINDS, isPromptKind, type PromptKind } from '../promptKinds'
-import { maxOutputTokensOf, writerKeyOf } from '../settingsRules'
+import { maxOutputTokensOf, secondaryModelOf, writerKeyOf, writerModelOf } from '../settingsRules'
 import type { Settings } from '../types'
 import { MAX_OUTPUT_TOKENS } from './adapter'
 import { adapterFor } from './index'
@@ -172,11 +172,9 @@ function parsesAsJsonDocument(text: string): boolean {
  */
 function modelToRun(settings: Settings, kind: PromptKind | undefined): ModelConfig {
   const kinds = settings.secondaryModelFor?.filter(isPromptKind) ?? DEFAULT_SECONDARY_KINDS
-  const secondary =
-    settings.secondaryModel && kind !== undefined && kinds.includes(kind)
-      ? settings.secondaryModel
-      : null
-  return modelFor(settings.apiProvider, secondary ?? settings.apiModel)
+  const secondary = secondaryModelOf(settings)
+  const routed = secondary !== '' && kind !== undefined && kinds.includes(kind)
+  return modelFor(settings.apiProvider, routed ? secondary : writerModelOf(settings))
 }
 
 /**

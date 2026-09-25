@@ -31,25 +31,37 @@ describe('secondPerson turns a filed memory into the one the player reads', () =
     [
       'she heard from Mia that the reader was with Sara',
       'she heard from Mia that you were with Sara'
-    ]
+    ],
+    [
+      "Ingrid told the reader she's heard his song before.",
+      "Ingrid told you she's heard your song before."
+    ],
+    ['she saw the reader and waved at him', 'she saw you and waved at you'],
+    ['The reader called. He was late', 'You called. You were late'],
+    ["the reader said he'd come", "you said you'd come"],
+    ['the reader said the choice was his.', 'you said the choice was yours.']
   ])('%s → %s', (text, expected) => {
     expect(secondPerson(text)).toBe(expected)
   })
 
-  it.each(['you walked her home', 'Tom embarrassed himself', 'the young reader smiled'])(
-    'leaves %s, which never names the reader, as it was',
-    (text) => {
-      expect(secondPerson(text)).toBe(text)
-    }
-  )
+  it.each([
+    'you walked her home',
+    'Tom embarrassed himself',
+    'the young reader smiled',
+    'Tom said he was late'
+  ])('leaves %s, which never names the reader, as it was', (text) => {
+    expect(secondPerson(text)).toBe(text)
+  })
 
-  it.each(['the reader was late', "the reader's notes", 'the reader hurt himself'])(
-    'changes nothing the second time over %s',
-    (text) => {
-      const once = secondPerson(text)
-      expect(secondPerson(once)).toBe(once)
-    }
-  )
+  it.each([
+    'the reader was late',
+    "the reader's notes",
+    'the reader hurt himself',
+    'the reader lost his keys'
+  ])('changes nothing the second time over %s', (text) => {
+    const once = secondPerson(text)
+    expect(secondPerson(once)).toBe(once)
+  })
 })
 
 describe('readerize turns a second-person memory into the reader’s voice', () => {

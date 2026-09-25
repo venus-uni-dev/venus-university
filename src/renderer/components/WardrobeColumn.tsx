@@ -16,7 +16,7 @@ import {
 import { EyeOffIcon, PlusIcon } from '../views/screenIcons'
 import { DeadNote } from './DeadNote'
 import { SetControl, type SetControlProps } from './SetControl'
-import { useEscapeLayer } from './useModalShell'
+import { useDismissLayer } from './useModalShell'
 
 export interface WardrobeColumnProps {
   charId: string
@@ -110,11 +110,11 @@ export function WardrobeColumn({
   // The title while it is being typed over; the committed name comes back down as `title`.
   const [renaming, setRenaming] = useState(false)
   const [nameText, setNameText] = useState('')
-  // Set by Escape, so the blur that follows the box leaving commits nothing.
+  // Set by Escape or a right-click, so the blur that follows the box leaving commits nothing.
   const renameDropped = useRef(false)
-  /* Escape puts the old name back, and it is answered here ahead of the modal behind the
-     box, which would otherwise close on the same press. */
-  useEscapeLayer(() => {
+  /* Escape or a right-click off the box puts the old name back, and it is answered here ahead
+     of the modal behind the box, which would otherwise close on the same press. */
+  useDismissLayer(() => {
     renameDropped.current = true
     setRenaming(false)
   }, renaming)

@@ -132,11 +132,13 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     apiModel: settings.apiModel,
     thinkingLevel: settings.thinkingLevel,
     // Carried, or a save made from anywhere else would drop the custom endpoint the writer
-    // runs on, the effort it runs at and the reply cap it is sent.
+    // runs on, the endpoint's models, the effort it runs at and the reply cap it is sent.
     endpointUrl: settings.endpointUrl,
+    endpointModel: settings.endpointModel,
+    endpointSecondaryModel: settings.endpointSecondaryModel,
     reasoningEffort: settings.reasoningEffort,
     maxOutputTokens: settings.maxOutputTokens,
-    // Carried, or a save made from anywhere else would drop the secondary model.
+    // Carried, or a save made from anywhere else would drop Gemini's secondary model.
     secondaryModel: settings.secondaryModel,
     secondaryModelFor: settings.secondaryModelFor,
     comfyDeferred: settings.comfyDeferred,

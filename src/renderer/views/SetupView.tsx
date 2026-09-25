@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'motion/react'
 import { endpointProblem, normalizeEndpoint } from '@shared/endpoint'
 import {
   defaultModelFor,
-  defaultSecondaryModelFor,
   modelFor,
   providerFor,
   thinkingLevelFor
@@ -522,39 +521,35 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
   const [apiProvider, setApiProvider] = useState<ProviderApi>(
     () => settings?.apiProvider ?? 'gemini'
   )
-  // Off the held provider, so the select never opens on another provider's model.
+  // Gemini's own pick whichever provider is stored, resolved through its table so the select
+  // opens on one of its options.
   const [apiModel, setApiModel] = useState(() =>
-    settings?.apiProvider === 'gemini'
-      ? modelFor('gemini', settings.apiModel).id
-      : defaultModelFor('gemini').id
+    settings ? modelFor('gemini', settings.apiModel).id : defaultModelFor('gemini').id
   )
   const [geminiKey, setGeminiKey] = useState('')
   // Only the browser has anywhere to keep a key between visits that the player might not want
   // it kept in; the desktop encrypts its own either way.
   const webBuild = isWebBuild()
   const [remember, setRemember] = useState(settings?.rememberKey === true)
-  // The custom endpoint's own fields. The keys are the exception to the seeding: the renderer is
-  // never told either one, so both open blank.
+  // The custom endpoint's own fields, seeded whichever provider is stored. The keys are the
+  // exception to the seeding: the renderer is never told either one, so both open blank.
   const [endpointUrl, setEndpointUrl] = useState(() => settings?.endpointUrl ?? '')
   const [endpointKey, setEndpointKey] = useState('')
-  const [modelIdText, setModelIdText] = useState(() =>
-    settings?.apiProvider === 'openai' ? settings.apiModel : ''
-  )
+  const [modelIdText, setModelIdText] = useState(() => settings?.endpointModel ?? '')
   // The layer inside the card a combobox hangs its list on, once it is in the document.
   const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
 
   const custom = apiProvider === 'openai'
   const modelId = modelIdText.trim()
 
-  // The two questions the custom page asks its endpoint. A first run sends the lowest effort
-  // there is, and the thinking level and the reply cap are whatever is already stored.
+  // The two questions the custom page asks its endpoint, at the effort and reply cap already
+  // stored; an absent effort reads as minimal.
   const probe = useEndpointProbe({
     enabled: custom,
     endpointUrl,
     endpointKey,
     modelId,
-    reasoningEffort: 'minimal',
-    thinkingLevel: settings?.thinkingLevel ?? defaultModelFor('gemini').defaultThinkingLevel,
+    reasoningEffort: thinkingLevelFor('openai', '', settings?.reasoningEffort ?? ''),
     maxOutputTokens: settings?.maxOutputTokens
   })
 
@@ -569,12 +564,12 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
     saving ||
     (custom ? endpointProblem(endpointUrl) !== null || modelId === '' : geminiKey.trim() === '')
 
-  /** The provider, and with it the page the card redresses itself as. Nothing is written. */
+  /**
+   * The provider, and with it the page the card redresses itself as; each page keeps what was
+   * picked or typed on it. Nothing is written.
+   */
   function handleProviderChange(value: string): void {
-    const next = value as ProviderApi
-    setApiProvider(next)
-    if (next === 'gemini') setApiModel(defaultModelFor('gemini').id)
-    setModelIdText('')
+    setApiProvider(value as ProviderApi)
     probe.reset()
   }
 
@@ -588,12 +583,7 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
           ...patchOf(settings),
           apiProvider: 'openai',
           endpointUrl: normalizeEndpoint(endpointUrl),
-          apiModel: modelId,
-          // The effort a first run sends at, and one model for every call: Settings is where
-          // the three of them are tuned, once there is a game to tune them for.
-          reasoningEffort: 'minimal',
-          secondaryModel: '',
-          secondaryModelFor: undefined,
+          endpointModel: modelId,
           rememberKey: remember,
           ...(endpointKey.trim() ? { endpointApiKey: endpointKey.trim() } : {})
         }
@@ -603,15 +593,7 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
           apiKey: geminiKey.trim(),
           rememberKey: remember,
           apiModel,
-          thinkingLevel: thinkingLevelFor('gemini', apiModel, settings.thinkingLevel),
-          // A writer coming back from a custom endpoint takes Gemini's own second model with it;
-          // one that was Gemini's already keeps whatever it was pointed at.
-          secondaryModel:
-            settings.apiProvider === 'gemini'
-              ? settings.secondaryModel
-              : defaultSecondaryModelFor('gemini').id,
-          secondaryModelFor:
-            settings.apiProvider === 'gemini' ? settings.secondaryModelFor : undefined
+          thinkingLevel: thinkingLevelFor('gemini', apiModel, settings.thinkingLevel)
         }
     const ok = await save(patch)
     // A failed write leaves the stage up; the store has already raised the error.

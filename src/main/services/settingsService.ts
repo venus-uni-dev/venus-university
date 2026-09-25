@@ -7,7 +7,8 @@ import {
   redactSettings,
   SETTINGS_READ,
   SETTINGS_SCHEMA_VERSION,
-  SETTINGS_UNREADABLE
+  SETTINGS_UNREADABLE,
+  upgradeSettings
 } from '@shared/settingsRules'
 import type { RendererSettings, Settings, SettingsPatch } from '@shared/types'
 import { getDataPath, getSettingsPath } from '../paths'
@@ -70,10 +71,8 @@ function decryptSecret(enc: string | undefined, plain: string | undefined, field
   return plain ?? ''
 }
 
-/** Serializes runtime settings to the on-disk shape and writes them atomically. */
-async function writeSettingsFile(settings: Settings): Promise<void> {
-  await ensureDataDir()
-
+/** Runtime settings in the on-disk shape, each secret encrypted where the keyring allows. */
+function fileShapeOf(settings: Settings): SettingsFile {
   const { apiKey, endpointApiKey, ...rest } = settings
   const file: SettingsFile = { ...rest, schemaVersion: SETTINGS_SCHEMA_VERSION }
 
@@ -86,23 +85,37 @@ async function writeSettingsFile(settings: Settings): Promise<void> {
   if (endpoint.enc) file.endpointApiKeyEnc = endpoint.enc
   if (endpoint.plain) file.endpointApiKey = endpoint.plain
 
+  return file
+}
+
+/** Writes the on-disk shape atomically, as it stands. */
+async function writeFileShape(file: SettingsFile): Promise<void> {
+  await ensureDataDir()
   await writeAtomicJson(getSettingsPath(), file, {
     code: 'SETTINGS_UNWRITABLE',
     message: 'Could not save settings.json.'
   })
 }
 
+/** Serializes runtime settings to the on-disk shape and writes them atomically. */
+async function writeSettingsFile(settings: Settings): Promise<void> {
+  await writeFileShape(fileShapeOf(settings))
+}
+
 /**
  * Reads `/data/settings.json` or defaults, decrypting both secrets; a malformed, wrong-version
- * or incomplete file is a hard error.
+ * or incomplete file is a hard error. A custom endpoint's file with its model ids in Gemini's
+ * fields is upgraded and written straight back, its key blobs as they were read.
  */
 export async function getSettings(): Promise<Settings> {
-  const candidate = await readValidatedJson<SettingsFile>(getSettingsPath(), {
+  const read = await readValidatedJson<SettingsFile>(getSettingsPath(), {
     ...SETTINGS_READ,
     unreadable: SETTINGS_UNREADABLE,
     // No settings file is the first-run state, not a failure.
     onMissing: defaultSettings
   })
+  const { settings: candidate, upgraded } = upgradeSettings(read)
+  if (upgraded) await writeFileShape(candidate)
 
   const {
     apiKeyEnc,

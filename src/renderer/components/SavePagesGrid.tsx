@@ -95,11 +95,14 @@ export function SavePagesGrid({
     if (next !== page) onPage(next)
   }
 
-  /** A notch down turns forward and a notch up turns back, once the notches add up to one. */
+  /**
+   * A notch down turns forward and a notch up turns back, once the notches add up to one, and
+   * never more than a page an event, however many notches arrive in it.
+   */
   const onWheel = (event: ReactWheelEvent<HTMLDivElement>): void => {
     if (busy) return
     const step = accumulateNotch(travel.current, wheelNotches(event.nativeEvent))
-    if (step !== 0) turn(page + step)
+    if (step !== 0) turn(page + Math.sign(step))
   }
 
   return (

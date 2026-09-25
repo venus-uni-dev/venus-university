@@ -24,10 +24,11 @@
   gap: 16px;
 }
 
-/* The row measures itself: a tile with no peek hugs its words where the row is wide, and every
-   tile stands in two rows where it is not. */
+/* The row measures itself under a name, which is how its tiles' queries read it past the tile
+   around them: a tile with no peek hugs its words where the row is wide, and every tile stands
+   in two rows where it is not. */
 .vu-edit-tiles {
-  container-type: inline-size;
+  container: edit-tiles / inline-size;
   display: flex;
   gap: 16px;
 }
@@ -177,7 +178,7 @@
 }
 
 /* The box the corner pills stand in: it sits in the crop's square bottom corner, clear of the
-   arch's curve, and its padding is dead space � the box lies over the sprite control, so a
+   arch's curve, and its padding is dead space — the box lies over the sprite control, so a
    cursor inside it hovers neither pill nor sprite, and the regenerate pill stays tucked while
    the cursor closes on Hide or Delete. */
 .vu-wardrobe-corner {
@@ -382,7 +383,7 @@
 /* A tile with a control and no peek hugs its words where the row is wide, so the room beside
    it has the width its two stills need; it measures nothing of its own, for the same reason
    the offer tile does not. */
-@container (min-width: 1000px) {
+@container edit-tiles (min-width: 1000px) {
   .vu-landscape--hug {
     flex: 0 0 auto;
     container-type: normal;
@@ -390,10 +391,10 @@
 }
 
 /* Where the row is narrower — the stage between 4:3 and 16:10 — the three tiles share it and
-   each stands in two rows rather than squeezing its pill. Both queries read the row, and sit
-   after the plain rules they override: `@container` adds no specificity, so a later plain rule
-   would win. */
-@container (max-width: 999px) {
+   each stands in two rows rather than squeezing its pill. Both queries read the row by its
+   name, the tile being a container of its own, and sit after the plain rules they override:
+   `@container` adds no specificity, so a later plain rule would win. */
+@container edit-tiles (max-width: 999px) {
   .vu-landscape {
     flex-wrap: wrap;
   }

@@ -26,16 +26,16 @@ const SCENE: ControlSection = {
       keys: ['Tab'],
       does: 'Auto-focus text box'
     },
-    { keys: ['Mouse wheel'], does: 'Rewind or go forward' },
+    { keys: ['Mouse wheel', '←/→'], does: 'Rewind or go forward' },
     { keys: ['H'], does: 'Hide UI' },
-    { keys: ['Escape', 'Right-click'], does: 'Open/close pause menu' }
+    { keys: ['Esc', 'Right-click'], does: 'Open/close pause menu' }
   ]
 }
 
 const EVERYWHERE: ControlSection = {
   title: 'Everywhere',
   rows: [
-    { keys: ['Escape'], does: 'Close a panel' },
+    { keys: ['Escape', 'Right-click'], does: 'Close a panel' },
     { keys: ['Enter'], does: "Submit form" },
   ]
 }

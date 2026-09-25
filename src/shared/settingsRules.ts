@@ -9,10 +9,10 @@ import type { RendererSettings, Settings, SettingsPatch } from './types'
 export const SETTINGS_SCHEMA_VERSION = 1
 
 /**
- * What the settings must carry; the two keys, the custom endpoint's URL, effort and reply cap,
- * the three dev switches, the two hand-edited call switches, the hand-edited ComfyUI build,
- * the secondary model, the group volumes, the NSFW sound switch and the browser build's
- * key-remembering are all optional.
+ * What the settings must carry; the two keys, the custom endpoint's URL, model ids, effort and
+ * reply cap, the three dev switches, the two hand-edited call switches, the hand-edited ComfyUI
+ * build, Gemini's secondary model, the group volumes, the NSFW sound switch and the browser
+ * build's key-remembering are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -20,6 +20,8 @@ const SETTINGS_REQUIRED: Record<
     | 'apiKey'
     | 'endpointApiKey'
     | 'endpointUrl'
+    | 'endpointModel'
+    | 'endpointSecondaryModel'
     | 'reasoningEffort'
     | 'maxOutputTokens'
     | 'freezeSeeds'
@@ -63,6 +65,36 @@ export const SETTINGS_READ: ValidateRecordOptions<Settings> = {
   required: SETTINGS_REQUIRED
 }
 
+/** The fields that say which model each provider runs on. */
+type ModelFields = Pick<
+  Settings,
+  'apiProvider' | 'apiModel' | 'secondaryModel' | 'endpointModel' | 'endpointSecondaryModel'
+>
+
+/**
+ * A custom endpoint's settings that name none of the endpoint's own model ids, their ids moved
+ * out of Gemini's fields into the endpoint's and Gemini's put back to its defaults; anything else
+ * comes back untouched. A blank Gemini second model moves as no endpoint second model at all.
+ */
+export function upgradeSettings<T extends ModelFields>(
+  settings: T
+): { settings: T; upgraded: boolean } {
+  if (settings.apiProvider !== 'openai' || settings.endpointModel !== undefined) {
+    return { settings, upgraded: false }
+  }
+
+  return {
+    settings: {
+      ...settings,
+      endpointModel: settings.apiModel,
+      ...(settings.secondaryModel ? { endpointSecondaryModel: settings.secondaryModel } : {}),
+      apiModel: defaultModelFor('gemini').id,
+      secondaryModel: defaultSecondaryModelFor('gemini').id
+    },
+    upgraded: true
+  }
+}
+
 /** Raised when the settings are there but cannot be read. */
 export const SETTINGS_UNREADABLE = {
   code: 'SETTINGS_UNREADABLE',
@@ -101,17 +133,37 @@ export function redactSettings(settings: Settings): RendererSettings {
   return { ...rest, apiKeySet: Boolean(apiKey), endpointApiKeySet: Boolean(endpointApiKey) }
 }
 
+/** The model id the writer runs on: a custom endpoint's typed id, or Gemini's pick. */
+export function writerModelOf(
+  settings: Pick<Settings, 'apiProvider' | 'apiModel' | 'endpointModel'>
+): string {
+  return settings.apiProvider === 'openai' ? (settings.endpointModel ?? '') : settings.apiModel
+}
+
+/** The second model the active provider routes to, empty where there is none. */
+export function secondaryModelOf(
+  settings: Pick<Settings, 'apiProvider' | 'secondaryModel' | 'endpointSecondaryModel'>
+): string {
+  return (
+    (settings.apiProvider === 'openai'
+      ? settings.endpointSecondaryModel
+      : settings.secondaryModel) ?? ''
+  )
+}
+
 /**
  * Whether the writer can be called: Gemini needs its key; a custom endpoint needs a URL that
  * can be sent to and a model id, and may run without a key. `keySet` is `Boolean(apiKey)`
  * where the key is held and `apiKeySet` where it is not.
  */
 export function writerReady(
-  settings: Pick<Settings, 'apiProvider' | 'apiModel' | 'endpointUrl'>,
+  settings: Pick<Settings, 'apiProvider' | 'apiModel' | 'endpointModel' | 'endpointUrl'>,
   keySet: boolean
 ): boolean {
   if (settings.apiProvider !== 'openai') return keySet
-  return endpointProblem(settings.endpointUrl ?? '') === null && settings.apiModel.trim() !== ''
+  return (
+    endpointProblem(settings.endpointUrl ?? '') === null && writerModelOf(settings).trim() !== ''
+  )
 }
 
 /** The Gemini key the cloud pictures are drawn with, empty where there is none. */
@@ -183,9 +235,12 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     thinkingLevel: patch.thinkingLevel,
     secondaryModel: patch.secondaryModel,
     secondaryModelFor: patch.secondaryModelFor,
-    // All three custom-endpoint fields ride every patch, so a provider switched away and back
-    // finds them as they were.
+    // Every custom-endpoint field rides every patch, so a provider switched away and back finds
+    // them as they were. The model id is written even blank, so no file this build writes is
+    // taken for one to upgrade.
     endpointUrl: patch.endpointUrl,
+    endpointModel: patch.endpointModel ?? '',
+    endpointSecondaryModel: patch.endpointSecondaryModel,
     reasoningEffort: patch.reasoningEffort,
     maxOutputTokens: patch.maxOutputTokens,
     // `serviceTier`, `streamResponses`, `comfyGpu`, `updateAsVersion` and `updateFeed` are not

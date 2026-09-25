@@ -17,7 +17,6 @@ export interface EndpointProbeInput {
   /** The model id as it would be saved (already trimmed). */
   modelId: string
   reasoningEffort: ThinkingLevel
-  thinkingLevel: ThinkingLevel
   maxOutputTokens: number | undefined
 }
 
@@ -82,11 +81,10 @@ export function useEndpointProbe(input: EndpointProbeInput): EndpointProbe {
     setTest('testing')
     const result = await testWriter({
       apiProvider: 'openai',
-      apiModel: input.modelId,
+      endpointModel: input.modelId,
       endpointUrl: normalizeEndpoint(input.endpointUrl),
       reasoningEffort: input.reasoningEffort,
       maxOutputTokens: input.maxOutputTokens,
-      thinkingLevel: input.thinkingLevel,
       endpointApiKey: input.endpointKey.trim() || undefined
     })
     setTest(result.ok ? 'ok' : { error: result.error })

@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defaultModelFor, defaultSecondaryModelFor } from '@shared/providers'
 import type { Settings, SettingsPatch } from '@shared/types'
 
 /**
@@ -187,6 +188,43 @@ describe('a blob that will not decrypt', () => {
 
     await settingsService.applySettingsPatch(patch({ apiKey: 'replacement' }))
     expect((await settingsService.getSettings()).apiKey).toBe('replacement')
+  })
+})
+
+describe("a custom endpoint's file with its ids in Gemini's fields", () => {
+  it("reads them as the endpoint's own and writes them back, every key blob as it was", async () => {
+    const apiKeyEnc = Buffer.from(`${ENC_PREFIX}AIza-secret`).toString('base64')
+    // A blob this account cannot open, which the rewrite must keep rather than drop.
+    const endpointApiKeyEnc = Buffer.from('written by another windows account').toString('base64')
+    await seed(
+      stored({
+        apiProvider: 'openai',
+        endpointUrl: 'https://example.com/v1',
+        apiModel: 'local-7b',
+        secondaryModel: 'local-1b',
+        apiKeyEnc,
+        endpointApiKeyEnc
+      })
+    )
+
+    const settings = await settingsService.getSettings()
+    expect(settings).toMatchObject({
+      endpointModel: 'local-7b',
+      endpointSecondaryModel: 'local-1b',
+      apiModel: defaultModelFor('gemini').id,
+      secondaryModel: defaultSecondaryModelFor('gemini').id,
+      apiKey: 'AIza-secret'
+    })
+
+    const file = await fileOnDisk()
+    expect(file).toMatchObject({
+      endpointModel: 'local-7b',
+      endpointSecondaryModel: 'local-1b',
+      apiModel: defaultModelFor('gemini').id,
+      apiKeyEnc,
+      endpointApiKeyEnc
+    })
+    expect(JSON.stringify(file)).not.toContain('AIza-secret')
   })
 })
 

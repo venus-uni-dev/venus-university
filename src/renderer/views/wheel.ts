@@ -1,6 +1,6 @@
-/** What a turn of the mouse wheel means in notches, and how notches add up to one step. */
+/** What a turn of the mouse wheel means in notches, and how notches add up to lines. */
 
-/** The wheel's notches since its last step, and when it last moved. */
+/** The trackpad's fraction of a notch toward its next line, and when the wheel last moved. */
 export interface WheelTravel {
   sum: number
   at: number
@@ -21,20 +21,27 @@ export function wheelNotches(event: WheelEvent): number {
   return (event.deltaY * zoom) / 100
 }
 
+/** The most lines one wheel event steps. */
+const MOST_LINES = 3
+
 /**
- * Adds one event's notches to the travel and answers the step it completes, back or forward,
- * or none. A trackpad's fractions of a notch add up to one, a flick takes one step and drops
- * the rest, and a turn the other way or a pause of 400 ms starts the count again.
+ * How many lines one event steps, back negative. More than half a notch is a wheel's own, and
+ * steps its notches rounded, up to three: a notch that measures a hair short is still a line,
+ * and notches that arrive together as one event are a line each. Less is a trackpad's fraction,
+ * which adds to the travel until it makes a line. A turn the other way or a pause of 400 ms
+ * starts the travel again.
  */
-export function accumulateNotch(travel: WheelTravel, notches: number): -1 | 0 | 1 {
+export function accumulateNotch(travel: WheelTravel, notches: number): number {
   if (notches === 0) return 0
-  const step = Math.max(-1, Math.min(1, notches))
   const now = performance.now()
-  if (Math.sign(step) !== Math.sign(travel.sum) || now - travel.at > 400) travel.sum = 0
-  travel.sum += step
+  if (Math.sign(notches) !== Math.sign(travel.sum) || now - travel.at > 400) travel.sum = 0
   travel.at = now
-  if (Math.abs(travel.sum) < 0.99) return 0
-  const back = travel.sum < 0
-  travel.sum = 0
-  return back ? -1 : 1
+  if (Math.abs(notches) > 0.5) {
+    travel.sum = 0
+    return Math.sign(notches) * Math.min(MOST_LINES, Math.round(Math.abs(notches)))
+  }
+  travel.sum += notches
+  const lines = Math.trunc(travel.sum + Math.sign(travel.sum) * 0.01)
+  travel.sum -= lines
+  return lines
 }

@@ -4,13 +4,16 @@ import {
   AUTOSAVE_ID,
   MANUAL_SAVE_SLOTS,
   MAX_SLOT_SAVES,
+  READER_SPEAKER,
   type Enrollment,
   type EnrollmentDraft,
   type GameSave,
   type PlaythroughDraft,
   type PlaythroughRecord,
   type SaveDraft,
-  type SaveSummary
+  type SaveSummary,
+  type SceneLine,
+  type SceneState
 } from './types'
 
 /**
@@ -277,6 +280,36 @@ export function listedSaveIds({ autosave, slots, manual }: SaveIdGroups): string
   return [...(autosave ? [AUTOSAVE_ID] : []), ...slots, ...manual]
 }
 
+/** A line the player has nothing to read on — whatever else it carries. */
+export function isSilentLine(line: SceneLine | null): boolean {
+  return line !== null && line.text.trim() === ''
+}
+
+/**
+ * The lines a load of `scene` plays before it waits: none where it resumes on its own line,
+ * otherwise the queue's reader lines passed over up to and including the first line that says
+ * something.
+ */
+export function openingLinesOf(scene: SceneState): SceneLine[] {
+  if (scene.resumeOnLine === true && scene.currentLine !== null) return []
+  const lines: SceneLine[] = []
+  for (const line of scene.pendingLines) {
+    if (line.speaker === READER_SPEAKER) continue
+    lines.push(line)
+    if (!isSilentLine(line)) break
+  }
+  return lines
+}
+
+/** The last background `lines` names, or null when none of them does. */
+function lastBgOf(lines: readonly SceneLine[]): string | null {
+  let bg: string | null = null
+  for (const line of lines) {
+    if (line.bg !== undefined) bg = line.bg
+  }
+  return bg
+}
+
 /** What the load grid shows of one save. */
 export function summaryOf(save: GameSave): SaveSummary {
   const summary: SaveSummary = {
@@ -284,7 +317,11 @@ export function summaryOf(save: GameSave): SaveSummary {
     time: save.time,
     graduationSeen: save.graduationSeen,
     midScene: save.scene !== null,
-    bg: save.scene?.bgOverride ?? save.scene?.bg ?? null
+    bg:
+      (save.scene ? lastBgOf(openingLinesOf(save.scene)) : null) ??
+      save.scene?.bgOverride ??
+      save.scene?.bg ??
+      null
   }
   if (save.thumbnail) summary.thumbnail = save.thumbnail
   return summary

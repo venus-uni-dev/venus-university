@@ -8,7 +8,6 @@ import {
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   defaultModelFor,
-  defaultSecondaryModelFor,
   modelFor,
   providerFor,
   thinkingLevelFor
@@ -97,14 +96,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [apiProvider, setApiProvider] = useState<ProviderApi>(
     () => settings?.apiProvider ?? 'gemini'
   )
-  // `modelFor` resolves through the provider table, so the select opens on one of its own
-  // options; under a custom endpoint it hands back whatever id is stored.
+  // Gemini's page, seeded from Gemini's own fields whichever provider is stored. `modelFor`
+  // resolves through the provider table, so the select opens on one of its own options.
   const [apiModel, setApiModel] = useState(() =>
-    settings ? modelFor(settings.apiProvider, settings.apiModel).id : ''
+    settings ? modelFor('gemini', settings.apiModel).id : ''
   )
   const [thinkingLevel, setThinkingLevel] = useState(() =>
     settings
-      ? thinkingLevelFor(settings.apiProvider, settings.apiModel, settings.thinkingLevel)
+      ? thinkingLevelFor('gemini', settings.apiModel, settings.thinkingLevel)
       : defaultModelFor('gemini').defaultThinkingLevel
   )
   const [secondaryModel, setSecondaryModel] = useState(() => settings?.secondaryModel ?? '')
@@ -133,14 +132,12 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     settings?.warnEndingInterrupt !== false
   )
 
-  // The typed fields, staged until Save. The URL and the two keys outlive a provider switch,
-  // so a panel switched away and back finds them as they were; the ids are the endpoint's own.
+  // The typed fields, staged until Save. Each is the endpoint's own, seeded whichever provider
+  // is stored, so a panel switched away and back finds them as they were.
   const [endpointUrl, setEndpointUrl] = useState(() => settings?.endpointUrl ?? '')
-  const [modelIdText, setModelIdText] = useState(() =>
-    settings?.apiProvider === 'openai' ? settings.apiModel : ''
-  )
-  const [secondaryIdText, setSecondaryIdText] = useState(() =>
-    settings?.apiProvider === 'openai' ? (settings.secondaryModel ?? '') : ''
+  const [modelIdText, setModelIdText] = useState(() => settings?.endpointModel ?? '')
+  const [secondaryIdText, setSecondaryIdText] = useState(
+    () => settings?.endpointSecondaryModel ?? ''
   )
   // The reply cap, seeded like the URL and outliving a provider switch with it; a stored cap
   // the resolver will not take opens the field blank, which is the ceiling it already sends.
@@ -182,7 +179,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     endpointKey,
     modelId,
     reasoningEffort,
-    thinkingLevel,
     maxOutputTokens
   })
 
@@ -216,8 +212,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     settings !== null &&
     (custom
       ? normalizeEndpoint(endpointUrl) !== (settings.endpointUrl ?? '') ||
-        modelIdText.trim() !== settings.apiModel ||
-        secondaryIdText.trim() !== (settings.secondaryModel ?? '') ||
+        modelIdText.trim() !== (settings.endpointModel ?? '') ||
+        secondaryIdText.trim() !== (settings.endpointSecondaryModel ?? '') ||
         maxOutputText.trim() !== String(maxOutputTokensOf(settings) ?? '') ||
         endpointKey.trim() !== '' ||
         geminiKey.trim() !== ''
@@ -235,11 +231,10 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   // Where the key and the whole of the player's data live in the browser's own storage.
   const webBuild = isWebBuild()
 
-  // Off the held provider, so a select never holds another provider's model; a custom
-  // endpoint's table is empty, which is why its ids are typed rather than picked.
-  const models = providerFor(apiProvider).models
-  // Likewise off the held model: which levels are accepted is a per-model fact.
-  const thinkingLevels = modelFor(apiProvider, apiModel).thinkingLevels
+  // Gemini's table, which only Gemini's page picks from; a custom endpoint's ids are typed.
+  const models = providerFor('gemini').models
+  // Off the held Gemini model: which levels are accepted is a per-model fact.
+  const thinkingLevels = modelFor('gemini', apiModel).thinkingLevels
 
   // The custom endpoint's second typed id, as it would be saved.
   const secondaryId = secondaryIdText.trim()
@@ -289,44 +284,16 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     }
   }
 
-  /** The provider, and with it the defaults the page under it opens on. */
+  /**
+   * Which provider writes, and nothing else: each page opens on its own provider's picks as
+   * they were left, so a provider switched away and back finds them unchanged.
+   */
   function handleProviderChange(value: string): void {
     const next = value as ProviderApi
-    const fallback = defaultModelFor('gemini')
-    const fields: Partial<SettingsPatch> =
-      next === 'openai'
-        ? { apiProvider: next, apiModel: '', secondaryModel: '', reasoningEffort: 'minimal' }
-        : {
-            apiProvider: next,
-            apiModel: fallback.id,
-            thinkingLevel: fallback.defaultThinkingLevel,
-            secondaryModel: defaultSecondaryModelFor('gemini').id
-          }
     setApiProvider(next)
-    if (next === 'openai') {
-      setApiModel('')
-      setSecondaryModel('')
-      setReasoningEffort('minimal')
-    } else {
-      setApiModel(fallback.id)
-      setThinkingLevel(fallback.defaultThinkingLevel)
-      setSecondaryModel(defaultSecondaryModelFor('gemini').id)
-    }
-    // The ids, the rows behind them and the probe all belong to the endpoint left behind.
-    setModelIdText('')
-    setSecondaryIdText('')
+    // The rows and the last verdict belong to the page left behind.
     probe.reset()
-    void write(fields).then(
-      reseed((stored) => {
-        setApiProvider(stored.apiProvider)
-        setApiModel(modelFor(stored.apiProvider, stored.apiModel).id)
-        setThinkingLevel(
-          thinkingLevelFor(stored.apiProvider, stored.apiModel, stored.thinkingLevel)
-        )
-        setSecondaryModel(stored.secondaryModel ?? '')
-        setReasoningEffort(thinkingLevelFor('openai', '', stored.reasoningEffort ?? ''))
-      })
-    )
+    void write({ apiProvider: next }).then(reseed((stored) => setApiProvider(stored.apiProvider)))
   }
 
   /** Gemini's model, with the level re-resolved against what the new model accepts. */
@@ -436,8 +403,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       ...(custom
         ? {
             endpointUrl: normalizeEndpoint(endpointUrl) || undefined,
-            apiModel: modelId,
-            secondaryModel: secondaryId,
+            endpointModel: modelId,
+            endpointSecondaryModel: secondaryId,
             maxOutputTokens
           }
         : {}),
@@ -499,7 +466,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                     <TextField
                       id="settings-endpoint-url"
                       label="Endpoint URL"
-                      hint="https, or http for a server on this machine. Make sure the URL is a chat completions endpoint (usually contains /v1 or /v1/chat/completions)"
+                      hint="The base URL of a chat completions endpoint (usually ends in /v1)"
                       value={endpointUrl}
                       onChange={setEndpointUrl}
                       onBlur={() => void probe.refreshModels()}

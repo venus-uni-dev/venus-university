@@ -26,6 +26,7 @@ import {
   SAFE_NUMERIC_ID,
   SAVE_NOT_FOUND
 } from '@shared/saveRules'
+import { upgradeSettings } from '@shared/settingsRules'
 import type { AppError, Character } from '@shared/types'
 import {
   isPregenChar,
@@ -373,7 +374,8 @@ export async function importBackup(archivePath: string): Promise<void> {
     // The stored key stays: a backup carries settings as the renderer sees them, so it never
     // carries one. The dev switches and the ComfyUI build stay too, being this install's own;
     // which shipped characters the player took off the roster travels with the backup, through
-    // its own writer.
+    // its own writer. A custom endpoint's model ids held in Gemini's fields move into the
+    // endpoint's own first, since the patch writes the endpoint's id blank where it names none.
     const {
       apiKeySet: _flag,
       endpointApiKeySet: _endpointFlag,
@@ -386,7 +388,7 @@ export async function importBackup(archivePath: string): Promise<void> {
       streamResponses: _stream,
       comfyGpu: _gpu,
       ...patch
-    } = record.settings
+    } = upgradeSettings(record.settings).settings
 
     await applySettingsPatch(patch)
     await setRemovedDefaults(removedDefaults)

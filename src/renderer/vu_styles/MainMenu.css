@@ -59,7 +59,9 @@
    linearRGB, which would flood a different colour than the token names. */
 .vu-menu-silhouette {
   position: absolute;
-  right: 60px;
+  /* She slides right as the stage narrows: 60px in from its edge at 1920 wide, 240px past it
+     at 1440. */
+  right: calc(62.5% - 1140px);
   bottom: -560px;
   height: 1560px;
   filter: url('#vu-silhouette');

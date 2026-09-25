@@ -3,6 +3,7 @@ import { useIsPresent } from 'motion/react'
 
 import { useAudioStore } from '../stores/audioStore'
 import { useCrossingStore } from '../stores/crossingStore'
+import { typingIn } from './useWindowKeydown'
 
 /** What a modal needs to mount itself: the portal host, and the dimming's handlers. */
 export interface ModalShell {
@@ -17,55 +18,74 @@ export interface ModalShell {
 }
 
 /**
- * Every open shell and every layer inside one, oldest first: Escape is answered by the last one
- * alone. Module scope because the stack spans components — a modal opened over another is a
- * different tree, and only the two of them together know which is on top.
+ * Every open shell and every layer inside one, oldest first: Escape and a right-click are
+ * answered by the last one alone. Module scope because the stack spans components — a modal
+ * opened over another is a different tree, and only the two of them together know which is on
+ * top.
  */
 const openShells: object[] = []
 
 /**
- * Takes the top of that stack for as long as the caller holds the teardown, and hands the key
- * to `answer` only while nothing has been pushed over it. Captured, so a screen's own listener
- * on the bubble does not also fire; whether the event is stopped is `answer`'s to say.
+ * Takes the top of that stack for as long as the caller holds the teardown, and hands Escape
+ * and a right-click to `answer` only while nothing has been pushed over it. A right-click in a
+ * field keeps its own menu; anywhere else the native one never opens. Captured, so a screen's
+ * own listener on the bubble does not also fire; whether the event is stopped is `answer`'s to
+ * say.
  */
-function topmostEscape(answer: (event: KeyboardEvent) => void): () => void {
+function topmostDismiss(answer: (event: Event) => void): () => void {
   const token = {}
   openShells.push(token)
+  const onTop = (): boolean => openShells[openShells.length - 1] === token
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape') return
-    if (openShells[openShells.length - 1] !== token) return
+    if (event.key !== 'Escape' || !onTop()) return
+    answer(event)
+  }
+  const onContextMenu = (event: Event): void => {
+    if (!onTop() || typingIn(event)) return
+    event.preventDefault()
     answer(event)
   }
   window.addEventListener('keydown', onKeyDown, true)
+  window.addEventListener('contextmenu', onContextMenu, true)
   return () => {
     window.removeEventListener('keydown', onKeyDown, true)
+    window.removeEventListener('contextmenu', onContextMenu, true)
     openShells.splice(openShells.indexOf(token), 1)
   }
 }
 
 /**
- * A layer inside a modal — a menu — that takes Escape ahead of the shell under it, since a
- * later listener on the same target and phase cannot otherwise win against the shell's capture
- * listener.
+ * A layer inside a modal — a menu, a box being typed in — that takes Escape and a right-click
+ * ahead of the shell under it, since a later listener on the same target and phase cannot
+ * otherwise win against the shell's capture listener. A right-click's press moves no focus while
+ * the layer stands, so a box it guards is not blurred away before the right-click reaches it.
  */
-export function useEscapeLayer(onEscape: () => void, active: boolean): void {
-  // Read at keypress rather than closed over, so the listener is registered once.
-  const escape = useRef(onEscape)
-  escape.current = onEscape
+export function useDismissLayer(onDismiss: () => void, active: boolean): void {
+  // Read at the event rather than closed over, so the listener is registered once.
+  const dismiss = useRef(onDismiss)
+  dismiss.current = onDismiss
 
   useEffect(() => {
     if (!active) return
-    return topmostEscape((event) => {
+    const holdFocus = (event: globalThis.MouseEvent): void => {
+      if (event.button !== 0) event.preventDefault()
+    }
+    window.addEventListener('mousedown', holdFocus, true)
+    const release = topmostDismiss((event) => {
       event.stopPropagation()
-      escape.current()
+      dismiss.current()
     })
+    return () => {
+      window.removeEventListener('mousedown', holdFocus, true)
+      release()
+    }
   }, [active])
 }
 
 /**
- * The portal host, the outside-click rule, Escape and the sounds a panel arrives and leaves on;
- * styling stays in `vu_styles`. `sound` is the pair it plays — `'phone'` for the Bunnyboard, and
- * `'none'` for a screen whose own sting is the sound of its arrival.
+ * The portal host, the outside-click rule, Escape and a right-click, and the sounds a panel
+ * arrives and leaves on; styling stays in `vu_styles`. `sound` is the pair it plays — `'phone'`
+ * for the Bunnyboard, and `'none'` for a screen whose own sting is the sound of its arrival.
  */
 export function useModalShell(
   onClose: () => void,
@@ -73,7 +93,7 @@ export function useModalShell(
 ): ModalShell {
   const [host, setHost] = useState<HTMLElement | null>(null)
   const pressedOverlay = useRef(false)
-  // Read at keypress rather than closed over, so the listener is registered once.
+  // Read at the event rather than closed over, so the listener is registered once.
   const close = useRef(onClose)
   close.current = onClose
 
@@ -123,12 +143,13 @@ export function useModalShell(
   }, [present, sound])
 
   /**
-   * Escape runs the same handler as an outside click, so a modal that ignores one ignores the
-   * other too. Captured and stopped, so the Game View's own Escape listener does not also fire.
+   * Escape and a right-click run the same handler as an outside click, so a modal that ignores
+   * one ignores all three. Captured and stopped, so the Game View's own listeners do not also
+   * fire.
    */
   useEffect(
     () =>
-      topmostEscape((event) => {
+      topmostDismiss((event) => {
         if (leaving.current) return
         event.stopPropagation()
         close.current()

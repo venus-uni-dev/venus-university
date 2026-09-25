@@ -1635,8 +1635,8 @@ export interface Settings {
   /** Which writer the scenes come from: Gemini by default, or a chat-completions endpoint. */
   apiProvider: ProviderApi
   /**
-   * Defaults to the configured provider's `defaultModel` (see `providers.ts`). Under `openai`
-   * it is whatever id the player typed.
+   * Gemini's model id, defaulting to its `defaultModel` (see `providers.ts`). Gemini's alone:
+   * a custom endpoint's is {@link endpointModel}.
    */
   apiModel: string
   /**
@@ -1651,6 +1651,13 @@ export interface Settings {
    * `/chat/completions`. Read only under `openai`.
    */
   endpointUrl?: string
+  /** The model id a custom endpoint runs on, as typed; blank is none. Read only under `openai`. */
+  endpointModel?: string
+  /**
+   * A custom endpoint's second model for the kinds in {@link secondaryModelFor}. Absent or blank
+   * means every call runs on {@link endpointModel}. Read only under `openai`.
+   */
+  endpointSecondaryModel?: string
   /**
    * How hard a custom endpoint's model reasons, sent as `reasoning_effort`. Absent reads as
    * minimal. Read only under `openai`.
@@ -1667,14 +1674,14 @@ export interface Settings {
    */
   endpointApiKey?: string
   /**
-   * A second model for the calls named in {@link secondaryModelFor} — a model id from
-   * the same provider's table. Absent or empty means every call runs on {@link apiModel}.
+   * Gemini's second model for the calls named in {@link secondaryModelFor} — a model id from
+   * Gemini's table. Absent or empty means every call runs on {@link apiModel}. Gemini's alone.
    */
   secondaryModel?: string
   /**
-   * Which kinds it writes. **Absent means the default set** (`DEFAULT_SECONDARY_KINDS`), so a
-   * player who picks a model and touches nothing else gets what the checkboxes show; an empty
-   * list means none.
+   * Which kinds the active provider's second model writes. **Absent means the default set**
+   * (`DEFAULT_SECONDARY_KINDS`), so a player who picks a model and touches nothing else gets
+   * what the checkboxes show; an empty list means none.
    */
   secondaryModelFor?: PromptKind[]
   /**
@@ -1803,11 +1810,10 @@ export type SettingsPatch = Omit<
 export type WriterCandidate = Pick<
   Settings,
   | 'apiProvider'
-  | 'apiModel'
+  | 'endpointModel'
   | 'endpointUrl'
   | 'reasoningEffort'
   | 'maxOutputTokens'
-  | 'thinkingLevel'
 > & {
   endpointApiKey?: string
 }

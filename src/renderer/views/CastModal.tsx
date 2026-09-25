@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import { isCustomOutfitSlot, outfitLabelOf } from '@shared/outfits'
 import type { Character, CustomOutfitSlot, OutfitLock } from '@shared/types'
 import { placeUnder } from '../components/popupPlace'
-import { useEscapeLayer, useModalShell } from '../components/useModalShell'
+import { useDismissLayer, useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { PORTRAIT_SLOTS, UNKNOWN_NAME, useGameStore } from '../stores/gameStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
@@ -45,7 +45,7 @@ export function CastModal({ theme, onClose }: CastModalProps): JSX.Element | nul
   const [openFor, setOpenFor] = useState<string | null>(null)
 
   const { host, overlayProps } = useModalShell(onClose)
-  useEscapeLayer(() => setOpenFor(null), openFor !== null)
+  useDismissLayer(() => setOpenFor(null), openFor !== null)
   if (!host) return null
 
   const shownSlots = displaySlotsOf(slots, stageOverride)
@@ -252,6 +252,8 @@ function CustomOutfitPill({
   useEffect(() => {
     if (!showList) return
     const handleMouseDown = (event: MouseEvent): void => {
+      // A right-click is the layer's to answer, on its contextmenu.
+      if (event.button !== 0) return
       const target = event.target
       if (!(target instanceof Node)) return
       if (pill.current?.contains(target) === true || pop.current?.contains(target) === true) return
