@@ -14,6 +14,7 @@ import type { AudioGroup } from './audio'
 import type { ComfyGpu } from './setupManifest'
 import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
+import type { PromptEdit } from './imagePrompt'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -132,6 +133,15 @@ export type SeededSet = OutfitSet | 'cg'
  * wardrobe, one of the alternates, the CGs, or the room backgrounds.
  */
 export type SetTarget = 'default' | OutfitSet | 'cgs' | 'room'
+
+/** One CG addressed on its own, as the gallery's per-image control asks for it. */
+export type CgTarget = `cg:${Position}`
+/** One expression sprite of one wardrobe addressed on its own: the column's per-sprite control. */
+export type ExpressionTarget = `expression:${SpriteRef}`
+/** Everything a render bucket can be asked for: a whole set, one CG, or one sprite. */
+export type RenderTarget = SetTarget | CgTarget | ExpressionTarget
+/** Every render the tag modal opens on: all but the room, whose prompt is prose. */
+export type RegenTarget = Exclude<RenderTarget, 'room'>
 
 /**
  * The sets made of sprites — every `SetTarget` but the CGs and the room — which is what the
@@ -314,6 +324,11 @@ export interface Character {
    * character — sprites, wardrobes and CGs alike.
    */
   negativeTags?: string[]
+  /**
+   * Every group each regenerate button last sent, whole, keyed by what it renders; the modal
+   * reopens on it. Omitted where no button has sent any.
+   */
+  regenTags?: Partial<Record<RegenTarget, PromptEdit>>
   /**
    * The LLM-written continuation of `ROOM_PROMPT_PREFIX` (shared/room.ts): her dorm room,
    * described for the cloud image model.

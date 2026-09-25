@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMOTIONS } from '@shared/emotions'
+import type { PromptEdit } from '@shared/imagePrompt'
 import {
   CUSTOM_OUTFIT_NAME_MAX,
   followsMain,
@@ -86,5 +87,35 @@ describe('withoutCustomOutfit', () => {
   it('drops the field entirely once the last wardrobe is gone', () => {
     const only = character({ customOutfits: { custom1: { tags: ['maid'] } } })
     expect('customOutfits' in withoutCustomOutfit(only, 'custom1')).toBe(false)
+  })
+
+  it('forgets what the slot’s button and its sprites’ buttons last sent, and nothing else', () => {
+    const slotEdit: PromptEdit = {
+      kind: 'sprite',
+      set: 'custom1',
+      base: [],
+      appearance: [],
+      outfit: [],
+      pose: [],
+      negative: []
+    }
+    const kept = character({
+      customOutfits: { custom1: { tags: ['maid'] } },
+      regenTags: {
+        custom1: slotEdit,
+        'expression:happy_custom1': { kind: 'expression', expression: ['happy_custom1'] },
+        'expression:happy_pe': { kind: 'expression', expression: ['happy_pe'] }
+      }
+    })
+    const result = withoutCustomOutfit(kept, 'custom1')
+    expect(result.regenTags).toEqual({
+      'expression:happy_pe': { kind: 'expression', expression: ['happy_pe'] }
+    })
+
+    const only = character({
+      customOutfits: { custom1: { tags: ['maid'] } },
+      regenTags: { custom1: slotEdit }
+    })
+    expect('regenTags' in withoutCustomOutfit(only, 'custom1')).toBe(false)
   })
 })

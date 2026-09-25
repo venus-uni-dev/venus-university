@@ -3,12 +3,14 @@ import type {
   CustomOutfit,
   CustomOutfitSlot,
   Emotion,
+  ExpressionTarget,
   OutfitSet,
   SeededSet,
   SpriteRef,
   StockOutfitSet
 } from './types'
 import { EMOTIONS, isEmotion } from './emotions'
+import { withoutRegenEdits } from './regenTags'
 
 /** The three wardrobes every character has, in a stable order. */
 export const STOCK_OUTFIT_SETS: readonly StockOutfitSet[] = ['pe', 'swim', 'nude'] as const
@@ -133,20 +135,24 @@ export function withCustomOutfit(
 }
 
 /**
- * The record with one player-authored wardrobe gone, seed provenance included: the next run
- * in that slot is a fresh set, armed to follow her main seed.
+ * The record with one player-authored wardrobe gone, seed provenance included, and the tags
+ * its button and its sprites' buttons last sent: the next run in that slot is a fresh set,
+ * armed to follow her main seed.
  */
 export function withoutCustomOutfit(character: Character, slot: CustomOutfitSlot): Character {
   const { [slot]: _gone, ...rest } = character.customOutfits ?? {}
   const { [slot]: _seed, ...setSeeds } = character.setSeeds
   const { [slot]: _flag, ...seedFollowsMain } = character.seedFollowsMain
   const { customOutfits: _all, ...without } = character
-  return {
-    ...without,
-    setSeeds,
-    seedFollowsMain,
-    ...(Object.keys(rest).length > 0 ? { customOutfits: rest } : {})
-  }
+  return withoutRegenEdits(
+    {
+      ...without,
+      setSeeds,
+      seedFollowsMain,
+      ...(Object.keys(rest).length > 0 ? { customOutfits: rest } : {})
+    },
+    [slot, ...EMOTIONS.map((emotion) => expressionTargetFor(emotion, slot))]
+  )
 }
 
 /** The tags one outfit set adds to the shared negative, if any. */
@@ -160,6 +166,11 @@ export function negativeTagsFor(set: OutfitSet): readonly string[] {
  */
 export function spriteRef(emotion: Emotion, set: OutfitSet | null): SpriteRef {
   return set ? `${emotion}_${set}` : emotion
+}
+
+/** The target naming one sprite of one wardrobe, as its own control and its kept tags address it. */
+export function expressionTargetFor(emotion: Emotion, set: OutfitSet | null): ExpressionTarget {
+  return `expression:${spriteRef(emotion, set)}`
 }
 
 /**

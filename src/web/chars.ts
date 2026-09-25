@@ -69,7 +69,11 @@ function assertEditableChar(charId: string): void {
 
 /** Lists both roots, shipped cast first, as the desktop lists its two folders. */
 export async function listCharacters(): Promise<Character[]> {
-  return [...shippedCharacters(), ...(await db.listOwn())]
+  // A row under a shipped id is shadowed by the pack, as a folder under one is on the desktop.
+  return [
+    ...shippedCharacters(),
+    ...(await db.listOwn()).filter((character) => !isShipped(character.charId))
+  ]
 }
 
 /** One character, whichever of the two holds her. */

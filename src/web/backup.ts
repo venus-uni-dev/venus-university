@@ -24,7 +24,7 @@ import { forgetRels } from './db/chars'
 import { database, storage } from './db/open'
 import { offerDownload } from './download'
 import { revokeAll } from './images'
-import { buildPack } from './packs'
+import { buildPack, isShipped } from './packs'
 import { forgetSettings, rendererSettings } from './settings'
 import { encodeJson, openArchive, packagedRel, pickFile, readJsonEntry, ZIP_TYPE } from './transfer'
 
@@ -78,7 +78,9 @@ export async function exportBackup(): Promise<string> {
       files[profilePictureEntry(key)] = bytes
     }
 
+    // The shipped cast is the build's and never travels in a backup, record or image.
     for (const key of await db.getAllKeys('charFiles')) {
+      if (isShipped(key[0])) continue
       const file = await db.get('charFiles', key)
       if (!file) continue
       const bytes = await bytesOf(file.blob)
@@ -97,7 +99,9 @@ export async function exportBackup(): Promise<string> {
       saves,
       endingArt,
       profilePictures,
-      characters: await db.getAll('characters')
+      characters: (await db.getAll('characters')).filter(
+        (character) => !isShipped(character.charId)
+      )
     }
     return backup
   })
@@ -107,8 +111,9 @@ export async function exportBackup(): Promise<string> {
 }
 
 /**
- * Puts a backup back: settings, grab bags, playthroughs and saves replace what is there, and
- * characters are merged in by id. One transaction, with every blob built before it opens.
+ * Puts a backup back: settings, grab bags, playthroughs and saves replace what is there, the
+ * player's own characters are merged in by id, and the shipped cast is left as the build ships
+ * it. One transaction, with every blob built before it opens.
  */
 export async function importBackup(): Promise<boolean> {
   const file = await pickFile(`.zip,${ZIP_TYPE}`)
@@ -177,16 +182,18 @@ export async function importBackup(): Promise<boolean> {
       }
     }
 
-    // Merged rather than replaced: a character made since the backup is still the player's.
+    // Merged rather than replaced: a character made since the backup is still the player's. A
+    // shipped character is never written, neither her record nor any of her images.
     const characters = tx.objectStore('characters')
     for (const character of record.characters) {
-      if (SAFE_CHAR_ID.test(character.charId)) void characters.put(character, character.charId)
+      if (!SAFE_CHAR_ID.test(character.charId) || isShipped(character.charId)) continue
+      void characters.put(character, character.charId)
     }
 
     const charFiles = tx.objectStore('charFiles')
     for (const [name, bytes] of Object.entries(entries)) {
       const at = charFileOf(name)
-      if (!at || bytes.length === 0) continue
+      if (!at || bytes.length === 0 || isShipped(at.charId)) continue
       const rel = namedRel(at.rel)
       // An archive holding both twins of one picture keeps the one already under the stored name.
       if (rel !== at.rel && entries[charFileEntry(at.charId, rel)]) continue

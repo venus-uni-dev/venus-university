@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import type { PromptEdit } from '@shared/imagePrompt'
+import { PROMPT_GROUPS, type PromptGroup } from '@shared/regenTags'
 import { CheckField } from '../components/CheckField'
 import { ChipListInput } from '../components/ChipListInput'
 import { TextField } from '../components/TextField'
@@ -19,26 +20,8 @@ import {
 } from './motion'
 import '../vu_styles/Regenerate.css'
 
-/** Every tag group any of the four kinds shows, as one key set. */
-export type GroupKey =
-  | 'base'
-  | 'appearance'
-  | 'outfit'
-  | 'pose'
-  | 'position'
-  | 'expression'
-  | 'negative'
-
-/** Which groups each kind of render opens on, in the order the prompt writes them. */
-const GROUPS: Record<PromptEdit['kind'], readonly GroupKey[]> = {
-  sprite: ['base', 'appearance', 'outfit', 'pose', 'negative'],
-  expression: ['expression'],
-  cgs: ['base', 'appearance', 'negative'],
-  cg: ['base', 'appearance', 'position', 'expression', 'negative']
-}
-
 /** What each group is called over its own well. */
-const LABELS: Record<GroupKey, string> = {
+const LABELS: Record<PromptGroup, string> = {
   base: 'Base',
   appearance: 'Appearance',
   outfit: 'Outfit',
@@ -49,7 +32,7 @@ const LABELS: Record<GroupKey, string> = {
 }
 
 /** The groups an edit arrives holding, keyed the way the wells address them. */
-function groupsOf(edit: PromptEdit): Partial<Record<GroupKey, readonly string[]>> {
+function groupsOf(edit: PromptEdit): Partial<Record<PromptGroup, readonly string[]>> {
   return edit
 }
 
@@ -57,7 +40,7 @@ function groupsOf(edit: PromptEdit): Partial<Record<GroupKey, readonly string[]>
  * The same edit with its own groups replaced by what the wells hold. Switched on the kind so
  * each branch hands back its own shape rather than a widened one.
  */
-function withGroups(edit: PromptEdit, values: Record<GroupKey, string[]>): PromptEdit {
+function withGroups(edit: PromptEdit, values: Record<PromptGroup, string[]>): PromptEdit {
   switch (edit.kind) {
     case 'sprite':
       return {
@@ -97,6 +80,11 @@ function digitsOf(raw: string, held: string): string {
   return next
 }
 
+/** Whether two tag lists hold the same tags in the same order. */
+function sameTags(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((tag, i) => tag === b[i])
+}
+
 export interface SeedPrefill {
   seed: number
   random: boolean
@@ -109,11 +97,13 @@ export interface RegenerateModalProps {
   title: string
   /** The groups the render is about to send, as the modal opens on them. */
   edit: PromptEdit
+  /** The groups the render would send unedited, which Reset puts back. */
+  defaults: PromptEdit
   seed: SeedPrefill
   /** Asks for a name as well, for a set that is being made rather than replaced. */
   name?: { value: string; placeholder: string; maxLength: number }
   /** A group the render cannot be sent without: the submit is dead while its well is empty. */
-  requireGroup?: GroupKey
+  requireGroup?: PromptGroup
   /** The primary's words, where the render is not a replacement. */
   submitLabel?: string
   /** The groups as the player left them, the seed — `null` asks for a new random one — and the
@@ -128,6 +118,7 @@ export function RegenerateModal({
   theme,
   title,
   edit,
+  defaults,
   seed,
   name,
   requireGroup,
@@ -135,11 +126,11 @@ export function RegenerateModal({
   onConfirm,
   onCancel
 }: RegenerateModalProps): JSX.Element | null {
-  const keys = GROUPS[edit.kind]
-  const [values, setValues] = useState<Record<GroupKey, string[]>>(() => {
+  const keys = PROMPT_GROUPS[edit.kind]
+  const [values, setValues] = useState<Record<PromptGroup, string[]>>(() => {
     const held = groupsOf(edit)
-    const seeded = {} as Record<GroupKey, string[]>
-    for (const key of Object.keys(LABELS) as GroupKey[]) seeded[key] = [...(held[key] ?? [])]
+    const seeded = {} as Record<PromptGroup, string[]>
+    for (const key of Object.keys(LABELS) as PromptGroup[]) seeded[key] = [...(held[key] ?? [])]
     return seeded
   })
   const [seedText, setSeedText] = useState(() => String(seed.seed))
@@ -151,6 +142,18 @@ export function RegenerateModal({
   const dead =
     (!random && seedText.length === 0) ||
     (requireGroup !== undefined && values[requireGroup].length === 0)
+
+  // Reset has nothing to do while every shown well already holds its default.
+  const defaultGroups = groupsOf(defaults)
+  const atDefaults = keys.every((key) => sameTags(values[key], defaultGroups[key] ?? []))
+
+  /** Puts every shown well back to its default; the seed and the name are left as they are. */
+  const resetGroups = (): void =>
+    setValues((prev) => {
+      const next = { ...prev }
+      for (const key of keys) next[key] = [...(defaultGroups[key] ?? [])]
+      return next
+    })
 
   const { host, overlayProps } = useModalShell(onCancel)
   if (!host) return null
@@ -264,6 +267,16 @@ export function RegenerateModal({
             onClick={onCancel}
           >
             Cancel
+          </motion.button>
+          <motion.button
+            id={`${id}-reset`}
+            className="vu-btn vu-btn--quiet"
+            type="button"
+            disabled={atDefaults}
+            {...gestures(atDefaults, quietLift, quietPress)}
+            onClick={resetGroups}
+          >
+            Reset to default tags
           </motion.button>
           <motion.button
             id={`${id}-submit`}

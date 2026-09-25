@@ -6,23 +6,26 @@ import type { PromptEdit } from '@shared/imagePrompt'
 import {
   allFollowMain,
   CUSTOM_OUTFIT_SLOTS,
+  expressionTargetFor,
   followsMain,
   outfitLabelOf,
   OUTFIT_SETS,
   parseSpriteRef,
-  spriteRef,
   STOCK_OUTFIT_SETS,
   withCustomOutfit,
   withoutCustomOutfit
 } from '@shared/outfits'
 import { isPosition, POSITIONS } from '@shared/positions'
+import { withRegenEdit } from '@shared/regenTags'
 import type {
   AppError,
   Character,
   CharacterBrief,
+  CgTarget,
   CustomOutfit,
   CustomOutfitSlot,
   Emotion,
+  ExpressionTarget,
   GenerateOptions,
   HandFixResult,
   OutfitSet,
@@ -30,6 +33,8 @@ import type {
   ProfileCrop,
   ProfileCropInfo,
   ReferenceImage,
+  RegenTarget,
+  RenderTarget,
   Result,
   SeededSet,
   SetTarget,
@@ -102,7 +107,8 @@ export interface RenderTask {
 /** Ids for {@link RenderTask.id}; a plain counter, unique for the app's lifetime. */
 let nextTaskId = 0
 
-export type { SetTarget }
+export type { RenderTarget, SetTarget }
+export { expressionTargetFor }
 
 /** Whether a render fills only what is missing or replaces the whole set. */
 export type RenderMode = 'fill' | 'regenerate'
@@ -110,29 +116,9 @@ export type RenderMode = 'fill' | 'regenerate'
 /** How an export ended; `'cancelled'` is the dialog dismissed. */
 type ExportOutcome = 'exported' | 'cancelled' | 'failed'
 
-/**
- * One CG addressed on its own, as the gallery's per-image control asks for it.
- * Renderer-only; it never crosses the bridge.
- */
-type CgTarget = `cg:${Position}`
-
-/**
- * One expression sprite of one wardrobe, addressed on its own — the wardrobe column's
- * per-sprite control. Renderer-only, like {@link CgTarget}.
- */
-type ExpressionTarget = `expression:${SpriteRef}`
-
-/** Everything a bucket can be asked for: a whole set, one CG, or one sprite. */
-export type RenderTarget = SetTarget | CgTarget | ExpressionTarget
-
 /** The {@link CgTarget} naming one position — the spelling every id here answers to. */
 export function cgTargetFor(position: Position): CgTarget {
   return `cg:${position}`
-}
-
-/** The {@link ExpressionTarget} naming one sprite of one wardrobe. */
-export function expressionTargetFor(emotion: Emotion, set: OutfitSet | null): ExpressionTarget {
-  return `expression:${spriteRef(emotion, set)}`
 }
 
 /** True for the one-CG form. */
@@ -294,6 +280,8 @@ interface CharacterStoreState {
     slot: CustomOutfitSlot,
     entry: CustomOutfit
   ) => Promise<boolean>
+  /** Keeps every group one regenerate button sent on her record, for the modal to reopen on. */
+  writeRegenTags: (charId: string, target: RegenTarget, edit: PromptEdit) => Promise<boolean>
   /**
    * Deletes one player-authored wardrobe, its images and its record entry; refused outright
    * while anything of that set is still rendering.
@@ -634,14 +622,15 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     patchCharacter(
       character.charId,
       (current) => {
-        // The run owns the seeds and the custom wardrobes, so a Save landing mid-render keeps
-        // what a bucket has just written.
-        const { customOutfits: _stale, ...edited } = character
+        // The run owns the seeds, the custom wardrobes and what each regenerate last sent, so a
+        // Save landing mid-render keeps what a bucket or a modal has just written.
+        const { customOutfits: _stale, regenTags: _kept, ...edited } = character
         return {
           ...edited,
           setSeeds: current.setSeeds,
           seedFollowsMain: current.seedFollowsMain,
-          ...(current.customOutfits ? { customOutfits: current.customOutfits } : {})
+          ...(current.customOutfits ? { customOutfits: current.customOutfits } : {}),
+          ...(current.regenTags ? { regenTags: current.regenTags } : {})
         }
       },
       set,
@@ -650,6 +639,16 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
 
   writeCustomOutfit: (charId, slot, entry) =>
     patchCharacter(charId, (current) => withCustomOutfit(current, slot, entry), set, get),
+
+  writeRegenTags: (charId, target, edit) => {
+    // An entry the record already holds word for word is not written again: a repeated roll
+    // of one sprite would otherwise stamp her record on every press.
+    const held = get().characters[charId]?.regenTags?.[target]
+    if (held !== undefined && JSON.stringify(held) === JSON.stringify(edit)) {
+      return Promise.resolve(true)
+    }
+    return patchCharacter(charId, (current) => withRegenEdit(current, target, edit), set, get)
+  },
 
   deleteCustomOutfit: async (charId, slot) => {
     // Its folder is being written into: there is nothing to say to that but no.
@@ -1015,7 +1014,7 @@ function setSeedOf(character: Character, set: OutfitSet | null): number {
  */
 export function seedPrefillFor(
   character: Character,
-  target: Exclude<RenderTarget, 'room'>
+  target: RegenTarget
 ): { seed: number; random: boolean } {
   if (seedsFrozen()) return { seed: character.generationSeed, random: false }
 

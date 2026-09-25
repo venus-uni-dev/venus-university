@@ -8,6 +8,7 @@ import { installConsoleLog } from './logFile'
 import { redact } from './redact'
 import { sweepStaging } from './services/characterService'
 import { killStray as killStrayComfy, stop as stopComfy } from './services/comfyService'
+import { ensureAmdNodePatches } from './services/setupService'
 import { ensureDataDir } from './services/settingsService'
 import { startUpdateCheck, sweepUpdateStaging } from './services/updateService'
 import { APP_ID } from '@shared/appId'
@@ -208,6 +209,12 @@ app
 
     // Clear an orphaned managed server before this run can adopt an unowned port.
     killStrayComfy()
+
+    // An AMD build's background-removal node runs on the CPU; a file the patch is missing from
+    // is fixed here, before the server can import it. A failure is logged, never fatal.
+    await ensureAmdNodePatches().catch((err) => {
+      console.warn('[setup] AMD node patch failed:', toAppError(err).message)
+    })
 
     // Drops the staging trees a quit mid-render left behind.
     await sweepStaging()

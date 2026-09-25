@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, stat } from 'fs/promises'
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import {
   COMFY_ARCHIVE_WRAPPER_DIR,
@@ -76,6 +76,48 @@ async function installedComfyGpu(): Promise<ComfyGpu | null> {
   } catch {
     return null
   }
+}
+
+/**
+ * Rewrites the background-removal node's source so its model runs on the CPU: every bare
+ * `Remover()` and `Remover(jit=True)` gains `device='cpu'`. A call already carrying the
+ * device matches neither text, so a patched file comes back null, and so does one with no
+ * call to rewrite.
+ */
+function patchRemoverForCpu(source: string): string | null {
+  const patched = source
+    .replaceAll('Remover()', "Remover(device='cpu')")
+    .replaceAll('Remover(jit=True)', "Remover(jit=True, device='cpu')")
+  return patched === source ? null : patched
+}
+
+/**
+ * On the AMD build, patches the background-removal node to run its model on the CPU, where
+ * the ROCm build cannot run it; an NVIDIA build, a missing node and a file already patched
+ * are all left as they are. Keyed off the build on disk, not the vendor the machine resolves to.
+ */
+export async function ensureAmdNodePatches(): Promise<void> {
+  if ((await installedComfyGpu()) !== 'amd') return
+  const node = PINNED_NODES.find((n) => n.id === 'inspyrenetRembg')
+  if (!node) return
+  const path = join(getComfyCustomNodePath(node.dirName), 'Inspyrenet_Rembg.py')
+  let source: string
+  try {
+    source = await readFile(path, 'utf8')
+  } catch {
+    return
+  }
+  const patched = patchRemoverForCpu(source)
+  if (patched === null) {
+    console.log(
+      source.includes("device='cpu'")
+        ? '[setup] inspyrenetRembg: already runs on the CPU'
+        : '[setup] inspyrenetRembg: source not recognised, left unpatched'
+    )
+    return
+  }
+  await writeFile(path, patched, 'utf8')
+  console.log('[setup] inspyrenetRembg: patched to run on the CPU (AMD build)')
 }
 
 /**
@@ -313,6 +355,13 @@ async function installCustomNode(
     await extractZip(archivePath, customNodesDir)
     await renameExtractedDir(customNodesDir, nodeZipWrapperDir(node), node.dirName)
     await rm(archivePath, { force: true })
+  }
+
+  // The AMD build runs this node on the CPU; the patch lands before pip so a failed dependency
+  // run still leaves the file right.
+  if (node.id === 'inspyrenetRembg' && (await installedComfyGpu()) === 'amd') {
+    report('Patching for AMD')
+    await ensureAmdNodePatches()
   }
 
   const nodeDir = getComfyCustomNodePath(node.dirName)

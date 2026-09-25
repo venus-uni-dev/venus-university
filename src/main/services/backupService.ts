@@ -327,16 +327,21 @@ async function restoreSaves(scratch: string, record: BackupFile): Promise<void> 
   }
 }
 
-/** Merges the backup's characters into `/data/characters`, by id, leaving the rest alone. */
+/**
+ * Merges the player's own characters from the backup into `/data/characters`, by id, leaving
+ * the rest alone; the shipped cast is left as the build ships it.
+ */
 async function restoreCharacters(scratch: string, record: BackupFile): Promise<void> {
   for (const character of record.characters) {
     const charId = character.charId
     if (!SAFE_CHAR_ID.test(charId)) continue
+    if (isPregenChar(charId)) continue
 
     const folder = join(getCharactersPath(), charId)
     await mkdir(folder, { recursive: true })
-    // Written here rather than through `writeCharacter`, which refuses a shipped id: a copy of
-    // one under `/data/characters` is simply shadowed, as the copies already there are.
+    // Written here rather than through `writeCharacter`, which would stamp a fresh `updatedAt`
+    // over the backup's and reorder the grid; the shipped cast was skipped above, record and
+    // images alike.
     const name = basename(getCharacterFilePath(charId))
     await writeAtomicJson(join(folder, name), character, RESTORE_FAILED)
 
@@ -354,7 +359,8 @@ async function restoreCharacters(scratch: string, record: BackupFile): Promise<v
 
 /**
  * Reads one backup back over everything this install holds: settings, grab bags and saves are
- * replaced by the backup's, and its characters are merged in by id.
+ * replaced by the backup's, the player's own characters are merged in by id, and the shipped
+ * cast is left as the build ships it.
  */
 export async function importBackup(archivePath: string): Promise<void> {
   const scratch = scratchDir('backup')

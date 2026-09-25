@@ -34,6 +34,7 @@ const CHARACTER_REQUIRED: Record<
     | 'customOutfits'
     | 'negativeTags'
     | 'profileCrop'
+    | 'regenTags'
     | 'updatedAt'
     | 'voicePitch'
   >,

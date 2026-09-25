@@ -181,7 +181,11 @@ export function FingerFixModal({
             paintLayer={previewing}
             emotions={repairing}
             onCancel={() => setPreviewing(null)}
-            onApplied={onClose}
+            // The preview comes down with the panel it applied to, for the discard confirm's reason.
+            onApplied={() => {
+              setPreviewing(null)
+              onClose()
+            }}
           />
         )}
 
@@ -194,7 +198,12 @@ export function FingerFixModal({
             message="No fixes have been applied yet."
             confirmText="Discard"
             cancelText="Keep painting"
-            onConfirm={onClose}
+            // Taken down before the panel goes, so the two do not leave as one exiting child
+            // rendered twice under the same key.
+            onConfirm={() => {
+              setDiscarding(false)
+              onClose()
+            }}
             onCancel={() => setDiscarding(false)}
           />
         )}

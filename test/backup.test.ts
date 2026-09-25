@@ -1,13 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMOTIONS } from '@shared/emotions'
 import type { BackupFile } from '@shared/backup'
 import type { Character, SaveDraft } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
-import { record } from './fixtures'
+import { character as characterFixture, record } from './fixtures'
 
 /**
  * Backing the data folder up and putting it back: a restore writes over every save, setting
@@ -51,6 +51,7 @@ const { validateRecord } = await import('../src/shared/jsonValidate')
 const { checkZipListing } = await import('../src/shared/zipRules')
 const { defaultSettings } = await import('../src/shared/settingsRules')
 const {
+  clearPregenCache,
   getCharacterCgsPath,
   getCharacterExpressionsPath,
   getCharacterPath,
@@ -58,6 +59,7 @@ const {
   getDataPath,
   getEndingArtPath,
   getGrabBagsPath,
+  getPregenCharactersPath,
   getSavesPath,
   getSettingsPath,
   getStagedExpressionsPath
@@ -72,14 +74,19 @@ const WEBP_BYTES = Uint8Array.from([
 /** The three bytes every JPEG opens with, as the graduation picture is stored. */
 const ENDING_ART = Uint8Array.from([0xff, 0xd8, 0xff])
 const BAGS = { inspiration: ['kettle', 'harbour'] }
+/** The id one of the shipped cast is seeded under, beside the player's own. */
+const SHIPPED = 'shipped-1'
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'venus-university-backup-'))
+  // The shipped listing is memoized for the run, so a fresh root needs a fresh read.
+  clearPregenCache()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true })
+  clearPregenCache()
   vi.restoreAllMocks()
 })
 
@@ -269,6 +276,49 @@ describe('importBackup', () => {
 
     // The whole archive was refused before a byte of it was put back.
     expect((await getSettings()).lessNsfwText).toBe(false)
+  })
+
+  it('leaves the shipped cast out of a backup and never writes one back', async () => {
+    await seedSettings()
+    const shipped = characterFixture({ charId: SHIPPED, personality: 'As shipped.' })
+    const shippedFolder = join(getPregenCharactersPath(), SHIPPED)
+    await mkdir(join(shippedFolder, 'expressions'), { recursive: true })
+    await writeFile(join(shippedFolder, 'character.json'), JSON.stringify(shipped), 'utf-8')
+    await writeFile(join(shippedFolder, expressionRel('neutral')), PNG_BYTES)
+    clearPregenCache()
+    const own = await seedCharacter()
+
+    const archive = join(root, 'out.zip')
+    await exportBackup(archive)
+    const entries = await entriesOf(archive)
+    const backup = JSON.parse(new TextDecoder().decode(entries[BACKUP_NAME])) as BackupFile
+    expect(backup.characters.map((entry) => entry.charId)).toEqual([own.charId])
+    const shippedPrefix = charFileEntry(SHIPPED, '')
+    expect(Object.keys(entries).filter((name) => name.startsWith(shippedPrefix))).toEqual([])
+
+    // The same backup with her record and a sprite of hers written in by hand.
+    const dir = join(root, 'with-shipped')
+    await extractZip(archive, dir)
+    const tampered: BackupFile = {
+      ...backup,
+      characters: [
+        ...backup.characters,
+        { ...shipped, charId: SHIPPED, personality: 'from the backup' }
+      ]
+    }
+    await writeFile(join(dir, BACKUP_NAME), JSON.stringify(tampered), 'utf-8')
+    const sprite = join(dir, charFileEntry(SHIPPED, expressionRel('neutral')))
+    await mkdir(dirname(sprite), { recursive: true })
+    await writeFile(sprite, PNG_BYTES)
+    const second = join(root, 'with-shipped.zip')
+    await createZip(dir, second)
+
+    await rm(getCharacterPath(own.charId), { recursive: true, force: true })
+    await importBackup(second)
+
+    expect((await getCharacter(own.charId)).personality).toBe('Quietly stubborn.')
+    expect((await getCharacter(SHIPPED)).personality).toBe('As shipped.')
+    await expect(stat(join(getCharactersPath(), SHIPPED))).rejects.toThrow()
   })
 })
 

@@ -38,6 +38,7 @@ import {
 import { isStatKey, type StatKey } from '@shared/playerStats'
 import { POSITIONS } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
+import { withRegenTags, type PromptGroup } from '@shared/regenTags'
 import { pictureKeySet } from '@shared/settingsRules'
 import { sfwWithholds } from '@shared/sfw'
 import { isGiftCategory } from '@shared/shop'
@@ -51,6 +52,7 @@ import type {
   CustomOutfitSlot,
   Emotion,
   OutfitSet,
+  RegenTarget,
   SetTarget,
   WardrobeLayer
 } from '@shared/types'
@@ -92,7 +94,7 @@ import { DuplicateIcon, FolderIcon } from './characterIcons'
 import { CustomOutfitsModal } from './CustomOutfitsModal'
 import { ImageGalleryModal } from './ImageGalleryModal'
 import { ProfilePictureModal } from './ProfilePictureModal'
-import { RegenerateModal, type GroupKey, type SeedPrefill } from './RegenerateModal'
+import { RegenerateModal, type SeedPrefill } from './RegenerateModal'
 import { SetHeightModal } from './SetHeightModal'
 import { FingerFixModal } from './FingerFixModal'
 import { TransparencyFixModal } from './TransparencyFixModal'
@@ -147,17 +149,22 @@ interface PendingAction {
 
 /** One render the tag modal is open on, and everything that modal draws itself from. */
 interface RegenerateRequest {
-  target: RenderTarget
+  target: RegenTarget
   title: string
   edit: PromptEdit
+  /** The groups the render would send unedited, which Reset puts back. */
+  defaults: PromptEdit
   seed: SeedPrefill
   /** Asks for a name too, where the set is being made rather than replaced. */
   name?: { value: string; placeholder: string; maxLength: number }
   /** A group the render cannot be sent without. */
-  requireGroup?: GroupKey
+  requireGroup?: PromptGroup
   /** The primary's words, where the render is not a replacement. */
   submitLabel?: string
 }
+
+/** What a caller builds a request from: the draft in place of the two tag states derived from it. */
+type RegenerateOpening = Omit<RegenerateRequest, 'defaults' | 'edit'> & { draft: PromptEdit }
 
 /** True for a whole-set target: the single-image forms name what they are in front of the key. */
 function isSetTarget(target: RenderTarget): target is SetTarget {
@@ -302,6 +309,7 @@ export function EditCharacterModal({
   const generateSet = useCharacterStore((s) => s.generateSet)
   const cancelSet = useCharacterStore((s) => s.cancelSet)
   const writeCustomOutfit = useCharacterStore((s) => s.writeCustomOutfit)
+  const writeRegenTags = useCharacterStore((s) => s.writeRegenTags)
   const deleteCustomOutfit = useCharacterStore((s) => s.deleteCustomOutfit)
   const exportCharacter = useCharacterStore((s) => s.exportCharacter)
   const duplicateCharacter = useCharacterStore((s) => s.duplicateCharacter)
@@ -541,16 +549,26 @@ export function EditCharacterModal({
     for (const single of liveSinglesOf(target)) void cancelSet(charId, single)
   }
 
-  /** Opens the tag modal on one render, built from the character as the store holds her now. */
+  /**
+   * Opens the tag modal on the tags the button last sent, or the draft where it sent none,
+   * built from the character as the store holds her now.
+   */
   const openRegenerate = (
-    build: (character: Character, poseTags: readonly string[]) => RegenerateRequest
+    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening
   ): void => {
     // Read fresh out of the store, never off `character`: the dirty gate may have just saved,
     // and the closure this runs from still holds the character as she was typed over.
     const current = useCharacterStore.getState().characters[charId]
     if (!current) return
     const poseTags = useAssetStore.getState().poses[current.pose]?.tags ?? []
-    setRegen(build(current, poseTags))
+    const { draft, ...request } = build(current, poseTags)
+    const kept = withRegenTags(draft, current.regenTags?.[request.target])
+    // A custom slot's Outfit group is her record, whatever its button last sent.
+    const edit =
+      isCustomOutfitSlot(request.target) && kept.kind === 'sprite' && draft.kind === 'sprite'
+        ? { ...kept, outfit: draft.outfit }
+        : kept
+    setRegen({ ...request, defaults: draft, edit })
   }
 
   /** What a set's control runs: a fill goes straight out, a regenerate opens on its tags first. */
@@ -570,7 +588,7 @@ export function EditCharacterModal({
       openRegenerate((current, poseTags) => ({
         target: slot,
         title: fresh ? 'Generate custom outfit' : `Regenerate ${outfitLabelOf(current, slot)}`,
-        edit: spriteDraft(current, poseTags, slot),
+        draft: spriteDraft(current, poseTags, slot),
         seed: seedPrefillFor(current, slot),
         // A wardrobe with no clothes in it is the one render the tags are the whole point of.
         requireGroup: 'outfit',
@@ -591,7 +609,7 @@ export function EditCharacterModal({
       openRegenerate((current) => ({
         target: 'cgs',
         title: 'Regenerate NSFW CG',
-        edit: cgSetDraft(current),
+        draft: cgSetDraft(current),
         seed: seedPrefillFor(current, 'cgs')
       }))
       return
@@ -602,7 +620,7 @@ export function EditCharacterModal({
     openRegenerate((current, poseTags) => ({
       target: spriteTarget,
       title: `Regenerate ${wardrobe.title}`,
-      edit: spriteDraft(current, poseTags, wardrobe.set),
+      draft: spriteDraft(current, poseTags, wardrobe.set),
       seed: seedPrefillFor(current, spriteTarget)
     }))
   }
@@ -638,7 +656,8 @@ export function EditCharacterModal({
   /**
    * Sends one render the tag modal answered. A player-authored wardrobe's Outfit group is
    * written onto her record first, so a later fill dresses her in the clothes it holds; a
-   * write that does not land queues nothing.
+   * write that does not land queues nothing. What the modal answered is kept as that button's
+   * tags either way.
    */
   const sendRender = async (
     request: RegenerateRequest,
@@ -655,6 +674,8 @@ export function EditCharacterModal({
       })
       if (!ok) return
     }
+    // Kept whether or not it lands: a failed write is reported, and the render goes out regardless.
+    void writeRegenTags(charId, target, edit)
     if (isSetTarget(target)) cancelSingles(target)
     await generateSet(charId, target, 'regenerate', { prompt: edit, seed })
   }
@@ -684,7 +705,7 @@ export function EditCharacterModal({
                       openRegenerate((current) => ({
                         target: expressionTargetFor(emotion, set),
                         title: 'Regenerate expression',
-                        edit: expressionDraft(current, emotion),
+                        draft: expressionDraft(current, emotion),
                         seed: seedPrefillFor(current, expressionTargetFor(emotion, set))
                       }))
                     ),
@@ -1295,7 +1316,7 @@ export function EditCharacterModal({
                 openRegenerate((current) => ({
                   target: cgTargetFor(position),
                   title: 'Regenerate CG',
-                  edit: cgDraft(current, position),
+                  draft: cgDraft(current, position),
                   seed: seedPrefillFor(current, cgTargetFor(position))
                 }))
               )
@@ -1390,52 +1411,60 @@ export function EditCharacterModal({
             message="This character has unsaved changes."
             confirmText="Discard changes"
             cancelText="Keep editing"
-            onConfirm={onClose}
+            // Taken down before the panel goes, so the two do not leave as one exiting child
+            // rendered twice under the same key.
+            onConfirm={() => {
+              setClosing(false)
+              onClose()
+            }}
             onCancel={() => setClosing(false)}
           />
         )}
+      </AnimatePresence>
 
-        {/* One presence in wait mode, so the tag modal never arrives over the confirm that
-            hands it the run, still fading. */}
-        <AnimatePresence propagate mode="wait">
-          {confirmSet !== null && (
-            <ConfirmModal
-              key="confirm-set"
-              id="regenerate-set"
-              theme={theme}
-              title={`Regenerate ${setLabel(confirmSet.target)}?`}
-              message={'Generations in progress will be cancelled.'}
-              confirmText="Regenerate all"
-              onConfirm={() => {
-                const request = confirmSet
-                setConfirmSet(null)
-                runSet(request.target, request.mode)
-              }}
-              onCancel={() => setConfirmSet(null)}
-            />
-          )}
+      {/* One presence in wait mode, so the tag modal never arrives over the confirm that
+          hands it the run, still fading. It stands beside the other presence rather than
+          inside it, because a presence that is always rendered inside another is rendered
+          twice when the parent leaves, and the parent then never finishes leaving. */}
+      <AnimatePresence propagate mode="wait">
+        {confirmSet !== null && (
+          <ConfirmModal
+            key="confirm-set"
+            id="regenerate-set"
+            theme={theme}
+            title={`Regenerate ${setLabel(confirmSet.target)}?`}
+            message={'Generations in progress will be cancelled.'}
+            confirmText="Regenerate all"
+            onConfirm={() => {
+              const request = confirmSet
+              setConfirmSet(null)
+              runSet(request.target, request.mode)
+            }}
+            onCancel={() => setConfirmSet(null)}
+          />
+        )}
 
-          {regen !== null && (
-            <RegenerateModal
-              key="regenerate"
-              id="regenerate"
-              theme={theme}
-              title={regen.title}
-              edit={regen.edit}
-              seed={regen.seed}
-              name={regen.name}
-              requireGroup={regen.requireGroup}
-              submitLabel={regen.submitLabel}
-              onConfirm={(edit, seed, name) => {
-                const request = regen
-                setRegen(null)
-                if (request === null) return
-                void sendRender(request, edit, seed, name)
-              }}
-              onCancel={() => setRegen(null)}
-            />
-          )}
-        </AnimatePresence>
+        {regen !== null && (
+          <RegenerateModal
+            key="regenerate"
+            id="regenerate"
+            theme={theme}
+            title={regen.title}
+            edit={regen.edit}
+            defaults={regen.defaults}
+            seed={regen.seed}
+            name={regen.name}
+            requireGroup={regen.requireGroup}
+            submitLabel={regen.submitLabel}
+            onConfirm={(edit, seed, name) => {
+              const request = regen
+              setRegen(null)
+              if (request === null) return
+              void sendRender(request, edit, seed, name)
+            }}
+            onCancel={() => setRegen(null)}
+          />
+        )}
       </AnimatePresence>
     </>,
     host
