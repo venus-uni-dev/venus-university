@@ -29,29 +29,29 @@ const MAX_BODY_SUBJECTS = 100
 /** How far back the mirror's history is searched for the last `Source-Commit:` trailer. */
 const MAX_TRAILER_LOOKBACK = 50
 
-/** The working notes, which stay private. */
-const PRIVATE_DOCS = new Set(['CLAUDE.md', 'DESIGN_GUIDE.md', 'UI_STYLE_GUIDE.md', 'TESTING_PLAN.md'])
-
 /**
  * Whether one tracked path, as `git ls-tree` prints it, belongs in the public
  * repo. `assets/` holds gigabytes of art including explicit images, so it is
- * allowlisted: a folder added there is private until this says otherwise,
- * `private/` is the folder for records that stay in this repo, and `testsave/`
- * is the generator harness's own fixture data.
+ * allowlisted: a folder added there is private until this names it. Under
+ * `sound/`, the `music/` and `ambient_music/` folders stay private because
+ * their licence does not allow redistribution. `private/` holds records that
+ * stay in this repo.
  */
 export function isPublic(path) {
   if (path.startsWith('private/')) return false
-  if (path.startsWith('testsave/')) return false
   if (path.startsWith('.github/')) return false
   if (path.startsWith('build/itch-page/')) return false
-  if (PRIVATE_DOCS.has(path)) return false
   if (path.startsWith('assets/')) {
     const rest = path.slice('assets/'.length)
     if (!rest.includes('/')) return true
+    if (rest.startsWith('sound/')) {
+      return !rest.startsWith('sound/music/') && !rest.startsWith('sound/ambient_music/')
+    }
     return (
       rest.startsWith('workflows/') ||
-      rest.startsWith('pose/skeletons/') ||
-      rest === 'pose/pose.json'
+      rest.startsWith('bg/') ||
+      rest.startsWith('bg_thumbs/') ||
+      rest.startsWith('pose/')
     )
   }
   return true
@@ -109,7 +109,15 @@ async function refExists(ref) {
 
 /** Brings `refs/public/main` up to date, answering whether the remote has a main. */
 async function fetchMirror() {
-  const fetched = await capture('git', ['fetch', PUBLIC_REPO, `+refs/heads/main:${MIRROR_REF}`])
+  // Only the tip commit and its tree are needed (the trailer and the tree
+  // comparison); the push excludes the mirror's objects by sha, so its ~2 GB
+  // of art is never downloaded.
+  const fetched = await capture('git', [
+    'fetch',
+    '--filter=blob:none',
+    PUBLIC_REPO,
+    `+refs/heads/main:${MIRROR_REF}`
+  ])
   if (fetched.code === 0) return true
   // An empty public repo is the first-sync case; auth and network failures are not.
   if (!/couldn.t find remote ref/i.test(fetched.err)) {
@@ -159,13 +167,10 @@ function assertNothingPrivate(paths) {
     const underAssets = path.startsWith('assets/')
     const allowedAsset =
       /^assets\/[^/]+$/.test(path) ||
-      path.startsWith('assets/workflows/') ||
-      path.startsWith('assets/pose/skeletons/') ||
-      path === 'assets/pose/pose.json'
+      /^assets\/(workflows|bg|bg_thumbs|pose)\//.test(path) ||
+      (/^assets\/sound\//.test(path) && !/^assets\/sound\/(music|ambient_music)\//.test(path))
     if (
-      PRIVATE_DOCS.has(path) ||
       path.startsWith('private/') ||
-      path.startsWith('testsave/') ||
       path.startsWith('.github/') ||
       path.startsWith('build/itch-page/') ||
       (underAssets && !allowedAsset)

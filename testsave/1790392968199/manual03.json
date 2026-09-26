@@ -1,0 +1,3764 @@
+{
+  "schemaVersion": 12,
+  "stats": {
+    "brain": 45,
+    "body": 44,
+    "heart": 43
+  },
+  "money": 1563,
+  "bio": "",
+  "tallies": {
+    "moneyEarned": 1536,
+    "kisses": 0,
+    "sex": 0,
+    "shiftsWorked": 14,
+    "tokensGenerated": 360233
+  },
+  "date": 51,
+  "time": 0,
+  "charInfo": {
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "memories": [
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader cheered her on while she worked in Foundations of Percussive Grooves"
+        },
+        {
+          "date": 10,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 17,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 24,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 31,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 38,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 39,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 45,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Foundations of Percussive Grooves"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": true,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "club_apogee",
+        "shifts": [
+          3,
+          11
+        ]
+      },
+      "feed": [
+        {
+          "id": "eb5ad441-cfe0-4db3-9312-efa665027beb",
+          "text": "slept 14 hours straight don't call me",
+          "date": -44,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "ce2df331-992b-4d86-b8cd-ca7ff7b9f166",
+          "text": "messing with some bass riffs on the floor",
+          "date": -34,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "24a3e7da-8208-49ab-9646-a01bcd420d33",
+          "text": "rainy days are for blankets and bad movies ☔",
+          "date": 6,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "b4425f2e-65d7-4f1a-9363-fc8d120b337c",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 7,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "0f63bd72-573b-46d2-bd66-eebefb39d9a3",
+          "text": "rain again?? my umbrella has officially given up 😩",
+          "date": 17,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "d21df09c-a58a-4c1e-8f36-eceec5f81665",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 20,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "2649cda6-c29e-4c87-866a-196137746f03",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 23,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "e27c920c-9c06-48d1-8144-138509a33271",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 27,
+          "time": 0,
+          "likes": 6
+        },
+        {
+          "id": "3ffe7740-a638-4ac5-b2b1-28e214b19471",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 28,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "c8074238-334e-4000-a4ee-f2a6af93655f",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 30,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "bd695d3d-aa7b-4b15-912e-91b68a0d3232",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 38,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "3b5386e1-93da-4ce9-b539-a23558f94c99",
+          "text": "rain again?? my umbrella has officially given up 😩",
+          "date": 43,
+          "time": 1,
+          "likes": 5
+        }
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        6
+      ],
+      "ignoredInvitation": false
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "memories": [],
+      "flags": {
+        "hasMet": false,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": false,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": false,
+      "gifts": [],
+      "job": {
+        "jobId": "cutetea",
+        "shifts": [
+          4,
+          6
+        ]
+      },
+      "feed": [
+        {
+          "id": "5be16426-2793-4c1b-b0e7-8668faaf84cb",
+          "text": "omg new lip tint review is live!",
+          "date": -47,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "4b380a02-5c61-4b2d-af8e-36a1b02ef236",
+          "text": "sub count went up while i was asleep 😭✨",
+          "date": -18,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "38da41e6-a65c-45c6-886a-509fa87b7ce9",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 5,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "861abe92-0f9a-4a52-a034-7e54abfded07",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 11,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "82f0376c-65fb-41fc-80b7-66ad97b276b8",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 12,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "e41f4d31-bac6-4f75-9d6c-af4c0067d2fa",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 13,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "0d2b42ea-2e39-47da-a0e5-deb6f1958e23",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 20,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "1d8c6771-d03e-4eb2-8ad5-8be891804a8a",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 22,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "dab05259-6f13-48bb-bb18-e9bc6d74e679",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 28,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "9cb27adc-46f1-4e4f-84c5-b6b84ebaa7c2",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 29,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "c6c48edb-104a-4541-ab40-f58e2f7886a8",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 33,
+          "time": 0,
+          "likes": 6
+        },
+        {
+          "id": "1796ab4a-b2f7-43ba-8305-868d2d4d008d",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 36,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "e867a898-90b1-4cd9-af4f-efd7af2757a3",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 39,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "f480638c-66a9-4be0-9af5-c391098d1c95",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 41,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "c01f98f9-c47a-4927-beb2-f326b1ab242e",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 43,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "2c9ec29e-e2c6-4d7d-ac4d-28f6392b1608",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 48,
+          "time": 0,
+          "likes": 6
+        }
+      ]
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "memories": [
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 10,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 12,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 17,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 24,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 31,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 38,
+          "type": "liked",
+          "desc": "the reader compared notes with her in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 46,
+          "type": "liked",
+          "desc": "the reader spent the evening having dinner with her at Bobby's Diner and walked her back afterward"
+        },
+        {
+          "date": 50,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": true,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "feed": [
+        {
+          "id": "c31844c8-99a0-4fbd-91d8-4b982d5a1df8",
+          "text": "whose idea was four rounds of tequila",
+          "date": -35,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "9f4c42c4-f30c-40df-a8c7-a3f21efa064b",
+          "text": "i need three gallons of water and a new brain",
+          "date": -15,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "84bb04ba-bdbd-4c12-a68c-4dc36e1a1e7e",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 1,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "bcce95cf-7534-41bc-941c-5e56789ac200",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 3,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "fcdd8839-a548-4782-83db-f58725617737",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 5,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "b3b098f7-f4f5-416e-97b6-ce0eec7223c4",
+          "text": "rainy days are for blankets and bad movies ☔",
+          "date": 7,
+          "time": 0,
+          "likes": 0
+        },
+        {
+          "id": "2fc935c0-9f4f-429e-896b-451a23eabe13",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 13,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "c293fe74-1fde-4499-8016-e5c4444f1c11",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 14,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "0c61fa7a-b9f1-4825-b03c-663487dc2008",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 20,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "df96bbbf-e3d8-4c0f-aca9-7023bf235b3a",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 20,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "19bb554c-af5a-459e-8aa8-85cf1f7a679f",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 27,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "a72bb435-b8f7-412d-99a2-db2136dd8d14",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 28,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "9bb63ae0-43f8-422f-a61d-45bd496ea3e1",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 29,
+          "time": 1,
+          "likes": 5
+        },
+        {
+          "id": "9993e617-7553-47af-a93b-b56dd9788109",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 31,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "2c6b26b4-dec7-4397-90fe-cc3cea870a81",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 32,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "8e175f61-e73a-4a57-a0b8-dfc788884257",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 36,
+          "time": 0,
+          "likes": 6
+        },
+        {
+          "id": "eb3b6d44-a557-4f7f-90e9-ea23b1eb811a",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 37,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "7bae875b-4725-4ebf-b260-02fefc2af829",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 39,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "8dd63fad-78cc-4795-b62e-8d54d0713a53",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 43,
+          "time": 0,
+          "likes": 6
+        },
+        {
+          "id": "f0f91637-4734-43d1-a523-192cc86903b4",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 45,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "1fa043c9-85f4-46e7-b723-b429cf37591e",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 45,
+          "time": 1,
+          "likes": 5
+        },
+        {
+          "id": "2137652c-2c41-4d0e-87be-aab167bda488",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 49,
+          "time": 1,
+          "likes": 5
+        }
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        7,
+        9
+      ],
+      "ignoredInvitation": true
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "memories": [
+        {
+          "date": 7,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 7,
+          "type": "liked",
+          "desc": "the reader kept pace with her through every drill in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 14,
+          "type": "liked",
+          "desc": "the reader kept pace with her through every drill in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 21,
+          "type": "liked",
+          "desc": "the reader partnered with her for drills in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 35,
+          "type": "liked",
+          "desc": "the reader kept pace with her through every drill in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 42,
+          "type": "liked",
+          "desc": "the reader partnered with her for drills in Self-Defense and Combative Arts"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": true,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "springmart",
+        "shifts": [
+          2,
+          11
+        ]
+      },
+      "feed": [
+        {
+          "id": "54f4d69f-7195-41ce-b5af-240556616ff1",
+          "text": "baked cinnamon scones for the neighbors 🌸",
+          "date": -35,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "2ec58aa3-e6ee-4fe8-b4c1-4ebcd3bb17fe",
+          "text": "my windowsill lavender is finally blooming!",
+          "date": -29,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "ad943060-1eac-47b5-a2cd-113ef8973f06",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 2,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "4e06d9a7-ad4d-42ea-bf26-869b04495856",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 2,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "6105ee6b-d58e-49a7-b674-60f77586d7bd",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 4,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "1746c498-ce98-472b-be1f-dd08cb0b034e",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 5,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "f33ac34f-8fae-42f4-afe9-cc40a4cc9bf7",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 6,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "acd70607-5b93-4fc9-9016-cc4cda2ebecf",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 11,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "48e46318-668c-4791-ac3f-0298b4a459ed",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 31,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "b47f74ff-1684-4e86-b46e-7f36dacdb8ae",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 33,
+          "time": 1,
+          "likes": 2
+        }
+      ],
+      "seenOutfits": [
+        "pe"
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        0
+      ]
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f": {
+      "memories": [
+        {
+          "date": 2,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 2,
+          "type": "liked",
+          "desc": "the reader compared notes with her in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 9,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 16,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 23,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 29,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 30,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 33,
+          "type": "liked",
+          "desc": "the reader listened to her talk about her week while ordering the Egghead Omelette at Bobby's Diner"
+        },
+        {
+          "date": 37,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 43,
+          "type": "liked",
+          "desc": "the reader listened to her talk about her week while getting bubble tea at CuteTea"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": true,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "kendall_library",
+        "shifts": [
+          7
+        ],
+        "startsOn": 10
+      },
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        3,
+        4,
+        10
+      ],
+      "feed": [
+        {
+          "id": "3f8d7a41-4a99-41ea-b459-1593ed0af04d",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 16,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "43d9497c-e8ae-4141-abfa-f9b83e60a464",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 16,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "51567c64-30ca-43fb-9f10-f4bc7e78a14a",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 19,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "b9ddc005-7664-4eb3-8a1c-178532bbfc6c",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 29,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "0cde1576-572f-4f53-acde-c7fd5dbe8eea",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 35,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "0d2941df-61ea-4ce8-91bb-a533478c7bc1",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 36,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "d919956e-2994-4d12-9a13-397ffba3e2f6",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 36,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "62e5bafb-44bf-471d-901b-a6ea1523723f",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 42,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "ae75cda7-78de-4b44-881e-a88069ec9567",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 49,
+          "time": 1,
+          "likes": 4
+        }
+      ],
+      "ignoredInvitation": false
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "memories": [],
+      "flags": {
+        "hasMet": false,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": false,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": false,
+      "gifts": [],
+      "job": {
+        "jobId": "kendall_library",
+        "shifts": [
+          8
+        ]
+      },
+      "feed": [
+        {
+          "id": "2536c3f2-9575-4a29-ade6-0ff8c130b495",
+          "text": "hot cocoa and snowy walks ☕",
+          "date": -40,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "429a66d2-bbbc-41d1-8db5-0173a6bec250",
+          "text": "rewatching cozy romcoms in fuzzy socks",
+          "date": -18,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "62e3c1ef-12ea-43da-a345-4c692324c2b2",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 5,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "457d4a45-5075-4dfc-a210-2de2ee0f3363",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 11,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "77d8caa3-50bc-46f5-a986-68f89f51d228",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 12,
+          "time": 0,
+          "likes": 7
+        },
+        {
+          "id": "436aab29-a759-4028-bff6-84679e390be7",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 12,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "0b458f51-6274-4424-af14-015092321e19",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 15,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "58ca7e82-1711-4ef6-a04c-b9af9e67503c",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 21,
+          "time": 1,
+          "likes": 8
+        },
+        {
+          "id": "f8f417fe-00f6-4f6a-8176-ccf9e57b4532",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 31,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "e8ab7c5f-bcf1-4207-a1a0-9fdfab0e78aa",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 34,
+          "time": 1,
+          "likes": 6
+        },
+        {
+          "id": "f0694621-b935-4ee5-b885-7accaa07f5ac",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 37,
+          "time": 1,
+          "likes": 5
+        },
+        {
+          "id": "dd8f5aec-0672-4241-a10f-856310139190",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 43,
+          "time": 0,
+          "likes": 7
+        },
+        {
+          "id": "0f7be6a9-0f82-4df3-9195-95722e0267d7",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 45,
+          "time": 0,
+          "likes": 9
+        }
+      ]
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+      "memories": [
+        {
+          "date": 0,
+          "type": "disliked",
+          "desc": "the reader made a bad first impression on her"
+        },
+        {
+          "date": 0,
+          "type": "disliked",
+          "desc": "the reader kept checking the reader's phone while hanging out with her on the Venus Quad"
+        },
+        {
+          "date": 2,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 4,
+          "type": "liked",
+          "desc": "the reader served her with a smile at Fast Eats"
+        },
+        {
+          "date": 6,
+          "type": "liked",
+          "desc": "the reader served her with a smile at Fast Eats"
+        },
+        {
+          "date": 9,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 11,
+          "type": "liked",
+          "desc": "the reader slipped her extra napkins and a smile at Fast Eats"
+        },
+        {
+          "date": 12,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 13,
+          "type": "liked",
+          "desc": "the reader slipped her extra napkins and a smile at Fast Eats"
+        },
+        {
+          "date": 16,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 20,
+          "type": "liked",
+          "desc": "the reader served her with a smile at Fast Eats"
+        },
+        {
+          "date": 23,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 30,
+          "type": "disliked",
+          "desc": "the reader kept tapping the reader's pen next to her all through Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 30,
+          "type": "liked",
+          "desc": "the reader listened to her talk about her week while going for a run on the Palaestra track"
+        },
+        {
+          "date": 34,
+          "type": "liked",
+          "desc": "the reader served her with a smile at Fast Eats"
+        },
+        {
+          "date": 37,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Studies in Classical Drama and Tragedy"
+        },
+        {
+          "date": 41,
+          "type": "liked",
+          "desc": "the reader served her with a smile at Fast Eats"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": true,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "fast_eats",
+        "shifts": [
+          13
+        ],
+        "startsOn": 7
+      },
+      "crushHint": {
+        "met": true
+      },
+      "feed": [
+        {
+          "id": "711fe85a-dce2-4deb-aa59-fb28d80b499d",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 1,
+          "time": 0,
+          "likes": 0
+        },
+        {
+          "id": "8baa9646-20fa-46ac-b75a-9bdf0151b0e5",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 10,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "4814c2c8-a184-48a4-ab69-028e1271a61c",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 16,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "261af942-d972-46c5-bd03-60eb6a4ad577",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 25,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "474d5a68-c346-453f-89cd-716624270c0c",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 28,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "6c389166-cb65-4925-8b80-29b2b9f79404",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 33,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "40d5afc4-a6ab-4e05-8e24-d9699f4950f7",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 38,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "009220ec-a9d5-4b12-a1e9-ca179b4a841c",
+          "text": "rainy days are for blankets and bad movies ☔",
+          "date": 39,
+          "time": 1,
+          "likes": 3
+        }
+      ],
+      "metSlots": [
+        4,
+        5,
+        8,
+        12
+      ],
+      "ignoredInvitation": false
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "memories": [
+        {
+          "date": 27,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 27,
+          "type": "liked",
+          "desc": "the reader listened to her talk about her week while eating fish head soup at the Eastern Buffet"
+        },
+        {
+          "date": 34,
+          "type": "disliked",
+          "desc": "the reader kept checking the reader's phone while protein-loading at the Eastern Buffet with her"
+        },
+        {
+          "date": 49,
+          "type": "liked",
+          "desc": "the reader spent the day at Silk River Stroll with her and kept her laughing"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "palaestra",
+        "shifts": [
+          0,
+          10
+        ]
+      },
+      "feed": [
+        {
+          "id": "3beb83c4-95ed-4e5a-8e6b-a989456e426c",
+          "text": "six miles in freezing rain done",
+          "date": -41,
+          "time": 0,
+          "likes": 0
+        },
+        {
+          "id": "1dc99fd2-4463-42bd-a719-298f2b752278",
+          "text": "don't slack off just because it's break",
+          "date": -19,
+          "time": 1,
+          "likes": 0
+        },
+        {
+          "id": "8953e5b0-dbdf-40a0-8ab4-d56db7339ccb",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 5,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "8ac0deb6-166c-4702-81a6-706b706d3e3f",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 6,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "0209d1bc-147e-47c8-b7c5-16e0635e02ee",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 12,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "365b3bc8-89b8-40a9-a179-94f6ffd279b5",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 28,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "2a11eeea-b5a7-466a-9342-107ac7615766",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 31,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "3b9cc025-a6c1-4e77-92bc-671d86d592f8",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 34,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "b8fc7d08-d136-4f97-ab6f-2865cae48a4c",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 36,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "630cff28-857e-47e0-a7a9-4a0c7720a992",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 51,
+          "time": 0,
+          "likes": 2
+        }
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        0,
+        13
+      ]
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "memories": [
+        {
+          "date": 1,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 1,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 8,
+          "type": "disliked",
+          "desc": "the reader kept tapping the reader's pen next to her all through Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 10,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Foundations of Percussive Grooves"
+        },
+        {
+          "date": 12,
+          "type": "liked",
+          "desc": "the reader spent the day swimming laps with her at the Palaestra pool and kept her laughing"
+        },
+        {
+          "date": 15,
+          "type": "liked",
+          "desc": "the reader compared notes with her in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 17,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Foundations of Percussive Grooves"
+        },
+        {
+          "date": 22,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 24,
+          "type": "liked",
+          "desc": "the reader traded ideas with her about the Foundations of Percussive Grooves project"
+        },
+        {
+          "date": 29,
+          "type": "liked",
+          "desc": "the reader compared notes with her in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 31,
+          "type": "liked",
+          "desc": "the reader cheered her on while she worked in Foundations of Percussive Grooves"
+        },
+        {
+          "date": 32,
+          "type": "liked",
+          "desc": "the reader spent the evening swimming laps with her at the Palaestra pool and walked her back afterward"
+        },
+        {
+          "date": 36,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 38,
+          "type": "liked",
+          "desc": "the reader cheered her on while she worked in Foundations of Percussive Grooves"
+        },
+        {
+          "date": 42,
+          "type": "liked",
+          "desc": "the reader spent the evening getting bubble tea with her at CuteTea and kept her laughing"
+        },
+        {
+          "date": 45,
+          "type": "liked",
+          "desc": "the reader cheered her on while she worked in Foundations of Percussive Grooves"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": true,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": true,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "feed": [
+        {
+          "id": "f721895d-d47f-42b2-bcc5-4a9710f05a8a",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 1,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "efe31366-04bd-4052-9344-8bc0363e807e",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 4,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "4b0997bf-dcd9-44e9-97fb-1f45df4a222d",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 4,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "d7d57d45-7477-4b9f-a4a4-1ff1cda28c46",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 12,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "907185ef-75b9-44c0-8756-15d09dc75496",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 34,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "cd6732e2-6fee-49c9-a222-fe458bdaf718",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 47,
+          "time": 0,
+          "likes": 7
+        }
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        1,
+        2,
+        6,
+        9,
+        10
+      ],
+      "seenOutfits": [
+        "swim"
+      ]
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "memories": [
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 3,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 10,
+          "type": "disliked",
+          "desc": "the reader kept tapping the reader's pen next to her all through Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 17,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 24,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 31,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Fermentation Science and Mixology Basics"
+        },
+        {
+          "date": 38,
+          "type": "liked",
+          "desc": "the reader shared the reader's notes with her in Fermentation Science and Mixology Basics"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "agora_tutoring",
+        "shifts": [
+          12,
+          13
+        ]
+      },
+      "feed": [
+        {
+          "id": "19bdbba7-945e-4f38-8b22-e88a614089ed",
+          "text": "reading ahead for honors seminar",
+          "date": -40,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "5486948d-95da-4e0c-af9a-54336a3b8601",
+          "text": "the silence of snow is comforting",
+          "date": -37,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "5a9b41f4-d8cf-4b5f-9666-3d686ad26c10",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 9,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "16b58304-0738-4393-b750-75d6ea4c06e6",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 13,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "748629fb-5790-4386-93f2-99672e90358e",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 22,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "2ccb1d5f-1688-41a4-a90a-f9de80aa77ef",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 26,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "9855e74a-f77d-4115-a245-1b00459b4748",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 29,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "9aa7da8d-8884-4f08-9dab-0c9d0231ccb6",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 29,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "18983dff-9b14-402a-a354-728ebec05669",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 36,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "267c6070-37ff-475b-9c08-326f40255c07",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 43,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "33c117ec-21b3-44a7-94e9-7100d9dd58bf",
+          "text": "rainy days are for blankets and bad movies ☔",
+          "date": 46,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "44946eec-4938-439b-92df-23dcfa17c738",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 48,
+          "time": 1,
+          "likes": 4
+        }
+      ],
+      "crushHint": {
+        "stat": "heart",
+        "tier": 2
+      },
+      "metSlots": [
+        7
+      ]
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639": {
+      "memories": [
+        {
+          "date": 28,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 28,
+          "type": "liked",
+          "desc": "the reader worked on the reader's Foundations of Percussive Grooves project in the practice room with her for company"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": false,
+        "gaveContactInfo": false,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "job": {
+        "jobId": "lumiere",
+        "shifts": [
+          11,
+          13
+        ]
+      },
+      "feed": [
+        {
+          "id": "8f8a274d-6baf-4391-88e1-0a0ce33efbaf",
+          "text": "working through break as usual",
+          "date": -45,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "627db91b-5c9c-437c-a59e-a5970ca2a852",
+          "text": "perfection demands endless revision",
+          "date": -11,
+          "time": 1,
+          "likes": 4
+        },
+        {
+          "id": "a7e80dcf-9def-4cbf-9cb3-82ad173414da",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 1,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "c096e32e-abdc-4bda-90e8-4636a5c91277",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 4,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "6978e651-fffb-4518-9e49-d0d8932dd19b",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 15,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "d969e333-f1e3-40e9-9100-c7ebcf241be8",
+          "text": "someone in my hall is playing guitar and honestly it's kind of nice 🎸",
+          "date": 22,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "599d5032-a7d4-4472-8f09-06a570ca1b55",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 33,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "2814f869-b4ab-4411-8b89-e5a76e3e0f96",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 36,
+          "time": 0,
+          "likes": 5
+        },
+        {
+          "id": "930149b9-104a-47fd-8a14-cd50b4163c7e",
+          "text": "rain again?? my umbrella has officially given up 😩",
+          "date": 46,
+          "time": 0,
+          "likes": 3
+        }
+      ],
+      "crushHint": {
+        "stat": "heart",
+        "tier": 2
+      },
+      "metSlots": [
+        0
+      ]
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074": {
+      "memories": [
+        {
+          "date": 1,
+          "type": "liked",
+          "desc": "the reader made a good first impression on her"
+        },
+        {
+          "date": 1,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 7,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was demonstrating a drill in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 8,
+          "type": "liked",
+          "desc": "the reader helped her catch up on what she missed in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 12,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 14,
+          "type": "liked",
+          "desc": "the reader partnered with her for drills in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 15,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 19,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 21,
+          "type": "liked",
+          "desc": "the reader kept pace with her through every drill in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 22,
+          "type": "liked",
+          "desc": "the reader made her laugh during a slow stretch of Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 28,
+          "type": "disliked",
+          "desc": "the reader ignored her text"
+        },
+        {
+          "date": 29,
+          "type": "disliked",
+          "desc": "the reader zoned out while she was presenting in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 35,
+          "type": "liked",
+          "desc": "the reader partnered with her for drills in Self-Defense and Combative Arts"
+        },
+        {
+          "date": 36,
+          "type": "liked",
+          "desc": "the reader compared notes with her in Global Survey of Art History: Antiquity to Renaissance"
+        },
+        {
+          "date": 42,
+          "type": "liked",
+          "desc": "the reader partnered with her for drills in Self-Defense and Combative Arts"
+        }
+      ],
+      "flags": {
+        "hasMet": true,
+        "hasCrush": false,
+        "friendZoned": false,
+        "friendZonedBy": false,
+        "isLover": false,
+        "brokenUp": 0,
+        "hasKissed": false,
+        "hadSex": false,
+        "benefits": false,
+        "harem": true,
+        "gaveContactInfo": true,
+        "blocked": false,
+        "knowsTraits": false,
+        "knowsBackstory": false,
+        "knowsLoveLife": false
+      },
+      "nameKnown": true,
+      "gifts": [],
+      "feed": [
+        {
+          "id": "dba22c22-bea6-49bc-a3a1-5b1e562bda5c",
+          "text": "museum galas are so dreadfully tedious",
+          "date": -43,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "5be0b469-e126-420f-85c1-2d237863c04b",
+          "text": "a vintage bordeaux cures almost everything",
+          "date": -22,
+          "time": 1,
+          "likes": 0
+        },
+        {
+          "id": "496d1c2d-12bf-4832-a3f6-a830359c3f2e",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 3,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "0653dd7f-dae4-41b8-941d-41d9d5d6caeb",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 9,
+          "time": 1,
+          "likes": 0
+        },
+        {
+          "id": "6055f8d7-a81b-470c-a98a-0a9d1b9044c1",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 16,
+          "time": 0,
+          "likes": 3
+        },
+        {
+          "id": "a7b88290-7aeb-4a2c-a0ef-4fa55c10de89",
+          "text": "why is the library always freezing. bringing a blanket next time 🥶",
+          "date": 20,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "d75d5b1d-3ad7-4928-b290-24831601ed7b",
+          "text": "found the best bench on the quad and i'm not telling anyone where 🌸",
+          "date": 31,
+          "time": 0,
+          "likes": 1
+        },
+        {
+          "id": "f985226e-d544-47e3-a1a6-eb2b8baede65",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 31,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "ae5725d8-2c43-4971-bca9-57dd1e3e0545",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 33,
+          "time": 1,
+          "likes": 1
+        },
+        {
+          "id": "a031edd3-ec04-499e-87ee-b03a1178ff5f",
+          "text": "trying to be productive tonight. key word trying 📚",
+          "date": 34,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "2ef363d2-febc-45b9-8415-5bc2ce61cfdd",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 38,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "1864620a-bfed-4819-a1a4-b42a6d60f36c",
+          "text": "the lowrise roof at sunset hits different 🌇",
+          "date": 42,
+          "time": 1,
+          "likes": 2
+        },
+        {
+          "id": "ad42b021-5d6b-48c2-b9f0-7eb8fbd67550",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 45,
+          "time": 0,
+          "likes": 4
+        },
+        {
+          "id": "2cd184f1-055a-45e5-aee2-bec426bfc561",
+          "text": "iced coffee and a window seat. perfect way to start the day ☕",
+          "date": 49,
+          "time": 0,
+          "likes": 2
+        },
+        {
+          "id": "5c4aea59-ad96-4be0-a9dc-5a95db8d1267",
+          "text": "late night snack run was a mistake. zero regrets though 🍜",
+          "date": 49,
+          "time": 1,
+          "likes": 3
+        },
+        {
+          "id": "fcfb58ad-3e8c-45f3-800b-8af12733fbcb",
+          "text": "three classes and a nap. that's the plan and i'm sticking to it",
+          "date": 50,
+          "time": 0,
+          "likes": 2
+        }
+      ],
+      "crushHint": {
+        "met": true
+      },
+      "metSlots": [
+        0,
+        2
+      ],
+      "seenOutfits": [
+        "pe"
+      ],
+      "ignoredInvitation": false
+    }
+  },
+  "playerSchedule": {
+    "0": "PED 140",
+    "2": "ARH 101",
+    "4": "LIT 330",
+    "6": "MUS 180",
+    "7": "MSC 112"
+  },
+  "history": {
+    "0": {
+      "0": "The reader spent the day hanging out with Ingrid Gingham on the Venus Quad. Ingrid seemed a little put off by the end of it.",
+      "1": "The reader spent the evening alone in his dorm room reviewing his lecture notes. He came out of it feeling a little sharper."
+    },
+    "1": {
+      "0": "The reader sat through Professor Johnson's first Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. Professor Johnson walked everyone through the syllabus and the exam dates. Celest compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and core work. He came out of it feeling a little stronger."
+    },
+    "2": {
+      "0": "The reader sat through Professor Ito's first Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. Professor Ito walked everyone through the syllabus and the exam dates. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "3": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov assigned the midterm showcase project. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's first Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. Professor Ivanov walked everyone through the syllabus and the exam dates. April compared notes with him afterward."
+    },
+    "4": {
+      "0": "The reader worked his 1st shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. The rush never let up, but every order went out.",
+      "1": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+    },
+    "5": {
+      "0": "The reader spent the day alone in his dorm room stretching and do core work. He came out of it feeling a little stronger.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "6": {
+      "0": "The reader worked his 2nd shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. It was a long shift, and he clocked out tired but steady.",
+      "1": "The reader spent the evening alone in his dorm room stretching and do core work. He came out of it feeling a little stronger."
+    },
+    "7": {
+      "0": "The reader ran drills in Coach Orlov's Self-Defense and Combative Arts class with Livvie Tierra and Isabelle Carmen in the Palaestra gym. Coach Orlov kept everyone moving until the whole class was out of breath. Livvie high-fived him on the way out.",
+      "1": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+    },
+    "8": {
+      "0": "The reader sat through Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. He came away with one fact worth remembering: Egyptian reliefs show the head in profile and the torso from the front.",
+      "1": "The reader spent the evening alone in his dorm room practising small talk out loud. He came out of it feeling a little more sure of himself."
+    },
+    "9": {
+      "0": "The reader sat through Professor Ito's Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. He came away with one fact worth remembering: Aristotle's Poetics says tragedy brings about catharsis through pity and fear. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening picking up some new books at Freights on his own. He came out of it feeling a little sharper."
+    },
+    "10": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov checked in on everyone's progress. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. He came away with one fact worth remembering: Saccharomyces cerevisiae is the yeast behind most ales, wines and breads. April compared notes with him afterward."
+    },
+    "11": {
+      "0": "The reader worked his 3rd shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. The rush never let up, but every order went out.",
+      "1": "The reader spent the evening alone in his dorm room practising small talk out loud. He came out of it feeling a little more sure of himself."
+    },
+    "12": {
+      "0": "The reader spent the day swimming laps with Celest Morokova at the Palaestra pool. It was easy company, and Celest left smiling.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and core work. He came out of it feeling a little stronger."
+    },
+    "13": {
+      "0": "The reader worked his 4th shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. The rush never let up, but every order went out.",
+      "1": "The reader spent the evening doing some open-air studying at Green Hill Park on his own. He came out of it feeling a little sharper."
+    },
+    "14": {
+      "0": "The reader ran drills in Coach Orlov's Self-Defense and Combative Arts class with Livvie Tierra and Isabelle Carmen in the Palaestra gym. Coach Orlov kept everyone moving until the whole class was out of breath. Livvie high-fived him on the way out.",
+      "1": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+    },
+    "15": {
+      "0": "The reader sat through Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. He came away with one fact worth remembering: A ziggurat was a stepped temple platform in ancient Mesopotamia. Celest compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and lift his dumbbells. He came out of it feeling a little stronger."
+    },
+    "16": {
+      "0": "The reader sat through Professor Ito's Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. He came away with one fact worth remembering: Hamartia is the error or flaw that brings about the tragic hero's downfall. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening trying to pick up girls at Club Apogee on his own. He came out of it feeling a little more sure of himself."
+    },
+    "17": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov checked in on everyone's progress. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. He came away with one fact worth remembering: Lager yeast ferments at cooler temperatures than ale yeast. April compared notes with him afterward."
+    },
+    "18": {
+      "0": "The reader worked his 5th shift as a Crew Member at Fast Eats. It was a long shift, and he clocked out tired but steady.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "19": {
+      "0": "The reader spent the day alone in his dorm room stretching and do core work. He came out of it feeling a little stronger.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "20": {
+      "0": "The reader worked his 6th shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. It was a long shift, and he clocked out tired but steady.",
+      "1": "The reader spent the evening alone in his dorm room studying his flashcards. He came out of it feeling a little sharper."
+    },
+    "21": {
+      "0": "The reader ran drills in Coach Orlov's Self-Defense and Combative Arts class with Livvie Tierra and Isabelle Carmen in the Palaestra gym. Coach Orlov kept everyone moving until the whole class was out of breath. Livvie high-fived him on the way out.",
+      "1": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+    },
+    "22": {
+      "0": "The reader sat through Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. He came away with one fact worth remembering: Babylon's Ishtar Gate was built under Nebuchadnezzar II. Celest compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room practising small talk out loud. He came out of it feeling a little more sure of himself."
+    },
+    "23": {
+      "0": "The reader sat through Professor Ito's Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. He came away with one fact worth remembering: Anagnorisis is the moment a tragic character recognizes the truth. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room stretching and do core work. He came out of it feeling a little stronger."
+    },
+    "24": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov checked in on everyone's progress. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. He came away with one fact worth remembering: Malting sprouts barley so its enzymes can convert starch into fermentable sugar."
+    },
+    "25": {
+      "0": "The reader worked his 7th shift as a Crew Member at Fast Eats. The dinner crowd kept him on his feet the whole time.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and lift his dumbbells. He came out of it feeling a little stronger."
+    },
+    "26": {
+      "0": "The reader spent the day alone in his dorm room rehearsing conversation openers in the mirror. He came out of it feeling a little more sure of himself.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and lift his dumbbells. He came out of it feeling a little stronger."
+    },
+    "27": {
+      "0": "The reader worked his 8th shift as a Crew Member at Fast Eats. The rush never let up, but every order went out.",
+      "1": "The reader spent the evening eating fish head soup at the Eastern Buffet with Gwen Haewon. They talked until the night ran out, and Gwen said she had fun."
+    },
+    "28": {
+      "0": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room with Florentine Chastain keeping him company. He got a solid stretch of work done.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing conversation openers in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "29": {
+      "0": "The reader sat through Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. He came away with one fact worth remembering: The Parthenon in Athens was dedicated to the goddess Athena. Celest compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing conversation openers in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "30": {
+      "0": "The reader sat through Professor Ito's Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. He came away with one fact worth remembering: Peripeteia is the sudden reversal of the hero's fortune. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening going for a run with Ingrid Gingham on the Palaestra track. It was easy company, and Ingrid left smiling."
+    },
+    "31": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov checked in on everyone's progress. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. He came away with one fact worth remembering: Hops give beer bitterness and aroma and help preserve it. April compared notes with him afterward."
+    },
+    "32": {
+      "0": "The reader worked his 9th shift as a Crew Member at Fast Eats. The dinner crowd kept him on his feet the whole time.",
+      "1": "The reader spent the evening swimming laps with Celest Morokova at the Palaestra pool. It was easy company, and Celest left smiling."
+    },
+    "33": {
+      "0": "The reader spent the day ordering the Egghead Omelette at Bobby's Diner with Morgana Notte. Morgana laughed more than she expected to, and they parted on a high note.",
+      "1": "The reader spent the evening alone in his dorm room doing push-ups and core work. He came out of it feeling a little stronger."
+    },
+    "34": {
+      "0": "The reader worked his 10th shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. The rush never let up, but every order went out.",
+      "1": "The reader spent the evening protein-loading at the Eastern Buffet with Gwen Haewon. Gwen seemed a little put off by the end of it."
+    },
+    "35": {
+      "0": "The reader ran drills in Coach Orlov's Self-Defense and Combative Arts class with Livvie Tierra and Isabelle Carmen in the Palaestra gym. Coach Orlov kept everyone moving until the whole class was out of breath. Livvie high-fived him on the way out.",
+      "1": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+    },
+    "36": {
+      "0": "The reader sat through Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture with Celest Morokova and Isabelle Carmen in the lecture hall. He came away with one fact worth remembering: The three classical Greek orders are Doric, Ionic and Corinthian. Celest compared notes with him afterward.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "37": {
+      "0": "The reader sat through Professor Ito's Studies in Classical Drama and Tragedy lecture with Morgana Notte and Ingrid Gingham in the lecture hall. He came away with one fact worth remembering: Hubris is the excessive pride that leads a hero to defy the gods. Morgana compared notes with him afterward.",
+      "1": "The reader spent the evening sketching the paintings at the Veridan Museum on his own. He came out of it feeling a little sharper."
+    },
+    "38": {
+      "0": "The reader worked through Professor Novikov's Foundations of Percussive Grooves session with Ami Holloway and Celest Morokova in the practice room. Professor Novikov checked in on everyone's progress. Ami asked how his project was coming along.",
+      "1": "The reader sat through Professor Ivanov's Fermentation Science and Mixology Basics lecture with April Valentine and Winter Yang in the lecture hall. He came away with one fact worth remembering: Malolactic fermentation converts sharp malic acid into softer lactic acid. April compared notes with him afterward."
+    },
+    "39": {
+      "0": "The reader worked his 11th shift as a Crew Member at Fast Eats. It was a long shift, and he clocked out tired but steady.",
+      "1": "The reader spent the evening alone in his dorm room stretching and do core work. He came out of it feeling a little stronger."
+    },
+    "40": {
+      "0": "The reader spent the day alone in his dorm room doing push-ups and lift his dumbbells. He came out of it feeling a little stronger.",
+      "1": "The reader spent the evening practicing piano in a Thorne Auditorium practice room on the Venus Quad on his own. He came out of it feeling a little sharper."
+    },
+    "41": {
+      "0": "The reader worked his 12th shift as a Crew Member at Fast Eats, serving Ingrid Gingham at the counter. The dinner crowd kept him on his feet the whole time.",
+      "1": "The reader spent the evening alone in his dorm room rehearsing small talk in the mirror. He came out of it feeling a little more sure of himself."
+    },
+    "42": {
+      "0": "The reader ran drills in Coach Orlov's Self-Defense and Combative Arts class with Livvie Tierra and Isabelle Carmen in the Palaestra gym. Coach Orlov kept everyone moving until the whole class was out of breath. Livvie high-fived him on the way out.",
+      "1": "The reader spent the evening getting bubble tea with Celest Morokova at CuteTea. They talked until the night ran out, and Celest said she had fun."
+    },
+    "43": {
+      "0": "The reader sat the midterm exam for Global Survey of Art History: Antiquity to Renaissance.",
+      "1": "The reader spent the evening getting bubble tea with Morgana Notte at CuteTea. It was easy company, and Morgana left smiling."
+    },
+    "44": {
+      "0": "The reader sat the midterm exam for Studies in Classical Drama and Tragedy.",
+      "1": "The reader spent the evening alone in his dorm room stretching and do core work. He came out of it feeling a little stronger."
+    },
+    "45": {
+      "0": "The reader presented his project at the Foundations of Percussive Grooves showcase with Ami Holloway and Celest Morokova in the practice room.",
+      "1": "The reader sat the midterm exam for Fermentation Science and Mixology Basics."
+    },
+    "46": {
+      "0": "The reader worked his 13th shift as a Crew Member at Fast Eats. The rush never let up, but every order went out.",
+      "1": "The reader spent the evening having dinner with April Valentine at Bobby's Diner. April laughed more than she expected to, and they parted on a high note."
+    },
+    "47": {
+      "0": "The reader spent the day alone in his dorm room reviewing his lecture notes. He came out of it feeling a little sharper.",
+      "1": "The reader spent the evening playing Wheel of Jeopardy at the BTB Arcade on his own. He came out of it feeling a little sharper."
+    },
+    "48": {
+      "0": "The reader worked his 14th shift as a Crew Member at Fast Eats. It was a long shift, and he clocked out tired but steady.",
+      "1": "The reader spent the evening hitting the weights in the Palaestra gym on his own. He came out of it feeling a little stronger."
+    },
+    "49": {
+      "0": "The reader spent the day at Silk River Stroll with Gwen Haewon. It was easy company, and Gwen left smiling.",
+      "1": "The reader spent the evening alone in his dorm room practising small talk out loud. He came out of it feeling a little more sure of himself."
+    },
+    "50": {
+      "0": "The reader spent the day alone in his dorm room doing push-ups and lift his dumbbells. He came out of it feeling a little stronger.",
+      "1": "The reader spent the evening alone in his dorm room studying his flashcards. He came out of it feeling a little sharper."
+    }
+  },
+  "bunnyboard": {
+    "conversations": {
+      "venus": {
+        "charId": "venus",
+        "messages": [
+          {
+            "id": "a91a33bb-80c0-4753-a01e-472334ed630c",
+            "sender": "contact",
+            "text": "Hi Theo! I'm Venus, the university's assistant. I can help you change your classes and will remind you of important dates coming up during the semester.",
+            "date": 0,
+            "time": 1
+          },
+          {
+            "id": "d30f1469-8ee2-4ede-8b1e-1fa37c346f99",
+            "sender": "contact",
+            "text": "If you want to change classes, you have until Friday, February 13 — the add/drop deadline — to change it. The button below will take you to the scheduling website.",
+            "date": 0,
+            "time": 1
+          },
+          {
+            "id": "05d3dcce-7b7e-47be-9412-00711132f808",
+            "sender": "contact",
+            "text": "Keep in mind that you need at least 3 regular classes plus a PE class to stay enrolled, 7 classes at most, and if you drop a class you won't be able to enroll in it again this semester.",
+            "date": 0,
+            "time": 1
+          },
+          {
+            "id": "49db7182-fe57-47a6-98fe-746f5f558621",
+            "sender": "contact",
+            "text": "Concordia et Prosperitas. Welcome to campus!",
+            "date": 0,
+            "time": 1
+          },
+          {
+            "id": "6709ff3a-f9bf-4a02-94f5-5910600f91e4",
+            "sender": "contact",
+            "text": "Hey Theo, did you know that there are many places on and off-campus that hire VU students?",
+            "date": 1,
+            "time": 1
+          },
+          {
+            "id": "4de16342-9cc6-4ca3-975e-7e19c78ffaba",
+            "sender": "contact",
+            "text": "Part-time employment isn't just a great way to put some extra dollars in your pocket. It's also a fun way to improve skills and meet people.",
+            "date": 1,
+            "time": 1
+          },
+          {
+            "id": "7f53fef1-5589-4f34-a48d-e03be26fbf83",
+            "sender": "contact",
+            "text": "Interested? I can help you apply for a part-time job. Just click the button below.",
+            "date": 1,
+            "time": 1
+          },
+          {
+            "id": "e68184f3-38b8-4483-a220-190ff98f7c38",
+            "sender": "contact",
+            "text": "How's your first week been, Theo? Remember to keep up with your coursework! By the way, there are two types of classes: lecture classes and project classes.",
+            "date": 8,
+            "time": 0
+          },
+          {
+            "id": "efc87769-bb7b-4825-aca3-3b7977827790",
+            "sender": "contact",
+            "text": "For lecture classes, you'll have a midterm and a final. Study hard and improve your Brains if you want a good grade. And if your professor says something will be on an exam, you should probably note it down.",
+            "date": 8,
+            "time": 0
+          },
+          {
+            "id": "2def6f91-8a19-4410-b321-e5ac70237e57",
+            "sender": "contact",
+            "text": "For project classes, you'll have a final showcase instead of an exam. If you work on your project every week, you'll avoid having to crunch when the deadline approaches. And it definitely helps to have high Heart so you can present your project effectively.",
+            "date": 8,
+            "time": 0
+          },
+          {
+            "id": "055e21d2-025d-43b5-9d18-d7c2778c837d",
+            "sender": "contact",
+            "text": "Midterms run March 2 to March 6. Good luck! Wishing you \"Concordia et Prosperitas.\"",
+            "date": 8,
+            "time": 0
+          },
+          {
+            "id": "2017712c-17e6-40ea-9006-fb9068f9bd47",
+            "sender": "contact",
+            "text": "Hi Theo! There's one week left before the add/drop deadline — Friday, February 13. If you'd like to make a change, you can tap on the button below to go to the scheduling website.",
+            "date": 18,
+            "time": 0
+          },
+          {
+            "id": "f673b767-d4ff-4d85-8f14-00e47c6ec6b0",
+            "sender": "contact",
+            "text": "Please remember that you won't be able to re-enroll in classes you've dropped.",
+            "date": 18,
+            "time": 0
+          },
+          {
+            "id": "9ee810cf-733d-45ae-8507-69e59e8480a8",
+            "sender": "contact",
+            "text": "One last reminder that today is the add/drop deadline. You won't be able to change your classes after today.",
+            "date": 25,
+            "time": 0
+          },
+          {
+            "id": "e62a23e0-e3fd-48d9-b694-ab9bf7db2cb7",
+            "sender": "contact",
+            "text": "Have you been studying hard, Theo? Midterms start next Monday and will run from March 2 to March 6. If you haven't finished your projects or still have low Brains, now is the time to catch up. Good luck!",
+            "date": 35,
+            "time": 0
+          }
+        ],
+        "unread": 15,
+        "summary": null
+      },
+      "bunnybot": {
+        "charId": "bunnybot",
+        "messages": [
+          {
+            "id": "057d80bb-3b36-49a3-92d3-14e84fc32f80",
+            "sender": "contact",
+            "text": "sup theo, i'm bunny_bot. your friends list is looking a little slim, huh? don't stress, i'm here to help",
+            "date": 1,
+            "time": 0
+          },
+          {
+            "id": "52e49eed-6609-48ac-831f-b088aa3d4adf",
+            "sender": "contact",
+            "text": "i suggested some people you may know on the friends tab... go ahead and send them a request. if they don't accept after a day or two, you probably need to work on your Heart or get closer to them offline",
+            "date": 1,
+            "time": 0
+          },
+          {
+            "id": "ec522199-d6c1-4b70-bc08-768e51e87898",
+            "sender": "contact",
+            "text": "you can also just ask people you meet for their number or contact info. i'll auto-add them to your contacts list",
+            "date": 1,
+            "time": 0
+          },
+          {
+            "id": "73887953-6aa0-45d8-8548-06edb74ccee2",
+            "sender": "contact",
+            "text": "nice job nabbing your first friend contact, hotshot. make sure to text them often (but not too often) to stay close",
+            "date": 3,
+            "time": 0
+          },
+          {
+            "id": "0343e6b8-f641-4d6b-89d5-667d2da1f4b9",
+            "sender": "contact",
+            "text": "and if you happen to have free time, why not ask them to hang out? though don't be surprised if you get turned down cuz they don't know you well enough yet",
+            "date": 3,
+            "time": 0
+          },
+          {
+            "id": "7c02f255-75b5-49ae-bb14-ed46f8807895",
+            "sender": "contact",
+            "text": "i also added the BunnyMap app to your sidebar, since you have access to their location updates now. i'm not saying to stalk them... i'm just letting you know where to hang out if you wanna run into them",
+            "date": 3,
+            "time": 0
+          },
+          {
+            "id": "0386fc1a-79f4-4cdc-a9eb-ef4568693432",
+            "sender": "contact",
+            "text": "have you been keeping up with the updates tab? looks like celest just posted",
+            "date": 4,
+            "time": 0
+          },
+          {
+            "id": "b23bde4e-0717-4c02-ac3c-b87022d4256b",
+            "sender": "contact",
+            "text": "why not go leave a like? people love getting a little love. liking old posts won't do much, but liking new ones will keep you on their radar",
+            "date": 4,
+            "time": 0
+          },
+          {
+            "id": "4c3cb4cd-452c-44d3-8a65-609863ab7218",
+            "sender": "contact",
+            "text": "that money burning a hole in your pocket yet? why not buy a gift for someone? i added the BunnyShop app to your sidebar just now",
+            "date": 5,
+            "time": 0
+          },
+          {
+            "id": "a57ec08a-6328-4935-82da-3810221a13d5",
+            "sender": "contact",
+            "text": "a gift is a great way to show your appreciation for someone and get closer to them... as long as you choose something they'd actually like",
+            "date": 5,
+            "time": 0
+          },
+          {
+            "id": "939b6de1-adbb-477a-9f1f-f2c7a0ce2afb",
+            "sender": "contact",
+            "text": "you can give a gift to a girl when you're meeting them face-to-face via the gift icon next to the response box",
+            "date": 5,
+            "time": 0
+          },
+          {
+            "id": "1cb50ac4-f230-4023-8bcf-bf34e7060498",
+            "sender": "contact",
+            "text": "not having much luck with the ladies yet? the first thing to try is to spend more time with them. but if that's not working, maybe you need to work on yourself",
+            "date": 12,
+            "time": 0
+          },
+          {
+            "id": "848bd1bf-1bca-4c2c-ac61-2441df692323",
+            "sender": "contact",
+            "text": "you have to be at least Good in a girl's preferred stat to catch their interest. for those with High Standards, you also have to be at least Decent in every other stat too",
+            "date": 12,
+            "time": 0
+          },
+          {
+            "id": "476f83c7-223f-44d2-bbe8-e3e02ba58759",
+            "sender": "contact",
+            "text": "and the better you are in their preferred stat, the better your chances will be",
+            "date": 12,
+            "time": 0
+          },
+          {
+            "id": "d7060b19-0f1b-468a-bc41-03e94e958d3f",
+            "sender": "contact",
+            "text": "also...",
+            "date": 12,
+            "time": 0
+          },
+          {
+            "id": "aa6b5f48-61c1-43d6-9b35-ada1a6294f41",
+            "sender": "contact",
+            "text": "okay hot stuff, looks like someone wants to hang out with you. if you're not feeling down for it, make sure to send them a text letting them know instead of ignoring them",
+            "date": 12,
+            "time": 0
+          }
+        ],
+        "unread": 16,
+        "summary": null
+      },
+      "job:fast_eats": {
+        "charId": "job:fast_eats",
+        "messages": [
+          {
+            "id": "43e77b93-9ca5-403a-814d-b7cb81600941",
+            "sender": "contact",
+            "text": "Dale the Man here, shift manager. Welcome aboard amigo, take it easy on your first shift alright?",
+            "date": 1,
+            "time": 1
+          },
+          {
+            "id": "e2e3711e-5f68-4e4e-a16a-18b7b0cb85d9",
+            "sender": "contact",
+            "text": "Pay raise from the Man to my rising burger star. Keep it up dude!",
+            "date": 11,
+            "time": 0
+          },
+          {
+            "id": "f87a4ed7-8167-4e73-9f78-8e915d2ceff1",
+            "sender": "contact",
+            "text": "Pay raise from the Man to my rising burger star. Keep it up dude!",
+            "date": 20,
+            "time": 0
+          },
+          {
+            "id": "5396b574-45af-42d8-89df-fa80f6f9c8ae",
+            "sender": "contact",
+            "text": "Pay raise from the Man to my rising burger star. Keep it up dude!",
+            "date": 32,
+            "time": 0
+          },
+          {
+            "id": "fcb87b0f-423a-47a3-ad82-f6fb64551b18",
+            "sender": "contact",
+            "text": "Pay raise from the Man to my rising burger star. Keep it up dude!",
+            "date": 41,
+            "time": 0
+          }
+        ],
+        "unread": 5,
+        "summary": null
+      },
+      "79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+        "charId": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+        "messages": [
+          {
+            "id": "fcb4d7c7-e2f6-4ce5-ac13-164ad774442d",
+            "sender": "system",
+            "text": "Celest accepted your friend request.",
+            "date": 3,
+            "time": 0
+          },
+          {
+            "id": "37bf4e1c-b448-4c34-b4ec-75873a05d45f",
+            "sender": "contact",
+            "text": "late night bubble tea run? 🧋",
+            "date": 42,
+            "time": 1,
+            "invite": true
+          },
+          {
+            "id": "c992a1cb-67f4-4f93-8047-d00de19e0203",
+            "sender": "player",
+            "text": "Sure",
+            "date": 42,
+            "time": 1
+          }
+        ],
+        "unread": 0,
+        "summary": null
+      },
+      "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": {
+        "charId": "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3",
+        "messages": [
+          {
+            "id": "79d2df71-862b-442a-be2e-758de1ec28a1",
+            "sender": "system",
+            "text": "Ingrid accepted your friend request.",
+            "date": 6,
+            "time": 0
+          },
+          {
+            "id": "7bd3b4a6-5759-4e5b-bcad-676b301529d1",
+            "sender": "contact",
+            "text": "come to Sunspot Stomp with me?? it's gonna be so fun 🎉",
+            "date": 12,
+            "time": 1,
+            "invite": true
+          }
+        ],
+        "unread": 2,
+        "summary": null,
+        "declined": 1
+      },
+      "d28276a0-b509-4f82-9a13-4d1158436074": {
+        "charId": "d28276a0-b509-4f82-9a13-4d1158436074",
+        "messages": [
+          {
+            "id": "1783ba19-8045-4d26-a0e4-f2cc9d3386d3",
+            "sender": "system",
+            "text": "Isabelle accepted your friend request.",
+            "date": 8,
+            "time": 0
+          },
+          {
+            "id": "ed81265f-9886-4382-8dd3-7a187979e1c0",
+            "sender": "contact",
+            "text": "lunch at bobby's? i'm starving lol",
+            "date": 12,
+            "time": 0,
+            "invite": true
+          },
+          {
+            "id": "d72878de-ac63-47fc-b4a1-707c3f556367",
+            "sender": "contact",
+            "text": "arcade tonight?? i will destroy you at air hockey 😤",
+            "date": 19,
+            "time": 1,
+            "invite": true
+          },
+          {
+            "id": "02caaf39-33e2-4dbc-9990-30fabf0178ef",
+            "sender": "contact",
+            "text": "wanna walk around green hill park with me? it's so nice out 🌳",
+            "date": 28,
+            "time": 0,
+            "invite": true
+          }
+        ],
+        "unread": 4,
+        "summary": null,
+        "declined": 3
+      },
+      "89ff5e67-3917-4027-ac77-46683ef94a8e": {
+        "charId": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+        "messages": [
+          {
+            "id": "82900342-7b8d-445b-af07-cb4866aac688",
+            "sender": "system",
+            "text": "April accepted your friend request.",
+            "date": 10,
+            "time": 1
+          },
+          {
+            "id": "a6b317d6-85e7-4d74-96bd-0ec391a113f2",
+            "sender": "contact",
+            "text": "wanna check out the new exhibit at the museum with me?",
+            "date": 12,
+            "time": 0,
+            "invite": true
+          },
+          {
+            "id": "1b4bfb7f-e591-48ea-bec0-ce806706c3b7",
+            "sender": "contact",
+            "text": "dinner at bobby's tonight? 🍔",
+            "date": 46,
+            "time": 1,
+            "invite": true
+          },
+          {
+            "id": "e1ed34cc-d325-4a20-a7d5-4bfca73117ae",
+            "sender": "player",
+            "text": "Sure",
+            "date": 46,
+            "time": 1
+          },
+          {
+            "id": "0da27c74-6cc8-494a-9f2f-d355b1439854",
+            "sender": "contact",
+            "text": "come to Retro Pinball Jam with me?? it's gonna be so fun 🎉",
+            "date": 50,
+            "time": 1,
+            "invite": true
+          }
+        ],
+        "unread": 1,
+        "summary": null,
+        "declined": 1
+      },
+      "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+        "charId": "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6",
+        "messages": [
+          {
+            "id": "5c6f3c95-d9fb-4aae-97b6-b1dd5fbaccfe",
+            "sender": "system",
+            "text": "Ami accepted your friend request.",
+            "date": 17,
+            "time": 0
+          },
+          {
+            "id": "641b65d8-da86-40ae-9068-78ab0721059c",
+            "sender": "contact",
+            "text": "come to Thorne Acoustic Sessions: Civic Heart with me?? it's gonna be so fun 🎉",
+            "date": 39,
+            "time": 1,
+            "invite": true
+          }
+        ],
+        "unread": 2,
+        "summary": null,
+        "declined": 1
+      },
+      "c27e108a-8a18-4649-a239-e8438af4109f": {
+        "charId": "c27e108a-8a18-4649-a239-e8438af4109f",
+        "messages": [
+          {
+            "id": "e4f770ec-013f-4370-95f5-8b3808d2ffd4",
+            "sender": "system",
+            "text": "Morgana accepted your friend request.",
+            "date": 23,
+            "time": 0
+          },
+          {
+            "id": "94372cb4-cc0f-42ec-aa0e-0edf7122a477",
+            "sender": "contact",
+            "text": "come to Mardi Gras with me?? it's gonna be so fun 🎉",
+            "date": 29,
+            "time": 1,
+            "invite": true
+          }
+        ],
+        "unread": 2,
+        "summary": null,
+        "declined": 1
+      },
+      "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+        "charId": "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b",
+        "messages": [
+          {
+            "id": "fd299823-ae1a-48b3-916e-ecf62a1e563e",
+            "sender": "system",
+            "text": "Winter accepted your friend request.",
+            "date": 24,
+            "time": 1
+          }
+        ],
+        "unread": 1,
+        "summary": null
+      },
+      "4b994943-17e0-4853-b67e-4754d5e698e5": {
+        "charId": "4b994943-17e0-4853-b67e-4754d5e698e5",
+        "messages": [
+          {
+            "id": "7d302656-0329-4b62-8f41-7bf9c51f25fb",
+            "sender": "system",
+            "text": "Gwen accepted your friend request.",
+            "date": 34,
+            "time": 1
+          },
+          {
+            "id": "497df4d9-dba0-4040-84c8-bc2ea89223fb",
+            "sender": "contact",
+            "text": "come to Silk River Stroll with me?? it's gonna be so fun 🎉",
+            "date": 49,
+            "time": 0,
+            "invite": true
+          },
+          {
+            "id": "91759ee2-ea09-4731-92fd-7905d1d5c574",
+            "sender": "player",
+            "text": "Sure",
+            "date": 49,
+            "time": 0
+          }
+        ],
+        "unread": 0,
+        "summary": null
+      },
+      "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+        "charId": "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f",
+        "messages": [
+          {
+            "id": "bfa7adf4-6d83-4c07-9244-75959ed76284",
+            "sender": "system",
+            "text": "Livvie accepted your friend request.",
+            "date": 35,
+            "time": 0
+          }
+        ],
+        "unread": 1,
+        "summary": null
+      }
+    },
+    "requestsSent": [],
+    "requestsReceived": [],
+    "contactsBadge": 0,
+    "suggestions": [
+      "ad254d3c-1118-4763-aaac-7640a5172639",
+      "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "d215de4d-7f92-4f59-954f-1f2461144f2c"
+    ]
+  },
+  "events": [],
+  "job": {
+    "jobId": "fast_eats",
+    "shifts": [
+      8,
+      12
+    ],
+    "shiftsWorked": 14,
+    "earned": 1536,
+    "raises": 4,
+    "streak": 14,
+    "strikes": 0,
+    "sickUsed": false,
+    "settledThrough": 101,
+    "workedSlots": [
+      8,
+      12,
+      22,
+      26,
+      36,
+      40,
+      50,
+      54,
+      64,
+      68,
+      78,
+      82,
+      92,
+      96
+    ]
+  },
+  "jobsClosed": [],
+  "inventory": [],
+  "classRecords": {
+    "ARH 101": {
+      "meetings": [
+        {
+          "date": 1,
+          "attended": true,
+          "summary": "Professor Johnson walked the Global Survey of Art History: Antiquity to Renaissance class through the syllabus, the grading and the exam dates while the reader sat with Celest Morokova and Isabelle Carmen."
+        },
+        {
+          "date": 8,
+          "attended": true,
+          "summary": "Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture, with Celest Morokova and Isabelle Carmen in the room, drove home one point: Egyptian reliefs show the head in profile and the torso from the front.",
+          "factoid": "Egyptian reliefs show the head in profile and the torso from the front."
+        },
+        {
+          "date": 15,
+          "attended": true,
+          "summary": "Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture, with Celest Morokova and Isabelle Carmen in the room, drove home one point: A ziggurat was a stepped temple platform in ancient Mesopotamia.",
+          "factoid": "A ziggurat was a stepped temple platform in ancient Mesopotamia."
+        },
+        {
+          "date": 22,
+          "attended": true,
+          "summary": "Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture, with Celest Morokova and Isabelle Carmen in the room, drove home one point: Babylon's Ishtar Gate was built under Nebuchadnezzar II.",
+          "factoid": "Babylon's Ishtar Gate was built under Nebuchadnezzar II."
+        },
+        {
+          "date": 29,
+          "attended": true,
+          "summary": "Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture, with Celest Morokova and Isabelle Carmen in the room, drove home one point: The Parthenon in Athens was dedicated to the goddess Athena.",
+          "factoid": "The Parthenon in Athens was dedicated to the goddess Athena."
+        },
+        {
+          "date": 36,
+          "attended": true,
+          "summary": "Professor Johnson's Global Survey of Art History: Antiquity to Renaissance lecture, with Celest Morokova and Isabelle Carmen in the room, drove home one point: The three classical Greek orders are Doric, Ionic and Corinthian.",
+          "factoid": "The three classical Greek orders are Doric, Ionic and Corinthian."
+        },
+        {
+          "date": 43,
+          "attended": true,
+          "summary": "The reader sat the midterm exam."
+        }
+      ],
+      "midterm": {
+        "asked": 3,
+        "correct": 3
+      },
+      "midtermScore": 83
+    },
+    "LIT 330": {
+      "meetings": [
+        {
+          "date": 2,
+          "attended": true,
+          "summary": "Professor Ito walked the Studies in Classical Drama and Tragedy class through the syllabus, the grading and the exam dates while the reader sat with Morgana Notte and Ingrid Gingham."
+        },
+        {
+          "date": 9,
+          "attended": true,
+          "summary": "Professor Ito's Studies in Classical Drama and Tragedy lecture, with Morgana Notte and Ingrid Gingham in the room, drove home one point: Aristotle's Poetics says tragedy brings about catharsis through pity and fear.",
+          "factoid": "Aristotle's Poetics says tragedy brings about catharsis through pity and fear."
+        },
+        {
+          "date": 16,
+          "attended": true,
+          "summary": "Professor Ito's Studies in Classical Drama and Tragedy lecture, with Morgana Notte and Ingrid Gingham in the room, drove home one point: Hamartia is the error or flaw that brings about the tragic hero's downfall.",
+          "factoid": "Hamartia is the error or flaw that brings about the tragic hero's downfall."
+        },
+        {
+          "date": 23,
+          "attended": true,
+          "summary": "Professor Ito's Studies in Classical Drama and Tragedy lecture, with Morgana Notte and Ingrid Gingham in the room, drove home one point: Anagnorisis is the moment a tragic character recognizes the truth.",
+          "factoid": "Anagnorisis is the moment a tragic character recognizes the truth."
+        },
+        {
+          "date": 30,
+          "attended": true,
+          "summary": "Professor Ito's Studies in Classical Drama and Tragedy lecture, with Morgana Notte and Ingrid Gingham in the room, drove home one point: Peripeteia is the sudden reversal of the hero's fortune.",
+          "factoid": "Peripeteia is the sudden reversal of the hero's fortune."
+        },
+        {
+          "date": 37,
+          "attended": true,
+          "summary": "Professor Ito's Studies in Classical Drama and Tragedy lecture, with Morgana Notte and Ingrid Gingham in the room, drove home one point: Hubris is the excessive pride that leads a hero to defy the gods.",
+          "factoid": "Hubris is the excessive pride that leads a hero to defy the gods."
+        },
+        {
+          "date": 44,
+          "attended": true,
+          "summary": "The reader sat the midterm exam."
+        }
+      ],
+      "midterm": {
+        "asked": 3,
+        "correct": 2
+      },
+      "midtermScore": 66
+    },
+    "MUS 180": {
+      "meetings": [
+        {
+          "date": 3,
+          "attended": true,
+          "summary": "Professor Novikov introduced the Foundations of Percussive Grooves class and assigned the midterm showcase project, and the reader sat with Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 10,
+          "attended": true,
+          "summary": "Professor Novikov gave the Foundations of Percussive Grooves class the session to work on their projects, and the reader worked beside Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 17,
+          "attended": true,
+          "summary": "Professor Novikov gave the Foundations of Percussive Grooves class the session to work on their projects, and the reader worked beside Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 24,
+          "attended": true,
+          "summary": "Professor Novikov gave the Foundations of Percussive Grooves class the session to work on their projects, and the reader worked beside Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 31,
+          "attended": true,
+          "summary": "Professor Novikov gave the Foundations of Percussive Grooves class the session to work on their projects, and the reader worked beside Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 38,
+          "attended": true,
+          "summary": "Professor Novikov gave the Foundations of Percussive Grooves class the session to work on their projects, and the reader worked beside Ami Holloway and Celest Morokova."
+        },
+        {
+          "date": 45,
+          "attended": true,
+          "summary": "The Foundations of Percussive Grooves showcase ran all session under Professor Novikov, and the reader presented his project alongside Ami Holloway and Celest Morokova."
+        }
+      ],
+      "midtermProject": {
+        "sessions": [
+          {
+            "date": 4,
+            "time": 1,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+          },
+          {
+            "date": 7,
+            "time": 1,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+          },
+          {
+            "date": 14,
+            "time": 1,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+          },
+          {
+            "date": 21,
+            "time": 1,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+          },
+          {
+            "date": 28,
+            "time": 0,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room with Florentine Chastain keeping him company. He got a solid stretch of work done."
+          },
+          {
+            "date": 35,
+            "time": 1,
+            "summary": "The reader put a work session into his Foundations of Percussive Grooves project in the practice room. He got a solid stretch of work done."
+          }
+        ]
+      },
+      "midtermScore": 100
+    },
+    "MSC 112": {
+      "meetings": [
+        {
+          "date": 3,
+          "attended": true,
+          "summary": "Professor Ivanov walked the Fermentation Science and Mixology Basics class through the syllabus, the grading and the exam dates while the reader sat with April Valentine and Winter Yang."
+        },
+        {
+          "date": 10,
+          "attended": true,
+          "summary": "Professor Ivanov's Fermentation Science and Mixology Basics lecture, with April Valentine and Winter Yang in the room, drove home one point: Saccharomyces cerevisiae is the yeast behind most ales, wines and breads.",
+          "factoid": "Saccharomyces cerevisiae is the yeast behind most ales, wines and breads."
+        },
+        {
+          "date": 17,
+          "attended": true,
+          "summary": "Professor Ivanov's Fermentation Science and Mixology Basics lecture, with April Valentine and Winter Yang in the room, drove home one point: Lager yeast ferments at cooler temperatures than ale yeast.",
+          "factoid": "Lager yeast ferments at cooler temperatures than ale yeast."
+        },
+        {
+          "date": 24,
+          "attended": true,
+          "summary": "Professor Ivanov's Fermentation Science and Mixology Basics lecture, with April Valentine and Winter Yang in the room, drove home one point: Malting sprouts barley so its enzymes can convert starch into fermentable sugar.",
+          "factoid": "Malting sprouts barley so its enzymes can convert starch into fermentable sugar."
+        },
+        {
+          "date": 31,
+          "attended": true,
+          "summary": "Professor Ivanov's Fermentation Science and Mixology Basics lecture, with April Valentine and Winter Yang in the room, drove home one point: Hops give beer bitterness and aroma and help preserve it.",
+          "factoid": "Hops give beer bitterness and aroma and help preserve it."
+        },
+        {
+          "date": 38,
+          "attended": true,
+          "summary": "Professor Ivanov's Fermentation Science and Mixology Basics lecture, with April Valentine and Winter Yang in the room, drove home one point: Malolactic fermentation converts sharp malic acid into softer lactic acid.",
+          "factoid": "Malolactic fermentation converts sharp malic acid into softer lactic acid."
+        },
+        {
+          "date": 45,
+          "attended": true,
+          "summary": "The reader sat the midterm exam."
+        }
+      ],
+      "midterm": {
+        "asked": 3,
+        "correct": 2
+      },
+      "midtermScore": 66
+    },
+    "PED 140": {
+      "meetings": [
+        {
+          "date": 7,
+          "attended": true,
+          "summary": "Coach Orlov ran the Self-Defense and Combative Arts class through drills, and the reader partnered up with Livvie Tierra and Isabelle Carmen."
+        },
+        {
+          "date": 14,
+          "attended": true,
+          "summary": "Coach Orlov ran the Self-Defense and Combative Arts class through drills, and the reader partnered up with Livvie Tierra and Isabelle Carmen."
+        },
+        {
+          "date": 21,
+          "attended": true,
+          "summary": "Coach Orlov ran the Self-Defense and Combative Arts class through drills, and the reader partnered up with Livvie Tierra and Isabelle Carmen."
+        },
+        {
+          "date": 35,
+          "attended": true,
+          "summary": "Coach Orlov ran the Self-Defense and Combative Arts class through drills, and the reader partnered up with Livvie Tierra and Isabelle Carmen."
+        },
+        {
+          "date": 42,
+          "attended": true,
+          "summary": "Coach Orlov ran the Self-Defense and Combative Arts class through drills, and the reader partnered up with Livvie Tierra and Isabelle Carmen."
+        }
+      ]
+    }
+  },
+  "gradesStanding": null,
+  "expelled": false,
+  "midtermStandingDone": false,
+  "finalsScoresShown": false,
+  "venusThrough": 102,
+  "bunnybotThrough": 102,
+  "bunnymapUnlocked": true,
+  "bunnyshopUnlocked": true,
+  "venusJobIntroSent": true,
+  "bunnybotContactIntroSent": true,
+  "bunnybotFirstPostNudgeSent": true,
+  "bunnybotTwoTimingTipSent": false,
+  "bunnybotSeenTipSent": false,
+  "bunnybotDeferred": [],
+  "droppedClasses": {},
+  "addedClasses": {},
+  "npcRelationships": {
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": -3,
+      "encounter": {
+        "date": 39,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true
+      }
+    },
+    "f4a99abb-66c4-4040-ac21-ab7249a142af|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": -3,
+      "encounter": {
+        "date": 46,
+        "kind": "hangout",
+        "ref": "pino_cola_lounge",
+        "positive": true
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": 5,
+      "encounter": {
+        "date": 43,
+        "kind": "hangout",
+        "ref": "room",
+        "positive": true,
+        "roomOf": "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6"
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": -2,
+      "encounter": {
+        "date": 48,
+        "kind": "hangout",
+        "ref": "venus_quad",
+        "positive": true
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": -4,
+      "encounter": {
+        "date": 36,
+        "kind": "dorm",
+        "ref": "lowrise_lounge",
+        "positive": true
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": 6,
+      "encounter": {
+        "date": 40,
+        "kind": "hangout",
+        "ref": "fast_eats",
+        "positive": true,
+        "roomOf": "d215de4d-7f92-4f59-954f-1f2461144f2c"
+      }
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -3
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 5,
+      "encounter": {
+        "date": 38,
+        "kind": "dorm",
+        "ref": "lowrise_kitchen",
+        "positive": false
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "affinity": -6
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 6,
+      "encounter": {
+        "date": 48,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 0,
+      "encounter": {
+        "date": 40,
+        "kind": "hangout",
+        "ref": "fast_eats",
+        "positive": true,
+        "roomOf": "d215de4d-7f92-4f59-954f-1f2461144f2c"
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 6,
+      "encounter": {
+        "date": 50,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true,
+        "roomOf": "ad254d3c-1118-4763-aaac-7640a5172639"
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "affinity": -1,
+      "encounter": {
+        "date": 44,
+        "kind": "class",
+        "ref": "KIN 310",
+        "positive": false
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": -4,
+      "encounter": {
+        "date": 34,
+        "kind": "hangout",
+        "ref": "btb_arcade",
+        "positive": true
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -1,
+      "encounter": {
+        "date": 42,
+        "kind": "dorm",
+        "ref": "elysium_lounge",
+        "positive": true
+      }
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 3,
+      "encounter": {
+        "date": 28,
+        "kind": "hangout",
+        "ref": "cutetea",
+        "positive": false,
+        "roomOf": "f4a99abb-66c4-4040-ac21-ab7249a142af"
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "affinity": 5,
+      "encounter": {
+        "date": 41,
+        "kind": "dorm",
+        "ref": "lowrise_lounge",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": 5,
+      "encounter": {
+        "date": 46,
+        "kind": "hangout",
+        "ref": "apogee_club",
+        "positive": true
+      }
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 6,
+      "encounter": {
+        "date": 45,
+        "kind": "hangout",
+        "ref": "apogee_club",
+        "positive": true,
+        "roomOf": "d215de4d-7f92-4f59-954f-1f2461144f2c"
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": -4,
+      "encounter": {
+        "date": 44,
+        "kind": "class",
+        "ref": "SWIM 102",
+        "positive": true
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 6,
+      "encounter": {
+        "date": 50,
+        "kind": "hangout",
+        "ref": "future_cinema",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": 1,
+      "encounter": {
+        "date": 35,
+        "kind": "dorm",
+        "ref": "lowrise_kitchen",
+        "positive": true
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": 3,
+      "encounter": {
+        "date": 43,
+        "kind": "hangout",
+        "ref": "agora",
+        "positive": true
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": 4,
+      "encounter": {
+        "date": 46,
+        "kind": "class",
+        "ref": "LIT 240",
+        "positive": false
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": -2,
+      "encounter": {
+        "date": 16,
+        "kind": "hangout",
+        "ref": "btb_arcade",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": 6,
+      "encounter": {
+        "date": 40,
+        "kind": "hangout",
+        "ref": "cutetea",
+        "positive": true,
+        "roomOf": "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6"
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": -4,
+      "encounter": {
+        "date": 43,
+        "kind": "hangout",
+        "ref": "kendall_library",
+        "positive": true
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "affinity": 5,
+      "encounter": {
+        "date": 45,
+        "kind": "class",
+        "ref": "MSC 112",
+        "positive": true
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -3,
+      "encounter": {
+        "date": 45,
+        "kind": "class",
+        "ref": "ARH 320",
+        "positive": true
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": 1,
+      "encounter": {
+        "date": 45,
+        "kind": "class",
+        "ref": "PED 101",
+        "positive": false
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": 4,
+      "encounter": {
+        "date": 46,
+        "kind": "class",
+        "ref": "PED 145",
+        "positive": true
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": -3,
+      "encounter": {
+        "date": 40,
+        "kind": "dorm",
+        "ref": "lowrise_lounge",
+        "positive": true
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "affinity": -3,
+      "encounter": {
+        "date": 49,
+        "kind": "hangout",
+        "ref": "bobbys_diner",
+        "positive": false
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": -1,
+      "encounter": {
+        "date": 7,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": false
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -4,
+      "encounter": {
+        "date": 33,
+        "kind": "hangout",
+        "ref": "lumiere_fusion",
+        "positive": false
+      }
+    },
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": 1,
+      "encounter": {
+        "date": 26,
+        "kind": "hangout",
+        "ref": "bobbys_diner",
+        "positive": true
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|ad254d3c-1118-4763-aaac-7640a5172639": {
+      "affinity": -2,
+      "encounter": {
+        "date": 5,
+        "kind": "hangout",
+        "ref": "kendall_library",
+        "positive": false
+      }
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": -3,
+      "encounter": {
+        "date": 41,
+        "kind": "hangout",
+        "ref": "whitman_greenhouse",
+        "positive": false
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": 1,
+      "encounter": {
+        "date": 48,
+        "kind": "hangout",
+        "ref": "whitman_greenhouse",
+        "positive": false
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": -3,
+      "encounter": {
+        "date": 12,
+        "kind": "dorm",
+        "ref": "lowrise_lounge",
+        "positive": true
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": -4,
+      "encounter": {
+        "date": 20,
+        "kind": "hangout",
+        "ref": "venus_quad",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": -1,
+      "encounter": {
+        "date": 44,
+        "kind": "hangout",
+        "ref": "reserve_bank_cafe",
+        "positive": false
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "affinity": 5,
+      "encounter": {
+        "date": 40,
+        "kind": "hangout",
+        "ref": "stalestein_bar",
+        "positive": false
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -1,
+      "encounter": {
+        "date": 50,
+        "kind": "hangout",
+        "ref": "stalestein_bar",
+        "positive": false
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|ad254d3c-1118-4763-aaac-7640a5172639": {
+      "affinity": 1,
+      "encounter": {
+        "date": 45,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true
+      }
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": 5,
+      "encounter": {
+        "date": 40,
+        "kind": "dorm",
+        "ref": "lowrise_kitchen",
+        "positive": true
+      }
+    },
+    "c27e108a-8a18-4649-a239-e8438af4109f|d28276a0-b509-4f82-9a13-4d1158436074": {
+      "affinity": -1,
+      "encounter": {
+        "date": 36,
+        "kind": "hangout",
+        "ref": "stalestein_bar",
+        "positive": false
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "affinity": -2,
+      "encounter": {
+        "date": 44,
+        "kind": "hangout",
+        "ref": "btb_arcade",
+        "positive": true
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|4b994943-17e0-4853-b67e-4754d5e698e5": {
+      "affinity": -2,
+      "encounter": {
+        "date": 21,
+        "kind": "hangout",
+        "ref": "palaestra_stadium",
+        "positive": true
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "affinity": 1,
+      "encounter": {
+        "date": 45,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": 0,
+      "encounter": {
+        "date": 46,
+        "kind": "hangout",
+        "ref": "whitman_greenhouse",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "affinity": -4,
+      "encounter": {
+        "date": 19,
+        "kind": "hangout",
+        "ref": "kendall_library",
+        "positive": false
+      }
+    },
+    "d215de4d-7f92-4f59-954f-1f2461144f2c|f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": {
+      "affinity": 3,
+      "encounter": {
+        "date": 41,
+        "kind": "hangout",
+        "ref": "bobbys_diner",
+        "positive": false
+      }
+    },
+    "89ff5e67-3917-4027-ac77-46683ef94a8e|c27e108a-8a18-4649-a239-e8438af4109f": {
+      "affinity": 1,
+      "encounter": {
+        "date": 36,
+        "kind": "hangout",
+        "ref": "kendall_library",
+        "positive": true
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|79dd2743-3541-4172-9ac9-c42c485aa5cc": {
+      "affinity": -1,
+      "encounter": {
+        "date": 37,
+        "kind": "hangout",
+        "ref": "btb_arcade",
+        "positive": true
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|d215de4d-7f92-4f59-954f-1f2461144f2c": {
+      "affinity": 0,
+      "encounter": {
+        "date": 41,
+        "kind": "hangout",
+        "ref": "cutetea",
+        "positive": false
+      }
+    },
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f|89ff5e67-3917-4027-ac77-46683ef94a8e": {
+      "affinity": 3,
+      "encounter": {
+        "date": 32,
+        "kind": "hangout",
+        "ref": "whitman_greenhouse",
+        "positive": false
+      }
+    },
+    "d28276a0-b509-4f82-9a13-4d1158436074|f4a99abb-66c4-4040-ac21-ab7249a142af": {
+      "affinity": 6,
+      "encounter": {
+        "date": 49,
+        "kind": "hangout",
+        "ref": "room",
+        "positive": true,
+        "roomOf": "d28276a0-b509-4f82-9a13-4d1158436074"
+      }
+    },
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3|3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": {
+      "affinity": 3,
+      "encounter": {
+        "date": 38,
+        "kind": "dorm",
+        "ref": "lowrise_lounge",
+        "positive": true
+      }
+    },
+    "4b994943-17e0-4853-b67e-4754d5e698e5|ad254d3c-1118-4763-aaac-7640a5172639": {
+      "affinity": 0,
+      "encounter": {
+        "date": 48,
+        "kind": "hangout",
+        "ref": "btb_arcade",
+        "positive": true
+      }
+    },
+    "ad254d3c-1118-4763-aaac-7640a5172639|c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": {
+      "affinity": 0,
+      "encounter": {
+        "date": 29,
+        "kind": "hangout",
+        "ref": "agora",
+        "positive": true
+      }
+    },
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc|ad254d3c-1118-4763-aaac-7640a5172639": {
+      "affinity": -2,
+      "encounter": {
+        "date": 43,
+        "kind": "hangout",
+        "ref": "spring_mart",
+        "positive": true
+      }
+    }
+  },
+  "npcFriendships": [
+    {
+      "a": "c27e108a-8a18-4649-a239-e8438af4109f",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 0,
+      "time": 0
+    },
+    {
+      "a": "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f",
+      "b": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+      "date": 0,
+      "time": 1
+    },
+    {
+      "a": "4b994943-17e0-4853-b67e-4754d5e698e5",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 3,
+      "time": 1
+    },
+    {
+      "a": "ad254d3c-1118-4763-aaac-7640a5172639",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 7,
+      "time": 1
+    },
+    {
+      "a": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+      "b": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+      "date": 9,
+      "time": 1
+    },
+    {
+      "a": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 10,
+      "time": 0
+    },
+    {
+      "a": "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3",
+      "b": "c27e108a-8a18-4649-a239-e8438af4109f",
+      "date": 12,
+      "time": 1
+    },
+    {
+      "a": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+      "b": "d28276a0-b509-4f82-9a13-4d1158436074",
+      "date": 19,
+      "time": 1
+    },
+    {
+      "a": "d215de4d-7f92-4f59-954f-1f2461144f2c",
+      "b": "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6",
+      "date": 20,
+      "time": 1
+    },
+    {
+      "a": "c27e108a-8a18-4649-a239-e8438af4109f",
+      "b": "d215de4d-7f92-4f59-954f-1f2461144f2c",
+      "date": 22,
+      "time": 1
+    },
+    {
+      "a": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+      "b": "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6",
+      "date": 25,
+      "time": 1
+    },
+    {
+      "a": "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f",
+      "b": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+      "date": 26,
+      "time": 0
+    },
+    {
+      "a": "89ff5e67-3917-4027-ac77-46683ef94a8e",
+      "b": "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b",
+      "date": 31,
+      "time": 1
+    },
+    {
+      "a": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+      "b": "d215de4d-7f92-4f59-954f-1f2461144f2c",
+      "date": 34,
+      "time": 0
+    },
+    {
+      "a": "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+      "b": "d28276a0-b509-4f82-9a13-4d1158436074",
+      "date": 36,
+      "time": 0
+    },
+    {
+      "a": "d215de4d-7f92-4f59-954f-1f2461144f2c",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 36,
+      "time": 0
+    },
+    {
+      "a": "d28276a0-b509-4f82-9a13-4d1158436074",
+      "b": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+      "date": 39,
+      "time": 1
+    }
+  ],
+  "occasionsDeclined": [
+    "dance",
+    "mardi-gras",
+    "concert",
+    "filler-break-1"
+  ],
+  "npcOverlay": {
+    "date": 51,
+    "time": 0,
+    "groups": [
+      {
+        "location": "eastern_buffet",
+        "host": "f4a99abb-66c4-4040-ac21-ab7249a142af",
+        "members": [
+          "f4a99abb-66c4-4040-ac21-ab7249a142af",
+          "89ff5e67-3917-4027-ac77-46683ef94a8e",
+          "4b994943-17e0-4853-b67e-4754d5e698e5"
+        ]
+      }
+    ],
+    "wentOut": []
+  },
+  "slotRumor": null,
+  "lastSlotCast": {
+    "date": 50,
+    "time": 1,
+    "charIds": []
+  },
+  "weekendOutings": {
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": 33,
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": 47,
+    "d28276a0-b509-4f82-9a13-4d1158436074": 33,
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": 40,
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": 5,
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc": 40,
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": 26
+  },
+  "outingSlots": {
+    "d215de4d-7f92-4f59-954f-1f2461144f2c": 100,
+    "d28276a0-b509-4f82-9a13-4d1158436074": 100,
+    "ad254d3c-1118-4763-aaac-7640a5172639": 100,
+    "4b994943-17e0-4853-b67e-4754d5e698e5": 101,
+    "89ff5e67-3917-4027-ac77-46683ef94a8e": 100,
+    "f4a99abb-66c4-4040-ac21-ab7249a142af": 100
+  },
+  "springBreakAway": [
+    "79dd2743-3541-4172-9ac9-c42c485aa5cc",
+    "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3",
+    "c27e108a-8a18-4649-a239-e8438af4109f",
+    "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b",
+    "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f",
+    "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6"
+  ],
+  "feedExtras": {
+    "date": 51,
+    "time": 0,
+    "teaser": null,
+    "randomPost": {
+      "handle": "dbergstrom_",
+      "text": "my calendar says im in a meeting rn. i am in bed",
+      "emoji": "🐌",
+      "likes": 2
+    }
+  },
+  "graduationSeen": false,
+  "farewellsDone": [],
+  "endingArtWanted": false,
+  "scene": {
+    "cast": [],
+    "transcript": [],
+    "summary": null,
+    "bg": null,
+    "slots": [
+      null,
+      null,
+      null
+    ],
+    "emotions": {},
+    "flipped": {},
+    "departed": [],
+    "offStage": {},
+    "sceneLog": [
+      {
+        "speaker": "",
+        "text": "March 11, Wednesday day. Eighth week of the semester."
+      }
+    ],
+    "currentLine": {
+      "speaker": "",
+      "text": "March 11, Wednesday day. Eighth week of the semester."
+    },
+    "pendingLines": [
+      {
+        "speaker": "",
+        "text": "You wake up in your Lowrise dorm room to sunlight sneaking in around the blinds."
+      },
+      {
+        "speaker": "",
+        "text": "Down the hall, someone is blasting music and somebody else is yelling at them to stop."
+      },
+      {
+        "speaker": "",
+        "text": "Campus is half empty for spring break, and the quiet is almost eerie."
+      }
+    ],
+    "resumeOnLine": true
+  },
+  "playthroughId": "1790392968199",
+  "saveId": "manual03",
+  "saveDate": 1790394272697
+}
