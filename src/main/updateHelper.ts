@@ -1,12 +1,13 @@
 import { spawn } from 'child_process'
-import { appendFileSync, existsSync } from 'fs'
+import { appendFileSync, existsSync, renameSync, writeFileSync } from 'fs'
 import { mkdir, readFile, rename } from 'fs/promises'
 import { dirname, join } from 'path'
 
 /**
  * The swap half of an update, run by the app's own exe in Node mode after the app has quit:
  * it parks the files the update replaces or drops, moves the staged ones in, rolls back if any
- * of that fails, and relaunches the game either way. Node builtins only — no electron, no app.
+ * of that fails, leaving word of why for the app's next launch, and relaunches the game either
+ * way. Node builtins only — no electron, no app.
  */
 
 // Electron's Node mode may still shim `fs` for `.asar` paths; here every one is a plain file.
@@ -32,10 +33,13 @@ const EXIT_TIMEOUT_MS = 60_000
 const POLL_MS = 200
 
 /** How many times a rename is retried while a scanner or a straggler holds the file. */
-const RENAME_TRIES = 5
+const RENAME_TRIES = 20
 
 /** How long between those tries. */
-const RENAME_BACKOFF_MS = 300
+const RENAME_BACKOFF_MS = 250
+
+/** The note left beside the plan when the swap did not land, read by the app's next launch. */
+const FAILED_NAME = 'failed.json'
 
 /** Errors that mean "something holds this file right now", rather than "this cannot work". */
 const HELD_CODES = new Set(['EBUSY', 'EPERM', 'EACCES'])
@@ -145,15 +149,39 @@ async function moveFile(from: string, to: string): Promise<void> {
   }
 }
 
-/** Puts every move back where it came from, newest first; a miss is logged and passed over. */
-async function rollback(journal: Array<[string, string]>): Promise<void> {
+/**
+ * Puts every move back where it came from, newest first; a miss is logged and passed over.
+ * Answers how many moves could not be put back.
+ */
+async function rollback(journal: Array<[string, string]>): Promise<number> {
   log('WARN', 'rolling the swap back')
+  let missed = 0
   for (const [from, to] of [...journal].reverse()) {
     try {
       await moveFile(to, from)
     } catch (err) {
+      missed++
       log('ERROR', `could not put ${from} back: ${messageOf(err)}`)
     }
+  }
+  return missed
+}
+
+/**
+ * Leaves word of why the swap did not land, for the app's next launch to read; a failed write
+ * is only logged.
+ */
+function leaveFailure(updateDir: string, message: string): void {
+  const target = join(updateDir, FAILED_NAME)
+  try {
+    writeFileSync(
+      `${target}.tmp`,
+      JSON.stringify({ schemaVersion: 1, message: redact(message) }),
+      'utf8'
+    )
+    renameSync(`${target}.tmp`, target)
+  } catch (err) {
+    log('ERROR', `could not leave word of the failure: ${messageOf(err)}`)
   }
 }
 
@@ -201,8 +229,10 @@ async function main(): Promise<number> {
   try {
     plan = checkPlan(JSON.parse(await readFile(planPath, 'utf-8')))
   } catch (err) {
-    // Nothing has moved and the log path is not known; the app's next launch sweeps the folder.
+    // Nothing has moved and the log path is not known; the app's next launch reads the note
+    // and sweeps the folder.
     console.error(`[helper] ${messageOf(err)}`)
+    leaveFailure(dirname(planPath), messageOf(err))
     return 1
   }
 
@@ -215,6 +245,10 @@ async function main(): Promise<number> {
   log('LOG', `waiting for the app (pid ${plan.parentPid}) to exit`)
   if (!(await waitForExit(plan.parentPid))) {
     log('ERROR', 'the app is still running; nothing was changed')
+    leaveFailure(
+      dirname(planPath),
+      'the app was still running a minute after it was asked to quit, so nothing was changed'
+    )
     return 1
   }
 
@@ -227,7 +261,11 @@ async function main(): Promise<number> {
   } catch (err) {
     failure = messageOf(err)
     log('ERROR', `the swap failed: ${failure}`)
-    await rollback(journal)
+    const missed = await rollback(journal)
+    leaveFailure(
+      dirname(planPath),
+      missed === 0 ? failure : `${failure}; ${missed} of the parked files could not be put back`
+    )
   }
 
   relaunch(plan)

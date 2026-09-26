@@ -5,8 +5,9 @@ import { ErrorModal } from '../components/ErrorModal'
 import { useUpdateStore } from '../stores/updateStore'
 
 /**
- * An update that stopped before anything was swapped, with the store page as the way to do it
- * by hand. Closing it releases the boot that was waiting behind it, which carries on as usual.
+ * An update that did not land — stopped before the swap, or rolled back by it on the last launch —
+ * with the store page as the way to do it by hand. Closing it releases whoever is waiting behind
+ * it, which carries on as usual.
  */
 export function UpdateFailedModal({
   theme,

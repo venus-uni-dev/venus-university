@@ -18,11 +18,18 @@ import {
   uploadFileUrl
 } from '@shared/updateSource'
 import { getAppLogPath, getDataPath, getInstallPath, getUpdatePath } from '../paths'
+import { redactError } from '../redact'
 import { discard, extractZip, stripWrapperDir } from './archiveService'
 import { downloadFile } from './downloadService'
 import { writeAtomicJson } from './jsonFile'
 import { getSettings } from './settingsService'
-import { compareVersions, isBuildManifest, parseLatest, planUpdate } from './updatePlan'
+import {
+  compareVersions,
+  isBuildManifest,
+  isSwapFailure,
+  parseLatest,
+  planUpdate
+} from './updatePlan'
 
 /**
  * The desktop's updater: the launch check against the itch.io channel, and the run that
@@ -41,6 +48,9 @@ const STALL_MS = 60000
 
 /** Where a build's file manifest sits, inside the install and inside the staged tree alike. */
 const MANIFEST_REL = 'resources/build-manifest.json'
+
+/** Where the helper leaves word of a swap that did not land, inside the update folder. */
+const FAILED_REL = 'failed.json'
 
 /** What itch.io sees this build as. */
 function userAgent(): string {
@@ -102,7 +112,6 @@ async function runCheck(): Promise<UpdateCheck> {
   const none: UpdateCheck = { current, latest: null, available: false }
   const feed = feedUrlOf(settings)
 
-  if (settings?.checkUpdates === false) return none
   // A dev run has no install to replace, so it checks only under one of the dev switches.
   if (!app.isPackaged && settings?.updateAsVersion === undefined && feed === null) return none
 
@@ -120,15 +129,52 @@ async function runCheck(): Promise<UpdateCheck> {
 /** The check's answer, asked for once per run. */
 let checking: Promise<UpdateCheck> | null = null
 
+/** What the last launch's swap left behind, read before the folder is swept. */
+let rolledBack: Promise<AppError | null> = Promise.resolve(null)
+
+/** The sweep of the update folder, which a new update waits out before staging into it. */
+let sweeping: Promise<void> = Promise.resolve()
+
 /** Starts the launch check, so the renderer's ask a moment later costs nothing. */
 export function startUpdateCheck(): void {
   checking ??= runCheck()
 }
 
-/** What the launch check found, starting it if the boot has not. */
-export function getUpdateCheck(): Promise<UpdateCheck> {
+/**
+ * What the launch check found, starting it if the boot has not, and word of the last update's
+ * swap when it did not land.
+ */
+export async function getUpdateCheck(): Promise<UpdateCheck> {
   checking ??= runCheck()
-  return checking
+  const [check, failure] = await Promise.all([checking, rolledBack])
+  return failure === null ? check : { ...check, lastFailure: failure }
+}
+
+/**
+ * The note a failed swap left, as the error the player is told, or null when there is none this
+ * build reads. Redacted here, since a successful answer is not redacted on its way out.
+ */
+async function readRolledBack(dir: string): Promise<AppError | null> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(join(dir, FAILED_REL), 'utf-8'))
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    console.warn('[update] the failure note could not be read:', messageOf(err))
+    return null
+  }
+  if (!isSwapFailure(parsed)) {
+    console.warn('[update] the failure note is not one this build reads')
+    return null
+  }
+  console.warn('[update] the last update did not land:', parsed.message)
+  return redactError(
+    appError(
+      'UPDATE_SWAP_FAILED',
+      'The last update could not be applied, so the previous version was restored.',
+      parsed.message
+    )
+  )
 }
 
 /** Every handshake miss reads the same: which step, and what the server said. Never the token. */
@@ -362,6 +408,9 @@ export async function applyUpdate(emit: (progress: UpdateProgress) => void): Pro
     )
   }
 
+  // A sweep still clearing the last update's leftovers would take this download with it.
+  await sweeping
+
   const installDir = getInstallPath()
   const updateDir = getUpdatePath()
   await probeInstallWritable(installDir)
@@ -480,13 +529,22 @@ async function swept(dir: string): Promise<boolean> {
 
 /**
  * Drops what a finished update left behind. The helper relaunched the app from the old exe it
- * had parked, so it may still be exiting: one retry, and never a failure the boot sees.
+ * had parked, so it may still be exiting: one retry, and never a rejection.
  */
-export async function sweepUpdateStaging(): Promise<void> {
-  const dir = getUpdatePath()
+async function sweepFolder(dir: string): Promise<void> {
   if (await swept(dir)) return
   await new Promise((resolve) => setTimeout(resolve, 5000))
   if (!(await swept(dir))) {
     console.warn('[update] the update folder is still held; the next launch clears it')
   }
+}
+
+/**
+ * Reads the note a failed swap left, then drops what the last update left behind; the next
+ * update waits on the sweep.
+ */
+export function startUpdateSweep(): void {
+  const dir = getUpdatePath()
+  rolledBack = readRolledBack(dir)
+  sweeping = rolledBack.then(() => sweepFolder(dir))
 }

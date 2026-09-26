@@ -142,7 +142,7 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     secondaryModel: settings.secondaryModel,
     secondaryModelFor: settings.secondaryModelFor,
     comfyDeferred: settings.comfyDeferred,
-    // Carried, or a save made from anywhere else would turn the update check back on.
+    // Carried, or a save made from anywhere else would turn the launch offer back on.
     checkUpdates: settings.checkUpdates,
     // Carried, or a save made from anywhere else would turn the ending warnings back on.
     warnEndingInterrupt: settings.warnEndingInterrupt,

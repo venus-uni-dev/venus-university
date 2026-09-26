@@ -3,7 +3,8 @@ import type { BuildManifest, FileStamp, UpdatePlan } from '@shared/types'
 
 /**
  * The pure half of updating: how two version strings compare, what the channel's reply says,
- * and which files an update puts in place and takes away. No electron, no disk.
+ * which files an update puts in place and takes away, and what a failed swap's note must hold.
+ * No electron, no disk.
  */
 
 /** One dotted part as a number; anything that is not one reads as 0. */
@@ -53,6 +54,19 @@ export function isBuildManifest(value: unknown): value is BuildManifest {
     Array.isArray(manifest.files) &&
     manifest.files.every(isFileStamp)
   )
+}
+
+/** The note the helper leaves when a swap did not land: a version and what went wrong. */
+export interface SwapFailure {
+  schemaVersion: 1
+  message: string
+}
+
+/** True for a parsed failure note this build reads. */
+export function isSwapFailure(value: unknown): value is SwapFailure {
+  if (typeof value !== 'object' || value === null) return false
+  const note = value as Partial<SwapFailure>
+  return note.schemaVersion === 1 && typeof note.message === 'string'
 }
 
 /** The key one manifest path is matched by: forward slashes, lowercased. */

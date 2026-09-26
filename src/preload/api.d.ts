@@ -410,7 +410,10 @@ export interface VenusUniversityApi {
   }
   /** The desktop's self-update off itch.io; the browser build has nothing to update. */
   update: {
-    /** Whether a newer build is on itch.io. Started at boot in main; this waits on that answer. */
+    /**
+     * Whether a newer build is on itch.io, and word of a swap that did not land on the last
+     * launch. Started at boot in main; this waits on that answer.
+     */
     check: () => Promise<Result<UpdateCheck>>
     /**
      * Downloads and stages the newer build, hands the file swap to a helper and quits moments

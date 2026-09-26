@@ -1702,8 +1702,8 @@ export interface Settings {
    */
   comfyGpu?: ComfyGpu
   /**
-   * Whether the desktop asks itch.io for a newer build at every launch. Optional on disk,
-   * absent meaning it does.
+   * Whether a newer build the launch check finds is offered before the first screen; the main
+   * menu's notice offers it either way. Optional on disk, absent meaning it is.
    */
   checkUpdates?: boolean
   /**
@@ -2017,6 +2017,11 @@ export interface UpdateCheck {
   /** Null when the build could not check, or the channel's build carries no version. */
   latest: string | null
   available: boolean
+  /**
+   * The last update's swap, which did not land and was rolled back, as the player is told it;
+   * absent when the last launch left no such word.
+   */
+  lastFailure?: AppError
 }
 
 /** Where an update is, on the fixed `update:progress` channel. Numbers only: nothing to redact. */

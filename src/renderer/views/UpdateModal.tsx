@@ -3,8 +3,9 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { useUpdateStore } from '../stores/updateStore'
 
 /**
- * The one question an update asks, put over the boot cover before the app has drawn a screen.
- * Either answer lets boot go on; only "Update" hands the rest of the launch to the updater.
+ * The one question an update asks, put over the boot cover before any screen is drawn, or over
+ * the menu from its notice. "Not now" leaves the app where it was; "Update" hands it to the
+ * updater.
  */
 export function UpdateModal({
   theme,
@@ -21,7 +22,7 @@ export function UpdateModal({
       id="update-offer"
       theme={theme}
       title="Update available"
-      message={`Version ${version} is out. Your saves, characters and settings stay where they are.`}
+      message={`Upgrade to version ${version}? Your saves, characters, and settings will be maintained.`}
       confirmText="Update"
       cancelText="Not now"
       onConfirm={() => answer('update')}

@@ -125,7 +125,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [volumes, setVolumes] = useState<Volumes>(() => volumesOf(settings?.volumes))
   // Only the browser keeps a key anywhere the player might not want it kept.
   const [remember, setRemember] = useState(settings?.rememberKey === true)
-  // Absent on the record means the desktop does check, so only an explicit false is off.
+  // Absent on the record means the desktop does ask, so only an explicit false is off.
   const [checkUpdates, setCheckUpdates] = useState(settings?.checkUpdates !== false)
   // Likewise absent means a scene warns before an ending is interrupted.
   const [warnEndingInterrupt, setWarnEndingInterrupt] = useState(
@@ -368,7 +368,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     )
   }
 
-  /** Whether the desktop asks itch.io for a newer build at every launch. */
+  /** Whether a newer build the launch check finds is offered before the first screen. */
   function handleCheckUpdatesChange(checked: boolean): void {
     setCheckUpdates(checked)
     void write({ checkUpdates: checked }).then(
@@ -757,7 +757,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             {!webBuild && (
               <CheckField
                 id="settings-check-updates"
-                label="Check for updates on launch"
+                label="Ask to update on launch"
                 checked={checkUpdates}
                 onChange={handleCheckUpdatesChange}
               />

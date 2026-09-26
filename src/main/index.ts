@@ -10,7 +10,7 @@ import { sweepStaging } from './services/characterService'
 import { killStray as killStrayComfy, stop as stopComfy } from './services/comfyService'
 import { ensureAmdNodePatches } from './services/setupService'
 import { ensureDataDir } from './services/settingsService'
-import { startUpdateCheck, sweepUpdateStaging } from './services/updateService'
+import { startUpdateCheck, startUpdateSweep } from './services/updateService'
 import { APP_ID } from '@shared/appId'
 import { toAppError } from '@shared/errors'
 import { zoomFor } from '@shared/stageZoom'
@@ -219,8 +219,9 @@ app
     // Drops the staging trees a quit mid-render left behind.
     await sweepStaging()
 
-    // What a finished update left, and the one request that asks whether another is out.
-    void sweepUpdateStaging()
+    // Word of a swap that did not land, the sweep of what the last update left, and the one
+    // request that asks whether another is out.
+    startUpdateSweep()
     startUpdateCheck()
 
     // No menu at all: one draws a bar the moment the window is not fullscreen, and hiding
