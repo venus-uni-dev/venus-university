@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPublic } from '../scripts/syncPublic.mjs'
+import { characterArchive, isPublic } from '../scripts/syncPublic.mjs'
 
 /**
  * The one gate between this repo and the public mirror. Everything under
@@ -52,5 +52,19 @@ describe('isPublic', () => {
 
   it.each(PUBLIC.map((path) => [path]))('publishes %s', (path) => {
     expect(isPublic(path)).toBe(true)
+  })
+})
+
+describe('characterArchive', () => {
+  it('names the character for a file inside its folder', () => {
+    expect(characterArchive('assets/characters/x/cg/sex.png')).toBe('x')
+    expect(characterArchive('assets/characters/x/character.json')).toBe('x')
+  })
+
+  it('names nobody for anything else', () => {
+    expect(characterArchive('assets/characters/x.zip')).toBeNull()
+    expect(characterArchive('assets/characters/x')).toBeNull()
+    expect(characterArchive('assets/bg/a.png')).toBeNull()
+    expect(characterArchive('src/main/index.ts')).toBeNull()
   })
 })

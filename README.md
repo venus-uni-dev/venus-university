@@ -9,24 +9,25 @@ This is a read-only snapshot mirror of my private development repository. I am n
 
 ## What's missing
 
-These folders are excluded from the mirror and do not exist here:
-
-- `assets/bg`, `assets/bg_thumbs` — shipped backgrounds/thumbs
-- `assets/characters` — character sprites since some of them contain NSFW imagery (breaches github's rules)
-- `assets/sound` — music/sfx that I don't have permission to redistribute
-- `assets/pose/poseMaterial` — the reference pictures the openpose skeletons were made from; the skeletons themselves are included
+- `assets/characters` — default characters are zipped so you can\'t preview their NSFW images on GitHub. Unzip them before use.
+- `assets/sound/music` and `assets/sound/ambient_music` — check `assets/sound/README.md` on how to obtain
 - `.github/` — the private repository's CI configuration.
+- `build/itch-page/` — the store page's pictures.
+- `private/` — the supporters ledger.
 
-and probably some other folders. If they're not here, I probably excluded them for some reason or other.
+and probably some other things. If they're not here, I probably excluded them for some reason or other.
 
 ## Running from this repo
 
-- `npm run dev` will start properly, but it'll have no backgrounds, no music/sfx and no pre-gen characters. Character generation should work: the pose
-  manifest and openpose skeletons under `assets/pose` are included.
+- Unzip the cast first. Every zip unpacks to `assets/characters/<id>/`, so from `assets/characters`:
+  `for z in *.zip; do unzip -q "$z"; done` (or extract each one in place with your archiver).
+- `npm run dev` then starts with the backgrounds, the sound effects and the pre-generated characters; only the music
+  tracks are missing. Character generation should work: the pose manifest and openpose skeletons under `assets/pose`
+  are included.
 - An external API is required to play. API keys are stored in `data/settings.json`, encrypted at rest
   with Windows DPAPI (Electron's `safeStorage`); where DPAPI is unavailable it falls back to
   storing the key as plain text in the same file.
-- The browser build (`npm run build:web`) won't work, it requires private assets
+- The browser build (`npm run build:web`) is untested from this repo.
 
 ## Building
 
@@ -50,7 +51,7 @@ Releases are Windows zips distributed on itch.io. To compare a release against t
    `git checkout vX.Y.Z && npm ci && npm run build`.
 3. Compare the built `out/main` and `out/preload` (which bundle no art) with the shipped copies.
 
-The two builds won't be byte identical since it's missing most of the assets.
+The two builds won't be byte identical since it's missing the music.
 
 ## Licence
 
