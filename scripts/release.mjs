@@ -176,9 +176,17 @@ async function assertDesktopPayload(version) {
     )
   }
 
-  const cast = await readdir(join(UNPACKED, 'resources/assets/characters'))
-  if (cast.length !== 24) {
-    throw new Error(`resources/assets/characters holds ${cast.length} characters, expected 24.`)
+  const shipped = (await readdir(join(REPO, 'assets/characters'))).sort()
+  const cast = (await readdir(join(UNPACKED, 'resources/assets/characters'))).sort()
+  if (cast.join('\n') !== shipped.join('\n')) {
+    const missing = shipped.filter((id) => !cast.includes(id))
+    const stray = cast.filter((id) => !shipped.includes(id))
+    throw new Error(
+      `resources/assets/characters holds ${cast.length} characters, but assets/characters has ${shipped.length}` +
+        (missing.length > 0 ? `; missing ${missing.join(', ')}` : '') +
+        (stray.length > 0 ? `; stray ${stray.join(', ')}` : '') +
+        '.'
+    )
   }
   if (existsSync(join(UNPACKED, 'resources/assets/bg'))) {
     throw new Error('resources/assets/bg was shipped; the renderer bundles the backgrounds.')
