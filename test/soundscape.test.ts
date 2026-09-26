@@ -336,7 +336,7 @@ describe('a wet sky', () => {
     expect(soundscapeOf(inGame({ weather: 'clear' })).ambience).toEqual({ key: null, fade: 0.5 })
   })
 
-  it('plays under a solo scene', () => {
+  it('plays under a solo scene, outdoors outside and through a window indoors', () => {
     const solo = inGame({
       landing: false,
       inScene: true,
@@ -345,6 +345,25 @@ describe('a wet sky', () => {
       weather: 'storm'
     })
     expect(soundscapeOf(solo).ambience).toEqual({ key: 'amb_outdoor_storm', fade: 1.5 })
+
+    // Alone in a room, the rain is heard the way a cast scene hears it: through the window.
+    const dorm = inGame({
+      landing: false,
+      inScene: true,
+      solo: true,
+      bg: { base: 'lowrise_dorm_room', kind: 'interior' },
+      weather: 'rain'
+    })
+    expect(soundscapeOf(dorm).ambience).toEqual({ key: 'amb_indoor_rain', fade: 1.5 })
+
+    const hers = inGame({
+      landing: false,
+      inScene: true,
+      solo: true,
+      bg: { base: 'room_ada_lin', kind: null },
+      weather: 'rain'
+    })
+    expect(soundscapeOf(hers).ambience).toEqual({ key: 'amb_indoor_rain', fade: 1.5 })
   })
 })
 

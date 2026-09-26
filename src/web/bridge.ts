@@ -1,7 +1,13 @@
 import type { ClassifierPromptRequest, ClassifierVerdict } from '@shared/classifier'
 import { base64ToBytes } from '@shared/base64'
 import { appError, toAppError } from '@shared/errors'
-import { assertEndingRequest, ENDING_PICTURE_SIZE, endingPicturePrompt } from '@shared/endingPicture'
+import {
+  assertEndingRequest,
+  ENDING_ART_FILE_NAME,
+  ENDING_PICTURE_SIZE,
+  endingPicturePrompt
+} from '@shared/endingPicture'
+import { imageTypeOf } from '@shared/imageBytes'
 import { cancelGroup, cancelKeys, runAbortable } from '@shared/jobQueue'
 import { LINEUP_MIME_TYPE } from '@shared/lineup'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
@@ -34,6 +40,7 @@ import * as chars from './chars'
 import * as saves from './db/saves'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
+import { offerDownload } from './download'
 import { emitter } from './emitter'
 import { exportLog, writeLogLine } from './log'
 import { currentSettings, patchSettings, rendererSettings } from './settings'
@@ -287,6 +294,18 @@ export function buildApi(): VenusUniversityApi {
         result('read the graduation picture', async () => {
           const bytes = await saves.readEndingArt(playthroughId)
           return bytes === null ? null : new Uint8Array(bytes)
+        }),
+      exportEndingArt: (playthroughId) =>
+        result('save the ending CG', async () => {
+          const bytes = await saves.readEndingArt(playthroughId)
+          if (bytes === null) {
+            throw appError(
+              'ENDING_ART_UNEXPORTABLE',
+              'Failed to save the ending CG.',
+              'No picture is stored for this playthrough.'
+            )
+          }
+          return offerDownload(ENDING_ART_FILE_NAME, bytes, imageTypeOf(bytes) ?? 'image/png')
         }),
       readProfilePicture: (playthroughId) =>
         result('read the profile picture', async () => {

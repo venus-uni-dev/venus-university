@@ -508,6 +508,10 @@ export async function startFarewellScene(charId: string): Promise<void> {
   game.setStreaming(true)
   // Without it the box keeps the ceremony's last line through the call.
   game.setWaitingForLine(true)
+  // A goodbye opens a scene from the landing like any other decision, so it is covered like
+  // one: the curtain goes up on the click and comes off the scene's first line, once the stage
+  // has drawn it.
+  coverSceneOpening()
 
   // The staging half alone: an epilogue owes no phone settle and no texting ledger.
   await stageCast([charId], { farewell: charId })
@@ -2102,10 +2106,13 @@ function abortSceneCall(): void {
 
 /**
  * Throws away the ending in progress — its goodbye call aside, which is the scene call's to
- * abort — and everything it banked, leaving the scene mid-way again. Writes nothing: the
- * interjection's own decision point follows it down the write chain.
+ * abort — and everything it banked, leaving the scene mid-way again, and drops the summary marks
+ * a rewrite during the ending held back. Writes nothing: the interjection's own decision point
+ * follows it down the write chain.
  */
 export function dropEnding(): void {
+  // First, while the ending still holds the lowest line it rewrote.
+  useGameStore.getState().dropEndingEdits()
   loopState.endingToken = {}
   void window.api.jobs.cancelGroup(ENDING_LLM_GROUP)
   // Woken so each parked call sees the fresh token and bails.

@@ -60,7 +60,6 @@ import {
   rowBounceFor,
   rowStill,
   sceneRow,
-  spin,
   statBadgeIn,
   stampSpinDay,
   stampSwayNight
@@ -136,11 +135,6 @@ export interface LandingChromeProps {
   /* What he may do about it. */
   actions: readonly LandingRow[]
   onSlotAction: (index: number) => void
-  /**
-   * Which row's call is out, if any. Its chevron turns into a ring for as long as it is —
-   * the wait's only report on a screen that draws no Go.
-   */
-  busyKey?: string
   action: string
   onAction: (value: string) => void
   onSubmit: () => void
@@ -463,7 +457,6 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
                 <SlotButton
                   action={slotAction}
                   dead={!held}
-                  busy={props.busyKey === slotAction.key}
                   onReach={setReaching}
                   onClick={() => props.onSlotAction(index)}
                 />
@@ -612,15 +605,12 @@ function AppButton({
 function SlotButton({
   action,
   dead,
-  busy,
   onReach,
   onClick
 }: {
   action: LandingRow
   /** The turn is not the player's — it is out on a call, or a line is still playing. */
   dead: boolean
-  /** This row's own call is the one that is out. */
-  busy: boolean
   /** The pointer is on this row, which stands the whole wave down ({@link rowStill}). */
   onReach: (reaching: boolean) => void
   onClick: () => void
@@ -670,9 +660,7 @@ function SlotButton({
       )}
       <span className="vu-landing-kind">{action.word ?? category.word}</span>
       <span className="vu-landing-doword">{action.text}</span>
-      {/* The row's own wait, in the mark's place. On a screen with no Go this is the only report
-          there is that the call went out, and the word beside it is the row's own. */}
-      {busy ? <motion.span className="vu-ring" animate={spin} /> : <ChevronIcon />}
+      <ChevronIcon />
     </motion.button>
   )
 }

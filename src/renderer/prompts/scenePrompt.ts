@@ -1488,8 +1488,8 @@ export const ACT_KINDS: ReadonlyArray<readonly [ActKind, string]> = [
 const EVENT_GLOSS: ReadonlyArray<readonly [string, string]> = [
   ['became_lovers', 'they agreed to be a couple in this scene'],
   ['broke_up', 'their relationship ended in this scene'],
-  ['friendzoned_by_reader', 'the reader turned her down or made it clear they\'re just friends'],
-  ['friendzoned_reader', 'she turned the reader down or made it clear they\'re just friends'],
+  ['friendzoned_by_reader', 'the reader turned her confession down or made it clear they\'re just friends'],
+  ['friendzoned_reader', 'she turned the reader\'s confession down or made it clear they\'re just friends'],
   [
     'gave_contact_info',
     'she gave the reader a way to reach her later or the reader gave his contact info: a phone number, email, Bunnyboard, or social media handle. Telling him where she lives or inviting him somewhere later also counts. Mentioning Bunnyboard in passing, or a campus or professor email does not count.'

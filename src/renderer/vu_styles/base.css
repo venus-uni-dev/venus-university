@@ -342,6 +342,14 @@ body {
   rotate: -3deg;
 }
 
+/* The sticker in the title tab's colours — accent-filled, accent ink — for a label that marks
+   the thing as the game's rather than the player's, such as an autosave beside manual slots. */
+.vu-sticker--accent {
+  border-color: var(--vu-accent);
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
 /* A set's count, drawn in what it is saying about itself: complete, short, or covered â€”
    where the art is hidden it reports nothing, a `7/7` over a cover being a boast about
    pictures the player cannot see. */

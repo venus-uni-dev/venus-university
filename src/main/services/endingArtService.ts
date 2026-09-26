@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises'
+import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'fs/promises'
 import { dirname } from 'path'
 import { appError, messageOf } from '@shared/errors'
 import { assertEndingRequest, ENDING_PICTURE_SIZE, endingPicturePrompt } from '@shared/endingPicture'
@@ -61,6 +61,20 @@ export async function readEndingArt(playthroughId: string): Promise<Buffer | nul
     throw appError(
       'ENDING_ART_UNREADABLE',
       'Failed to generate CG.',
+      messageOf(err)
+    )
+  }
+}
+
+/** Copies the picture to `to`, where the native save dialog pointed. */
+export async function copyEndingArtTo(playthroughId: string, to: string): Promise<void> {
+  assertSafePlaythroughId(playthroughId)
+  try {
+    await copyFile(getEndingArtPath(playthroughId), to)
+  } catch (err) {
+    throw appError(
+      'ENDING_ART_UNEXPORTABLE',
+      'Failed to save the ending CG.',
       messageOf(err)
     )
   }

@@ -1712,6 +1712,11 @@ export interface Settings {
    */
   warnEndingInterrupt?: boolean
   /**
+   * Whether rewriting a chat-log line during a scene's ending warns first. Optional on disk,
+   * absent meaning it does.
+   */
+  warnEndingEdit?: boolean
+  /**
    * The version the update check pretends this build is. **Not a player setting** — hand-edited
    * like {@link serviceTier}, for exercising an update against a build already on itch.io.
    */

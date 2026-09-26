@@ -32,6 +32,7 @@ const SETTINGS_REQUIRED: Record<
     | 'comfyGpu'
     | 'checkUpdates'
     | 'warnEndingInterrupt'
+    | 'warnEndingEdit'
     | 'updateAsVersion'
     | 'updateFeed'
     | 'secondaryModel'
@@ -251,6 +252,7 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     checkUpdates: patch.checkUpdates,
     // Absent stays absent, and absent is warning.
     warnEndingInterrupt: patch.warnEndingInterrupt,
+    warnEndingEdit: patch.warnEndingEdit,
     noNsfwImages: patch.noNsfwImages,
     lessNsfwText: patch.lessNsfwText,
     // Absent stays absent, as the volumes below do, and absent is the sound playing.

@@ -825,6 +825,45 @@ describe('editLogLine', () => {
     })
   })
 
+  it('holds the summaries during the ending until it is dropped, and lets them be when it ends', () => {
+    useGameStore.setState({ pendingLines: sceneLines('The quad.') })
+    useGameStore.getState().advanceLine()
+    playTurn('I wave.', sceneLines('a1', 'a2'))
+    useGameStore.getState().setSceneSummary('first', 1)
+    playTurn('I sit.', sceneLines('b1', 'b2'))
+    useGameStore.getState().setSceneSummary('second', 4)
+    useGameStore.setState({ sceneEnding: true })
+    const { sceneSummaries } = useGameStore.getState()
+
+    // A later line and then an earlier one: the floor is the lower of the two.
+    expect(useGameStore.getState().editLogLine(6, 'b2, reworded.')).toBe(5)
+    expect(useGameStore.getState().editLogLine(3, 'a2, reworded.')).toBe(2)
+    const held = useGameStore.getState()
+    expect(held.sceneLog[3]).toEqual({ speaker: '', text: 'a2, reworded.' })
+    expect(held.currentSceneTranscript[2]).toBe(held.sceneLog[3])
+    expect(held.currentSceneTranscript[5]).toBe(held.sceneLog[6])
+    expect(held.sceneSummaries).toBe(sceneSummaries)
+    expect(held).toMatchObject({ sceneSummary: 'second', endingEditAt: 2 })
+
+    // An interjection drops the ending, and with it the marks past the floor.
+    useGameStore.getState().dropEndingEdits()
+    expect(useGameStore.getState()).toMatchObject({
+      sceneSummary: 'first',
+      sceneSummaries: [{ at: 1, summary: 'first' }],
+      endingEditAt: null
+    })
+
+    // An ending that runs out keeps every mark.
+    useGameStore.getState().setSceneSummary('third', 6)
+    expect(useGameStore.getState().editLogLine(6, 'b2, again.')).toBe(5)
+    const marks = useGameStore.getState().sceneSummaries
+    useGameStore.getState().setSceneEnding(false)
+    const ended = useGameStore.getState()
+    expect(ended.endingEditAt).toBeNull()
+    expect(ended.sceneSummaries).toBe(marks)
+    expect(ended.sceneSummary).toBe('third')
+  })
+
   it('refuses the narration before the first action, the reader’s lines and a status line', () => {
     useGameStore.setState({ pendingLines: sceneLines('The quad.') })
     useGameStore.getState().advanceLine()

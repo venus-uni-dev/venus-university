@@ -378,6 +378,14 @@ interface GameStoreState {
    */
   lineRewound: number
   /**
+   * The lowest transcript index a rewrite during the scene's ending reached, or null. The summary
+   * marks past it are kept while the ending runs and dropped only if the ending is dropped, so a
+   * finished ending files the whole recap and an interjection carries the rewrite verbatim.
+   * **Transient** like {@link lineRewound}: never captured, and lost with the edit on a reload,
+   * which replays the banked ending's original words anyway.
+   */
+  endingEditAt: number | null
+  /**
    * How many beats past the shown line the reader has already read: the lines a rewind moved back
    * onto the head of {@link pendingLines}, the reader's own among them not counted, plus one for
    * the decision point when the rewind left one. Transient like {@link lineRewound}.
@@ -607,12 +615,20 @@ interface GameStoreState {
   /** Spends the beat the reread count held for the decision point, once it is reached. */
   clearReread: () => void
   /**
-   * Rewrites `sceneLog[at]`, a reply line, on the log, on its transcript line with every summary
-   * covering it dropped, and on screen when shown. Returns the transcript index rewritten, -1 when
-   * the transcript holds none, or null, changing nothing, when the line is the reader's, before
-   * his first action, a status line, or already says `text`.
+   * Rewrites `sceneLog[at]`, a reply line, on the log, on its transcript line, and on screen when
+   * shown. Every summary covering the line is dropped at once outside an ending; during one they
+   * are held for {@link dropEndingEdits} and the lowest index reached is kept as
+   * {@link endingEditAt}. Returns the transcript index rewritten, -1 when the transcript holds
+   * none, or null, changing nothing, when the line is the reader's, before his first action, a
+   * status line, or already says `text`.
    */
   editLogLine: (at: number, text: string) => number | null
+  /**
+   * Drops the summary marks past {@link endingEditAt} that a rewrite during the ending held back,
+   * and clears it. Nothing when no rewrite was made.
+   */
+  dropEndingEdits: () => void
+  /** Leaving the ending also clears {@link endingEditAt}, keeping every mark it held back. */
   setSceneEnding: (ending: boolean) => void
   setEndingInFlight: (inFlight: boolean) => void
   setStatusShown: (shown: boolean) => void
@@ -1266,6 +1282,7 @@ const initialState = {
   endingInFlight: false,
   statusShown: false,
   lineRewound: 0,
+  endingEditAt: null as number | null,
   reread: 0,
   awaitingInput: false,
   activeGameOver: null as GameOverReason | null,
@@ -1660,10 +1677,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({
       sceneLog,
       // A summary covering the rewritten line is dropped, so the next call reads it verbatim.
+      // During the ending the drop waits for an interjection, so an ending that runs out still
+      // files the whole recap.
       ...(mirrored
         ? {
             currentSceneTranscript: transcript.map((line, i) => (i === tAt ? edited : line)),
-            ...summariesWithin(state.sceneSummaries, tAt)
+            ...(state.sceneEnding
+              ? { endingEditAt: Math.min(state.endingEditAt ?? tAt, tAt) }
+              : summariesWithin(state.sceneSummaries, tAt))
           }
         : {}),
       ...(shown ? { currentLine: edited, lineRewound: state.lineRewound + 1 } : {})
@@ -1671,7 +1692,15 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return mirrored ? tAt : -1
   },
 
-  setSceneEnding: (ending) => set({ sceneEnding: ending }),
+  dropEndingEdits: () =>
+    set((state) =>
+      state.endingEditAt === null
+        ? {}
+        : { endingEditAt: null, ...summariesWithin(state.sceneSummaries, state.endingEditAt) }
+    ),
+
+  setSceneEnding: (ending) =>
+    set(ending ? { sceneEnding: true } : { sceneEnding: false, endingEditAt: null }),
 
   setEndingInFlight: (inFlight) => set({ endingInFlight: inFlight }),
 

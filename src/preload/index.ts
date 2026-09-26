@@ -121,6 +121,8 @@ const api: VenusUniversityApi = {
     generateEndingArt: (playthroughId, sheet, friendCount, group) =>
       ipcRenderer.invoke('saves:generateEndingArt', playthroughId, sheet, friendCount, group),
     readEndingArt: (playthroughId) => ipcRenderer.invoke('saves:readEndingArt', playthroughId),
+    exportEndingArt: (playthroughId) =>
+      ipcRenderer.invoke('saves:exportEndingArt', playthroughId),
     readProfilePicture: (playthroughId) =>
       ipcRenderer.invoke('saves:readProfilePicture', playthroughId),
     writeProfilePicture: (playthroughId, png) =>

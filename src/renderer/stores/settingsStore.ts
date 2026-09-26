@@ -144,8 +144,9 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     comfyDeferred: settings.comfyDeferred,
     // Carried, or a save made from anywhere else would turn the update check back on.
     checkUpdates: settings.checkUpdates,
-    // Carried, or a save made from anywhere else would turn the ending warning back on.
+    // Carried, or a save made from anywhere else would turn the ending warnings back on.
     warnEndingInterrupt: settings.warnEndingInterrupt,
+    warnEndingEdit: settings.warnEndingEdit,
     noNsfwImages: settings.noNsfwImages,
     lessNsfwText: settings.lessNsfwText,
     noNsfwSound: settings.noNsfwSound,

@@ -1,5 +1,5 @@
 import { rollProfessor } from '@shared/academics'
-import { CLASS_SLOTS, MAX_CLASS_SIZE } from '@shared/classes'
+import { CLASS_SLOTS, freeClassCode, MAX_CLASS_SIZE } from '@shared/classes'
 import { shuffle } from '@shared/shuffle'
 import {
   charKeyOf,
@@ -194,8 +194,7 @@ function swapInSwimClass(
     const fewest = Math.min(...load.values())
     const slot = shuffle(CLASS_SLOTS.filter((s) => load.get(s) === fewest))[0] as ClassSlot
 
-    let free = SWIM_CLASS.code as string
-    while (classes[free]) free = free.replace(/\d+$/, (n) => String(Number(n) + 1))
+    const free = freeClassCode(SWIM_CLASS.code, (c) => c in classes)
     // Nobody to inherit a coach from, so this is the one path that rolls its own.
     const instructor = rollProfessor(LAST_NAMES)
     classes[free] = {

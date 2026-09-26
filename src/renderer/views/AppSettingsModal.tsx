@@ -131,6 +131,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [warnEndingInterrupt, setWarnEndingInterrupt] = useState(
     settings?.warnEndingInterrupt !== false
   )
+  // And before a line is rewritten while an ending is under way.
+  const [warnEndingEdit, setWarnEndingEdit] = useState(settings?.warnEndingEdit !== false)
 
   // The typed fields, staged until Save. Each is the endpoint's own, seeded whichever provider
   // is stored, so a panel switched away and back finds them as they were.
@@ -379,6 +381,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     setWarnEndingInterrupt(checked)
     void write({ warnEndingInterrupt: checked }).then(
       reseed((stored) => setWarnEndingInterrupt(stored.warnEndingInterrupt !== false))
+    )
+  }
+
+  /** Whether rewriting a chat-log line in a scene that has started its ending asks first. */
+  function handleWarnEndingEditChange(checked: boolean): void {
+    setWarnEndingEdit(checked)
+    void write({ warnEndingEdit: checked }).then(
+      reseed((stored) => setWarnEndingEdit(stored.warnEndingEdit !== false))
     )
   }
 
@@ -669,9 +679,15 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             <SfwCheckList sfw={sfw} onChange={handleSfwChange} />
 
             <CheckField
+              id="settings-warn-ending-edit"
+              label="Warn when editing an ending scene"
+              checked={warnEndingEdit}
+              onChange={handleWarnEndingEditChange}
+            />
+
+            <CheckField
               id="settings-warn-ending-interrupt"
               label="Warn when interrupting an ending scene"
-              note="Toggles the confirmation modal when interjecting at the end of a scene."
               checked={warnEndingInterrupt}
               onChange={handleWarnEndingInterruptChange}
             />

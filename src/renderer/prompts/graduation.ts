@@ -74,7 +74,7 @@ export function graduationScrollLines(seniors: readonly string[]): SceneLine[] {
       text: `You follow the Gold road to the quad, which has been turned into a makeshift amphitheater overnight, filled with white folding chairs shaded by trees.`
     },
     {
-      text: `You find a seat near the back. For hours, black-gowned students filter up on stage to get their handshake and diploma.`
+      text: `You find a seat near the back. For hours, black-gowned students filter up on stage to get a handshake and a little piece of paper.`
     },
     {
       text:

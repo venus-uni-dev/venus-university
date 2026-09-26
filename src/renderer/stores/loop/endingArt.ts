@@ -11,6 +11,7 @@ import {
 import { loadWardrobeImage } from '../characterStore'
 import { useGameStore } from '../gameStore'
 import { retrySilently } from '../silentRetry'
+import { useUiStore } from '../uiStore'
 import { canvasToBase64 } from './encode'
 import { armEndingPosts } from './endingPosts'
 import { friendCharIds } from './farewells'
@@ -235,4 +236,17 @@ function armEndingArt(): void {
 export function armEpilogue(): void {
   armEndingArt()
   armEndingPosts()
+}
+
+/** Hands the reader a copy of the picture; false where the dialog was dismissed or it failed. */
+export async function exportEndingArt(): Promise<boolean> {
+  const playthroughId = useGameStore.getState().playthroughId
+  if (!playthroughId) return false
+
+  const result = await window.api.saves.exportEndingArt(playthroughId)
+  if (!result.ok) {
+    useUiStore.getState().showError(result.error)
+    return false
+  }
+  return result.data !== null
 }

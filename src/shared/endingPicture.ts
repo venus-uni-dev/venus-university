@@ -10,6 +10,9 @@ import type { ImageSize } from './providers'
 /** The reply's resolution: the picture is shown full-screen. */
 export const ENDING_PICTURE_SIZE: ImageSize = '4K'
 
+/** The name the picture is offered under when the reader downloads their own copy. */
+export const ENDING_ART_FILE_NAME = 'ending.png'
+
 /** Nothing this app builds puts more than a full roster on one sheet. */
 const MAX_ENDING_FRIENDS = 12
 

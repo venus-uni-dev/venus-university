@@ -320,6 +320,11 @@ export interface VenusUniversityApi {
     ) => Promise<Result<Uint8Array<ArrayBuffer>>>
     /** The picture already on disk, or `null` where there is none. */
     readEndingArt: (playthroughId: string) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
+    /**
+     * Saves a copy of the graduation picture where the native dialog points; `null`
+     * when the player cancels.
+     */
+    exportEndingArt: (playthroughId: string) => Promise<Result<string | null>>
     /** The reader's own picture kept beside the playthrough, or `null` where there is none. */
     readProfilePicture: (playthroughId: string) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
     /** Keeps the reader's picture, a PNG as base64, beside the playthrough. */

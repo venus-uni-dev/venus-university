@@ -8,6 +8,7 @@ import {
   type StructuredRequest
 } from '@shared/types'
 import { rollDifficulty, rollProfessor, type ClassKind } from '@shared/academics'
+import { freeClassCode } from '@shared/classes'
 import type { DormId } from '@shared/dorms'
 import { appError } from '@shared/errors'
 import { LAST_NAMES } from './characterSuggestions'
@@ -222,7 +223,7 @@ export function clamp(value: number, min: number, max: number, what: string): nu
   return held
 }
 
-/** Validates a reply and folds interest classes into the catalog. */
+/** Validates a reply, renumbers a colliding course code and folds interest classes into the catalog. */
 export function validateClassDraft(
   draft: ClassGenReply,
   roster: readonly Character[]
@@ -231,10 +232,16 @@ export function validateClassDraft(
   const seen = new Map<string, string>()
 
   const add = <T extends CourseDraft>(entry: T, origin: string): T => {
-    const code = (entry?.code ?? '').trim()
+    let code = (entry?.code ?? '').trim()
     if (!code) invalid(`${origin} has a blank course code.`)
     const prior = seen.get(code)
-    if (prior) invalid(`Course code "${code}" is used twice: ${prior} and ${origin}.`)
+    if (prior) {
+      const renumbered = freeClassCode(code, (c) => seen.has(c))
+      console.warn(
+        `[classes] Course code "${code}" is used twice: ${prior} and ${origin}; ${origin} is now "${renumbered}".`
+      )
+      code = renumbered
+    }
     seen.set(code, origin)
     return {
       ...entry,

@@ -114,3 +114,12 @@ export function studentsOf(
 ): string[] {
   return chars.filter((charId) => schedules[charId]?.schedule?.[entry.slot] === entry.code)
 }
+
+/** The first code from `code` upward whose trailing number `taken` does not claim. */
+export function freeClassCode(code: string, taken: (code: string) => boolean): string {
+  let free = /\d+$/.test(code) ? code : `${code} 101`
+  while (taken(free)) {
+    free = free.replace(/\d+$/, (n) => String(Number(n) + 1).padStart(n.length, '0'))
+  }
+  return free
+}

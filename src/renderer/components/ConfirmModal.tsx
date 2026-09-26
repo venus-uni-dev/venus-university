@@ -29,6 +29,8 @@ export interface ConfirmModalProps {
    */
   extraText?: string
   onExtra?: () => void
+  /** Locks the third answer alone, where what it offers is not there to give. */
+  extraDisabled?: boolean
   onConfirm: () => void
   /**
    * Omitted for a modal with only one way out: the dismiss button is then
@@ -60,6 +62,7 @@ export function ConfirmModal({
   lockOut = false,
   extraText,
   onExtra,
+  extraDisabled = false,
   onConfirm,
   onCancel,
   onDismiss
@@ -95,8 +98,8 @@ export function ConfirmModal({
               id={`${id}-extra`}
               className="vu-btn vu-btn--quiet"
               type="button"
-              disabled={busy}
-              {...gestures(busy, quietLift, quietPress)}
+              disabled={busy || extraDisabled}
+              {...gestures(busy || extraDisabled, quietLift, quietPress)}
               onClick={onExtra}
             >
               {extraText}

@@ -55,7 +55,7 @@ export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
     ],
     title: 'Thanks for playing!',
     message:
-      'Your university life is over... until next semester. Congratulations on making it to the end of the game! From the bottom of my heart, thank you for playing.'
+      'Your university life is over... until next semester. Congratulations on making it to the end of the game! If an ending CG was generated for you, I\'d love it if you would email me it! I\'ll take it as proof you finished the game and will add you to the credits as a special thank you.'
   },
   endingDebt: {
     lines: [

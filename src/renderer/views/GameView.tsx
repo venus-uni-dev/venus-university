@@ -40,6 +40,7 @@ import {
   isEpilogueNight,
   isGraduationSlot
 } from '../prompts/graduation'
+import { exportEndingArt } from '../stores/loop/endingArt'
 import { farewellOptions } from '../stores/loop/farewells'
 import {
   profileUrl,
@@ -627,8 +628,10 @@ export function GameView(): JSX.Element {
   const [uiHidden, setUiHidden] = useState(false)
   /** The reader has looked at the graduation picture. Unsaved, like `uiHidden`. */
   const [finDismissed, setFinDismissed] = useState(false)
-  /** The reader has turned the winning ending's last line. Unsaved, like `finDismissed`. */
+  /** The reader has turned the ending's last line. Unsaved, like `finDismissed`. */
   const [endingTurned, setEndingTurned] = useState(false)
+  /** The ending CG's file is being handed over. */
+  const [savingArt, setSavingArt] = useState(false)
   /** The eye clears the chrome off the stage, and every chrome fades it out for itself. */
   const hideUi = (): void => setUiHidden(true)
 
@@ -637,12 +640,6 @@ export function GameView(): JSX.Element {
    * through this and reports the wait on the Go button.
    */
   const [sending, setSending] = useState(false)
-  /**
-   * Which row of the epilogue's goodbye menu spent that turn. The landing turns exactly
-   * that row's chevron into a ring, which on a screen with no Go is the only report of the wait
-   * there is; it is cleared with {@link sending}, being the same wait said twice.
-   */
-  const [sentKey, setSentKey] = useState<string | null>(null)
   /** The scene chrome's box is still arriving, so the line it will hold does not type yet. */
   const [typeHeld, setTypeHeld] = useState(false)
   /** A click during that arrival, which lands the box rather than advancing past a line. */
@@ -999,10 +996,7 @@ export function GameView(): JSX.Element {
   // Cleared during render for the reveal counter's own reason: the reply's first line and the
   // end of the wait land in one commit (`loop/stream.ts`'s `emit`), and an effect would leave
   // the box a frame at the new line before the scene chrome's exit could take the old one away.
-  if (sending && !waitingForLine) {
-    setSending(false)
-    if (sentKey) setSentKey(null)
-  }
+  if (sending && !waitingForLine) setSending(false)
 
   useEffect(() => {
     // The scene chrome holds the line until the box that will hold it has arrived.
@@ -1078,8 +1072,8 @@ export function GameView(): JSX.Element {
     gameOver && pendingLines.length === 0 && fullyRevealed && !waitingForLine
   )
 
-  /** The winning ending's last line is still waiting on the click that turns it. */
-  const endingHeld = proseSettled && activeGameOver === 'gameComplete' && !endingTurned
+  /** The ending's last line is still waiting on the click that turns it. */
+  const endingHeld = proseSettled && !endingTurned
 
   /** The ending's prose has been read and put down. */
   const endingRead = proseSettled && !endingHeld
@@ -1280,8 +1274,9 @@ export function GameView(): JSX.Element {
       setRevealed(text.length)
       return
     }
-    // The winning ending's last line turns to the picture, not to `advance()`, which past
-    // the end of an ending would hand the turn back on a screen with nothing left to say.
+    // The ending's last line turns to what follows it — the picture when the game is won, the
+    // modal when it is lost — never to `advance()`, which past the end of an ending would hand
+    // the turn back on a screen with nothing left to say.
     if (endingHeld) {
       setEndingTurned(true)
       return
@@ -1415,10 +1410,10 @@ export function GameView(): JSX.Element {
         return
       }
       if (busy || blocked || !awaitingInput) return
-      setSentKey(chosen.key)
       // `startFarewellScene` raises `waitingForLine` synchronously, so the flag is never up
       // alone, and the render-time clear lowers `sending` again on the scene's first line —
-      // a slot button's own arrangement, one branch down.
+      // a slot button's own arrangement, one branch down. The wait itself is reported by the
+      // curtain the scene raises, as a slot button's is.
       setSending(true)
       void startFarewellScene(chosen.key.slice(FAREWELL_KEY.length))
       return
@@ -1813,7 +1808,6 @@ export function GameView(): JSX.Element {
           stats={stats}
           actions={epilogue ? epilogueActions : slotActions}
           onSlotAction={onSlotAction}
-          busyKey={sentKey ?? undefined}
           action={action}
           onAction={setAction}
           onSubmit={() => onSubmit(true)}
@@ -2264,6 +2258,12 @@ export function GameView(): JSX.Element {
             lockOut
             title={gameOver.title}
             message={gameOver.message}
+            extraText={activeGameOver === 'gameComplete' ? 'Download ending CG' : undefined}
+            extraDisabled={!endingArt || savingArt}
+            onExtra={() => {
+              setSavingArt(true)
+              void exportEndingArt().finally(() => setSavingArt(false))
+            }}
             confirmText="Return to the main menu"
             onConfirm={() => toMenu()}
           />

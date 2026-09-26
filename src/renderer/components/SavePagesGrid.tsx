@@ -30,6 +30,8 @@ export type SaveGridEntry =
       saveId: string
       /** The label hung over the cell's corner: which slot or which autosave it is. */
       sticker: string
+      /** The sticker wears the accent, as a title tab does, marking an autosave off from a slot. */
+      accent?: boolean
       headline: string
       meta: string
       /** Why the save cannot be loaded, said under its meta. */
@@ -40,7 +42,7 @@ export type SaveGridEntry =
       dead?: boolean
       deletable: boolean
     }
-  | { kind: 'empty'; slot: number; sticker: string }
+  | { kind: 'empty'; slot: number; sticker: string; accent?: boolean }
 
 /** A cell holding a save. */
 export type SaveGridCard = Extract<SaveGridEntry, { kind: 'card' }>
@@ -233,7 +235,9 @@ function SaveCell({
         </div>
       )}
 
-      <span className="vu-sticker vu-pages-sticker">{entry.sticker}</span>
+      <span className={`vu-sticker vu-pages-sticker${entry.accent ? ' vu-sticker--accent' : ''}`}>
+        {entry.sticker}
+      </span>
 
       {entry.kind === 'card' && entry.deletable && onDelete && (
         <DeleteX

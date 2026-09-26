@@ -1,14 +1,18 @@
 import { useCallback, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { READER_SPEAKER } from '@shared/types'
+import { CheckField } from '../components/CheckField'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { useFitToText } from '../components/useFitToText'
 import { graduationScrollLines, isEpilogueNight } from '../prompts/graduation'
 import { rewriteLine, speakerNameOf } from '../stores/gameLoop'
 import { seniorNames } from '../stores/loop/farewells'
+import { interjectOfferOf } from '../stores/loop/playback'
 import { useGameStore } from '../stores/gameStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { lineEditable } from '../stores/stageStep'
 import { sceneActiveOf, sceneOnScreenOf } from '../stores/textingLoop'
 import type { ScreenTheme } from './clockTheme'
@@ -25,9 +29,11 @@ export interface ChatLogModalProps {
 /**
  * The scene so far, as the player read it. Renders `sceneLog` and nothing else — never
  * `sceneSummary`, which is written for the model — and rewrites any reply line of it in place,
- * one row at a time, never the reader's own line or a status line, and none while the scene's
- * ending is under way. On the goodbye menu it holds the last goodbye instead, since the
- * epilogue's save carries no scene of its own to render, and nothing there can be rewritten.
+ * one row at a time, never the reader's own line or a status line. While the scene's ending is
+ * under way a line may still be rewritten for as long as the ending can be interrupted, behind a
+ * warning: the ending already banked keeps the original words. On the goodbye menu it holds the
+ * last goodbye instead, since the epilogue's save carries no scene of its own to render, and
+ * nothing there can be rewritten.
  */
 export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element | null {
   const sceneLog = useGameStore((s) => s.sceneLog)
@@ -36,6 +42,7 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const time = useGameStore((s) => s.time)
   const graduationSeen = useGameStore((s) => s.graduationSeen)
   const sceneEnding = useGameStore((s) => s.sceneEnding)
+  const offer = useGameStore(interjectOfferOf)
   const sceneActive = useGameStore(sceneActiveOf)
   const inScene = useGameStore(sceneOnScreenOf)
   const { host, overlayProps } = useModalShell(onClose)
@@ -45,6 +52,8 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
    * It lives only as long as the modal: closing mid-edit drops the rewrite without asking.
    */
   const [edit, setEdit] = useState<{ at: number; text: string } | null>(null)
+  /** The ask in front of saving a rewrite during the ending is up. */
+  const [confirmEdit, setConfirmEdit] = useState(false)
 
   /** The goodbye menu itself, rather than one of the goodbyes it opens. */
   const menu = isEpilogueNight(date, time, graduationSeen) && !sceneActive
@@ -75,125 +84,199 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
     if (box) box.scrollTop = box.scrollHeight
   }, [])
 
+  /** Saves the box, asking first during an ending unless the player has said not to. */
+  function onSaveLine(): void {
+    if (!edit) return
+    const changed = edit.text !== sceneLog[edit.at]?.text
+    const warns = useSettingsStore.getState().settings?.warnEndingEdit !== false
+    if (changed && sceneEnding && warns) {
+      setConfirmEdit(true)
+      return
+    }
+    commitEdit()
+  }
+
+  /** Hands the box's words to the rewrite and closes the box. */
+  function commitEdit(): void {
+    if (!edit) return
+    rewriteLine(edit.at, edit.text)
+    setEdit(null)
+  }
+
   if (!host) return null
 
   return createPortal(
-    <motion.div
-      className="vu-veil"
-      data-theme={theme}
-      variants={veilIn}
-      initial="hidden"
-      animate="shown"
-      exit="gone"
-      {...overlayProps}
-    >
+    <>
       <motion.div
-        id="chat-log"
-        className="vu-sheet vu-chatlog vu-paper"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Chat log"
-        variants={panelUnderTab}
+        className="vu-veil"
+        data-theme={theme}
+        variants={veilIn}
+        initial="hidden"
+        animate="shown"
+        exit="gone"
+        {...overlayProps}
       >
-        <TitleTab>Chat log</TitleTab>
+        <motion.div
+          id="chat-log"
+          className="vu-sheet vu-chatlog vu-paper"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chat log"
+          variants={panelUnderTab}
+        >
+          <TitleTab>Chat log</TitleTab>
 
-        <div className="vu-scroll-box">
-          {/* The second well in the app that opts back into selection, after the error's. */}
-          <div className="vu-chatlog-body" ref={scrollToLatest} data-cursor="text">
-            {visible.length === 0 ? (
-              <p className="vu-empty vu-chatlog-empty">Nothing has happened yet.</p>
-            ) : (
-              visible.map((line, index) => {
-                const speaker = speakerNameOf(line)
-                // The player's own submissions are set apart.
-                const reader = line.speaker === READER_SPEAKER
-                // The line's own place in `sceneLog`, which is what a rewrite is keyed on.
-                const at = start + index
-                const editable = !menu && !sceneEnding && lineEditable(sceneLog, at)
-                const editing = editable && edit?.at === at
-                return (
-                  // Lines carry no id and the list is append-only, so the index is the key.
-                  <div
-                    className={`vu-row vu-chatlog-line${reader ? ' vu-chatlog-line--reader' : ''}`}
-                    key={index}
-                  >
-                    <div className="vu-chatlog-line-body">
-                      {speaker && <span className="vu-chatlog-speaker">{speaker}</span>}
-                      {editing ? (
-                        <LineEditBox
-                          text={edit.text}
-                          onChange={(text) => setEdit({ at, text })}
-                        />
-                      ) : (
-                        <span className="vu-chatlog-text">{line.text}</span>
-                      )}
+          <div className="vu-scroll-box">
+            {/* The second well in the app that opts back into selection, after the error's. */}
+            <div className="vu-chatlog-body" ref={scrollToLatest} data-cursor="text">
+              {visible.length === 0 ? (
+                <p className="vu-empty vu-chatlog-empty">Nothing has happened yet.</p>
+              ) : (
+                visible.map((line, index) => {
+                  const speaker = speakerNameOf(line)
+                  // The player's own submissions are set apart.
+                  const reader = line.speaker === READER_SPEAKER
+                  // The line's own place in `sceneLog`, which is what a rewrite is keyed on.
+                  const at = start + index
+                  // During the ending, only while an interjection could still carry the rewrite.
+                  const editable =
+                    !menu && lineEditable(sceneLog, at) && (!sceneEnding || offer !== 'none')
+                  const editing = editable && edit?.at === at
+                  return (
+                    // Lines carry no id and the list is append-only, so the index is the key.
+                    <div
+                      className={`vu-row vu-chatlog-line${reader ? ' vu-chatlog-line--reader' : ''}`}
+                      key={index}
+                    >
+                      <div className="vu-chatlog-line-body">
+                        {speaker && <span className="vu-chatlog-speaker">{speaker}</span>}
+                        {editing ? (
+                          <LineEditBox
+                            text={edit.text}
+                            onChange={(text) => setEdit({ at, text })}
+                          />
+                        ) : (
+                          <span className="vu-chatlog-text">{line.text}</span>
+                        )}
+                      </div>
+                      {/* Every row keeps the column, empty where the line cannot be rewritten, so
+                          the words line up down the log. */}
+                      <div className="vu-chatlog-tools">
+                        {editing ? (
+                          <>
+                            <motion.button
+                              className="vu-chatlog-tool"
+                              type="button"
+                              aria-label="Save line"
+                              disabled={!edit.text.trim()}
+                              {...gestures(!edit.text.trim(), quietLift, quietPress)}
+                              onClick={onSaveLine}
+                            >
+                              <CheckIcon />
+                            </motion.button>
+                            <motion.button
+                              className="vu-chatlog-tool"
+                              type="button"
+                              aria-label="Discard edit"
+                              {...gestures(false, quietLift, quietPress)}
+                              onClick={() => setEdit(null)}
+                            >
+                              <CloseIcon />
+                            </motion.button>
+                          </>
+                        ) : (
+                          editable && (
+                            // Opening one row's box drops whatever another row had in its own.
+                            <motion.button
+                              className="vu-chatlog-tool"
+                              type="button"
+                              aria-label="Edit line"
+                              {...gestures(false, quietLift, quietPress)}
+                              onClick={() => setEdit({ at, text: line.text })}
+                            >
+                              <PencilIcon />
+                            </motion.button>
+                          )
+                        )}
+                      </div>
                     </div>
-                    {/* Every row keeps the column, empty where the line cannot be rewritten, so
-                        the words line up down the log. */}
-                    <div className="vu-chatlog-tools">
-                      {editing ? (
-                        <>
-                          <motion.button
-                            className="vu-chatlog-tool"
-                            type="button"
-                            aria-label="Save line"
-                            disabled={!edit.text.trim()}
-                            {...gestures(!edit.text.trim(), quietLift, quietPress)}
-                            onClick={() => {
-                              rewriteLine(edit.at, edit.text)
-                              setEdit(null)
-                            }}
-                          >
-                            <CheckIcon />
-                          </motion.button>
-                          <motion.button
-                            className="vu-chatlog-tool"
-                            type="button"
-                            aria-label="Discard edit"
-                            {...gestures(false, quietLift, quietPress)}
-                            onClick={() => setEdit(null)}
-                          >
-                            <CloseIcon />
-                          </motion.button>
-                        </>
-                      ) : (
-                        editable && (
-                          // Opening one row's box drops whatever another row had in its own.
-                          <motion.button
-                            className="vu-chatlog-tool"
-                            type="button"
-                            aria-label="Edit line"
-                            {...gestures(false, quietLift, quietPress)}
-                            onClick={() => setEdit({ at, text: line.text })}
-                          >
-                            <PencilIcon />
-                          </motion.button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                  )
+                })
+              )}
+            </div>
+            <div className="vu-scroll-fade" />
           </div>
-          <div className="vu-scroll-fade" />
-        </div>
 
-        {/* A panel with nothing to spend has one answer. */}
-        <div className="vu-foot">
-          <motion.button
-            id="chat-log-close"
-            className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
-            type="button"
-            {...gestures(false, lift, press)}
-            onClick={onClose}
-          >
-            Close
-          </motion.button>
-        </div>
+          {/* A panel with nothing to spend has one answer. */}
+          <div className="vu-foot">
+            <motion.button
+              id="chat-log-close"
+              className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
+              type="button"
+              {...gestures(false, lift, press)}
+              onClick={onClose}
+            >
+              Close
+            </motion.button>
+          </div>
+        </motion.div>
       </motion.div>
-    </motion.div>,
+
+      {/* A sibling of the veil, not a child: a click inside it does not reach the veil's own
+          handler through the React tree. Cancel leaves the box open with its words. */}
+      <AnimatePresence propagate>
+        {confirmEdit && (
+          <EditEndingModal
+            key="edit-ending"
+            theme={theme}
+            onCancel={() => setConfirmEdit(false)}
+            onConfirm={(mute) => {
+              if (mute) void useSettingsStore.getState().update({ warnEndingEdit: false })
+              setConfirmEdit(false)
+              commitEdit()
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>,
     host
+  )
+}
+
+/**
+ * The ask in front of rewriting a line during a scene's ending: that what the ending already sent
+ * goes on with the old words, and the box that stops it being asked again, which the answer
+ * carries.
+ */
+function EditEndingModal({
+  theme,
+  onConfirm,
+  onCancel
+}: {
+  theme: ScreenTheme
+  onConfirm: (mute: boolean) => void
+  onCancel: () => void
+}): JSX.Element {
+  const [mute, setMute] = useState(false)
+  return (
+    <ConfirmModal
+      id="edit-ending"
+      theme={theme}
+      title="Edit ending scene?"
+      message="Bookkeeping prompts have already been sent. Your changes won't be reflected unless you insert another action."
+      aside={
+        <CheckField
+          id="edit-ending-mute"
+          label="Don't warn me again"
+          checked={mute}
+          onChange={setMute}
+        />
+      }
+      confirmText="Save"
+      cancelText="Cancel"
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(mute)}
+    />
   )
 }
 

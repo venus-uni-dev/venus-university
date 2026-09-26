@@ -209,13 +209,18 @@ describe('writerModelOf and secondaryModelOf', () => {
 })
 
 describe('mergePatch — the optional switches', () => {
-  it('carries the ending warning turned off, and leaves an absent one absent', () => {
+  it('carries the ending warnings turned off, and leaves an absent one absent', () => {
     // Absent is warning, so a save that dropped the field would turn the warning back on.
-    const off = mergePatch(settings(), settingsPatch({ warnEndingInterrupt: false }))
+    const off = mergePatch(
+      settings(),
+      settingsPatch({ warnEndingInterrupt: false, warnEndingEdit: false })
+    )
     expect(off.warnEndingInterrupt).toBe(false)
+    expect(off.warnEndingEdit).toBe(false)
 
     const untouched = mergePatch(settings(), settingsPatch())
     expect(untouched.warnEndingInterrupt).toBeUndefined()
+    expect(untouched.warnEndingEdit).toBeUndefined()
   })
 })
 

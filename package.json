@@ -1,6 +1,6 @@
 {
   "name": "venus-university",
-  "version": "0.1.5",
+  "version": "0.1.9",
   "description": "Venus University is a dating sim where you can say and do anything.",
   "main": "./out/main/index.js",
   "author": "Venus Dev",

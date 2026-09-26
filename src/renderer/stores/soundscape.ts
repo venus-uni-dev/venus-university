@@ -220,13 +220,16 @@ function gameMix(facts: SoundFacts): Soundscape {
   }
 
   // A solo scene keeps the landing's theme and stays out of the room, except for a wet sky:
-  // rain and thunder are heard right through it, same as on the landing itself. The theme is
-  // named rather than kept, so a save loaded straight into one starts the right half's.
+  // it is heard the way a cast scene hears it, the outdoor loop where the reader is outside
+  // and rain through a window anywhere else. The theme is named rather than kept, so a save
+  // loaded straight into one starts the right half's.
   if (game.inScene) {
     return {
       music: { key: theme, fade: LANDING },
       ambience: {
-        key: isWet(game.weather) ? outdoorAmbience(game.half, game.weather) : null,
+        key: isWet(game.weather)
+          ? ambienceFor(game.bg.base, game.bg.kind, game.half, game.weather)
+          : null,
         fade: SCENE
       },
       ...cg

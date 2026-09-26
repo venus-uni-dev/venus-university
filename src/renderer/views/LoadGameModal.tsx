@@ -123,7 +123,8 @@ function cardOf(entry: ResolvedSave, sticker: string): SaveGridCard {
 /**
  * One page of a playthrough's saves, ten cells in slot order, laid down the columns. Page 0 is
  * the scene autosave and then the newest boundary autosaves; every page after it is ten manual
- * slots in order. A slot with nothing in it is a gap wearing the same sticker.
+ * slots in order. A slot with nothing in it is a gap wearing the same sticker. Every sticker on
+ * page 0 wears the accent, so an autosave never reads as a slot the player filled.
  */
 export function pageEntriesOf(saves: readonly ResolvedSave[], page: number): SaveGridEntry[] {
   if (page === 0) {
@@ -131,13 +132,17 @@ export function pageEntriesOf(saves: readonly ResolvedSave[], page: number): Sav
     const boundary = saves.filter((entry) => classifySaveId(entry.saveId) === 'boundary')
     const cells: SaveGridEntry[] = [
       autosave
-        ? cardOf(autosave, 'SCENE AUTOSAVE')
-        : { kind: 'empty', slot: 0, sticker: 'SCENE AUTOSAVE' }
+        ? { ...cardOf(autosave, 'SCENE AUTOSAVE'), accent: true }
+        : { kind: 'empty', slot: 0, sticker: 'SCENE AUTOSAVE', accent: true }
     ]
     for (let i = 0; i < MAX_SLOT_SAVES; i++) {
       const sticker = `AUTOSAVE ${i + 1}`
       const entry = boundary[i]
-      cells.push(entry ? cardOf(entry, sticker) : { kind: 'empty', slot: i + 1, sticker })
+      cells.push(
+        entry
+          ? { ...cardOf(entry, sticker), accent: true }
+          : { kind: 'empty', slot: i + 1, sticker, accent: true }
+      )
     }
     return cells
   }

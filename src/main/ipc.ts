@@ -112,6 +112,7 @@ import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm
 import { listModels, testWriter } from '@shared/llm/endpointProbe'
 import { backupName } from '@shared/backup'
 import { exportFileName } from '@shared/characterTransfer'
+import { ENDING_ART_FILE_NAME } from '@shared/endingPicture'
 import { useSettingsSource } from '@shared/llm/settingsPort'
 import { setTokenSink } from '@shared/llm/tokenPort'
 import { logExportName, logRecordOf } from '@shared/logRules'
@@ -123,7 +124,7 @@ import {
   runAbortable,
   setProgressSink
 } from '@shared/jobQueue'
-import { generateEndingArt, readEndingArt } from './services/endingArtService'
+import { copyEndingArtTo, generateEndingArt, readEndingArt } from './services/endingArtService'
 import {
   deleteProfilePicture,
   readProfilePicture,
@@ -355,6 +356,18 @@ export function registerIpcHandlers(): void {
       runAbortable(group, (signal) => generateEndingArt(playthroughId, sheet, friendCount, signal))
   )
   handle('saves:readEndingArt', (_event, playthroughId: string) => readEndingArt(playthroughId))
+  // A copy of the picture, saved where the native dialog points; a dismissed dialog resolves `null`.
+  handle('saves:exportEndingArt', async (event, playthroughId: string) => {
+    const { canceled, filePath } = await showSaveDialogFor(event, {
+      title: 'Save ending CG',
+      defaultPath: ENDING_ART_FILE_NAME,
+      filters: [{ name: 'PNG image', extensions: ['png'] }]
+    })
+    if (canceled || filePath === undefined || filePath === '') return null
+
+    await copyEndingArtTo(playthroughId, filePath)
+    return filePath
+  })
 
   // The reader's own picture.
   handle('saves:readProfilePicture', (_event, playthroughId: string) =>

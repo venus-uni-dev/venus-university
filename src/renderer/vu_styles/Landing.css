@@ -422,15 +422,6 @@
   opacity: 0.75;
 }
 
-/* The wait that stands in the chevron's place while this row's call is out: the mark's own
-   size and the mark's own tone, so nothing else in the row moves when the two swap. */
-.vu-landing-do .vu-ring {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  opacity: 0.75;
-}
-
 /* Somewhere to go, where the hour has nothing already in it: **quiet**, because a suggestion is
    not a commitment — an outline on a translucent surface, no fill and no paper layer, so the
    three commitments above it stay the loud things in the column. */
