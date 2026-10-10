@@ -244,25 +244,26 @@ export function buildProfilePrompt(roster: readonly Character[]): StructuredRequ
     properties: {
       year: intField(1, 4),
       classesTaken: intField(3, 6),
-      // Closed like `job`: the dorm list is code, identical in every save.
+      // The dorm list is code, identical in every save.
       dorm: { type: 'string', enum: [...DORM_IDS] },
-      job: { type: 'string', enum: ['', ...JOB_CATALOG.map((def) => def.id)] },
+      // Free strings, not their menus as enums: '' is the ordinary answer and Gemini rejects an
+      // empty-string enum value.
+      job: { type: 'string' },
       jobShifts: intField(0, MAX_NPC_SHIFTS),
       homeSlots: intField(MIN_HOME_SLOTS, MAX_HOME_SLOTS),
-      // Closed for `job`'s reason; `''` is legal in the two optional ones and is the ordinary answer.
-      study: { type: 'string', enum: ['', ...Object.keys(STUDY_LOCATIONS)] },
+      study: { type: 'string' },
       fun: {
         type: 'array',
         maxItems: MAX_FUN_LOCATIONS,
         items: { type: 'string', enum: [...Object.keys(FUN_LOCATIONS)] }
       },
-      // Her own phrase, unlike the closed menus: the place it happens at rides `activityLocation`.
+      // Her own phrase: the place it happens at rides `activityLocation`.
       activity: { type: 'string' },
       handle: { type: 'string' },
       winterPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } },
       springBreakPlans: { type: 'string' },
-      activityLocation: { type: 'string', enum: ['', ...Object.keys(ACTIVITY_LOCATIONS)] },
-      meal: { type: 'string', enum: ['', ...Object.keys(MEAL_LOCATIONS)] }
+      activityLocation: { type: 'string' },
+      meal: { type: 'string' }
     }
   }
 

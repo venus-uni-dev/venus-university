@@ -18,7 +18,7 @@ export async function classifyCloud(
     {
       system: request.system,
       user: request.user,
-      schema: { name: 'classifier', schema: buildClassifierFormat(request.classCodes) },
+      schema: { name: 'classifier', schema: buildClassifierFormat() },
       cacheKey: 'classifier',
       // The classifier is judged better at a floor of low.
       minThinking: 'low'

@@ -1066,12 +1066,13 @@ function sceneSchema(
   wantSummary: boolean,
   wantEnd: boolean
 ): { name: string; schema: Record<string, unknown> } {
-  const charKeys = cast.map((c) => charKeyOf(c.firstName, c.lastName))
   const actions = actionEnum(cast, state)
 
   // An empty `enum` is not a legal schema, so a solo scene drops `actions` instead.
   const lineProperties: Record<string, unknown> = {
-    speaker: { type: 'string', enum: ['', ...charKeys] },
+    // A free string, not the cast as an enum: '' is narration, and Gemini rejects an
+    // empty-string enum value.
+    speaker: { type: 'string' },
     ...(actions.length > 0
       ? { actions: { type: 'array', items: { type: 'string', enum: actions } } }
       : {}),

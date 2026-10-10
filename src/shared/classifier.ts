@@ -5,8 +5,8 @@ export interface ClassifierPromptRequest {
   system: string
   user: string
   /**
-   * Codes of the classes meeting in this slot, in list order — not prompt text; main turns them
-   * into the `classCode` enum.
+   * Codes of the classes meeting in this slot, in list order — not prompt text; the reply's
+   * `classCode` is matched back against them.
    */
   classCodes: string[]
 }
@@ -144,10 +144,11 @@ export function buildClassifierPrompt(
 }
 
 /**
- * Structured-output schema for one call, built per call because `classCode`'s enum is
- * this slot's class list.
+ * Structured-output schema for the classifier's reply. `classCode` is a free string rather than
+ * this slot's class list as an enum: Gemini rejects an empty-string `enum` value and `''` is the
+ * ordinary answer, so the verdict is matched back against `classCodes` after the call instead.
  */
-export function buildClassifierFormat(classCodes: readonly string[]): Record<string, unknown> {
+export function buildClassifierFormat(): Record<string, unknown> {
   return {
     type: 'object',
     properties: {
@@ -156,7 +157,7 @@ export function buildClassifierFormat(classCodes: readonly string[]): Record<str
       mentionedOnly: { type: 'array', items: { type: 'string' } },
       goingToClass: { type: 'boolean' },
       // '' is always legal: class but no code given, and the only value when nothing is meeting.
-      classCode: { type: 'string', enum: ['', ...classCodes] },
+      classCode: { type: 'string' },
       goingToWork: { type: 'boolean' },
       workingOnProject: { type: 'boolean' },
       projectClassCode: { type: 'string' },

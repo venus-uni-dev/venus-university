@@ -1075,11 +1075,22 @@ function sceneDecision(input) {
 
 /* ---- Scene replies ---------------------------------------------------------------------- */
 
+/** The charKeys the scene prompt's `CAST` block lists — the one place they are written down. */
+function castKeysOf(user) {
+  const lines = String(user).split('\n')
+  const start = lines.indexOf('CAST')
+  const end = start === -1 ? -1 : lines.indexOf('NOW', start)
+  const region = start === -1 ? [] : lines.slice(start + 1, end === -1 ? undefined : end)
+  return region
+    .map((line) => line.match(/^([a-z0-9_]+) — (.+)\.$/)?.[1])
+    .filter((key) => typeof key === 'string')
+}
+
 /** What the scene schema offers: cast, legal actions and backgrounds, and which call it is. */
-function sceneShape(schema) {
+function sceneShape(schema, user) {
   const props = schema.properties ?? {}
   const lineProps = props.lines?.items?.properties ?? {}
-  const castKeys = (lineProps.speaker?.enum ?? ['']).filter(Boolean)
+  const castKeys = castKeysOf(user)
   const hasSummary = 'summary' in props
   const hasEnd = 'end_scene' in props
   const kind =
@@ -1361,7 +1372,7 @@ function onStageKeys(user, d, castKeys) {
  * chunk boundaries concatenate to precisely what `chunks.join('')` says.
  */
 function sceneReply(schema, userText) {
-  const shape = sceneShape(schema)
+  const shape = sceneShape(schema, userText)
   const now = parseNow(userText)
   const slotKey = now ? `${now.date}:${now.time}` : `x:${hash(userText.slice(-400))}`
   learnEnrolled(userText)
@@ -1913,7 +1924,7 @@ async function handleChatCompletions(req, res) {
       reply = sceneReply(schema, userText)
     } catch (err) {
       console.error('[mock] DIRECTOR ERROR (scene):', err)
-      const shape = sceneShape(schema)
+      const shape = sceneShape(schema, userText)
       const lines = [{ speaker: '', text: 'The hour passes without much to say about it.', ...(shape.bgEnum[0] ? { bg: legalBg('quad', shape.bgEnum) } : {}) }]
       const obj = { lines, ...(shape.hasSummary ? { summary: 'The reader spent the hour quietly.' } : {}), ...(shape.hasEnd ? { end_scene: true } : {}) }
       reply = { kind: shape.kind, chunks: [JSON.stringify(obj)], d: null }
