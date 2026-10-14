@@ -8,6 +8,7 @@ import { randomId } from '@shared/uuid'
 import { checkZipListing, MAX_ZIP_BYTES, MAX_ZIP_ENTRIES, type ZipEntry } from '@shared/zipRules'
 import { getTempPath } from '../paths'
 import { sniffImageFile } from './imageFiles'
+import { renameWithPatience } from './jsonFile'
 
 /**
  * The bundled 7-Zip. Packaged, `7zip-bin` is read out of the asar, whose paths `spawn` cannot
@@ -60,6 +61,19 @@ export async function createZip(sourceDir: string, archivePath: string): Promise
       reject(appError('ZIP_CREATE_FAILED', `Could not write ${archivePath}.`, messageOf(err)))
     })
   })
+}
+
+/** Replace an export only after a separate, complete ZIP has been created and listed. */
+export async function replaceZip(sourceDir: string, targetPath: string): Promise<void> {
+  const pending = `${targetPath}.${randomId()}.tmp`
+  try {
+    await createZip(sourceDir, pending)
+    await listZip(pending)
+    await renameWithPatience(pending, targetPath)
+  } finally {
+    // Never remove the destination: it may still be the player's previous good export.
+    await rm(pending, { force: true }).catch(() => {})
+  }
 }
 
 /** One listed entry, read off the property map 7-Zip's `-slt` output was parsed into. */

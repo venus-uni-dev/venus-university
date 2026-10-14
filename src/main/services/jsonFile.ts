@@ -74,7 +74,7 @@ export async function readValidatedJson<T extends object>(
 }
 
 /** Renames, waiting out the ladder while the target is held by another process. */
-async function renameWithPatience(from: string, to: string): Promise<void> {
+export async function renameWithPatience(from: string, to: string): Promise<void> {
   for (const wait of RENAME_RETRY_WAITS_MS) {
     try {
       await rename(from, to)

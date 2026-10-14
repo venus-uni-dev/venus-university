@@ -24,7 +24,7 @@ import { getCharacterPath, getCharactersPath } from '../paths'
 import {
   checkExtractedContent,
   copyInto,
-  createZip,
+  replaceZip,
   discard,
   extractZip,
   relPathsUnder,
@@ -58,13 +58,7 @@ export async function exportCharacter(charId: string, targetPath: string): Promi
       message: 'Could not write the export manifest.'
     })
 
-    // 7-Zip's `a` updates an existing archive, so an old zip must go first.
-    await rm(targetPath, { force: true })
-    await createZip(stagingDir, targetPath)
-  } catch (err) {
-    // A half-written zip is worse than none: it opens, and it is not her.
-    await rm(targetPath, { force: true }).catch(() => {})
-    throw err
+    await replaceZip(stagingDir, targetPath)
   } finally {
     await discard(stagingDir)
   }
