@@ -328,10 +328,11 @@
 - A right-click closes the panel in front as Escape does, and on the bare stage opens the menu.
 - The well takes the focus the moment the turn is the player's, and Enter on an empty well sends nothing.
 - The well is put away the moment a reply starts to be read, whatever the pointer sits over, and comes back only on a mouse move across the divider's strip, never on a pointer merely resting there; it takes the focus only on a click or Tab.
-- The strip lies inside the one-line well's own box and is the row's only hover zone while the well is away: the hidden well's box, Go's seat, the Gift and the tips mark all give the pointer up.
+- The strip lies inside the one-line well's own box and is the row's only hover zone while the well is away: the hidden well's box, Go's seat, End scene, the Gift and the tips mark all give the pointer up.
 - The dialogue box drops onto the strip while the well is away and rises again with the well.
 - A row going down mid-reply keeps the divider standing and the well away as it fades; the offer it loses on the way out swaps nothing in under the fade.
 - The tips mark and the Gift stand only while the well is out, and fade with it; the Gift keeps its place in the row either way, so nothing beside it moves as the row changes over, and while it is out it holds the well out as Go does.
+- End scene is the Gift's twin on the same terms, a quiet half-pill standing to the Gift's right; no rule stands between Go, the Gift and End scene.
 - The row stands over a reply's last line as it does any other, and hands over to the turn's well only on the click past it.
 - The well's draft is cleared when a line turns, forward or back; a press outside it leaves the words standing.
 - A picture a cut mounts decodes synchronously, there being nothing left underneath it to hide a deferred decode.

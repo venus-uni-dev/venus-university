@@ -2012,7 +2012,9 @@ function ledgerSchema(
   rosterKeys: readonly string[],
   // Null when the scene was not a class; `factoid` is for a lecture class only.
   classScene: { factoid: boolean } | null,
-  castStats: boolean
+  castStats: boolean,
+  // The scene's recap, asked for last of all when nothing else will write one.
+  recap: boolean
 ): { name: string; schema: Record<string, unknown> } {
   const charKey = { type: 'string', enum: [...charKeys] }
   // Dropped whole when no plans are asked for: an uninstructed field invites filling.
@@ -2042,15 +2044,23 @@ function ledgerSchema(
     : {}
   const classRequired = Object.keys(classProps)
 
+  const recapProps: Record<string, unknown> = recap ? { summary: { type: 'string' } } : {}
+  const recapRequired = Object.keys(recapProps)
+
   const memoryType = { type: 'string', enum: [...MEMORY_TYPES] }
 
   if (charKeys.length === 0) {
-    return objectSchema('ledger', ['stats', 'spent', 'expelled', ...classRequired], {
-      stats,
-      spent,
-      expelled,
-      ...classProps
-    })
+    return objectSchema(
+      'ledger',
+      ['stats', 'spent', 'expelled', ...classRequired, ...recapRequired],
+      {
+        stats,
+        spent,
+        expelled,
+        ...classProps,
+        ...recapProps
+      }
+    )
   }
 
   return objectSchema(
@@ -2063,7 +2073,8 @@ function ledgerSchema(
       'expelled',
       ...planRequired,
       ...(castStats ? ['stats'] : []),
-      ...classRequired
+      ...classRequired,
+      ...recapRequired
     ],
     {
       spent,
@@ -2108,7 +2119,8 @@ function ledgerSchema(
             chars: { type: 'array', items: charKey }
           }
         }
-      }
+      },
+      ...recapProps
     }
   )
 }
@@ -2145,7 +2157,9 @@ export function buildLedgerPrompt(
   scene: readonly SceneLine[],
   state: PromptState,
   reader: string,
-  schedule: SchedulePromptInput
+  schedule: SchedulePromptInput,
+  // A scene ended by hand whose running summary falls short of it has nobody else to recap it.
+  recap = false
 ): StructuredRequest {
   const charKeys = cast.map((c) => charKeyOf(c.firstName, c.lastName))
   const rosterKeys = scheduleCharKeys(schedule.characters)
@@ -2245,6 +2259,14 @@ export function buildLedgerPrompt(
             : []),
           ''
         ]
+      : []),
+    ...(recap
+      ? [
+          'SUMMARY',
+          'Then, for the "summary" field: condense the whole scene into a recap, third-person, referring to the MC as "the reader".',
+          'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.',
+          ''
+        ]
       : [])
   ].join('\n')
 
@@ -2268,7 +2290,7 @@ export function buildLedgerPrompt(
   return {
     system: ledgerPersonaFor(state.lessNsfwText),
     user: `${preamble}\n${rest}`,
-    schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats),
+    schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats, recap),
     // Constant, not the playthrough: nothing above the seam varies by save.
     cacheKey: 'ledger',
     logFrom: preamble.length + 1,

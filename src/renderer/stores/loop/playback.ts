@@ -8,6 +8,7 @@ import {
   type SceneLine,
   type TimeSlot
 } from '@shared/types'
+import { isGraduationSlot } from '../../prompts/graduation'
 import { isOrientationSlot } from '../../prompts/introScript'
 import { lastReaderIndexOf, rewindTargetOf } from '../stageStep'
 import { sceneOnScreenOf } from '../textingLoop'
@@ -32,6 +33,8 @@ export interface PlaybackSlice {
   sceneSecret: string | null
   sceneQuiz: QuizState | null
   sceneEnding: boolean
+  /** The ending under way is one End scene began, which nothing interrupts. */
+  sceneEndedByHand: boolean
   statusShown: boolean
   statusModal: StatusModal | null
   streaming: boolean
@@ -141,11 +144,12 @@ function lockOf(s: PlaybackSlice): 'locked' | 'open' {
 }
 
 /**
- * The interjection on offer: none in a replay, or unless there is something to interrupt — lines
- * unread, a reply still arriving, or an ending under way — and otherwise as the scene's lock has it.
+ * The interjection on offer: none in a replay or under an ending End scene began, or unless there
+ * is something to interrupt — lines unread, a reply still arriving, or an ending under way — and
+ * otherwise as the scene's lock has it.
  */
 export function interjectOfferOf(s: PlaybackSlice): InterjectOffer {
-  if (!playbackOffered(s) || s.replaying) return 'none'
+  if (!playbackOffered(s) || s.replaying || s.sceneEndedByHand) return 'none'
   const tail = s.currentSceneTranscript[s.currentSceneTranscript.length - 1]
   const interruptible =
     s.pendingLines.length > 0 ||
@@ -158,10 +162,11 @@ export function interjectOfferOf(s: PlaybackSlice): InterjectOffer {
 /**
  * The row's offer while a reply is on screen: the interjection's, extended over a resolved
  * reply's last line until that line is turned — so the row stands over the whole reply and hands
- * over to the turn's own well only on the click past it. None in a replay.
+ * over to the turn's own well only on the click past it. None in a replay or under an ending End
+ * scene began.
  */
 export function replyRowOfferOf(s: PlaybackSlice): InterjectOffer {
-  if (s.replaying) return 'none'
+  if (s.replaying || s.sceneEndedByHand) return 'none'
   const offer = interjectOfferOf(s)
   if (offer !== 'none') return offer
   const lastLineUnturned =
@@ -172,4 +177,19 @@ export function replyRowOfferOf(s: PlaybackSlice): InterjectOffer {
     s.pendingLines.length === 0 &&
     replyReach(s) >= 1
   return lastLineUnturned ? lockOf(s) : 'none'
+}
+
+/**
+ * Whether End scene may end the scene now: a reply line of it has been read, its own ending is not
+ * under way, and nothing holds its opening reply shut. Never on the orientation's or the
+ * graduation's slot, nor in a replay.
+ */
+export function endSceneOpenOf(s: PlaybackSlice): boolean {
+  if (!playbackOffered(s) || s.replaying || s.sceneEnding) return false
+  if (isOrientationSlot(s.date, s.time, s.semesterIndex) || isGraduationSlot(s.date, s.time)) {
+    return false
+  }
+  if (interjectOfferOf(s) === 'locked') return false
+  const read = readPrefixOf(s)
+  return read.slice(read.findIndex(isReaderLine) + 1).some((line) => !isReaderLine(line))
 }

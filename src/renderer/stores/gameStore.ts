@@ -481,6 +481,11 @@ interface GameStoreState {
    */
   sceneEnding: boolean
   /**
+   * The ending under way is one the player asked for from End scene, which nothing interrupts.
+   * Transient, and lowered with {@link sceneEnding}.
+   */
+  sceneEndedByHand: boolean
+  /**
    * True from a scene resolving until its ending is written: the drain parks on it rather than
    * crossing an ending still being paid for. **Transient**, never captured.
    */
@@ -756,6 +761,12 @@ interface GameStoreState {
    */
   truncateUnread: () => void
   /**
+   * Cuts the scene to what the player has read: every line a rewind stepped back over read again,
+   * the unread lines cut as {@link truncateUnread} cuts them, and a last action no read line
+   * answers cut from the transcript and the log, its gift handed back.
+   */
+  cutToRead: () => void
+  /**
    * Steps playback back to the previous line that says something, across the reader's own lines
    * as far as the scene's first reply — in a replay as far as its first line — putting the lines
    * after it back on the queue and the stage back as it stood there. Returns false, changing
@@ -784,8 +795,11 @@ interface GameStoreState {
    * and clears it. Nothing when no rewrite was made.
    */
   dropEndingEdits: () => void
-  /** Leaving the ending also clears {@link endingEditAt}, keeping every mark it held back. */
-  setSceneEnding: (ending: boolean) => void
+  /**
+   * Leaving the ending also clears {@link endingEditAt}, keeping every mark it held back; `byHand`
+   * marks an ending End scene began.
+   */
+  setSceneEnding: (ending: boolean, byHand?: boolean) => void
   setEndingInFlight: (inFlight: boolean) => void
   setStatusShown: (shown: boolean) => void
   /** Files the running summary under the slot that just finished. */
@@ -1496,6 +1510,7 @@ const initialState = {
   sceneSummary: null as string | null,
   sceneSummaries: [] as SceneSummaryMark[],
   sceneEnding: false,
+  sceneEndedByHand: false,
   endingInFlight: false,
   statusShown: false,
   lineRewound: 0,
@@ -1912,6 +1927,23 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       }
     }),
 
+  cutToRead: () => {
+    while (get().forwardLine()) continue
+    get().truncateUnread()
+    set((state) => {
+      const transcript = state.currentSceneTranscript
+      const last = transcript.length - 1
+      if (last < 0 || transcript[last].speaker !== READER_SPEAKER) return {}
+      const log = state.sceneLog
+      return {
+        currentSceneTranscript: transcript.slice(0, last),
+        sceneLog: log[log.length - 1]?.speaker === READER_SPEAKER ? log.slice(0, -1) : log,
+        ...summariesWithin(state.sceneSummaries, last),
+        ...giftsWithin(state, last)
+      }
+    })
+  },
+
   rewindLine: () => {
     const state = get()
     const log = state.sceneLog
@@ -1998,8 +2030,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         : { endingEditAt: null, ...summariesWithin(state.sceneSummaries, state.endingEditAt) }
     ),
 
-  setSceneEnding: (ending) =>
-    set(ending ? { sceneEnding: true } : { sceneEnding: false, endingEditAt: null }),
+  setSceneEnding: (ending, byHand = false) =>
+    set(
+      ending
+        ? { sceneEnding: true, sceneEndedByHand: byHand }
+        : { sceneEnding: false, sceneEndedByHand: false, endingEditAt: null }
+    ),
 
   setEndingInFlight: (inFlight) => set({ endingInFlight: inFlight }),
 

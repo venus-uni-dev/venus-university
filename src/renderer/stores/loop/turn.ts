@@ -223,5 +223,6 @@ export async function runSceneTurn(
   useGameStore.getState().setEndingInFlight(true)
   loopState.endingAbandoned = false
 
-  await runEnding(solo)
+  // A solo scene wrote its own landing: no goodbye.
+  await runEnding(!solo)
 }

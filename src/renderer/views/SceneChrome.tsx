@@ -123,6 +123,11 @@ export interface SceneChromeProps {
   /** The dead reason a hover names — a gift already given, or nobody here — or null. */
   giftNote: string | null
   onGift: () => void
+  /** End scene stands beside the Gift, on the same terms, wherever the scene may be ended by hand. */
+  endSceneShown: boolean
+  /** Nothing to end yet, or the scene's own ending is already under way. */
+  endSceneDead: boolean
+  onEndScene: () => void
   calendarBadge: number
   bunnyboardBadge: number
   railDead: boolean
@@ -201,6 +206,9 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
    * the scene will not be interrupted yet.
    */
   const giftOff = props.sending || props.giftDead || props.inputDead
+
+  /** End scene takes no click while the scene cannot be ended by hand. */
+  const endOff = props.endSceneDead
 
   /** Which word the divider last said, held while it fades so it does not change on the way out. */
   const dividerWord = useRef<DividerWord>('hover')
@@ -506,7 +514,6 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
                 >
                   {/* The Gift stays silent, so what a dead one is short of is said beside it. */}
                   <DeadNote note={props.giftNote}>
-                    <span className="vu-scene-rule" />
                     <motion.button
                       id="game-gift"
                       className="vu-scene-giftbtn"
@@ -518,6 +525,35 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
                       <GiftIcon />
                     </motion.button>
                   </DeadNote>
+                </motion.div>
+              </motion.div>
+            )}
+            {/* End scene stands with the Gift and on its terms, hard against its far side. */}
+            {props.endSceneShown && (
+              <motion.div
+                className="vu-scene-end"
+                variants={wellMark}
+                initial={false}
+                animate={wellOut ? 'shown' : 'hidden'}
+                onPointerMove={() => setHover(true)}
+                onPointerLeave={() => setHover(false)}
+              >
+                <motion.div
+                  className="vu-scene-endseat"
+                  variants={seat}
+                  initial={false}
+                  animate={seatState(true, endOff)}
+                >
+                  <motion.button
+                    id="game-end-scene"
+                    className="vu-scene-endbtn"
+                    aria-label="End scene"
+                    disabled={endOff}
+                    {...gestures(endOff, quietLift, quietPress)}
+                    onClick={props.onEndScene}
+                  >
+                    <ClapperboardIcon />
+                  </motion.button>
                 </motion.div>
               </motion.div>
             )}
@@ -738,6 +774,27 @@ function CastIcon(): JSX.Element {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function ClapperboardIcon(): JSX.Element {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+      <path d="m6.2 5.3 3.1 3.9" />
+      <path d="m12.4 3.4 3.1 4" />
+      <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
     </svg>
   )
 }

@@ -619,6 +619,73 @@ describe('truncateUnread', () => {
 })
 
 /**
+ * End scene writes the scene as cut: a line he never read booked by the ledger, or one he did read
+ * lost to a rewind, makes a save of a scene he never saw, and an action nobody answered keeps a
+ * gift spent on nothing.
+ */
+describe('cutToRead', () => {
+  const reader = (text: string): SceneLine => ({ speaker: READER_SPEAKER, text })
+  const playTurn = (action: string, lines: SceneLine[]) => {
+    useGameStore.getState().logPlayerAction(action, true)
+    useGameStore.getState().appendSceneLines(lines)
+    useGameStore.getState().appendPendingLines(lines)
+    while (useGameStore.getState().advanceLine()) continue
+  }
+
+  it('cuts at the furthest line read, whatever a rewind left on screen', () => {
+    const store = useGameStore.getState()
+    playTurn('I wave.', sceneLines('a1', 'a2'))
+    store.setSceneSummary('first', 3)
+    // A reply still arriving: b1 and b2 read, b3 and b4 queued, and the summary written past them.
+    store.logPlayerAction('I sit.', true)
+    store.appendSceneLines(sceneLines('b1', 'b2', 'b3', 'b4'))
+    store.appendPendingLines(sceneLines('b1', 'b2', 'b3', 'b4'))
+    useGameStore.getState().advanceLine()
+    useGameStore.getState().advanceLine()
+    store.setSceneSummary('second', 8)
+
+    store.rewindLine()
+    store.rewindLine()
+    expect(useGameStore.getState().currentLine).toEqual({ speaker: '', text: 'a2' })
+    store.cutToRead()
+    const read = [
+      reader('I wave.'),
+      ...sceneLines('a1', 'a2'),
+      reader('I sit.'),
+      ...sceneLines('b1', 'b2')
+    ]
+    expect(useGameStore.getState()).toMatchObject({
+      currentSceneTranscript: read,
+      sceneLog: read,
+      currentLine: { speaker: '', text: 'b2' },
+      pendingLines: [],
+      reread: 0,
+      sceneSummary: 'first',
+      sceneSummaries: [{ at: 3, summary: 'first' }]
+    })
+  })
+
+  it('drops an action no read line answers, handing back the gift given with it', () => {
+    const store = useGameStore.getState()
+    useGameStore.setState({ inventory: [{ itemId: 'rose', count: 1 }], sceneGifts: [] })
+    playTurn('I wave.', sceneLines('a1', 'a2'))
+    store.setSceneSummary('first', 3)
+    store.giftItem('a', { itemId: 'rose' })
+    store.logPlayerAction('I hand her a rose.', true)
+
+    store.cutToRead()
+    expect(useGameStore.getState()).toMatchObject({
+      currentSceneTranscript: [reader('I wave.'), ...sceneLines('a1', 'a2')],
+      sceneLog: [reader('I wave.'), ...sceneLines('a1', 'a2')],
+      sceneSummary: 'first',
+      sceneSummaries: [{ at: 3, summary: 'first' }],
+      sceneGifts: [],
+      inventory: [{ itemId: 'rose', count: 1 }]
+    })
+  })
+})
+
+/**
  * Stepping back a line within the reply rebuilds the stage from the log. The stage is captured
  * into every mid-scene save, so a fold that disagrees with forward play writes a scene that
  * resumes onto somebody else's stage.

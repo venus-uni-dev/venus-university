@@ -11,8 +11,8 @@ import type { TurnSnapshot } from './state'
 interface SlotCycle {
   /** Advances playback by one line or handles queue-drain outcomes. */
   advance: () => void
-  /** The whole end of a scene, as one unit. */
-  runEnding: (solo: boolean) => Promise<void>
+  /** The whole end of a scene, as one unit, with or without its goodbye. */
+  runEnding: (goodbye: boolean) => Promise<void>
   /**
    * The opening for the slot this ending leads into, or null if abandoned — or dropped, once
    * `dropped` answers true.
@@ -65,8 +65,8 @@ export function advance(): void {
   need(slotCycle, 'the slot cycle').advance()
 }
 
-export function runEnding(solo: boolean): Promise<void> {
-  return need(slotCycle, 'the slot cycle').runEnding(solo)
+export function runEnding(goodbye: boolean): Promise<void> {
+  return need(slotCycle, 'the slot cycle').runEnding(goodbye)
 }
 
 export function fetchEndingOpening(

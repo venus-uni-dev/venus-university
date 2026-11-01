@@ -2548,6 +2548,11 @@ export interface LedgerResponse {
    * message the player reads, and the pool that class's exam questions are drawn from.
    */
   classFactoid?: string
+  /**
+   * The scene's recap, asked only of a scene ended by hand whose running summary falls short of
+   * it. Filed as the scene's summary and never banked.
+   */
+  summary?: string
 }
 
 /**

@@ -182,7 +182,8 @@
    while a reply is being read never leaves them all, and the hover holding them out never drops
    between them. */
 .vu-scene-row .vu-turn-goslot,
-.vu-scene-row .vu-scene-gift {
+.vu-scene-row .vu-scene-gift,
+.vu-scene-row .vu-scene-end {
   margin-left: calc(-1 * var(--turn-gap));
   padding-left: var(--turn-gap);
 }
@@ -214,6 +215,7 @@
 .vu-scene-row:not([data-well='out']) > .vu-turn-inputbox,
 .vu-scene-row:not([data-well='out']) > .vu-turn-goslot,
 .vu-scene-row:not([data-well='out']) > .vu-scene-gift,
+.vu-scene-row:not([data-well='out']) > .vu-scene-end,
 .vu-scene-row:not([data-well='out']) > .vu-scene-help {
   pointer-events: none;
 }
@@ -222,7 +224,7 @@
   pointer-events: auto;
 }
 
-/* The rule is the gift's divider laid flat: the same weight and the same veiled surface. */
+/* The rule: a thin bar in the veiled surface either side of the word. */
 .vu-scene-divider-rule {
   flex: 1;
   height: 3px;
@@ -341,7 +343,8 @@
 
 /* The divider and the gift, which is the turn's second answer. The outer layer stands and fades
    with the well; the seat inside it is the gift's own dim. */
-.vu-scene-gift {
+.vu-scene-gift,
+.vu-scene-end {
   position: relative;
   display: flex;
   flex: none;
@@ -353,23 +356,17 @@
   align-items: center;
 }
 
-/* The rule and the button are one row inside the wrapper that hears the pointer for the dead
-   Gift, so the note hangs off the pair rather than off the button alone. */
-.vu-scene-giftseat > .vu-deadnote {
+/* The button inside the wrapper that hears the pointer for the dead Gift, and End scene's beside
+   it, each with no rule in front of it. */
+.vu-scene-giftseat > .vu-deadnote,
+.vu-scene-endseat {
   display: flex;
   align-items: center;
-  gap: 26px;
-}
-
-.vu-scene-rule {
-  width: 3px;
-  height: 34px;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--vu-surface) 70%, transparent);
 }
 
 /* Quiet: no paper layer beside a loud Go, and no word beside its own picture. */
-.vu-scene-giftbtn {
+.vu-scene-giftbtn,
+.vu-scene-endbtn {
   display: flex;
   align-items: center;
   padding: 15px 26px 15px 20px;
@@ -380,7 +377,8 @@
   transform-origin: left center;
 }
 
-.vu-scene-giftbtn svg {
+.vu-scene-giftbtn svg,
+.vu-scene-endbtn svg {
   display: block;
 }
 
