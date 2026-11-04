@@ -16,6 +16,7 @@ import {
   getPhotosPath,
   getPlaythroughPath,
   getProfilePicturePath,
+  getProfileSourcePath,
   getSavesPath
 } from '../paths'
 import { relPathsUnder } from './archiveService'
@@ -83,10 +84,15 @@ async function playthroughImages(playthroughId: string): Promise<LegacyImage[]> 
   const folder = getPlaythroughPath(playthroughId)
   const ending = basename(getEndingArtPath(playthroughId))
   const profile = basename(getProfilePicturePath(playthroughId))
+  const profileSource = basename(getProfileSourcePath(playthroughId))
   const pictures = (await namesIn(folder))
     .filter(
       (name) =>
-        isPngName(name) && (name === ending || name === profile || endingArtSemesterOf(name) !== null)
+        isPngName(name) &&
+        (name === ending ||
+          name === profile ||
+          name === profileSource ||
+          endingArtSemesterOf(name) !== null)
     )
     .map((name) => ({ path: join(folder, name), lossless: false }))
 

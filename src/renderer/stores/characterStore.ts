@@ -2,7 +2,14 @@ import { create } from 'zustand'
 import { bytesToBase64 } from '@shared/base64'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
 import { blankSheet, isWritten, withCharacterLora } from '@shared/characterRules'
-import { customCgAfterEdit, withCustomCg, withoutCustomCg } from '@shared/customCgs'
+import type { DrawnLora } from '@shared/comfyModels'
+import { defaultTagsOf, type DefaultTags } from '@shared/defaultTags'
+import {
+  customCgAfterEdit,
+  withCustomCg,
+  withoutCustomCg,
+  type CustomCgPatch
+} from '@shared/customCgs'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, isAppError, messageOf, toAppError } from '@shared/errors'
 import { cardFileName, spritePackFileName } from '@shared/sillyTavern'
@@ -316,14 +323,14 @@ interface CharacterStoreState {
   /**
    * Renders one set: `fill` queues only the images missing from disk; `regenerate` renders the
    * set whole into staging and commits it at the end, under the regenerate modal's edit where
-   * it came from one. `withoutLora` renders it without her LoRA, which stays on her record.
+   * it came from one. `loras` says which LoRAs it draws other than her record's.
    */
   generateSet: (
     charId: string,
     target: RenderTarget,
     mode: RenderMode,
     edit?: RenderEdit,
-    withoutLora?: boolean
+    loras?: LoraChoice
   ) => Promise<void>
   /** Aborts one set's outstanding jobs, leaving the rest of the run alone. */
   cancelSet: (charId: string, target: RenderTarget) => Promise<void>
@@ -339,7 +346,12 @@ interface CharacterStoreState {
     patch: Partial<CustomOutfit>
   ) => Promise<boolean>
   /** Keeps every group one regenerate button sent on her record, for the modal to reopen on. */
-  writeRegenTags: (charId: string, target: RegenTarget, edit: PromptEdit) => Promise<boolean>
+  writeRegenTags: (
+    charId: string,
+    target: RegenTarget,
+    edit: PromptEdit,
+    tags: DefaultTags
+  ) => Promise<boolean>
   /**
    * Deletes one player-authored wardrobe, its images and its record entry; refused outright
    * while anything of that set is still rendering.
@@ -351,7 +363,7 @@ interface CharacterStoreState {
    * Merges a write into one player-authored CG pair on her record as it stands at its turn;
    * a field the patch leaves out keeps what the slot holds.
    */
-  writeCustomCg: (charId: string, slot: CustomCgSlot, patch: Partial<CustomCg>) => Promise<boolean>
+  writeCustomCg: (charId: string, slot: CustomCgSlot, patch: CustomCgPatch) => Promise<boolean>
   /**
    * Deletes one player-authored CG pair, both its images and its record entry; refused outright
    * while the pair or either of its images is still rendering.
@@ -372,21 +384,26 @@ interface CharacterStoreState {
   /** Opens one character's folder in the OS file manager. */
   openFolder: (charId: string) => Promise<void>
   /**
-   * Queues a fill for every incomplete optional set of every character, those in `withoutLora`
-   * rendered without their LoRA; returns how many.
+   * Queues a fill for every incomplete optional set of every character, each drawing the LoRAs
+   * `lorasFor` says; returns how many.
    */
-  generateAllMissing: (gates: MissingContentGates, withoutLora?: ReadonlySet<string>) => number
+  generateAllMissing: (
+    gates: MissingContentGates,
+    lorasFor?: (charId: string, target: RenderTarget) => LoraChoice
+  ) => number
   /**
    * Writes one wardrobe's repaired sprites over the set, plus the paint layer they were made
    * with, kept as the file `kind` names. `paintLayer` is `null` where the repair keeps
-   * none — the hand fix — and the write removes that file instead.
+   * none — the hand fix — and the write removes that file instead. `base` is the set's base
+   * frame, which only the erase rewrites.
    */
   applyWardrobeFix: (
     charId: string,
     set: OutfitSet | null,
     images: WardrobeFixImage[],
     paintLayer: string | null,
-    kind: WardrobeLayer
+    kind: WardrobeLayer,
+    base?: string
   ) => Promise<boolean>
   /** Throws away one repair's kept paint layer, where there is one to throw away. */
   discardWardrobeLayer: (
@@ -661,7 +678,10 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     }
 
     const sheet = blankSheet(created.data, personality, pose)
-    const saved = await window.api.chars.update(lora ? withCharacterLora(sheet, lora) : sheet)
+    const { subject } = defaultTagsOf(useSettingsStore.getState().settings)
+    const saved = await window.api.chars.update(
+      lora ? withCharacterLora(sheet, lora, subject) : sheet
+    )
     if (!saved.ok) {
       useUiStore.getState().showError(saved.error)
       // Nothing was ever written to her folder that a player could open, so it does not stay.
@@ -697,13 +717,13 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     await runWritePipeline(charId, request, set, get, withoutLora)
   },
 
-  generateSet: async (charId, target, mode, edit, withoutLora = false) => {
+  generateSet: async (charId, target, mode, edit, loras = {}) => {
     if (!get().characters[charId]) return
 
     // A run already holding this character takes the set.
     const run = activeRuns.get(charId)
     if (run) {
-      queueOnRun(charId, run, target, mode, edit, withoutLora, set, get)
+      queueOnRun(charId, run, target, mode, edit, loras, set, get)
       return
     }
 
@@ -711,7 +731,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const started: ActiveRun = { pending: [] }
     activeRuns.set(charId, started)
 
-    const spec = await prepareSpec(charId, target, mode, edit, withoutLora, set, get)
+    const spec = await prepareSpec(charId, target, mode, edit, loras, set, get)
     const specs = spec && specKeys(spec).length > 0 ? [spec] : []
     const character = get().characters[charId]
     if (!character || (specs.length === 0 && started.pending.length === 0)) {
@@ -775,14 +795,21 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
   writeCustomOutfit: (charId, slot, patch) =>
     patchCharacter(charId, (current) => withCustomOutfit(current, slot, patch), set, get),
 
-  writeRegenTags: (charId, target, edit) => {
+  writeRegenTags: (charId, target, edit, tags) => {
     // An entry the record already holds word for word is not written again: a repeated roll
     // of one sprite would otherwise stamp her record on every press.
-    const held = get().characters[charId]?.regenTags?.[target]
-    if (held !== undefined && JSON.stringify(held) === JSON.stringify(edit)) {
+    const current = get().characters[charId]
+    const held = current?.regenTags?.[target]
+    const kept = current && withRegenEdit(current, target, edit, tags).regenTags?.[target]
+    if (held !== undefined && JSON.stringify(held) === JSON.stringify(kept)) {
       return Promise.resolve(true)
     }
-    return patchCharacter(charId, (current) => withRegenEdit(current, target, edit), set, get)
+    return patchCharacter(
+      charId,
+      (fresh) => withRegenEdit(fresh, target, edit, tags),
+      set,
+      get
+    )
   },
 
   deleteCustomOutfit: async (charId, slot) => {
@@ -926,7 +953,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     if (!result.ok) useUiStore.getState().showError(result.error)
   },
 
-  generateAllMissing: (gates, withoutLora = new Set()) => {
+  generateAllMissing: (gates, lorasFor) => {
     // Recomputed, not taken from the caller: a bucket may have landed since the confirm opened.
     const plan = missingContentPlan(get(), gates)
     // Never awaited: a `generateSet` resolves only once its whole run drains.
@@ -936,19 +963,20 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
         entry.target,
         'fill',
         undefined,
-        withoutLora.has(entry.charId)
+        lorasFor?.(entry.charId, entry.target)
       )
     }
     return plan.length
   },
 
-  applyWardrobeFix: async (charId, outfitSet, images, paintLayer, kind) => {
+  applyWardrobeFix: async (charId, outfitSet, images, paintLayer, kind, base) => {
     const result = await window.api.chars.applyWardrobeFix(
       charId,
       outfitSet ?? 'default',
       images,
       paintLayer,
-      kind
+      kind,
+      base
     )
     if (!result.ok) {
       useUiStore.getState().showError(result.error)
@@ -1203,15 +1231,32 @@ interface Staging {
   staged: boolean
 }
 
-/** Whether a bucket renders her without the LoRA the player was told is missing. */
-interface LoraChoice {
+/**
+ * Which LoRAs a bucket draws other than her record's: hers left off where the player answered
+ * to render without it, ComfyUI not listing it, and a custom CG's position LoRA in place of its
+ * pair's — `null` for none — where the bucket carries one.
+ */
+export interface LoraChoice {
   withoutLora?: boolean
+  cgLora?: DrawnLora | null
 }
 
 /** Her record as a render sends it without her LoRA, which her record itself keeps. */
 function withoutLoraOf(character: Character): Character {
   const { lora: _lora, ...rest } = character
   return rest
+}
+
+/**
+ * Her record as one bucket sends it to ComfyUI, the LoRAs its choice names changed on this copy
+ * alone: her record itself keeps its own.
+ */
+function drawnAs(character: Character, spec: RenderTaskSpec): Character {
+  const held = spec.withoutLora ? withoutLoraOf(character) : character
+  if (spec.cgLora === undefined) return held
+  const slot =
+    spec.kind === 'customCg' ? spec.slot : spec.kind === 'cg' ? customCgSlotOf(spec.position) : null
+  return slot ? withCustomCg(held, slot, { lora: spec.cgLora }) : held
 }
 
 /**
@@ -1379,8 +1424,8 @@ interface PendingSet {
   taskId: number
   /** What the regenerate modal settled, held until the run reaches this set and plans it. */
   edit?: RenderEdit
-  /** Whether the player answered to render it without her missing LoRA. */
-  withoutLora?: boolean
+  /** Which LoRAs it draws other than her record's, as the player answered. */
+  loras?: LoraChoice
 }
 
 interface ActiveRun {
@@ -1406,7 +1451,7 @@ function queueOnRun(
   target: RenderTarget,
   mode: RenderMode,
   edit: RenderEdit | undefined,
-  withoutLora: boolean,
+  loras: LoraChoice,
   set: SetState,
   get: () => CharacterStoreState
 ): void {
@@ -1422,7 +1467,7 @@ function queueOnRun(
     mode,
     taskId: nextTaskId++,
     ...(edit ? { edit } : {}),
-    ...(withoutLora ? { withoutLora } : {})
+    loras
   }
   run.pending.push(pending)
   set((state) => {
@@ -1619,20 +1664,25 @@ export function missingContentPlan(
 }
 
 /**
- * What rendering one set now means: which images, which seed, whether staged, and whether
- * without her LoRA.
+ * What rendering one set now means: which images, which seed, whether staged, and which LoRAs
+ * it draws other than her record's.
  */
 async function prepareSpec(
   charId: string,
   target: RenderTarget,
   mode: RenderMode,
   edit: RenderEdit | undefined,
-  withoutLora: boolean,
+  loras: LoraChoice,
   set: SetState,
   get: () => CharacterStoreState
 ): Promise<RenderTaskSpec | null> {
   const spec = await planSpec(charId, target, mode, edit, set, get)
-  return spec && withoutLora ? { ...spec, withoutLora } : spec
+  if (!spec) return spec
+  return {
+    ...spec,
+    ...(loras.withoutLora ? { withoutLora: true } : {}),
+    ...(loras.cgLora !== undefined ? { cgLora: loras.cgLora } : {})
+  }
 }
 
 /** {@link prepareSpec} short of the LoRA, which every kind of set carries alike. */
@@ -1934,9 +1984,11 @@ async function runWritePipeline(
   const character = get().characters[charId]
   if (!character) return
 
-  const written = draftToCharacter(character, drafted.data, poses)
-  const filled = request.lora ? withCharacterLora(written, request.lora) : written
-  const missing = missingRequiredFields(filled)
+  // The subject tags in force as her sheet lands.
+  const { subject } = defaultTagsOf(useSettingsStore.getState().settings)
+  const written = draftToCharacter(character, drafted.data, poses, subject)
+  const filled = request.lora ? withCharacterLora(written, request.lora, subject) : written
+  const missing = missingRequiredFields(filled, subject)
   if (missing.length > 0) {
     // An empty required field is a job failure.
     fail({
@@ -2157,7 +2209,7 @@ async function runBuckets(
             next.target,
             next.mode,
             next.edit,
-            next.withoutLora ?? false,
+            next.loras ?? {},
             set,
             get
           )
@@ -2372,10 +2424,9 @@ async function runBuckets(
     const bucketId = bucketIdFor(target)
     /** Read fresh on every check — a cancel can land at any point in a bucket. */
     const cancelled = (): boolean => isBucketCancelled(charId, bucketId)
-    // The character as the store holds it now, not as the run captured it, her LoRA left off
-    // where the player answered to render without it.
-    const held = get().characters[charId] ?? character
-    const current = spec.withoutLora ? withoutLoraOf(held) : held
+    // The character as the store holds it now, not as the run captured it, drawing the LoRAs
+    // the player answered for.
+    const current = drawnAs(get().characters[charId] ?? character, spec)
 
     // Cancelled before it started: no jobs to abort, and the run carries on to the next set.
     if (cancelled()) {

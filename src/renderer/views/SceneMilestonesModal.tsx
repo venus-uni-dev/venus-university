@@ -25,7 +25,7 @@ import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
 import '../vu_styles/SceneCreator.css'
 
 /** What each box says, her name standing in where the milestone is hers or his. */
-export function milestoneLabel(key: SceneMilestone, name: string): string {
+export function milestoneLabel(key: SceneMilestone | 'contact' | 'blocked', name: string): string {
   switch (key) {
     case 'met':
       return `Met before`
@@ -45,6 +45,10 @@ export function milestoneLabel(key: SceneMilestone, name: string): string {
       return `${name} friendzoned you`
     case 'agreed_to_harem':
       return `Agreed to an open relationship`
+    case 'contact':
+      return 'Gave you her contact info'
+    case 'blocked':
+      return `${name} blocked you`
   }
 }
 

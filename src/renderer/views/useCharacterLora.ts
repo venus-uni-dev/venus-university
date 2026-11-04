@@ -13,8 +13,9 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useComfyProbe } from './useComfyProbe'
 
 /**
- * What a screen offering a character's own LoRA needs from the ComfyUI the settings name: the
- * LoRAs it can pick from, the folder they go in, and whether a saved one is still there.
+ * What a screen offering a character's own LoRA, or a custom CG's, needs from the ComfyUI the
+ * settings name: the LoRAs it can pick from, the folder they go in, and whether a saved one is
+ * still there.
  */
 export interface CharacterLoraList {
   /** The select's options around the pick: None, every listed LoRA, and the pick if missing. */
@@ -29,9 +30,9 @@ export interface CharacterLoraList {
 }
 
 /**
- * The LoRA list for a character's own pick, asked for when the screen opens where `enabled`,
- * and again on the window's next focus after its folder was opened, so a file dropped in there
- * is offered without leaving the screen.
+ * The LoRA list for a character's own pick or a custom CG's, asked for when the screen opens
+ * where `enabled`, and again on the window's next focus after its folder was opened, so a file
+ * dropped in there is offered without leaving the screen.
  */
 export function useCharacterLora(enabled: boolean): CharacterLoraList {
   const settings = useSettingsStore((s) => s.settings)

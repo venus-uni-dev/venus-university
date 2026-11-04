@@ -695,7 +695,7 @@ export function milestoneReports(projected: ProjectedLedger): MilestoneReport[] 
  * graduates are in it beside the roster: a girlfriend gone from Veridan still minds him dating
  * somebody new, and so do her friends.
  */
-function datingInputOf(
+export function datingInputOf(
   before: Readonly<Record<string, CharInfo>>,
   after: Readonly<Record<string, CharInfo>>,
   date: number

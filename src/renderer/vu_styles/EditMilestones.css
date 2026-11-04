@@ -1,0 +1,37 @@
+/* A contact's milestones set by hand: the Scene Creator's milestones panel frame, a warning over
+   its boxes and a two-answer foot. Imported from the view module, never from index.css.
+
+   The veil, the boxes and the foot are base.css's. */
+
+/* No `overflow`: the tab overhangs, and the panel's own shadow pseudo would go with it. */
+.vu-milestones {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -1.2deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(720px, 100% - 60px);
+  max-height: calc(100% - 100px);
+  padding: 78px 56px 28px 100px;
+  border-radius: 120px 0 0 120px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+/* A consequence that has not happened yet, which is the whole of what `--vu-warn` says: on its
+   tint, ahead of the boxes, so it is read before anything is ticked. */
+.vu-milestones-warn {
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 18px;
+  background: var(--vu-warn-tint);
+  color: var(--vu-warn);
+  font: 700 16px/1.5 var(--font-body);
+}
+
+.vu-milestones-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

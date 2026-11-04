@@ -72,6 +72,10 @@ export interface SceneChromeProps {
   speakerName: string
   speakerCharId: string | undefined
   speakerVersion: number
+  /** The reader's own picture, where the settings show it on narrated lines. */
+  readerPicture: string | undefined
+  /** The line on screen is the narrator's. */
+  narrated: boolean
   text: string
   /** Runs of that line drawn in a colour of their own — a status message's. */
   marks?: readonly TextMark[]
@@ -400,6 +404,8 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         speakerName={props.speakerName}
         speakerCharId={props.speakerCharId}
         speakerVersion={props.speakerVersion}
+        readerPicture={props.readerPicture}
+        narrated={props.narrated}
         text={props.text}
         marks={props.marks}
         revealed={props.revealed}

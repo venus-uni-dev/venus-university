@@ -318,24 +318,32 @@ export function loraWeightToStore(weight: number): number | undefined {
   return weight === DEFAULT_LORA_WEIGHT ? undefined : weight
 }
 
-/** A character's LoRA as her record carries it, the weight left out at the default. */
-export function characterLoraToStore(name: string, weight: number): CharacterLora {
+/** A LoRA as a render draws it: the file as the server lists it, and the weight. */
+export interface DrawnLora {
+  name: string
+  weight: number
+}
+
+/** A LoRA as a record carries it, hers or a custom CG's, the weight left out at the default. */
+export function loraToStore(name: string, weight: number): CharacterLora {
   const stored = loraWeightToStore(weight)
   return stored === undefined ? { name } : { name, weight: stored }
 }
 
 /**
- * The LoRA a character is drawn through and its weight, or null where she has none. Her record
- * is hand-editable, so a name that is not one is none and a weight the loader would refuse is
- * the default.
+ * A LoRA read off a hand-editable record, or null where it names none: a name that is not one
+ * is none, and a weight the loader would refuse is the default.
  */
-export function characterLoraOf(
-  character: Pick<Character, 'lora'>
-): { name: string; weight: number } | null {
-  const lora = character.lora as Partial<CharacterLora> | undefined
+export function loraOf(value: unknown): DrawnLora | null {
+  const lora = value as Partial<CharacterLora> | undefined
   if (!lora || typeof lora !== 'object') return null
   if (typeof lora.name !== 'string' || lora.name.trim() === '') return null
   return { name: lora.name, weight: isLoraWeight(lora.weight) ? lora.weight : DEFAULT_LORA_WEIGHT }
+}
+
+/** The LoRA a character is drawn through and its weight, or null where she has none. */
+export function characterLoraOf(character: Pick<Character, 'lora'>): DrawnLora | null {
+  return loraOf(character.lora)
 }
 
 /**

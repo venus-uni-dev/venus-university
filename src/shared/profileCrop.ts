@@ -63,7 +63,8 @@ export function clampProfileCrop(
   const width = Math.round(
     Math.min(maxWidth, Math.max(Math.min(PROFILE_MIN_WIDTH, maxWidth), crop.width))
   )
-  const height = Math.round(width / PROFILE_ASPECT)
+  // Capped, since a width rounded up can ask for a pixel more than a short image has.
+  const height = Math.min(imageHeight, Math.round(width / PROFILE_ASPECT))
   return {
     seed: crop.seed,
     x: Math.round(Math.min(Math.max(0, crop.x), imageWidth - width)),

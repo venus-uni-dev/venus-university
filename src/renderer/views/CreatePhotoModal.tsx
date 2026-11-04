@@ -5,7 +5,9 @@ import { EMOTIONS } from '@shared/emotions'
 import { outfitLabelOf } from '@shared/outfits'
 import {
   fitPhotoOptions,
+  isReaderRow,
   MAX_PHOTO_CHARACTERS,
+  PHOTO_READER_ROW,
   PHOTO_WORDS_MAX,
   type PhotoBackground,
   type PhotoModelChoice,
@@ -89,8 +91,8 @@ function resolveCaps(
 
 /**
  * The draft fitted to what the models, the wardrobes and the places actually offer: a row whose
- * girl dropped out of contact or lost her last offered wardrobe is gone, a row's set moves onto
- * an offered one where it is not, the options are fitted to the model that will run, and a
+ * girl dropped out of contact or lost her last offered wardrobe is gone, as is the reader's where
+ * no picture of him is kept, a row's set moves onto an offered one where it is not, the options are fitted to the model that will run, and a
  * background no longer listed, or wet where it has no rain render, is dropped.
  */
 function fitDraft(
@@ -99,9 +101,11 @@ function fitDraft(
   wardrobes: Record<string, WardrobeTarget[]>,
   contactIds: readonly string[],
   noNsfw: boolean,
-  places: ReadonlySet<string>
+  places: ReadonlySet<string>,
+  hasPicture: boolean
 ): PhotoDraft {
   const rows = draft.rows.flatMap((row): PhotoRow[] => {
+    if (isReaderRow(row)) return hasPicture ? [row] : []
     if (!contactIds.includes(row.charId)) return []
     const offered = offeredSets(wardrobes[row.charId], noNsfw)
     if (offered.length === 0) return []
@@ -149,6 +153,7 @@ export function CreatePhotoModal({
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
   const graduationSeen = useGameStore((s) => s.graduationSeen)
+  const readerPicture = useGameStore((s) => s.profilePicture)
   const backgrounds = useAssetStore((s) => s.backgrounds)
   const noNsfw = useSettingsStore(noNsfwImagesOf)
 
@@ -188,7 +193,9 @@ export function CreatePhotoModal({
     if (!ready || fittedOnce.current) return
     fittedOnce.current = true
     const places = new Set([...listed, ...roomOwners.keys()])
-    setDraft((current) => fitDraft(current, choice, wardrobes, contactIds, noNsfw, places))
+    setDraft((current) =>
+      fitDraft(current, choice, wardrobes, contactIds, noNsfw, places, readerPicture !== null)
+    )
   }, [ready, choice, wardrobes])
 
   const { host, overlayProps } = useModalShell(onClose)
@@ -221,6 +228,13 @@ export function CreatePhotoModal({
     setDraft((current) => ({ ...current, rows: [...current.rows, { charId, set, emotion: 'happy' }] }))
   }
 
+  function addReader(): void {
+    setDraft((current) => ({
+      ...current,
+      rows: [...current.rows, { charId: PHOTO_READER_ROW, set: 'default', emotion: 'neutral' }]
+    }))
+  }
+
   // The "Add character" list: a floating `.vu-pop`, placed against the panel like the Cast
   // modal's custom-outfits pill.
   const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
@@ -237,8 +251,12 @@ export function CreatePhotoModal({
   const remaining = offeredContactIds.filter(
     (charId) => !draft.rows.some((row) => row.charId === charId)
   )
-  const showAdd = draft.rows.length < MAX_PHOTO_CHARACTERS && remaining.length > 0
+  const readerOffered = readerPicture !== null && !draft.rows.some(isReaderRow)
+  const showAdd =
+    draft.rows.length < MAX_PHOTO_CHARACTERS && (remaining.length > 0 || readerOffered)
   const showList = addOpen && popupHost !== null
+  /** How many rows of the list stand ahead of the contacts. */
+  const readerSeats = readerOffered ? 1 : 0
 
   const reposition = useCallback((): void => {
     const box = addBtn.current
@@ -249,7 +267,7 @@ export function CreatePhotoModal({
     placeUnder(box, layer, panel, POP_GAP, false)
   }, [popupHost])
 
-  useLayoutEffect(reposition, [reposition, showList, remaining.length])
+  useLayoutEffect(reposition, [reposition, showList, remaining.length, readerOffered])
 
   useEffect(() => {
     const panel = popupHost?.parentElement
@@ -339,13 +357,22 @@ export function CreatePhotoModal({
 
             {draft.rows.length === 0 ? (
               <p className="vu-empty">
-                {contactIds.length === 0
+                {contactIds.length === 0 && readerPicture === null
                   ? 'No contacts yet. Add some friends first.'
                   : 'Add a character to start.'}
               </p>
             ) : (
               <ul className="vu-cp-rows">
                 {draft.rows.map((row) => {
+                  if (isReaderRow(row)) {
+                    return (
+                      <ReaderRowCard
+                        key={row.charId}
+                        picture={readerPicture}
+                        onRemove={() => removeRow(row.charId)}
+                      />
+                    )
+                  }
                   const character = characters[row.charId]
                   if (!character) return null
                   return (
@@ -383,6 +410,19 @@ export function CreatePhotoModal({
                   createPortal(
                     <div ref={pop} className="vu-pop">
                       <div className="vu-pop-list" role="listbox" aria-label="Add a character">
+                        {readerOffered && (
+                          <AddOptionRow
+                            src={readerPicture}
+                            label="Me"
+                            hovered={hoveredAdd === 0}
+                            onHover={() => setHoveredAdd(0)}
+                            onLeave={() => setHoveredAdd(-1)}
+                            onPick={() => {
+                              setAddOpen(false)
+                              addReader()
+                            }}
+                          />
+                        )}
                         {remaining.map((charId, index) => {
                           const character = characters[charId]
                           if (!character) return null
@@ -391,8 +431,8 @@ export function CreatePhotoModal({
                               key={charId}
                               charId={charId}
                               character={character}
-                              hovered={index === hoveredAdd}
-                              onHover={() => setHoveredAdd(index)}
+                              hovered={index + readerSeats === hoveredAdd}
+                              onHover={() => setHoveredAdd(index + readerSeats)}
                               onLeave={() => setHoveredAdd(-1)}
                               onPick={() => {
                                 setAddOpen(false)
@@ -721,7 +761,75 @@ function PhotoRowCard({
   )
 }
 
-/** One row of the "Add character" list: her face beside her name. */
+/** The reader's own row: his picture and the one word, there being nothing of his to pick. */
+function ReaderRowCard({
+  picture,
+  onRemove
+}: {
+  picture: string | null
+  onRemove: () => void
+}): JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <motion.li
+      className="vu-cp-row-wrap"
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+    >
+      <div className="vu-cp-row">
+        <span className="vu-arch vu-cp-face">
+          <span className="vu-crop">
+            {picture && <img className="vu-crop-img" src={picture} alt="" />}
+          </span>
+        </span>
+        <span className="vu-cp-name">Me</span>
+      </div>
+      <DeleteX
+        className="vu-x vu-cp-row-x"
+        hovered={hovered}
+        label="Remove yourself"
+        onDelete={onRemove}
+      />
+    </motion.li>
+  )
+}
+
+/** One row of the "Add character" list: a face beside a name. */
+function AddOptionRow({
+  src,
+  label,
+  hovered,
+  onHover,
+  onLeave,
+  onPick
+}: {
+  src: string | null
+  label: string
+  hovered: boolean
+  onHover: () => void
+  onLeave: () => void
+  onPick: () => void
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`vu-pop-option vu-cp-pop-option${hovered ? ' vu-pop-option--on' : ''}`}
+      role="option"
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+      onClick={onPick}
+    >
+      <span className="vu-arch vu-cp-pop-face">
+        <span className="vu-crop">
+          {src && <img className="vu-crop-img" src={src} alt="" />}
+        </span>
+      </span>
+      {label}
+    </button>
+  )
+}
+
+/** One girl in the "Add character" list. */
 function AddOption({
   charId,
   character,
@@ -739,20 +847,13 @@ function AddOption({
 }): JSX.Element {
   const version = useSpriteVersion(charId)
   return (
-    <button
-      type="button"
-      className={`vu-pop-option vu-cp-pop-option${hovered ? ' vu-pop-option--on' : ''}`}
-      role="option"
-      onMouseEnter={onHover}
-      onMouseLeave={onLeave}
-      onClick={onPick}
-    >
-      <span className="vu-arch vu-cp-pop-face">
-        <span className="vu-crop">
-          <img className="vu-crop-img" src={profileUrl(charId, version)} alt="" />
-        </span>
-      </span>
-      {fullNameOf(character)}
-    </button>
+    <AddOptionRow
+      src={profileUrl(charId, version)}
+      label={fullNameOf(character)}
+      hovered={hovered}
+      onHover={onHover}
+      onLeave={onLeave}
+      onPick={onPick}
+    />
   )
 }

@@ -43,7 +43,8 @@
    `pointer-events: none` and every control in it takes its own back; this is the box taking
    its own, and it is what moves the hand off the whole stage and onto the box. */
 .vu-box-face[data-cursor],
-.vu-box-label[data-cursor] {
+.vu-box-label[data-cursor],
+.vu-box-reader[data-cursor] {
   pointer-events: auto;
 }
 
@@ -109,6 +110,34 @@
   padding: 9px 28px 9px calc(var(--tuck) + 10px);
   color: var(--vu-speaker-ink);
   font: 400 26px var(--font-display);
+}
+
+/* ---- the reader's picture ------------------------------------------------- */
+
+/* Over the box's round cap on a narrated line, in the gap between the date and the words. Its
+   left edge follows the widest date's right edge as the stage narrows, a percentage here being
+   the box's width and the box a fixed share of the stage. Its foot is hung off the box's top, so
+   a box grown by a fourth line carries it up; a percentage margin is the box's width too, and
+   once the stage is narrower than 16:9 and the words reach under it, the margin lifts it clear of
+   their first row. */
+.vu-box-reader {
+  position: absolute;
+  left: calc(202px - 19%);
+  bottom: calc(100% - 160px);
+  width: 150px;
+  height: 180px;
+  margin-bottom: clamp(0px, calc((1250px - 100%) * 6), 122px);
+}
+
+.vu-box-reader-arch {
+  --paper-face: var(--vu-recessed);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 6px 5px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: bottom center;
+  will-change: transform;
 }
 
 /* ---- the line ------------------------------------------------------------- */

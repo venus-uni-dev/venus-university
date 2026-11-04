@@ -14,7 +14,7 @@ import type { Emotion, TimeSlot, WardrobeTarget } from './types'
 /** The one version of a photo's sidecar this build reads and writes. */
 export const PHOTO_SCHEMA_VERSION = 1
 
-/** No roster holds more than twelve girls, so no photo does. */
+/** No roster holds more than twelve girls, and no photo holds more than twelve people. */
 export const MAX_PHOTO_CHARACTERS = 12
 
 /** The longest prompt a photo may be sent with. */
@@ -36,7 +36,18 @@ export const PHOTO_THUMB_QUALITY = 0.85
 /** The folder a playthrough's photos sit in, beside its saves. */
 export const PHOTOS_DIR = 'photos'
 
-/** One girl in a photo: who, in which wardrobe, wearing which face. */
+/**
+ * The `charId` of the row standing for the reader, whose picture the player uploaded. No character
+ * id can match it, and its wardrobe and face are never read.
+ */
+export const PHOTO_READER_ROW = '@me'
+
+/** Whether a row stands for the reader rather than a girl. */
+export function isReaderRow(row: { charId: string }): boolean {
+  return row.charId === PHOTO_READER_ROW
+}
+
+/** One person in a photo: a girl, in which wardrobe, wearing which face, or the reader. */
 export interface PhotoRow {
   charId: string
   set: WardrobeTarget
@@ -82,13 +93,13 @@ export interface PhotoMeta {
 export interface PhotoRequest {
   prompt: string
   /**
-   * The reference pictures, JPEGs as base64 with no `data:` prefix: one per girl in the rows'
+   * The reference pictures, JPEGs as base64 with no `data:` prefix: one per row in the rows'
    * order, or one lineup sheet of them all where the model takes too few pictures for that.
    */
   references: string[]
   /** The background picture, a JPEG in the same form, sent after the references. */
   background?: string
-  /** How many girls are in the photo. */
+  /** How many people are in the photo. */
   count: number
   options: PhotoOptions
 }

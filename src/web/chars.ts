@@ -22,6 +22,7 @@ import {
   newCharacter,
   withRemovedDefault
 } from '@shared/characterRules'
+import { defaultTagsOf } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, messageOf } from '@shared/errors'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
@@ -182,7 +183,12 @@ export async function createCharacter(
   brief?: CharacterBrief,
   reference?: ReferenceImage
 ): Promise<Character> {
-  const character = newCharacter(firstName, lastName, brief)
+  const character = newCharacter(
+    firstName,
+    lastName,
+    defaultTagsOf(await currentSettings()).subject,
+    brief
+  )
   if (reference) {
     const bytes = base64ToBytes(reference.data)
     await db.writeFiles(character.charId, [
@@ -368,14 +374,16 @@ function decodePng(data: string, what: string): Blob {
 
 /**
  * Writes one wardrobe's repaired sprites over the set, plus its paint layer where the repair
- * keeps one. The hand repair passes `null` instead, removing any stale layer.
+ * keeps one. The hand repair passes `null` instead, removing any stale layer. The erase also
+ * hands over the set's base frame, written in the same transaction.
  */
 export async function applyWardrobeFix(
   charId: string,
   target: WardrobeTarget,
   images: readonly WardrobeFixImage[],
   paintLayer: string | null,
-  kind: WardrobeLayer
+  kind: WardrobeLayer,
+  base?: string
 ): Promise<void> {
   await claimCharacter(charId)
   if (images.length === 0) {
@@ -390,6 +398,12 @@ export async function applyWardrobeFix(
     writes.push({
       rel: layerRel(target, kind),
       blob: decodePng(paintLayer, 'the paint layer')
+    })
+  }
+  if (base !== undefined) {
+    writes.push({
+      rel: baseRel(target === 'default' ? null : target),
+      blob: decodePng(base, 'the base frame')
     })
   }
 

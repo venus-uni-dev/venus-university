@@ -21,7 +21,13 @@ import { canEncodeWebp, sniffedType, webpOf } from './webp'
 const CONCURRENCY = 2
 
 /** The stores a picture of the player's own is kept in. */
-type PictureStore = 'charFiles' | 'photos' | 'endingArt' | 'profilePictures' | 'backgrounds'
+type PictureStore =
+  | 'charFiles'
+  | 'photos'
+  | 'endingArt'
+  | 'profilePictures'
+  | 'profileSources'
+  | 'backgrounds'
 
 type Key<S extends PictureStore> = StoreKey<VenusUniversityDb, S>
 type Row<S extends PictureStore> = StoreValue<VenusUniversityDb, S>
@@ -127,6 +133,18 @@ async function barePictures(store: 'endingArt' | 'profilePictures'): Promise<Sto
   }))
 }
 
+/** Every full picture the reader's crop was cut from. */
+async function profileSourcePictures(): Promise<StoredPicture[]> {
+  return (await rowsOf('profileSources')).map(([key, row]) => ({
+    label: `profileSources/${key}`,
+    blob: row.image,
+    replace: (next) =>
+      rewrite('profileSources', key, (current) =>
+        holds(current.image, row.image) ? { ...current, image: next } : null
+      )
+  }))
+}
+
 /** Every picture of the player's own backgrounds, one per variant. */
 async function backgroundPictures(): Promise<StoredPicture[]> {
   const found: StoredPicture[] = []
@@ -207,6 +225,7 @@ async function convertAll(
     ...(await photoPictures()),
     ...(await barePictures('endingArt')),
     ...(await barePictures('profilePictures')),
+    ...(await profileSourcePictures()),
     ...(await backgroundPictures())
   ])
   const total = pictures.length

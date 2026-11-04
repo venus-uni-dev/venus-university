@@ -54,7 +54,12 @@ import { postsLocationUpdate } from '../stores/feedRolls'
 import { FEED_PAGE, isFeedContact, updatesFeed, type FeedEntry } from '../stores/feedView'
 import { awayWhereabouts, knownWhereabouts, type Whereabouts } from '../stores/whereabouts'
 import { useGameStore } from '../stores/gameStore'
-import { pickProfilePicture, removeProfilePicture } from '../stores/loop/profilePicture'
+import type { ReplayOffer } from '../stores/loop/saves'
+import {
+  openPickedPicture,
+  removeProfilePicture,
+  type ReaderPicture
+} from '../stores/loop/profilePicture'
 import { useSettingsStore } from '../stores/settingsStore'
 import {
   acceptFriendRequest,
@@ -84,6 +89,7 @@ import {
 import { ContactPage } from './ContactPage'
 import { LorebookPage } from './LorebookPage'
 import { PhotosPage } from './PhotosPage'
+import { ReaderPictureModal, ScenesAskModal } from './ReaderPictureModal'
 import { EditPromptModal } from './EditPromptModal'
 import { RescheduleModal } from './RescheduleModal'
 import {
@@ -129,6 +135,8 @@ export interface BunnyboardModalProps {
   onChangeSchedule: () => void
   /** Opens the part-time jobs modal, whichever face it is owed; likewise supplied. */
   onOpenJobs: () => void
+  /** Whether a contact page's Edit milestones can be used right now. */
+  milestonesOffer: ReplayOffer
 }
 
 /** The two app bots draw a mark where a person has a face; an employer keeps his emoji. */
@@ -284,7 +292,8 @@ export function BunnyboardModal({
   theme,
   scheduleChangeReady,
   onChangeSchedule,
-  onOpenJobs
+  onOpenJobs,
+  milestonesOffer
 }: BunnyboardModalProps): JSX.Element | null {
   const tab = useBunnyboardStore((s) => s.tab)
   const viewingCharId = useBunnyboardStore((s) => s.viewingCharId)
@@ -333,7 +342,12 @@ export function BunnyboardModal({
       {...overlayProps}
     >
       {contact ? (
-        <ContactPage key={contact} charId={contact} theme={theme} />
+        <ContactPage
+          key={contact}
+          charId={contact}
+          theme={theme}
+          milestonesOffer={milestonesOffer}
+        />
       ) : (
         <div className="vu-bb" role="dialog" aria-modal="true" aria-label="Bunnyboard">
           <LettersFilter id="vu-bb-letters" inkClassName="vu-bb-letters-ink" />
@@ -416,7 +430,7 @@ export function BunnyboardModal({
                 )}
                 {tab === 'friends' && <FriendsList />}
                 {tab === 'updates' && <UpdatesFeed />}
-                {tab === 'profile' && <ProfilePage />}
+                {tab === 'profile' && <ProfilePage theme={theme} />}
                 {tab === 'photos' && <PhotosPage theme={theme} />}
                 {tab === 'lorebook' && <LorebookPage theme={theme} />}
               </div>
@@ -1475,7 +1489,7 @@ function FriendsList(): JSX.Element {
  * rides every prompt, and the semester counted up. Every reading below the bio is derived here
  * from what the save already holds rather than kept beside it.
  */
-function ProfilePage(): JSX.Element {
+function ProfilePage({ theme }: { theme: 'day' | 'night' }): JSX.Element {
   const firstName = useGameStore((s) => s.playerFirstName)
   const lastName = useGameStore((s) => s.playerLastName)
   const picture = useGameStore((s) => s.profilePicture)
@@ -1497,12 +1511,37 @@ function ProfilePage(): JSX.Element {
   const conversations = useGameStore((s) => s.bunnyboard.conversations)
   const lessNsfwText = useSettingsStore((s) => s.settings?.lessNsfwText === true)
   const fileInput = useRef<HTMLInputElement>(null)
+  /** The picture's crop modal, then the ask its Save may raise, one following the other. */
+  const [picturePanel, setPicturePanel] = useState<'framing' | 'asking' | null>(null)
+  /** The file the crop modal opens on, where it does not open on the kept picture. */
+  const [picked, setPicked] = useState<ReaderPicture | null>(null)
 
   /** Hands the pick to the store, clearing the box so the same file picked twice fires twice. */
-  const pick = (file: File | undefined): void => {
+  const pick = async (file: File | undefined): Promise<void> => {
     if (fileInput.current) fileInput.current.value = ''
     if (!file) return
-    void pickProfilePicture(file)
+    const next = await openPickedPicture(file)
+    if (!next) return
+    setPicked(next)
+    setPicturePanel('framing')
+  }
+
+  /** The crop is kept: asks about scenes only where the answer could change anything. */
+  const onPictureSaved = (): void => {
+    const settings = useSettingsStore.getState().settings
+    const asks =
+      settings?.showProfilePictureInScenes !== true &&
+      settings?.askProfilePictureInScenes !== false
+    setPicturePanel(asks ? 'asking' : null)
+  }
+
+  const onScenesAnswer = (show: boolean, mute: boolean): void => {
+    setPicturePanel(null)
+    if (!show && !mute) return
+    void useSettingsStore.getState().update({
+      ...(show ? { showProfilePictureInScenes: true } : {}),
+      ...(mute ? { askProfilePictureInScenes: false } : {})
+    })
   }
 
   // One walk of the roster, the records and the threads for the whole grid, rather than one
@@ -1595,9 +1634,16 @@ function ProfilePage(): JSX.Element {
           <motion.button
             className={`vu-arch vu-bb-me-arch${picture ? '' : ' vu-bb-me-arch--empty'}`}
             type="button"
-            aria-label={picture ? 'Change profile picture' : 'Add a profile picture'}
+            aria-label={picture ? 'Edit profile picture' : 'Add a profile picture'}
             {...gestures(false, portraitLift, quietPress)}
-            onClick={() => fileInput.current?.click()}
+            onClick={() => {
+              if (!picture) {
+                fileInput.current?.click()
+                return
+              }
+              setPicked(null)
+              setPicturePanel('framing')
+            }}
           >
             {picture ? (
               <span className="vu-crop">
@@ -1624,7 +1670,7 @@ function ProfilePage(): JSX.Element {
             type="file"
             accept={PROFILE_PICTURE_TYPES.join(',')}
             hidden
-            onChange={(event) => pick(event.target.files?.[0])}
+            onChange={(event) => void pick(event.target.files?.[0])}
           />
           <div className="vu-bb-me-main">
             <span className="vu-bb-me-name">
@@ -1669,6 +1715,22 @@ function ProfilePage(): JSX.Element {
           ))}
         </motion.div>
       </div>
+
+      {/* The crop modal and the ask its Save raises follow one another, so they share one presence
+          in wait mode and the ask never arrives over the modal still leaving. */}
+      <AnimatePresence propagate mode="wait">
+        {picturePanel === 'framing' ? (
+          <ReaderPictureModal
+            key="reader-picture"
+            theme={theme}
+            picked={picked}
+            onClose={() => setPicturePanel(null)}
+            onSaved={onPictureSaved}
+          />
+        ) : picturePanel === 'asking' ? (
+          <ScenesAskModal key="reader-picture-scenes" theme={theme} onAnswer={onScenesAnswer} />
+        ) : null}
+      </AnimatePresence>
     </div>
   )
 }

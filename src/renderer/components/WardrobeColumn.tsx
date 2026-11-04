@@ -49,7 +49,7 @@ export interface WardrobeColumnProps {
   liveExpressions?: ReadonlySet<Emotion>
   /** Opens the transparency repair, where it is offered; the read-only panel passes none. */
   onFixTransparency?: () => void
-  /** True while the set cannot be repaired — a render going, or no neutral to paint over. */
+  /** True while the set cannot be repaired — a render going, or no neutral to work on. */
   fixDisabled?: boolean
   /** Opens the hand repair, on the same terms as the one above. */
   onFixFingers?: () => void
@@ -57,6 +57,8 @@ export interface WardrobeColumnProps {
   fingersDisabled?: boolean
   /** What a hover raises over a dead Fix fingers: the render's own prerequisite, or `null`. */
   fingersNote?: string | null
+  /** Opens the artifact eraser, on the transparency repair's terms. */
+  onEraseArtifacts?: () => void
   /** Generates a set that has nothing in it yet; the plus stands where the word would. */
   onAdd?: () => void
   /** The plus is dead — a render going, or whatever the set control below already names. */
@@ -106,6 +108,7 @@ export function WardrobeColumn({
   onFixFingers,
   fingersDisabled = false,
   fingersNote = null,
+  onEraseArtifacts,
   onAdd,
   addDisabled = false,
   rename,
@@ -380,45 +383,65 @@ export function WardrobeColumn({
 
       {control && <SetControl {...control} />}
 
-      {/* Inline actions, so they stay underlined at rest. The transparency repair says nothing
-          about its own gate — the count above, the control below and `NOT GENERATED` in the
-          archway have already said it — while the hand fix is a render too, and a missing
-          install is raised over it. A custom set's instructions are words, live whatever runs. */}
-      {(onFixTransparency || onFixFingers || onInstructions) && (
+      {/* Inline actions, so they stay underlined at rest, two to a row. The transparency
+          repair and the eraser say nothing about their own gate — the count above, the control
+          below and `NOT GENERATED` in the archway have already said it — while the hand fix is
+          a render too, and a missing install is raised over it. A custom set's instructions
+          are words, live whatever runs. */}
+      {(onFixTransparency || onFixFingers || onEraseArtifacts || onInstructions) && (
         <div className="vu-wardrobe-links">
-          {onFixTransparency && (
-            <motion.button
-              className="vu-wardrobe-fix"
-              type="button"
-              disabled={fixDisabled}
-              {...gestures(fixDisabled, linkLift, rowPress)}
-              onClick={onFixTransparency}
-            >
-              Fix holes
-            </motion.button>
+          {(onFixTransparency || onFixFingers) && (
+            <div className="vu-wardrobe-links-row">
+              {onFixTransparency && (
+                <motion.button
+                  className="vu-wardrobe-fix"
+                  type="button"
+                  disabled={fixDisabled}
+                  {...gestures(fixDisabled, linkLift, rowPress)}
+                  onClick={onFixTransparency}
+                >
+                  Fix holes
+                </motion.button>
+              )}
+              {onFixFingers && (
+                <DeadNote note={fingersDisabled ? fingersNote : null} align="center">
+                  <motion.button
+                    className="vu-wardrobe-fix"
+                    type="button"
+                    disabled={fingersDisabled}
+                    {...gestures(fingersDisabled, linkLift, rowPress)}
+                    onClick={onFixFingers}
+                  >
+                    Fix fingers
+                  </motion.button>
+                </DeadNote>
+              )}
+            </div>
           )}
-          {onFixFingers && (
-            <DeadNote note={fingersDisabled ? fingersNote : null} align="center">
-              <motion.button
-                className="vu-wardrobe-fix"
-                type="button"
-                disabled={fingersDisabled}
-                {...gestures(fingersDisabled, linkLift, rowPress)}
-                onClick={onFixFingers}
-              >
-                Fix fingers
-              </motion.button>
-            </DeadNote>
-          )}
-          {onInstructions && (
-            <motion.button
-              className="vu-wardrobe-fix"
-              type="button"
-              {...gestures(false, linkLift, rowPress)}
-              onClick={onInstructions}
-            >
-              Instructions
-            </motion.button>
+          {(onEraseArtifacts || onInstructions) && (
+            <div className="vu-wardrobe-links-row">
+              {onEraseArtifacts && (
+                <motion.button
+                  className="vu-wardrobe-fix"
+                  type="button"
+                  disabled={fixDisabled}
+                  {...gestures(fixDisabled, linkLift, rowPress)}
+                  onClick={onEraseArtifacts}
+                >
+                  Erase artifacts
+                </motion.button>
+              )}
+              {onInstructions && (
+                <motion.button
+                  className="vu-wardrobe-fix"
+                  type="button"
+                  {...gestures(false, linkLift, rowPress)}
+                  onClick={onInstructions}
+                >
+                  Instructions
+                </motion.button>
+              )}
+            </div>
           )}
         </div>
       )}

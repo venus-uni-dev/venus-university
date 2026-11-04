@@ -21,15 +21,19 @@ import { isCharacterTrait } from '@shared/traits'
 import { pendingSecretOf, SECRET_TIERS } from '@shared/secrets'
 import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
+import { DeadNote } from '../components/DeadNote'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { newestFirst } from '../stores/feedRolls'
 import { useGameStore } from '../stores/gameStore'
+import { offerNoteOf } from '../stores/gameLoop'
+import type { ReplayOffer } from '../stores/loop/saves'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { sendFriendRequest } from '../stores/textingLoop'
 import type { ScreenTheme } from './clockTheme'
 import { CharacterNotesModal } from './CharacterNotesModal'
 import { EditMemoryModal } from './EditMemoryModal'
+import { EditMilestonesModal } from './EditMilestonesModal'
 import {
   breatheDecor,
   dealt,
@@ -65,10 +69,13 @@ const CARDS_DEAL = dealt(0.22, 0.07)
  */
 export function ContactPage({
   charId,
-  theme
+  theme,
+  milestonesOffer
 }: {
   charId: string
   theme: ScreenTheme
+  /** Whether her milestones can be edited by hand right now, and what keeps them if not. */
+  milestonesOffer: ReplayOffer
 }): JSX.Element {
   const character = useGameStore((s) => s.characters[charId])
   const info = useGameStore((s) => s.charInfo[charId])
@@ -93,6 +100,8 @@ export function ContactPage({
   const [editing, setEditing] = useState<CharMemory | null>(null)
   // Whether the notes panel stands over the page.
   const [notesOpen, setNotesOpen] = useState(false)
+  // Whether the milestones panel stands over the page.
+  const [milestonesOpen, setMilestonesOpen] = useState(false)
 
   if (!character) return <p className="vu-contact-gone">This account no longer exists.</p>
 
@@ -420,6 +429,21 @@ export function ContactPage({
           >
             Close
           </motion.button>
+          {/* Anybody's, contact or not; dead while a scene or a call is out, as Replay is. */}
+          {milestonesOffer !== 'none' && (
+            <DeadNote note={offerNoteOf(milestonesOffer)}>
+              <motion.button
+                id={`bb-milestones-${charId}`}
+                className="vu-btn vu-btn--quiet"
+                type="button"
+                disabled={milestonesOffer !== 'open'}
+                {...gestures(milestonesOffer !== 'open', quietLift, quietPress)}
+                onClick={() => setMilestonesOpen(true)}
+              >
+                Edit milestones
+              </motion.button>
+            </DeadNote>
+          )}
           {isContact ? (
             <>
               <motion.button
@@ -526,6 +550,15 @@ export function ContactPage({
             theme={theme}
             charId={charId}
             onClose={() => setNotesOpen(false)}
+          />
+        )}
+        {milestonesOpen && (
+          <EditMilestonesModal
+            key="edit-milestones"
+            theme={theme}
+            charId={charId}
+            offer={milestonesOffer}
+            onClose={() => setMilestonesOpen(false)}
           />
         )}
       </AnimatePresence>

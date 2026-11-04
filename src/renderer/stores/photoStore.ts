@@ -5,6 +5,7 @@ import { imageTypeOf } from '@shared/imageBytes'
 import { LINEUP_MIME_TYPE, LINEUP_QUALITY } from '@shared/lineup'
 import { outfitLabelOf } from '@shared/outfits'
 import {
+  isReaderRow,
   PHOTO_SCHEMA_VERSION,
   PHOTO_THUMB_QUALITY,
   PHOTO_THUMB_SIZE,
@@ -24,6 +25,7 @@ import { loadWardrobeImage, readyOutfitSets } from './characterStore'
 import { useGameStore } from './gameStore'
 import { stitchLineup, type LineupFrame } from './lineupSheet'
 import { blobToBase64, canvasToBase64, canvasToWebpOr } from './loop/encode'
+import { readerReference } from './loop/profilePicture'
 import { bundledImage, characterImage, customImage, roomOwnerNow } from './loop/thumbnail'
 import { retrySilently } from './silentRetry'
 import { useUiStore } from './uiStore'
@@ -264,10 +266,14 @@ async function cutThumb(bytes: Uint8Array<ArrayBuffer>): Promise<Blob> {
   }
 }
 
-/** One row's frame for the sheet; a sprite that will not read loads as nothing. */
-function frameOf(row: PhotoRow): LineupFrame {
+/**
+ * One row's frame for the sheet, the reader's being `reader`, the picture read for him; a picture
+ * that will not read loads as nothing.
+ */
+function frameOf(row: PhotoRow, reader: Blob | null): LineupFrame {
   return async () => {
     try {
+      if (isReaderRow(row)) return reader ? await createImageBitmap(reader) : null
       return await loadWardrobeImage(row.charId, row.set === 'default' ? null : row.set, row.emotion)
     } catch {
       return null
@@ -321,6 +327,29 @@ async function backgroundReference(background: PhotoBackground): Promise<string 
     }
   } catch (err) {
     console.warn(`[photo] the background ${background.bg} would not read:`, err)
+    return null
+  }
+}
+
+/** The reader's own picture as a JPEG the model takes, at its own size on black; null where it will not read. */
+async function readerJpeg(picture: Blob): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(picture)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(bitmap, 0, 0)
+      return await canvasToBase64(canvas, LINEUP_MIME_TYPE, LINEUP_QUALITY)
+    } finally {
+      bitmap.close()
+    }
+  } catch (err) {
+    console.warn('[photo] the profile picture would not read:', err)
     return null
   }
 }
@@ -486,6 +515,17 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
 
     const unreadable = (index: number): false => {
       const row = draft.rows[index]
+      if (isReaderRow(row)) {
+        useUiStore
+          .getState()
+          .showError(
+            appError(
+              'PHOTO_READER_MISSING',
+              'Your profile picture could not be read. Upload it again, or take yourself out of the photo.'
+            )
+          )
+        return false
+      }
       useUiStore
         .getState()
         .showError(
@@ -497,6 +537,9 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
       return false
     }
 
+    const withReader = draft.rows.some(isReaderRow)
+    const reader = withReader ? await readerReference(playthroughId) : null
+
     const background = draft.background
     // The background takes one of the model's pictures, so the girls go as one sheet sooner.
     const each = draft.rows.length <= maxReferences - (background ? 1 : 0)
@@ -504,12 +547,18 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
     if (each) {
       // One at a time, so a single girl's frame is ever decoded at once.
       for (const [index, row] of draft.rows.entries()) {
-        const picture = await stitchLineup([frameOf(row)])
+        if (isReaderRow(row)) {
+          const data = reader ? await readerJpeg(reader) : null
+          if (data === null) return unreadable(index)
+          references.push(data)
+          continue
+        }
+        const picture = await stitchLineup([frameOf(row, reader)])
         if (!picture || !picture.drawn.includes(0)) return unreadable(index)
         references.push(picture.data)
       }
     } else {
-      const sheet = await stitchLineup(draft.rows.map(frameOf))
+      const sheet = await stitchLineup(draft.rows.map((row) => frameOf(row, reader)))
       const missing = draft.rows.findIndex((_, i) => !sheet?.drawn.includes(i))
       if (!sheet || missing >= 0) return unreadable(Math.max(0, missing))
       references.push(sheet.data)
@@ -528,7 +577,12 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
       }
     }
 
+    const readerName = fullNameOf({
+      firstName: game.playerFirstName,
+      lastName: game.playerLastName
+    })
     const names = draft.rows.map((row) => {
+      if (isReaderRow(row)) return readerName
       const character = game.characters[row.charId]
       return character ? fullNameOf(character) : ''
     })
@@ -537,7 +591,13 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
       jobId,
       playthroughId,
       request: {
-        prompt: photoPrompt(draft.prompt, names, each ? 'each' : 'sheet', background !== undefined),
+        prompt: photoPrompt(
+          draft.prompt,
+          names,
+          each ? 'each' : 'sheet',
+          background !== undefined,
+          withReader ? readerName : undefined
+        ),
         references,
         ...(backgroundData !== null ? { background: backgroundData } : {}),
         count: draft.rows.length,

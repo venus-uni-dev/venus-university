@@ -80,6 +80,22 @@ export function loraMissingCopy(
   }
 }
 
+/** The line under a custom CG's Position LoRA picker. */
+export const POSITION_LORA_HINT = 'LoRA trigger words should go in Position.'
+
+/** The confirm in front of a render whose custom CG's position LoRA ComfyUI does not list. */
+export function positionLoraMissingCopy(file: string): {
+  title: string
+  message: string
+  confirmText: string
+} {
+  return {
+    title: 'Generate without the position LoRA?',
+    message: `ComfyUI can't find ${file}. It stays picked for this CG, and will be used again once it's back in the LoRA folder.`,
+    confirmText: 'Generate without it'
+  }
+}
+
 /** The line under a custom CG's Instructions field, wherever it is written. */
 export const CG_INSTRUCTIONS_HINT =
   'Include an optional instruction to the LLM on when to use this CG, starting with "she", e.g. "she is riding him".'

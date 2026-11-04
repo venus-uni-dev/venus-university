@@ -5,6 +5,7 @@ import {
   picksToStore,
   resolveModelPick
 } from '@shared/comfyModels'
+import { defaultTagsOf, defaultTagsToStore, SHIPPED_DEFAULT_TAGS } from '@shared/defaultTags'
 import { endpointProblem, normalizeEndpoint } from '@shared/endpoint'
 import {
   defaultSettings,
@@ -334,6 +335,15 @@ describe('the ComfyUI picks a save writes', () => {
     expect(loraWeightOf({ comfyLoraWeight: 500 }, 'managed')).toBe(1)
     expect(loraWeightOf({ comfyLoraWeight: '0.5' as unknown as number }, 'managed')).toBe(1)
   })
+
+  it('keeps only the default tags that differ from the build’s, and reads junk as the build’s', () => {
+    expect(defaultTagsToStore(SHIPPED_DEFAULT_TAGS)).toBeUndefined()
+    expect(defaultTagsToStore({ ...SHIPPED_DEFAULT_TAGS, cg: [] })).toEqual({ cg: [] })
+    const read = defaultTagsOf({
+      comfyTags: { cg: [], quality: 'score_9' as unknown as string[], subject: [' 1girl ', ''] }
+    })
+    expect(read).toEqual({ ...SHIPPED_DEFAULT_TAGS, cg: [], subject: ['1girl'] })
+  })
 })
 
 describe('samplingProblem', () => {
@@ -640,21 +650,28 @@ describe('settingsFromBackup', () => {
     expect(restored).not.toHaveProperty('apiKeySet')
   })
 
-  it("keeps the install's ComfyUI, URL, picks and weights whatever the backup carries", () => {
+  it("keeps the install's ComfyUI, URL, picks, weights and tags whatever the backup carries", () => {
     const current = settings({
       comfySource: 'external',
       comfyUrl: 'http://127.0.0.1:8000',
       comfyExternalModels: { checkpoint: 'mine.safetensors' },
-      comfyExternalLoraWeight: 0.6
+      comfyExternalLoraWeight: 0.6,
+      comfyTags: { quality: ['score_9'] }
     })
-    const carried = redactSettings(settings({ comfyModels: { lora: '' }, comfyLoraWeight: 0.4 }))
+    const carried = redactSettings(
+      settings({ comfyModels: { lora: '' }, comfyLoraWeight: 0.4, comfyTags: { subject: [] } })
+    )
     const restored = settingsFromBackup(current, carried, MALFORMED)
     expect(restored.comfySource).toBe('external')
     expect(restored.comfyUrl).toBe('http://127.0.0.1:8000')
     expect(restored.comfyExternalModels).toEqual({ checkpoint: 'mine.safetensors' })
     expect(restored.comfyExternalLoraWeight).toBe(0.6)
+    expect(restored.comfyTags).toEqual({ quality: ['score_9'] })
     expect(restored).not.toHaveProperty('comfyModels')
     expect(restored).not.toHaveProperty('comfyLoraWeight')
+
+    const none = settingsFromBackup(settings(), carried, MALFORMED)
+    expect(none).not.toHaveProperty('comfyTags')
   })
 
   it("lets go of the endpoint's key for a backup naming another host, and keeps Gemini's", () => {

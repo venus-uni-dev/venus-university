@@ -357,6 +357,21 @@ export function replayOfferOf(
 }
 
 /**
+ * What a contact page's Edit milestones offers: Save Game's offers, or dead for as long as a scene
+ * is on, whose ending reads her flags and banks what it rolled off them for the boundary.
+ */
+export function milestonesOffer(): ReplayOffer {
+  return replayOfferOf(manualSaveOffer(), sceneActiveOf(useGameStore.getState()), false)
+}
+
+/** What a hover raises over a control dead on one of these offers, or null where it is live. */
+export function offerNoteOf(offer: ReplayOffer): string | null {
+  if (offer === 'scene') return 'Unavailable in scenes'
+  if (offer === 'waiting') return 'Waiting for LLM response'
+  return null
+}
+
+/**
  * What a manual save taken now records, read in one go: the status sequence's base inside it,
  * the goodbye menu as between scenes, and otherwise the scene on screen on its line. Null when
  * there is nothing a load could be put back onto.

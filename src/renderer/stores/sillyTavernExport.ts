@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate'
 import { expressionRel } from '@shared/characterFiles'
+import { defaultTagsOf } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { appError } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
@@ -10,6 +11,7 @@ import { buildCharacterCard } from '../prompts/characterCard'
 import { bgUrl } from '../views/bgAssets'
 import { blobToBase64, canvasToBlob } from './loop/encode'
 import { bundledImage } from './loop/thumbnail'
+import { useSettingsStore } from './settingsStore'
 
 /**
  * Composing the two files a character leaves the app as for SillyTavern: the card picture,
@@ -67,7 +69,11 @@ export async function composeCard(charId: string, character: Character): Promise
   const blob = await canvasToBlob(canvas, 'image/png', 1)
   const bytes = new Uint8Array(await blob.arrayBuffer())
 
-  const card = buildCharacterCard(character, new Date())
+  const card = buildCharacterCard(
+    character,
+    new Date(),
+    defaultTagsOf(useSettingsStore.getState().settings).subject
+  )
   const cardBytes = withTextChunks(bytes, {
     chara: utf8ToBase64(JSON.stringify(card.v2)),
     ccv3: utf8ToBase64(JSON.stringify(card.v3))

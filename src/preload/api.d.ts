@@ -15,6 +15,7 @@ import type {
   PhotoModelChoice,
   PhotoRequest
 } from '@shared/photos'
+import type { ProfileSource, ProfileSourceWrite } from '@shared/profilePicture'
 import type { SlotReplay } from '@shared/replays'
 import type { RoomVariant } from '@shared/room'
 import type { SavedScene, SavedSceneSummary } from '@shared/sceneCreator'
@@ -236,9 +237,9 @@ export interface VenusUniversityApi {
      */
     deleteSet: (charId: string, slot: CustomOutfitSlot | CustomCgSlot) => Promise<Result<void>>
     /**
-     * The bytes of one wardrobe image — a sprite by emotion, or `'fix'` for the set's saved
-     * transparency-repair layer — or `null` if it is not on disk. The hand repair keeps
-     * no layer, so there is none of its to ask for.
+     * The bytes of one wardrobe image — a sprite by emotion, `'fix'` for the set's saved
+     * transparency-repair layer, or `'base'` for its base frame — or `null` if it is not on
+     * disk. The hand repair keeps no layer, so there is none of its to ask for.
      */
     readWardrobeImage: (
       charId: string,
@@ -258,14 +259,17 @@ export interface VenusUniversityApi {
     /**
      * Writes one wardrobe's repaired sprites over the set, plus the paint layer they were
      * repaired with, kept as the file `kind` names. `paintLayer` is `null` where the repair
-     * keeps none — the hand fix — and the write then *removes* that file instead.
+     * keeps none — the hand fix — and the write then *removes* that file instead. `base`, where
+     * given, is written over the set's base frame in the same write: the erase's, so a single
+     * re-roll keeps it.
      */
     applyWardrobeFix: (
       charId: string,
       target: WardrobeTarget,
       images: WardrobeFixImage[],
       paintLayer: string | null,
-      kind: WardrobeLayer
+      kind: WardrobeLayer,
+      base?: string
     ) => Promise<Result<void>>
     /**
      * Removes one repair's kept paint layer, if it is there: what Fix fingers runs as it
@@ -420,11 +424,17 @@ export interface VenusUniversityApi {
      * when the player cancels.
      */
     exportEndingArt: (playthroughId: string, semesterId?: string) => Promise<Result<string | null>>
-    /** The reader's own picture kept beside the playthrough, or `null` where there is none. */
+    /** The crop of the reader's picture kept beside the playthrough, or `null` where there is none. */
     readProfilePicture: (playthroughId: string) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
-    /** Keeps the reader's picture, a PNG as base64, beside the playthrough. */
-    writeProfilePicture: (playthroughId: string, png: string) => Promise<Result<void>>
-    /** Removes the reader's picture; already gone is success. */
+    /** The full picture the crop was cut from and its frame, or `null` where none was kept. */
+    readProfileSource: (playthroughId: string) => Promise<Result<ProfileSource | null>>
+    /** Keeps the crop, a PNG as base64, beside the playthrough, with the frame and any new full picture. */
+    writeProfilePicture: (
+      playthroughId: string,
+      png: string,
+      source: ProfileSourceWrite
+    ) => Promise<Result<void>>
+    /** Removes the crop, the full picture and its frame; already gone is success. */
     deleteProfilePicture: (playthroughId: string) => Promise<Result<void>>
   }
   photos: {

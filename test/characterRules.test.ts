@@ -6,6 +6,7 @@ import {
   readCharacterRecord,
   withCharacterLora
 } from '@shared/characterRules'
+import { SUBJECT_TAGS } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { defaultSpriteScale } from '@shared/spriteScale'
 import type { CharacterLoraBrief } from '@shared/types'
@@ -18,7 +19,7 @@ import { character } from './fixtures'
 
 describe('blankSheet', () => {
   it('writes a blank, unbriefed sheet the player fills in by hand', () => {
-    const character = newCharacter('Ann', 'Lee', {
+    const character = newCharacter('Ann', 'Lee', SUBJECT_TAGS, {
       prompt: 'x',
       namesAreSuggestions: false,
       options: {},
@@ -64,7 +65,8 @@ describe('withCharacterLora', () => {
   it('puts the trigger after the subject tags and replaces only the groups the player filled', () => {
     const merged = withCharacterLora(
       written,
-      brief({ trigger: 'anav2', appearance: ['silver_hair'], weight: 0.8 })
+      brief({ trigger: 'anav2', appearance: ['silver_hair'], weight: 0.8 }),
+      SUBJECT_TAGS
     )
     expect(merged.baseAppearance).toEqual(['1girl', 'mature_female', 'anav2', 'silver_hair'])
     expect(merged.outfit).toEqual(['red_coat'])
@@ -75,7 +77,8 @@ describe('withCharacterLora', () => {
   it('puts the player tags in front of what was written where it adds, without repeats', () => {
     const merged = withCharacterLora(
       written,
-      brief({ appearance: ['blue_eyes', 'freckles'], outfit: ['scarf'], replace: false, weight: 1 })
+      brief({ appearance: ['blue_eyes', 'freckles'], outfit: ['scarf'], replace: false, weight: 1 }),
+      SUBJECT_TAGS
     )
     expect(merged.baseAppearance).toEqual([
       '1girl',
@@ -98,7 +101,7 @@ describe('withCharacterLora', () => {
 describe('readCharacterRecord', () => {
   /** A written record at `schemaVersion`, with only the appearance the test gives her. */
   function stored(schemaVersion: number, baseAppearance: string[]): unknown {
-    return { ...newCharacter('Ann', 'Lee'), schemaVersion, baseAppearance }
+    return { ...newCharacter('Ann', 'Lee', SUBJECT_TAGS), schemaVersion, baseAppearance }
   }
 
   it('reads a version-2 record as version 3, the subject tags in front of her appearance', () => {

@@ -6,6 +6,7 @@ import type { BgVariant, CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
 import type { LorebookRecord } from '@shared/lorebookRecord'
 import type { PhotoMeta } from '@shared/photos'
+import type { ProfileFrame } from '@shared/profilePicture'
 import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
 import type { Character, GameSave, GrabBags, Settings } from '@shared/types'
@@ -36,6 +37,12 @@ export interface StoredPhoto {
   meta?: PhotoMeta
 }
 
+/** The full picture a reader's crop was cut from, and the frame it was cut through. */
+interface StoredProfileSource {
+  image: Blob
+  frame: ProfileFrame
+}
+
 /** One of the player's own backgrounds: its record and its pictures, written as one row. */
 export interface StoredBackground {
   record: CustomBackground
@@ -53,6 +60,7 @@ export interface VenusUniversityDb extends DBSchema {
   saves: { key: [string, string]; value: GameSave; indexes: { byDate: [string, number] } }
   endingArt: { key: string; value: Blob }
   profilePictures: { key: string; value: Blob }
+  profileSources: { key: string; value: StoredProfileSource }
   photos: { key: [string, string]; value: StoredPhoto }
   characters: { key: string; value: Character }
   charFiles: { key: [string, string]; value: CharFile }
@@ -84,10 +92,11 @@ const STORES = [
   'scenes',
   'replays',
   'lorebooks',
-  'applications'
+  'applications',
+  'profileSources'
 ] as const
 
-const DB_VERSION = 9
+const DB_VERSION = 10
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

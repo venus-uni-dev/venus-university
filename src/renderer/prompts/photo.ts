@@ -22,21 +22,27 @@ export type PhotoCastLayout = 'each' | 'sheet'
  * The exact prompt a photo is sent with: `words` as the player left them, then who is in which
  * reference picture — in the rows' order, the sheet's left to right — so words that name a girl
  * can be followed, and, where a background picture follows them, a line saying it is the place.
+ * `player` names the reader where he is among them; his picture is one the player uploaded, so
+ * on its own it is on no black background.
  */
 export function photoPrompt(
   words: string,
   names: readonly string[],
   layout: PhotoCastLayout,
-  background: boolean
+  background: boolean,
+  player?: string
 ): string {
   const first = background ? 'The first reference image' : 'The reference image'
   const cast =
     names.length === 1
-      ? `${first} shows this character on a black background: ${names[0]}.`
+      ? player
+        ? `${first} shows the player, who is named ${player}.`
+        : `${first} shows this character on a black background: ${names[0]}.`
       : layout === 'sheet'
         ? `${first} shows these ${names.length} characters on a black background, from left to right: ${andList(names)}.`
-        : `${background ? `The first ${names.length} reference images` : 'The reference images'} show one character each on a black background, in this order: ${andList(names)}.`
+        : `${background ? `The first ${names.length} reference images` : 'The reference images'} show one character each${player ? '' : ' on a black background'}, in this order: ${andList(names)}.`
   const lines = [words.trim(), '', cast]
+  if (player && names.length > 1) lines.push(`${player} is the player.`)
   if (background) {
     lines.push(
       'The last reference image is a background. Use it as reference only, do not copy the camera angle, lighting, or composition.'

@@ -6,6 +6,7 @@ import { STOCK_POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
 import { giftLoreNote, itemDefOf } from '@shared/shop'
 import { pendingSecretOf } from '@shared/secrets'
+import { defaultTagsOf } from '@shared/defaultTags'
 import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { affectionsOf } from '@shared/sceneCreator'
 import {
@@ -540,6 +541,7 @@ export function promptState(): PromptState {
     lessNsfwText: lessNsfwTextNow(),
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
+    subjectTags: defaultTagsOf(useSettingsStore.getState().settings).subject,
     memoryBudgets: memoryBudgetsNow(),
     secretBudget: secretBudgetNow(),
     history: game.history,

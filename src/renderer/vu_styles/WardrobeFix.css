@@ -1,8 +1,8 @@
-/* Both wardrobe repairs: a sprite, a layer of paint over or under it, and the tools
-   that put it there — Fix transparency and Fix fingers are one chassis in two orders, so
-   this is one file rather than two kept in step by hand. Imported from `LayerPainter`,
-   never from index.css — a screen's file must load after base.css or its overrides lose
-   at equal specificity.
+/* The wardrobe repairs: a sprite, a layer of paint over or under it or a mask cut out of it,
+   and the tools that do it — Fix holes, Fix fingers and Erase artifacts are one chassis, so
+   this is one file rather than three kept in step by hand. Imported from `LayerPainter` and
+   the eraser, never from index.css — a screen's file must load after base.css or its
+   overrides lose at equal specificity.
 
    The colour wheel's own layout lives here too rather than beside its component: these two
    are its only callers, and a screen owns its layout. */
@@ -24,8 +24,17 @@
   overflow: hidden auto;
 }
 
+/* The eraser's stage scrolls both ways instead: what it takes away sits along her outline and
+   out at the picture's edges, which the zoom would otherwise clip. `safe` on both axes, so
+   every edge is reachable. */
+.vu-fix-stage-box--pan {
+  justify-content: safe center;
+  overflow: auto;
+}
+
 /* Sized off the sprite's own aspect, scaled by the zoom. Bare, it is the box's own recessed
-   ground: the hand repair paints over an opaque sprite and has no hole to key. */
+   ground: the hand repair paints over an opaque sprite and has no hole to key. The eraser's
+   canvas is the sprite itself, and takes the pointer as the paint layer does. */
 .vu-fix-stage {
   position: relative;
   flex: none;

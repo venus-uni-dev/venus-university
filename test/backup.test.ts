@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyCatalog } from '@shared/application'
@@ -8,7 +8,7 @@ import { EMOTIONS } from '@shared/emotions'
 import type { BackupFile } from '@shared/backup'
 import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
-import type { Character, SaveDraft } from '@shared/types'
+import type { AppError, Character, SaveDraft } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { character as characterFixture, record } from './fixtures'
 
@@ -32,12 +32,33 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
+// Which renames Windows refuses in this test, as it refuses a folder another program holds.
+const held = vi.hoisted(() => ({
+  refuses: null as ((from: string, to: string) => boolean) | null
+}))
+vi.mock('fs/promises', async (actual) => {
+  const real = await actual<typeof import('fs/promises')>()
+  return {
+    ...real,
+    rename: async (from: string, to: string): Promise<void> => {
+      if (held.refuses?.(from, to)) {
+        throw Object.assign(new Error(`EPERM: operation not permitted, rename '${from}'`), {
+          code: 'EPERM'
+        })
+      }
+      await real.rename(from, to)
+    }
+  }
+})
+
 const { exportBackup, importBackup } = await import('../src/main/services/backupService')
 const { createCharacter, getCharacter, readCharacterImage, writeCharacter } = await import(
   '../src/main/services/characterService'
 )
 const { readEndingArt } = await import('../src/main/services/endingArtService')
-const { readProfilePicture } = await import('../src/main/services/profilePictureService')
+const { readProfilePicture, readProfileSource } = await import(
+  '../src/main/services/profilePictureService'
+)
 const {
   createPlaythrough,
   listPlaythroughs,
@@ -71,6 +92,7 @@ const {
   endingArtEntry,
   photoEntry,
   profilePictureEntry,
+  profileSourceEntry,
   replaysFromBackup,
   semesterEndingArtEntry
 } = await import('../src/shared/backup')
@@ -93,6 +115,8 @@ const {
   getPhotosPath,
   getPregenCharactersPath,
   getProfilePicturePath,
+  getProfileSourcePath,
+  getProfileSourceRecordPath,
   getSavesPath,
   getSettingsPath,
   getStagedExpressionsPath
@@ -129,6 +153,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  held.refuses = null
   await rm(root, { recursive: true, force: true })
   clearPregenCache()
   vi.restoreAllMocks()
@@ -286,6 +311,12 @@ describe('importBackup', () => {
     await rm(getEndingArtPath(playthroughId))
     await writeFile(asWebp(getEndingArtPath(playthroughId)), WEBP_BYTES)
     await writeFile(asWebp(getProfilePicturePath(playthroughId)), WEBP_BYTES)
+    await writeFile(asWebp(getProfileSourcePath(playthroughId)), WEBP_BYTES)
+    const frame = { x: 10, y: 20, width: 100, height: 120 }
+    await writeFile(
+      getProfileSourceRecordPath(playthroughId),
+      JSON.stringify({ schemaVersion: 1, frame })
+    )
     const photos = getPhotosPath(playthroughId)
     for (const name of await readdir(photos)) {
       if (name.startsWith('42.') && !name.endsWith('.json')) await rm(join(photos, name))
@@ -297,12 +328,17 @@ describe('importBackup', () => {
     const entries = await entriesOf(archive)
     expect(entries[endingArtEntry(playthroughId)]).toEqual(WEBP_BYTES)
     expect(entries[profilePictureEntry(playthroughId)]).toEqual(WEBP_BYTES)
+    expect(entries[profileSourceEntry(playthroughId)]).toEqual(WEBP_BYTES)
     expect(entries[photoEntry(playthroughId, '42')]).toEqual(WEBP_BYTES)
 
     await rm(getSavesPath(), { recursive: true, force: true })
     await importBackup(archive)
     expect(await readEndingArt(playthroughId)).toEqual(Buffer.from(WEBP_BYTES))
     expect(await readProfilePicture(playthroughId)).toEqual(Buffer.from(WEBP_BYTES))
+    expect(await readProfileSource(playthroughId)).toEqual({
+      image: new Uint8Array(WEBP_BYTES),
+      frame
+    })
     expect(await readPhoto(playthroughId, '42')).toEqual(Buffer.from(WEBP_BYTES))
   })
 
@@ -682,6 +718,62 @@ describe('importBackup — the settings it carries', () => {
     // Neither the settings nor anything after them was put back.
     expect((await getSettings()).lessNsfwText).toBe(false)
     expect(await listCustomBackgrounds()).toEqual([])
+  })
+})
+
+describe('importBackup — a saves folder that will not move', () => {
+  /** A backup, and an install that has since moved on from it, as bytes to compare against. */
+  async function seedAndMoveOn(): Promise<{
+    archive: string
+    playthroughId: string
+    saveIds: string[]
+    settings: Buffer
+    bags: Buffer
+  }> {
+    const { archive, playthroughId, saveIds } = await seedAndExport()
+    await seedSettings({ lessNsfwText: false })
+    await setGrabBags({ inspiration: ['lantern'] })
+    return {
+      archive,
+      playthroughId,
+      saveIds,
+      settings: await readFile(getSettingsPath()),
+      bags: await readFile(getGrabBagsPath())
+    }
+  }
+
+  it.each([
+    ['the live folder is held', 'BACKUP_SAVES_HELD', (from: string) => from === getSavesPath()],
+    [
+      'the staged folder will not land',
+      'BACKUP_RESTORE_FAILED',
+      (from: string, to: string) => to === getSavesPath() && !basename(from).startsWith('saves-old-')
+    ]
+  ])('changes nothing when %s', async (_case, code, refuses) => {
+    const { archive, playthroughId, saveIds, settings, bags } = await seedAndMoveOn()
+
+    held.refuses = refuses
+    await expect(importBackup(archive)).rejects.toMatchObject({ code })
+
+    expect(await readFile(getSettingsPath())).toEqual(settings)
+    expect(await readFile(getGrabBagsPath())).toEqual(bags)
+    for (const saveId of saveIds) {
+      expect((await loadSave(playthroughId, saveId)).saveId).toBe(saveId)
+    }
+  })
+
+  it('names the folder the saves are left in when they cannot be moved back', async () => {
+    const { archive, playthroughId, settings } = await seedAndMoveOn()
+
+    held.refuses = (_from, to) => to === getSavesPath()
+    const error = (await importBackup(archive).catch((err: unknown) => err)) as AppError
+
+    expect(error.code).toBe('BACKUP_SAVES_STRANDED')
+    const parked = /data\\tmp\\(saves-old-[^,\s]+)/.exec(error.message)?.[1] ?? ''
+    expect(parked).not.toBe('')
+    const left = await readdir(join(getDataPath(), 'tmp', parked, playthroughId))
+    expect(left.length).toBeGreaterThan(0)
+    expect(await readFile(getSettingsPath())).toEqual(settings)
   })
 })
 

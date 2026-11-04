@@ -27,6 +27,26 @@ function phraseOf(value: string): string {
 }
 
 /**
+ * `values` with every tag in `text` appended, the way a well commits typed text: blanks and
+ * ones already listed dropped, by the `phrases` rule where it is on.
+ */
+export function withTypedTags(
+  values: readonly string[],
+  text: string,
+  phrases = false
+): string[] {
+  const clean = phrases ? phraseOf : tagOf
+  // Two phrases differing only in case are one phrase.
+  const key = (tag: string): string => (phrases ? tag.toLowerCase() : tag)
+  // Deduped against itself too: "a, a" is one tag, by the same rule.
+  const next = [...values]
+  for (const tag of text.split(',').map(clean)) {
+    if (tag.length > 0 && !next.some((value) => key(value) === key(tag))) next.push(tag)
+  }
+  return next
+}
+
+/**
  * An editable list of booru tags shown as chips; its styling is `vu_styles/base.css`'s,
  * with the rest of the final design's form controls.
  */
@@ -49,16 +69,7 @@ export function ChipListInput({
 
   /** Appends every tag in `text`, dropping blanks and ones already listed. */
   const commit = (text: string): void => {
-    const clean = phrases ? phraseOf : tagOf
-    // Two phrases differing only in case are one phrase.
-    const key = (tag: string): string => (phrases ? tag.toLowerCase() : tag)
-    const added = text
-      .split(',')
-      .map(clean)
-      .filter((tag) => tag.length > 0 && !values.some((value) => key(value) === key(tag)))
-    // Deduped against itself too: "a, a" is one tag, by the same rule.
-    const next = [...values]
-    for (const tag of added) if (!next.some((value) => key(value) === key(tag))) next.push(tag)
+    const next = withTypedTags(values, text, phrases)
     if (next.length !== values.length) onChange(next)
   }
 

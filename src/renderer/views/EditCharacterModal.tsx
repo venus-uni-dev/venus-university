@@ -24,6 +24,7 @@ import {
 } from '@shared/audio'
 import {
   customCgLabelOf,
+  customCgLoraOf,
   customCgSfxOf,
   customCgVoiceOf,
   DEFAULT_CG_SFX,
@@ -33,10 +34,12 @@ import {
 } from '@shared/customCgs'
 import {
   characterLoraOf,
-  characterLoraToStore,
   DEFAULT_LORA_WEIGHT,
+  loraOf,
+  loraToStore,
   loraWeightText,
-  parseLoraWeight
+  parseLoraWeight,
+  type DrawnLora
 } from '@shared/comfyModels'
 import { EMOTIONS } from '@shared/emotions'
 import {
@@ -46,6 +49,7 @@ import {
   spriteDraft,
   type PromptEdit
 } from '@shared/imagePrompt'
+import { defaultTagsOf, type DefaultTags } from '@shared/defaultTags'
 import {
   CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
   CUSTOM_OUTFIT_NAME_MAX,
@@ -83,8 +87,7 @@ import type {
   Emotion,
   OutfitSet,
   RegenTarget,
-  SetTarget,
-  WardrobeLayer
+  SetTarget
 } from '@shared/types'
 import { poseKeysOf, useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
@@ -120,6 +123,7 @@ import {
   loraMissingCopy,
   outfitInstructionsHint,
   OUTFIT_NAME_HINT,
+  positionLoraMissingCopy,
   PREFERRED_STAT_OPTIONS,
   sheetPlaceholders,
   TAG_FIELDS,
@@ -137,10 +141,12 @@ import { ProfilePictureModal } from './ProfilePictureModal'
 import {
   RegenerateModal,
   type CgSounds,
+  type LoraAnswer,
   type PastedSet,
   type SeedPrefill
 } from './RegenerateModal'
 import { SetHeightModal } from './SetHeightModal'
+import { EraseArtifactsModal } from './EraseArtifactsModal'
 import { FingerFixModal } from './FingerFixModal'
 import { committedWeightText, useCharacterLora, weightTextAfterPick } from './useCharacterLora'
 import { TransparencyFixModal } from './TransparencyFixModal'
@@ -200,6 +206,8 @@ interface RegenerateRequest {
   edit: PromptEdit
   /** The groups the render would send unedited, which Reset puts back. */
   defaults: PromptEdit
+  /** The default tags both were drawn under, kept beside what the render sends. */
+  tags: DefaultTags
   seed: SeedPrefill
   /** Asks for a name too, where the set is being made rather than replaced. */
   name?: { value: string; placeholder: string; maxLength: number; hint: string }
@@ -207,6 +215,8 @@ interface RegenerateRequest {
   instructions?: { value: string; maxLength: number; hint: (name: string) => string }
   /** And for the loops a CG plays, on the same terms. */
   sounds?: CgSounds
+  /** And for the position LoRA a custom CG draws, opening on this one, wherever it renders one. */
+  lora?: { value: DrawnLora | null }
   /** A group the render cannot be sent without. */
   requireGroup?: PromptGroup
   /** Fills the form from the last set of its kind copied, where the set is being made. */
@@ -218,7 +228,9 @@ interface RegenerateRequest {
 }
 
 /** What a caller builds a request from: the draft in place of the two tag states derived from it. */
-type RegenerateOpening = Omit<RegenerateRequest, 'defaults' | 'edit'> & { draft: PromptEdit }
+type RegenerateOpening = Omit<RegenerateRequest, 'defaults' | 'edit' | 'tags'> & {
+  draft: PromptEdit
+}
 
 /** True for a whole-set target: the single-image forms name what they are in front of the key. */
 function isSetTarget(target: RenderTarget): target is SetTarget {
@@ -327,10 +339,11 @@ export function EditCharacterModal({
   const [deletingCg, setDeletingCg] = useState<CustomCgSlot | null>(null)
   // Which player-authored CG pair's instructions and loops are being written.
   const [editingCg, setEditingCg] = useState<CustomCgSlot | null>(null)
+  // Which wardrobe repair is open, over which set.
   const [fixing, setFixing] = useState<{
     set: OutfitSet | null
     title: string
-    kind: WardrobeLayer
+    kind: 'fix' | 'hands' | 'erase'
   } | null>(null)
   const [framing, setFraming] = useState(false)
   // Whether the portrait is being pointed at, which is what raises the mark over it.
@@ -355,6 +368,10 @@ export function EditCharacterModal({
   const [resetting, setResetting] = useState(false)
   // A render whose LoRA ComfyUI does not list, waiting on the player's answer.
   const [loraMissing, setLoraMissing] = useState<{ file: string; run: () => void } | null>(null)
+  // And a custom CG fill whose position LoRA it does not list, on the same terms.
+  const [cgLoraMissing, setCgLoraMissing] = useState<{ file: string; run: () => void } | null>(
+    null
+  )
 
   const setField =
     <K extends keyof Form>(key: K) =>
@@ -548,7 +565,7 @@ export function EditCharacterModal({
     const weight = parseLoraWeight(form.loraWeight) ?? held?.weight ?? DEFAULT_LORA_WEIGHT
     if (form.loraName === '') delete next.lora
     else if (held?.name !== form.loraName || held.weight !== weight) {
-      next.lora = characterLoraToStore(form.loraName, weight)
+      next.lora = loraToStore(form.loraName, weight)
     }
     return next
   }
@@ -650,6 +667,7 @@ export function EditCharacterModal({
       setConfirmSet(null)
       setPending(null)
       setLoraMissing(null)
+      setCgLoraMissing(null)
     })
   }
 
@@ -719,7 +737,11 @@ export function EditCharacterModal({
    * built from the character as the store holds her now.
    */
   const openRegenerate = (
-    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening,
+    build: (
+      character: Character,
+      poseTags: readonly string[],
+      tags: DefaultTags
+    ) => RegenerateOpening,
     withoutLora = false
   ): void => {
     // Read fresh out of the store, never off `character`: the dirty gate may have just saved,
@@ -727,8 +749,9 @@ export function EditCharacterModal({
     const current = useCharacterStore.getState().characters[charId]
     if (!current) return
     const poseTags = useAssetStore.getState().poses[current.pose]?.tags ?? []
-    const { draft, ...request } = build(current, poseTags)
-    const kept = withRegenTags(draft, current.regenTags?.[request.target])
+    const tags = defaultTagsOf(useSettingsStore.getState().settings)
+    const { draft, ...request } = build(current, poseTags, tags)
+    const kept = withRegenTags(draft, current.regenTags?.[request.target], tags)
     // A custom slot's Outfit group, and a custom CG pair's Position group for either of its
     // images, are her record, whatever the button last sent.
     const edit =
@@ -737,7 +760,7 @@ export function EditCharacterModal({
         : customCgOfTarget(request.target) && kept.kind === 'cg' && draft.kind === 'cg'
           ? { ...kept, position: draft.position }
           : kept
-    setRegen({ ...request, defaults: draft, edit, withoutLora })
+    setRegen({ ...request, defaults: draft, edit, tags, withoutLora })
   }
 
   /**
@@ -754,6 +777,24 @@ export function EditCharacterModal({
     }
     void loras.isListed(lora.name).then((listed) => {
       if (listed === false) setLoraMissing({ file: lora.name, run: () => run(true) })
+      else run(false)
+    })
+  }
+
+  /**
+   * Runs a custom CG pair's fill past the check on its position LoRA, as {@link guardLora} runs
+   * a render past hers: behind the confirm where ComfyUI does not list it, whose answer runs it
+   * without.
+   */
+  const guardCgLora = (slot: CustomCgSlot, run: (withoutCgLora: boolean) => void): void => {
+    const current = useCharacterStore.getState().characters[charId]
+    const lora = current ? customCgLoraOf(current, slot) : null
+    if (!lora) {
+      run(false)
+      return
+    }
+    void loras.isListed(lora.name).then((listed) => {
+      if (listed === false) setCgLoraMissing({ file: lora.name, run: () => run(true) })
       else run(false)
     })
   }
@@ -780,7 +821,8 @@ export function EditCharacterModal({
       sounds: {
         voice: isCgVoice(clip.voice) ? clip.voice : DEFAULT_CG_VOICE,
         sfx: isCgSfx(clip.sfx) ? clip.sfx : DEFAULT_CG_SFX
-      }
+      },
+      lora: loraOf(clip.lora)
     }
   }
 
@@ -795,17 +837,25 @@ export function EditCharacterModal({
     // A fill replaces nothing, and the room's prompt is prose rather than booru tags, so
     // neither has a set of groups for the modal to open on.
     if (!fresh && (mode === 'fill' || target === 'room')) {
-      cancelSingles(target)
-      void generateSet(charId, target, mode, undefined, withoutLora)
+      const fill = (withoutCgLora: boolean): void => {
+        cancelSingles(target)
+        void generateSet(charId, target, mode, undefined, {
+          withoutLora,
+          ...(withoutCgLora ? { cgLora: null } : {})
+        })
+      }
+      // A pair's fill draws the position LoRA its record holds, so that is asked about here.
+      if (isCustomCgSlot(target) && mode === 'fill') guardCgLora(target, fill)
+      else fill(false)
       return
     }
     if (isCustomOutfitSlot(target)) {
       const slot = target
       openRegenerate(
-        (current, poseTags) => ({
+        (current, poseTags, tags) => ({
           target: slot,
           title: fresh ? 'Generate custom outfit' : `Regenerate ${outfitLabelOf(current, slot)}`,
-          draft: spriteDraft(current, poseTags, slot),
+          draft: spriteDraft(current, poseTags, slot, tags),
           seed: seedPrefillFor(current, slot),
           // A wardrobe with no clothes in it is the one render the tags are the whole point of.
           requireGroup: 'outfit',
@@ -835,11 +885,12 @@ export function EditCharacterModal({
     if (isCustomCgSlot(target)) {
       const slot = target
       openRegenerate(
-        (current) => ({
+        (current, _poseTags, tags) => ({
           target: slot,
           title: fresh ? 'Generate custom CG' : `Regenerate ${customCgLabelOf(current, slot)}`,
-          draft: cgDraft(current, slot),
+          draft: cgDraft(current, slot, tags),
           seed: seedPrefillFor(current, slot),
+          lora: { value: customCgLoraOf(current, slot) },
           // A CG with no position in it is the one render the tags are the whole point of.
           requireGroup: 'position',
           ...(fresh
@@ -870,10 +921,10 @@ export function EditCharacterModal({
     }
     if (target === 'cgs') {
       openRegenerate(
-        (current) => ({
+        (current, _poseTags, tags) => ({
           target: 'cgs',
           title: 'Regenerate NSFW CG',
-          draft: cgSetDraft(current),
+          draft: cgSetDraft(current, tags),
           seed: seedPrefillFor(current, 'cgs')
         }),
         withoutLora
@@ -884,10 +935,10 @@ export function EditCharacterModal({
     if (!wardrobe) return
     const spriteTarget = target
     openRegenerate(
-      (current, poseTags) => ({
+      (current, poseTags, tags) => ({
         target: spriteTarget,
         title: `Regenerate ${wardrobe.title}`,
-        draft: spriteDraft(current, poseTags, wardrobe.set),
+        draft: spriteDraft(current, poseTags, wardrobe.set, tags),
         seed: seedPrefillFor(current, spriteTarget)
       }),
       withoutLora
@@ -910,7 +961,11 @@ export function EditCharacterModal({
   /** A single re-roll's tag modal behind the same two gates. */
   const requestSingle = (
     target: RenderTarget,
-    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening
+    build: (
+      character: Character,
+      poseTags: readonly string[],
+      tags: DefaultTags
+    ) => RegenerateOpening
   ): void =>
     guardDirty('regenerate', () =>
       guardLora(target, (withoutLora) => openRegenerate(build, withoutLora))
@@ -939,9 +994,10 @@ export function EditCharacterModal({
 
   /**
    * Sends one render the tag modal answered. A player-authored wardrobe's Outfit group, or a CG
-   * pair's Position group, is written onto her record first, so a later fill draws from what
-   * it holds; a write that does not land queues nothing. What the modal answered is kept as
-   * that button's tags either way.
+   * pair's Position group and position LoRA, is written onto her record first, so a later fill
+   * draws from what it holds; a write that does not land queues nothing. What the modal
+   * answered is kept as that button's tags either way. One image of a pair re-rolled alone
+   * draws the LoRA its form left for that render, and writes none.
    */
   const sendRender = async (
     request: RegenerateRequest,
@@ -949,7 +1005,8 @@ export function EditCharacterModal({
     seed: number | null,
     name?: string,
     instructions?: string,
-    sounds?: CgSounds
+    sounds?: CgSounds,
+    lora?: LoraAnswer
   ): Promise<void> => {
     const target = request.target
     if (isCustomOutfitSlot(target) && edit.kind === 'sprite') {
@@ -958,19 +1015,30 @@ export function EditCharacterModal({
       if (!ok) return
     }
     if (isCustomCgSlot(target) && edit.kind === 'cg') {
-      // The same, the loops included.
+      // The same, the loops and the LoRA included.
       const ok = await writeCustomCg(charId, target, {
         tags: edit.position,
         name,
         instructions,
-        ...(sounds ?? {})
+        ...(sounds ?? {}),
+        ...(lora ? { lora: lora.pick } : {})
       })
       if (!ok) return
     }
     // Kept whether or not it lands: a failed write is reported, and the render goes out regardless.
-    void writeRegenTags(charId, target, edit)
+    void writeRegenTags(charId, target, edit, request.tags)
     if (isSetTarget(target)) cancelSingles(target)
-    await generateSet(charId, target, 'regenerate', { prompt: edit, seed }, request.withoutLora)
+    // The LoRA the form left, or none where the player answered to render without it.
+    await generateSet(
+      charId,
+      target,
+      'regenerate',
+      { prompt: edit, seed },
+      {
+        withoutLora: request.withoutLora,
+        ...(lora ? { cgLora: lora.drawn ? lora.pick : null } : {})
+      }
+    )
   }
 
   /** Everything one wardrobe column is handed, stock or player-authored. */
@@ -1007,7 +1075,8 @@ export function EditCharacterModal({
             fixDisabled: fixBlocked(target, set),
             onFixFingers: () => setFixing({ set, title, kind: 'hands' }),
             fingersDisabled: fingersBlocked(target, set),
-            fingersNote: comfyNote
+            fingersNote: comfyNote,
+            onEraseArtifacts: () => setFixing({ set, title, kind: 'erase' })
           }
 
     /* What only a player-authored wardrobe offers: the plus that writes an empty slot, and —
@@ -1700,10 +1769,10 @@ export function EditCharacterModal({
             regenEnabled={!setBlocked('cgs') && !sfwWithholds('cgs', noNsfwImages)}
             // A single CG re-roll goes through the dirty gate as a set does.
             onRegenerate={(position) =>
-              requestSingle(cgTargetFor(position), (current) => ({
+              requestSingle(cgTargetFor(position), (current, _poseTags, tags) => ({
                 target: cgTargetFor(position),
                 title: 'Regenerate CG',
-                draft: cgDraft(current, position),
+                draft: cgDraft(current, position, tags),
                 seed: seedPrefillFor(current, cgTargetFor(position))
               }))
             }
@@ -1742,11 +1811,12 @@ export function EditCharacterModal({
             onFill={(slot) => requestSet('generate', slot, 'fill')}
             onRegeneratePair={(slot) => requestSet('regenerate', slot, 'regenerate')}
             onRegenerateAfter={(slot) =>
-              requestSingle(cgTargetFor(afterOf(slot)), (current) => ({
+              requestSingle(cgTargetFor(afterOf(slot)), (current, _poseTags, tags) => ({
                 target: cgTargetFor(afterOf(slot)),
                 title: 'Regenerate CG',
-                draft: cgDraft(current, afterOf(slot)),
-                seed: seedPrefillFor(current, cgTargetFor(afterOf(slot)))
+                draft: cgDraft(current, afterOf(slot), tags),
+                seed: seedPrefillFor(current, cgTargetFor(afterOf(slot))),
+                lora: { value: customCgLoraOf(current, slot) }
               }))
             }
             onEdit={setEditingCg}
@@ -1777,6 +1847,16 @@ export function EditCharacterModal({
         {fixing?.kind === 'hands' && (
           <FingerFixModal
             key="fix-fingers"
+            charId={charId}
+            set={fixing.set}
+            title={fixing.title}
+            theme={theme}
+            onClose={() => setFixing(null)}
+          />
+        )}
+        {fixing?.kind === 'erase' && (
+          <EraseArtifactsModal
+            key="erase-artifacts"
             charId={charId}
             set={fixing.set}
             title={fixing.title}
@@ -1902,6 +1982,21 @@ export function EditCharacterModal({
           />
         )}
 
+        {cgLoraMissing !== null && (
+          <ConfirmModal
+            key="cg-lora-missing"
+            id="cg-lora-missing"
+            theme={theme}
+            {...positionLoraMissingCopy(cgLoraMissing.file)}
+            onConfirm={() => {
+              const answered = cgLoraMissing
+              setCgLoraMissing(null)
+              answered.run()
+            }}
+            onCancel={() => setCgLoraMissing(null)}
+          />
+        )}
+
         {confirmSet !== null && (
           <ConfirmModal
             key="confirm-set"
@@ -1931,14 +2026,15 @@ export function EditCharacterModal({
             name={regen.name}
             instructions={regen.instructions}
             sounds={regen.sounds}
+            lora={regen.lora}
             requireGroup={regen.requireGroup}
             paste={regen.paste}
             submitLabel={regen.submitLabel}
-            onConfirm={(edit, seed, name, instructions, sounds) => {
+            onConfirm={(edit, seed, name, instructions, sounds, lora) => {
               const request = regen
               setRegen(null)
               if (request === null) return
-              void sendRender(request, edit, seed, name, instructions, sounds)
+              void sendRender(request, edit, seed, name, instructions, sounds, lora)
             }}
             onCancel={() => setRegen(null)}
           />

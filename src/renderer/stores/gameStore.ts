@@ -76,6 +76,7 @@ import type { Weather } from '@shared/weather'
 import { globalSlotOf, MAX_RAISES, newJobState, RAISE_EVERY } from '@shared/jobs'
 import type { ExamPeriod } from '@shared/academics'
 import type { DatingPassOutcome } from '@shared/dating'
+import { withMilestonesEdited, type EditMilestones } from '@shared/milestoneEdit'
 import type {
   NpcFriendship,
   NpcRelationshipMap,
@@ -88,6 +89,7 @@ import {
   emptyBunnyboard,
   READER_SPEAKER,
   type AppError,
+  type BreakupOwed,
   type BunnyboardState,
   type CalendarEvent,
   type CharMemory,
@@ -389,6 +391,8 @@ interface GameStoreState {
   springBreakAway: string[] | null
   /** The graduate back in town for this fall's Homecoming, null until then or with none. Persisted. */
   homecomingVisitor: string | null
+  /** The lovers a hand-set relationship left, waiting on the next opening's texts. Persisted. */
+  breakupsOwed: BreakupOwed[]
   /** The feed items belonging to today alone, stamped with it. Persisted. */
   feedExtras: FeedExtras | null
   /** The graduation narration has played. Persisted. */
@@ -691,8 +695,6 @@ interface GameStoreState {
   setReplay: (date: number, time: TimeSlot, id: string) => void
   /** Forgets the replay kept for one finished slot, if any. */
   dropReplay: (date: number, time: TimeSlot) => void
-  /** Rewords a created scene's opening action, typed again after its first send failed. */
-  setCreatedPrompt: (prompt: string) => void
   /** Puts a created scene's picked background on the empty stage its opening call reads. */
   seedStageBg: (bg: string) => void
   /** Clears all game state (e.g. on return to main menu). */
@@ -878,6 +880,11 @@ interface GameStoreState {
   replaceMemory: (charId: string, match: CharMemory, next: CharMemory | null) => void
   /** Keeps the player's notes on her, trimmed; blank ones are dropped rather than stored. */
   setCharNotes: (charId: string, text: string) => void
+  /**
+   * Applies the milestone boxes that differ between `opened` and `picked` to her entry as the
+   * game's own transitions; a girl with no entry is left alone.
+   */
+  editMilestones: (charId: string, opened: EditMilestones, picked: EditMilestones) => void
   /** Files what this slot's texting left her with, **replacing** the last slot's. */
   setTextMemory: (charId: string, entry: CharMemory) => void
   /** Remembers what the scene-end status lines just told him about her standards. */
@@ -1080,6 +1087,10 @@ interface GameStoreState {
   setSpringBreakAway: (charIds: readonly string[]) => void
   /** Files the graduate back in town for Homecoming, or that nobody is. */
   setHomecomingVisitor: (charId: string | null) => void
+  /** Owes the next slot's opening the breakup texts of these lovers. */
+  addBreakupsOwed: (breakups: readonly BreakupOwed[]) => void
+  /** Forgets every owed breakup, once an opening has been banked with their texts. */
+  clearBreakupsOwed: () => void
   /** Marks the graduation narration played, so a resumed epilogue skips it. */
   markGraduationSeen: () => void
   /** Spends one goodbye off the epilogue's menu. Idempotent. */
@@ -1478,6 +1489,7 @@ const initialState = {
   outingSlots: {} as Record<string, number>,
   springBreakAway: null as string[] | null,
   homecomingVisitor: null as string | null,
+  breakupsOwed: [] as BreakupOwed[],
   feedExtras: null as FeedExtras | null,
   graduationSeen: false,
   farewellsDone: [] as string[],
@@ -1622,6 +1634,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       outingSlots: save.outingSlots,
       springBreakAway: save.springBreakAway,
       homecomingVisitor: save.homecomingVisitor ?? null,
+      breakupsOwed: save.breakupsOwed ?? [],
       sceneEventsFired: save.sceneEventsFired ?? {},
       readerCold: save.readerCold ?? null,
       readerColdsHad: save.readerColdsHad ?? [],
@@ -1685,18 +1698,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   seedStageBg: (bg) => set({ bg }),
-
-  setCreatedPrompt: (prompt) =>
-    set((state) =>
-      state.createdScene
-        ? {
-            createdScene: {
-              ...state.createdScene,
-              setup: { ...state.createdScene.setup, prompt }
-            }
-          }
-        : {}
-    ),
 
   reset: () => set({ ...initialState, loads: get().loads, ...freshStage() }),
 
@@ -2367,6 +2368,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       })
     ),
 
+  // The transitions live in `shared/milestoneEdit`, beside the rule the modal keeps.
+  editMilestones: (charId, opened, picked) =>
+    set((state) =>
+      patchCharInfo(state, charId, (info) =>
+        info ? withMilestonesEdited(info, opened, picked, state.date) : null
+      )
+    ),
+
   setCrush: (charId) =>
     set((state) =>
       patchCharInfo(state, charId, (info) => {
@@ -3024,6 +3033,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   setHomecomingVisitor: (charId) => set({ homecomingVisitor: charId }),
 
+  addBreakupsOwed: (breakups) =>
+    set((state) =>
+      breakups.length === 0 ? {} : { breakupsOwed: [...state.breakupsOwed, ...breakups] }
+    ),
+
+  clearBreakupsOwed: () =>
+    set((state) => (state.breakupsOwed.length === 0 ? {} : { breakupsOwed: [] })),
+
   markGraduationSeen: () => set({ graduationSeen: true }),
 
   markEndingArtWanted: () => set({ endingArtWanted: true }),
@@ -3126,6 +3143,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       outingSlots: state.outingSlots,
       springBreakAway: state.springBreakAway,
       ...(state.homecomingVisitor ? { homecomingVisitor: state.homecomingVisitor } : {}),
+      ...(state.breakupsOwed.length > 0 ? { breakupsOwed: state.breakupsOwed } : {}),
       ...(Object.keys(state.sceneEventsFired).length > 0
         ? { sceneEventsFired: state.sceneEventsFired }
         : {}),

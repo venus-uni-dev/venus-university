@@ -21,6 +21,7 @@ import { ChevronIcon } from './screenIcons'
 import {
   boxRewind,
   boxWipe,
+  breatheDecor,
   chipRow,
   cursorOff,
   cursorOn,
@@ -31,6 +32,7 @@ import {
   press,
   quietLift,
   quietPress,
+  readerFace,
   sceneBox,
   sceneBoxState,
   sceneHint,
@@ -64,6 +66,10 @@ export interface DialogueBoxProps {
   speakerName?: string
   speakerCharId?: string | undefined
   speakerVersion?: number
+  /** The reader's own picture, where this box shows it on narrated lines. */
+  readerPicture?: string | undefined
+  /** The line is the narrator's, a speaker's line that resolved to nobody being no such thing. */
+  narrated?: boolean
   text: string
   /** Runs of this line drawn in a colour of their own — a stat's, or the money's. */
   marks?: readonly TextMark[]
@@ -118,6 +124,8 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
     speakerName = '',
     speakerCharId,
     speakerVersion = 0,
+    readerPicture,
+    narrated = false,
     text,
     marks,
     revealed,
@@ -210,11 +218,9 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
    */
   const frozen = useRef('')
   if (dress === shownDress && arrival === 'shown') frozen.current = text.slice(0, revealed)
-  const worn = useRef<{ charId: string | undefined; name: string }>({
-    charId: speakerCharId,
-    name: speakerName
-  })
-  if (dress === shownDress) worn.current = { charId: speakerCharId, name: speakerName }
+  const speaking = { charId: speakerCharId, name: speakerName, narrated: narrated && Boolean(text) }
+  const worn = useRef(speaking)
+  if (dress === shownDress) worn.current = speaking
 
   // A click during the arrival lands every layer at once. Without it the player out-clicks the
   // respawn and advances past a line he never saw, which is the one way this can eat one.
@@ -363,6 +369,31 @@ export function DialogueBox(props: DialogueBoxProps): JSX.Element {
             </motion.span>
           </span>
         </div>
+      )}
+
+      {/* The reader's own picture over the round cap: a sibling keyed like the rest, its fade and
+          its breath two elements, one property apiece. It answers as the box does only while it
+          is on show, an opacity of zero still being a hit target. */}
+      {readerPicture && !worn.current.charId && (
+        <motion.div
+          className="vu-box-reader"
+          key={`reader:${shownDress}:${cutMount}`}
+          {...(worn.current.narrated ? answers : undefined)}
+          variants={readerFace}
+          initial={layerStart}
+          animate={leaving ? 'gone' : dressed && worn.current.narrated ? 'shown' : 'hidden'}
+        >
+          <motion.div className="vu-box-reader-arch vu-arch vu-paper" animate={breatheDecor}>
+            <span className="vu-crop">
+              <img
+                className="vu-crop-img"
+                src={readerPicture}
+                alt=""
+                decoding={cutIn ? 'sync' : 'async'}
+              />
+            </span>
+          </motion.div>
+        </motion.div>
       )}
 
       <motion.div

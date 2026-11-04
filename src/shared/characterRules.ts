@@ -1,5 +1,6 @@
 import { CHARACTER_FILE_NAME } from './characterFiles'
-import { characterLoraToStore, DEFAULT_LORA_WEIGHT, isLoraWeight } from './comfyModels'
+import { DEFAULT_LORA_WEIGHT, isLoraWeight, loraToStore } from './comfyModels'
+import { SUBJECT_TAGS, withoutSubjectTags } from './defaultTags'
 import { EMOTIONS } from './emotions'
 import { assertSafeId, validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import { allFollowMain } from './outfits'
@@ -24,9 +25,6 @@ import { randomId } from './uuid'
 
 /** Schema version this build reads and writes. */
 export const CHARACTER_SCHEMA_VERSION = 3
-
-/** The tags every render opens her appearance with. */
-export const SUBJECT_TAGS: readonly string[] = ['1girl', 'mature_female']
 
 /** What a character record must carry; where it is kept names her. */
 const CHARACTER_REQUIRED: Record<
@@ -152,10 +150,12 @@ function emptyBehavior(): CharacterBehavior {
 /**
  * The pre-LLM record a new character starts as; an empty `pose` marks her as not generated.
  * The brief rides along until her sheet lands, so an interrupted write can be rerun from it.
+ * Her appearance opens on `subject`, the subject tags in force.
  */
 export function newCharacter(
   firstName: string,
   lastName: string,
+  subject: readonly string[],
   brief?: CharacterBrief
 ): Character {
   return {
@@ -180,7 +180,7 @@ export function newCharacter(
     generationSeed: randomSeed(),
     seedFollowsMain: allFollowMain(),
     setSeeds: {},
-    baseAppearance: [...SUBJECT_TAGS],
+    baseAppearance: [...subject],
     pose: '',
     outfit: [],
     peOutfit: [],
@@ -234,22 +234,27 @@ function joinedTags(...groups: readonly (readonly string[])[]): string[] {
 
 /**
  * Her sheet with the LoRA the New Character modal picked: the LoRA on her record, its trigger
- * word and appearance tags after the subject tags, and its outfit tags in her default outfit.
- * A group the player filled stands in for the one her sheet already holds where `replace` is
- * on, and goes in front of it otherwise; a group left empty keeps what her sheet holds.
+ * word and appearance tags after `subject`, the subject tags in force, and its outfit tags in
+ * her default outfit. A group the player filled stands in for the one her sheet already holds
+ * where `replace` is on, and goes in front of it otherwise; a group left empty keeps what her
+ * sheet holds.
  */
-export function withCharacterLora(character: Character, lora: CharacterLoraBrief): Character {
+export function withCharacterLora(
+  character: Character,
+  lora: CharacterLoraBrief,
+  subject: readonly string[]
+): Character {
   const appearance = joinedTags([lora.trigger], lora.appearance)
   const outfit = joinedTags(lora.outfit)
-  const written = character.baseAppearance.filter((tag) => !SUBJECT_TAGS.includes(tag))
+  const written = withoutSubjectTags(character.baseAppearance, subject)
   const baseAppearance = joinedTags(
-    SUBJECT_TAGS,
+    subject,
     appearance,
     lora.replace && appearance.length > 0 ? [] : written
   )
   return {
     ...character,
-    lora: characterLoraToStore(
+    lora: loraToStore(
       lora.name,
       isLoraWeight(lora.weight) ? lora.weight : DEFAULT_LORA_WEIGHT
     ),

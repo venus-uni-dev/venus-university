@@ -164,13 +164,14 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     serviceTier: settings.serviceTier,
     comfyDeferred: settings.comfyDeferred,
     // Carried, or a save made from anywhere else would put the app's own ComfyUI back in charge
-    // and forget which models each one draws with, and at what LoRA weight.
+    // and forget which models each one draws with, at what LoRA weight and under which tags.
     comfySource: settings.comfySource,
     comfyUrl: settings.comfyUrl,
     comfyModels: settings.comfyModels,
     comfyExternalModels: settings.comfyExternalModels,
     comfyLoraWeight: settings.comfyLoraWeight,
     comfyExternalLoraWeight: settings.comfyExternalLoraWeight,
+    comfyTags: settings.comfyTags,
     // Carried, or a save made from anywhere else would turn the launch offer back on.
     checkUpdates: settings.checkUpdates,
     // Carried, or a save made from anywhere else would open the next launch fullscreen again.
@@ -178,6 +179,9 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     // Carried, or a save made from anywhere else would turn the ending warnings back on.
     warnEndingInterrupt: settings.warnEndingInterrupt,
     warnEndingEdit: settings.warnEndingEdit,
+    // Carried, or a save made from anywhere else would take the picture back out of scenes.
+    showProfilePictureInScenes: settings.showProfilePictureInScenes,
+    askProfilePictureInScenes: settings.askProfilePictureInScenes,
     // Carried, or a save made from anywhere else would turn the New Game setup welcome back on.
     newGameWelcome: settings.newGameWelcome,
     noNsfwImages: settings.noNsfwImages,

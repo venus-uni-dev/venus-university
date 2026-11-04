@@ -31,6 +31,7 @@ import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
 import { earlierSemesters, keptReplayIds } from '../stores/loop/replay'
 import type { ReplayOffer } from '../stores/loop/saves'
+import { offerNoteOf } from '../stores/gameLoop'
 import { dayOfMonth, gridCellsOf, monthIndexOf, monthName, monthsOf } from './calendarMonths'
 import type { ScreenTheme } from './clockTheme'
 import {
@@ -547,12 +548,7 @@ export function CalendarModal({
   function replayRow(time: TimeSlot): JSX.Element | null {
     const id = day.replays[selected]?.[time]
     if (!id || !kept?.has(id)) return null
-    const note =
-      replayOffer === 'scene'
-        ? 'Unavailable in scenes'
-        : replayOffer === 'waiting'
-          ? 'Waiting for LLM response'
-          : null
+    const note = offerNoteOf(replayOffer)
     const dead = note !== null
     return (
       <motion.div className="vu-cal-replay" variants={slideInQuick}>

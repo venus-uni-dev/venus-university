@@ -40,6 +40,8 @@ export interface ChipFieldProps {
   autoFocus?: boolean
   /** The modal's copy marks, which this well's mark reads and writes. */
   mark: CopyMark
+  /** Hears the half-typed text after every keystroke, so a caller can commit it without a blur. */
+  onDraft?: (text: string) => void
 }
 
 /** A labelled chip well, its label followed by the mark that copies its tags while it holds any. */
@@ -51,7 +53,8 @@ export function ChipField({
   onChange,
   placeholder,
   autoFocus,
-  mark
+  mark,
+  onDraft
 }: ChipFieldProps): JSX.Element {
   const copied = mark.copiedId === id
 
@@ -78,6 +81,7 @@ export function ChipField({
         onChange={onChange}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        onDraft={onDraft}
       />
     </label>
   )

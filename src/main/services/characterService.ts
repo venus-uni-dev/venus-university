@@ -26,6 +26,7 @@ import {
   SAFE_CHAR_ID,
   withRemovedDefault
 } from '@shared/characterRules'
+import { defaultTagsOf } from '@shared/defaultTags'
 import { appError, messageOf } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
@@ -283,7 +284,12 @@ export async function createCharacter(
   brief?: CharacterBrief,
   reference?: ReferenceImage
 ): Promise<Character> {
-  const character = newCharacter(firstName, lastName, brief)
+  const character = newCharacter(
+    firstName,
+    lastName,
+    defaultTagsOf(await getSettings()).subject,
+    brief
+  )
 
   await mkdir(getCharacterExpressionsPath(character.charId), { recursive: true })
   await mkdir(getCharacterCgsPath(character.charId), { recursive: true })
@@ -629,13 +635,15 @@ export function decodePng(data: string, what: string): Buffer {
 /**
  * Writes one wardrobe's repaired sprites over the set on disk, plus its paint layer where the
  * repair keeps one. The hand repair passes `null` instead, removing any stale layer on disk.
+ * The erase also hands over the set's base frame, written in the same batch.
  */
 export async function applyWardrobeFix(
   charId: string,
   target: WardrobeTarget,
   images: readonly WardrobeFixImage[],
   paintLayer: string | null,
-  kind: WardrobeLayer
+  kind: WardrobeLayer,
+  base?: string
 ): Promise<void> {
   await claimCharacter(charId)
   if (images.length === 0) {
@@ -650,9 +658,15 @@ export async function applyWardrobeFix(
   if (paintLayer !== null) {
     writes.push({ rel: layerRel(target, kind), bytes: decodePng(paintLayer, 'the paint layer') })
   }
+  if (base !== undefined) {
+    writes.push({
+      rel: baseRel(target === 'default' ? null : target),
+      bytes: decodePng(base, 'the base frame')
+    })
+  }
 
   // Every picture is encoded before any is written: the sprites at the shared profile, the
-  // paint layer losslessly.
+  // paint layer and the base frame losslessly.
   const stored = await Promise.all(
     writes.map(({ rel, bytes }) =>
       storedImage(getCharacterImagePath(charId, rel), bytes, isLosslessRel(rel))
@@ -662,7 +676,10 @@ export async function applyWardrobeFix(
   try {
     await mkdir(dir, { recursive: true })
     for (const [index, image] of stored.entries()) await writeFile(temps[index], image.bytes)
-    for (const [index, image] of stored.entries()) await rename(temps[index], image.path)
+    // A scanner can still hold a picture the boot just converted, so each rename waits it out.
+    for (const [index, image] of stored.entries()) {
+      await renameWithPatience(temps[index], image.path)
+    }
     // The twin each picture replaced goes too, so one stem is one image.
     for (const image of stored) await retireTwins(image)
   } catch (err) {

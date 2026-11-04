@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 
 /**
- * The marks the repair modal's rail wears: the three tools at palette size, and the
+ * The marks the repair modals' rails wear: the four tools at palette size, and the
  * four row actions at pill size. Lucide-shaped and drawn in `currentColor`, so the button
  * they sit in tints them with one rule.
  */
@@ -41,6 +41,22 @@ export function EraserIcon(): JSX.Element {
       <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
       <path d="M22 21H7" />
       <path d="m5 11 9 9" />
+    </>
+  )
+}
+
+export function WandIcon(): JSX.Element {
+  return mark(
+    32,
+    <>
+      <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72" />
+      <path d="m14 7 3 3" />
+      <path d="M5 6v4" />
+      <path d="M19 14v4" />
+      <path d="M10 2v2" />
+      <path d="M7 8H3" />
+      <path d="M21 16h-4" />
+      <path d="M11 3H9" />
     </>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type JSX, type MutableRefObject } from 'react'
+import { motion } from 'motion/react'
 import {
   COMFY_MODEL_SLOTS,
   comfyPicksOf,
@@ -15,13 +16,25 @@ import {
   type ComfyModelRole,
   type ComfySource
 } from '@shared/comfyModels'
+import {
+  DEFAULT_TAG_GROUPS,
+  defaultTagsOf,
+  defaultTagsToStore,
+  sameTags,
+  SHIPPED_DEFAULT_TAGS,
+  type DefaultTagGroup,
+  type DefaultTags
+} from '@shared/defaultTags'
 import type { RendererSettings, SettingsPatch } from '@shared/types'
+import { ChipField, useCopyMark } from '../components/ChipField'
+import { withTypedTags } from '../components/ChipListInput'
 import { ComfyEndpointFields } from '../components/ComfyEndpointFields'
 import { ComfyModelPicker, resolvedPickOf } from '../components/ComfyModelPicker'
 import { SelectField } from '../components/SelectField'
 import { useComfyStore } from '../stores/comfyStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSetupStore } from '../stores/setupStore'
+import { gestures, quietLift, quietPress } from './motion'
 import { useComfyProbe } from './useComfyProbe'
 
 export interface SettingsComfyTabProps {
@@ -30,8 +43,15 @@ export interface SettingsComfyTabProps {
   /** The player's own ComfyUI's URL as typed, staged by the panel behind Save. */
   url: string
   onUrlChange: (url: string) => void
-  /** Filled with the LoRA weight's commit, which the panel runs on its way out. */
+  /**
+   * Filled with the commit of the LoRA weight and of any tag still half-typed in a well, which
+   * the panel runs on its way out.
+   */
   commitRef: MutableRefObject<(() => Promise<void>) | null>
+  /** Filled with what puts every default tag back to the build's, which the panel's confirm runs. */
+  resetTagsRef: MutableRefObject<(() => void) | null>
+  /** Asks the panel to confirm putting every default tag back to the build's. */
+  onResetTags: () => void
 }
 
 /** What the source select offers, the app's own install first. */
@@ -55,21 +75,45 @@ function weightTextsOf(settings: RendererSettings | null): Record<ComfySource, s
   }
 }
 
+/** Each default tag group's well, in the order the column stands them. */
+const TAG_FIELDS: Record<DefaultTagGroup, { label: string; hint: string }> = {
+  quality: { label: 'Quality', hint: 'Added to sprite and CG prompts.' },
+  negative: {
+    label: 'Negative prompt',
+    hint: 'Added to sprite and CG prompts.'
+  },
+  sprite: {
+    label: 'Sprite',
+    hint: 'Only added to sprite prompts.'
+  },
+  spriteNegative: {
+    label: 'Sprite negative',
+    hint: 'Only added to sprite prompts.'
+  },
+  cg: { label: 'CG', hint: 'Only added to CG prompts.' },
+  subject: {
+    label: 'Subject',
+    hint: "Added to character appearance tags."
+  }
+}
+
 /** What the source select says about the player's own ComfyUI. */
 export const OWN_COMFY_NOTE =
   'Please note that I cannot provide technical support for players using their own ComfyUI instance, you are on your own for troubleshooting.'
 
 /**
  * Settings' ComfyUI tab: which ComfyUI draws and, for the player's own, where it answers and
- * whether it has what the workflows need; beside them, the models each source draws with. The
- * source and the picks are written the moment they change, the LoRA weight as it is left; the
- * URL is the panel's to stage.
+ * whether it has what the workflows need, and under them the models each source draws with; beside
+ * them, the default tags both draw with. The source, the picks and each tag are written the moment
+ * they change, the LoRA weight as it is left; the URL is the panel's to stage.
  */
 export function SettingsComfyTab({
   active,
   url,
   onUrlChange,
-  commitRef
+  commitRef,
+  resetTagsRef,
+  onResetTags
 }: SettingsComfyTabProps): JSX.Element {
   const settings = useSettingsStore((s) => s.settings)
   const update = useSettingsStore((s) => s.update)
@@ -91,6 +135,14 @@ export function SettingsComfyTab({
     managed: settings ? loraWeightOf(settings, 'managed') : DEFAULT_LORA_WEIGHT,
     external: settings ? loraWeightOf(settings, 'external') : DEFAULT_LORA_WEIGHT
   })
+
+  // The default tags as the wells hold them, ahead of the store while a write is in the lane, and
+  // each well's half-typed text, which the panel's way out commits.
+  const [tags, setTags] = useState<DefaultTags>(() => defaultTagsOf(settings))
+  const tagsRef = useRef(tags)
+  const typed = useRef<Partial<Record<DefaultTagGroup, string>>>({})
+  // Which well's copy mark wears the check.
+  const copyMark = useCopyMark()
 
   const probe = useComfyProbe({ source, url })
 
@@ -115,6 +167,8 @@ export function SettingsComfyTab({
       external: loraWeightOf(stored, 'external')
     }
     setWeightText(weightTextsOf(stored))
+    tagsRef.current = defaultTagsOf(stored)
+    setTags(tagsRef.current)
   }
 
   /** Which ComfyUI draws; leaving the app's own stops it, a render in flight with it. */
@@ -173,9 +227,39 @@ export function SettingsComfyTab({
     if (!ok) reseed(useSettingsStore.getState().settings)
   }
 
-  // The weight still holding text it has not sent, committed on the panel's way out, a blur not
-  // being guaranteed; re-filled every render so it reads the text as it stands.
-  commitRef.current = commitWeight
+  /** Writes the default tags, a group the build ships as it stands stored absent. */
+  async function writeTags(next: DefaultTags): Promise<void> {
+    tagsRef.current = next
+    setTags(next)
+    const ok = await update({ comfyTags: defaultTagsToStore(next) })
+    if (!ok) reseed(useSettingsStore.getState().settings)
+  }
+
+  /** Commits whatever is still half-typed in a well as that well would. */
+  async function commitTyped(): Promise<void> {
+    let next = tagsRef.current
+    for (const group of DEFAULT_TAG_GROUPS) {
+      const text = typed.current[group]
+      if (text) next = { ...next, [group]: withTypedTags(next[group], text) }
+    }
+    typed.current = {}
+    if (next !== tagsRef.current) await writeTags(next)
+  }
+
+  // The weight and the wells still holding text they have not sent, committed on the panel's way
+  // out, a blur not being guaranteed; re-filled every render so they read the text as it stands.
+  commitRef.current = async () => {
+    await commitWeight()
+    await commitTyped()
+  }
+  resetTagsRef.current = () => {
+    typed.current = {}
+    void writeTags({ ...SHIPPED_DEFAULT_TAGS })
+  }
+
+  const tagsShipped = DEFAULT_TAG_GROUPS.every((group) =>
+    sameTags(tags[group], SHIPPED_DEFAULT_TAGS[group])
+  )
 
   const own = source === 'external'
   const folderUrl = own && comfyUrlProblem(url) === null ? normalizeComfyUrl(url) : null
@@ -202,15 +286,8 @@ export function SettingsComfyTab({
                 picks={picks.external}
               />
             )}
-          </div>
-          <div className="vu-scroll-fade" />
-        </div>
-      </div>
 
-      <div className="vu-settings-col">
-        <div className="vu-scroll-box">
-          <div className="vu-settings-fields">
-            <span className="vu-settings-heading">Models</span>
+            <span className="vu-settings-heading vu-settings-group-heading">Models</span>
             <p className="vu-settings-note">
               { 'You can open the model folder to add or remove models.'}
             </p>
@@ -230,6 +307,42 @@ export function SettingsComfyTab({
               onWeightText={(text) => setWeightText((prev) => ({ ...prev, [source]: text }))}
               onWeightBlur={() => void commitWeight()}
             />
+          </div>
+          <div className="vu-scroll-fade" />
+        </div>
+      </div>
+
+      <div className="vu-settings-col">
+        <div className="vu-scroll-box">
+          <div className="vu-settings-fields">
+            <span className="vu-settings-heading">Default tags</span>
+            <p className="vu-settings-note">
+              {"Please note that existing characters usually won't be affected by changes here until they are reset to default."}
+            </p>
+            {DEFAULT_TAG_GROUPS.map((group) => (
+              <ChipField
+                key={group}
+                id={`settings-comfy-tags-${group}`}
+                label={TAG_FIELDS[group].label}
+                hint={TAG_FIELDS[group].hint}
+                values={tags[group]}
+                onChange={(next) => void writeTags({ ...tagsRef.current, [group]: next })}
+                onDraft={(text) => {
+                  typed.current[group] = text
+                }}
+                mark={copyMark}
+              />
+            ))}
+            <motion.button
+              id="settings-comfy-tags-reset"
+              className="vu-pill vu-settings-pill"
+              type="button"
+              disabled={tagsShipped}
+              {...gestures(tagsShipped, quietLift, quietPress)}
+              onClick={onResetTags}
+            >
+              Reset to default tags
+            </motion.button>
           </div>
           <div className="vu-scroll-fade" />
         </div>

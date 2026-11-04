@@ -87,9 +87,6 @@ export const STOCK_CG_DISPLAY_ORDER: readonly StockPosition[] = [
   ...STOCK_POSITIONS.filter((position) => isAfterPosition(position))
 ] as const
 
-/** Prefixes every CG's positive prompt, after the quality tags. */
-export const CG_BASE_PROMPT = 'sweat, breath, blush, looking_at_viewer'
-
 /** Booru tags describing each stock position; the middle of the CG positive prompt. */
 export const POSITION_TAGS: Record<StockPosition, string> = {
   nude_foreplay: 'nude, solo, nipples, pussy, on_back',

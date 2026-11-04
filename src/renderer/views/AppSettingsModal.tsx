@@ -204,6 +204,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   )
   // And before a line is rewritten while an ending is under way.
   const [warnEndingEdit, setWarnEndingEdit] = useState(settings?.warnEndingEdit !== false)
+  // And absent means the reader's picture stays out of scenes.
+  const [showPicture, setShowPicture] = useState(settings?.showProfilePictureInScenes === true)
 
   // The typed fields, staged until Save. Each is the endpoint's own, seeded whichever provider
   // is stored, so a panel switched away and back finds them as they were.
@@ -229,6 +231,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [restoring, setRestoring] = useState(false)
   // Whether the gate in front of a restore is up: it writes over everything already here.
   const [confirmRestore, setConfirmRestore] = useState(false)
+  // Whether the gate in front of putting every default tag back is up.
+  const [confirmResetTags, setConfirmResetTags] = useState(false)
   // Whether the gate in front of leaving unsaved text behind is up.
   const [closing, setClosing] = useState(false)
   // Which tab is on screen.
@@ -239,8 +243,10 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [advancedProblem, setAdvancedProblem] = useState<string | null>(null)
   // What commits every Advanced field still holding text it has not sent.
   const commitAdvanced = useRef<(() => Promise<void>) | null>(null)
-  // What commits the LoRA weight while it holds text it has not sent.
+  // What commits the LoRA weight and the tag wells while they hold text they have not sent.
   const commitComfy = useRef<(() => Promise<void>) | null>(null)
+  // What puts every default tag back to the build's, once its gate is answered.
+  const resetComfyTags = useRef<(() => void) | null>(null)
   // Whether the system prompt editor or the player's own backgrounds stand over this panel.
   const [editing, setEditing] = useState(false)
   const [backgrounds, setBackgrounds] = useState(false)
@@ -554,6 +560,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     )
   }
 
+  /** Whether the reader's picture stands beside the box on a scene's narrated lines. */
+  function handleShowPictureChange(checked: boolean): void {
+    setShowPicture(checked)
+    void write({ showProfilePictureInScenes: checked }).then(
+      reseed((stored) => setShowPicture(stored.showProfilePictureInScenes === true))
+    )
+  }
+
   /** A group's slider: heard at once, and written once it has stood still for a moment. */
   function handleVolumeChange(key: AudioGroup, value: number): void {
     const next: Volumes = { ...volumesRef.current, [key]: value }
@@ -757,6 +771,13 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       label="Warn when interrupting an ending scene"
                       checked={warnEndingInterrupt}
                       onChange={handleWarnEndingInterruptChange}
+                    />
+
+                    <CheckField
+                      id="settings-show-profile-picture"
+                      label="Show profile picture in scenes"
+                      checked={showPicture}
+                      onChange={handleShowPictureChange}
                     />
 
                     <span className="vu-settings-heading vu-settings-group-heading">Content</span>
@@ -1089,6 +1110,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                   url={comfyUrlText}
                   onUrlChange={setComfyUrlText}
                   commitRef={commitComfy}
+                  resetTagsRef={resetComfyTags}
+                  onResetTags={() => setConfirmResetTags(true)}
                 />
               )}
 
@@ -1168,6 +1191,23 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                 .then(() => lorebookSettled())
                 .then(() => importBackup())
                 .finally(() => setRestoring(false))
+            }}
+          />
+        )}
+
+        {confirmResetTags && (
+          <ConfirmModal
+            key="reset-tags"
+            id="settings-reset-tags-confirm"
+            theme={theme}
+            title="Reset default tags?"
+            message="Every field under Default tags will go back to the tags the game ships with."
+            confirmText="Reset"
+            cancelText="Cancel"
+            onCancel={() => setConfirmResetTags(false)}
+            onConfirm={() => {
+              setConfirmResetTags(false)
+              resetComfyTags.current?.()
             }}
           />
         )}

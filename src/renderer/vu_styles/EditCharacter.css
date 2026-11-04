@@ -255,9 +255,17 @@
   color: var(--vu-text-muted);
 }
 
-/* The two repairs sit on one row: they are the same kind of offer over the same set, and a
-   column this narrow has no room for a second line of them. */
+/* The repairs and a custom set's instructions, two to a row: they are the same kind of offer
+   over the same set, and a column this narrow — five abreast on a 4:3 stage — has no room for
+   three of them on one line. */
 .vu-wardrobe-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.vu-wardrobe-links-row {
   display: flex;
   gap: 12px;
   justify-content: center;
@@ -266,7 +274,7 @@
 /* The wrapper that hears the pointer for a dead Fix fingers stands in the row where the link
    itself stood, so it carries the link the way the row lays one out rather than as a line of
    text with a strut of its own. */
-.vu-wardrobe-links > .vu-deadnote {
+.vu-wardrobe-links-row > .vu-deadnote {
   display: flex;
 }
 

@@ -506,7 +506,14 @@
   border-radius: 11px;
 }
 
-/* The leave and the answer at the end of the row, neither wider than its own words. */
+/* The leave and the answer at the end of the row, neither wider than its own words, set closer
+   than a modal's so all four still stand on one line at the narrowest stage. */
 .vu-contact-foot {
   flex: none;
+  gap: 16px;
+}
+
+/* The wrapper a dead control's note hears the pointer through keeps the foot's own swell. */
+.vu-contact-foot > .vu-deadnote > button {
+  transform-origin: center;
 }

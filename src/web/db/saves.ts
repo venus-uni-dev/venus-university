@@ -2,6 +2,7 @@ import type { IDBPTransaction } from 'idb'
 import type { Application, ApplicationDraft, KeptApplication } from '@shared/application'
 import { appError } from '@shared/errors'
 import { validateRecord } from '@shared/jsonValidate'
+import type { ProfileFrame, ProfileSource } from '@shared/profilePicture'
 import {
   idsMissingFrom,
   replayIdOf,
@@ -910,6 +911,7 @@ export async function deletePlaythrough(playthroughId: string): Promise<void> {
         'saves',
         'endingArt',
         'profilePictures',
+        'profileSources',
         'photos',
         'replays',
         'lorebooks',
@@ -917,12 +919,13 @@ export async function deletePlaythrough(playthroughId: string): Promise<void> {
       ],
       'readwrite'
     )
-    // Nine deletes, all database requests, so the transaction sees all of them.
+    // Ten deletes, all database requests, so the transaction sees all of them.
     void tx.objectStore('playthroughs').delete(playthroughId)
     void tx.objectStore('saves').delete(partRange(playthroughId))
     void tx.objectStore('endingArt').delete(playthroughId)
     void tx.objectStore('endingArt').delete(semesterPicturesRange(playthroughId))
     void tx.objectStore('profilePictures').delete(playthroughId)
+    void tx.objectStore('profileSources').delete(playthroughId)
     void tx.objectStore('photos').delete(partRange(playthroughId))
     void tx.objectStore('replays').delete(partRange(playthroughId))
     void tx.objectStore('lorebooks').delete(playthroughId)
@@ -983,7 +986,7 @@ export async function writeEndingArt(
   )
 }
 
-/** The reader's own picture already stored, or `null` where there is none. */
+/** The crop of the reader's own picture already stored, or `null` where there is none. */
 export async function readProfilePicture(playthroughId: string): Promise<Uint8Array | null> {
   assertSafePlaythroughId(playthroughId)
   const blob = await storage('read the profile picture', async () =>
@@ -992,19 +995,46 @@ export async function readProfilePicture(playthroughId: string): Promise<Uint8Ar
   return blob ? new Uint8Array(await blob.arrayBuffer()) : null
 }
 
-/** Keeps the reader's own picture beside the playthrough it belongs to. */
-export async function writeProfilePicture(playthroughId: string, picture: Blob): Promise<void> {
+/** The full picture the crop was cut from and its frame, or `null` where only a crop was kept. */
+export async function readProfileSource(playthroughId: string): Promise<ProfileSource | null> {
   assertSafePlaythroughId(playthroughId)
-  const blob = await storedBlob(picture, false)
-  await storage('save the profile picture', async () =>
-    (await database()).put('profilePictures', blob, playthroughId)
+  const row = await storage('read the profile picture', async () =>
+    (await database()).get('profileSources', playthroughId)
   )
+  return row ? { image: new Uint8Array(await row.image.arrayBuffer()), frame: row.frame } : null
 }
 
-/** Removes the reader's own picture; one that is already gone is success. */
+/**
+ * Keeps the crop beside the playthrough it belongs to, with the frame it was cut through and the
+ * full picture where a new one is handed over; `null` keeps the one stored. One transaction.
+ */
+export async function writeProfilePicture(
+  playthroughId: string,
+  crop: Blob,
+  source: Blob | null,
+  frame: ProfileFrame
+): Promise<void> {
+  assertSafePlaythroughId(playthroughId)
+  const storedCrop = await storedBlob(crop, false)
+  const storedSource = source ? await storedBlob(source, false) : null
+  await storage('save the profile picture', async () => {
+    const tx = (await database()).transaction(['profilePictures', 'profileSources'], 'readwrite')
+    const sources = tx.objectStore('profileSources')
+    // A database request, so the transaction is still open for the puts.
+    const image = storedSource ?? (await sources.get(playthroughId))?.image
+    if (image) void sources.put({ image, frame }, playthroughId)
+    void tx.objectStore('profilePictures').put(storedCrop, playthroughId)
+    await tx.done
+  })
+}
+
+/** Removes the crop, the full picture and its frame; whatever is already gone is success. */
 export async function deleteProfilePicture(playthroughId: string): Promise<void> {
   assertSafePlaythroughId(playthroughId)
-  await storage('remove the profile picture', async () =>
-    (await database()).delete('profilePictures', playthroughId)
-  )
+  await storage('remove the profile picture', async () => {
+    const tx = (await database()).transaction(['profilePictures', 'profileSources'], 'readwrite')
+    void tx.objectStore('profilePictures').delete(playthroughId)
+    void tx.objectStore('profileSources').delete(playthroughId)
+    await tx.done
+  })
 }

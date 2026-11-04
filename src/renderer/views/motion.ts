@@ -767,6 +767,16 @@ export const speakerFace: Variants = {
 }
 
 /**
+ * The reader's own picture beside the box on a narrated line: a fade on the box's own wipe, gone
+ * on the label's clock, so it has left before the box does and never pops as the next dress arrives.
+ */
+export const readerFace: Variants = {
+  hidden: { opacity: 0, transition: { duration: 0.1 } },
+  shown: { opacity: 1, transition: { duration: 0.24, ease: 'easeOut' } },
+  gone: { opacity: 0, transition: { duration: 0.1, delay: SCENE_OUT_LABEL } }
+}
+
+/**
  * Her name wiping in under the face once it has landed, the splash's own surface at label scale.
  * **The right edge of a box whose left edge is already in place** is what animates, so the flat
  * edge is the wipe front and nothing has to be measured for names of any length.

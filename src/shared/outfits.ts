@@ -280,6 +280,12 @@ export function parseSpriteRef(
  */
 export const FIX_IMAGE = 'fix'
 
+/**
+ * The name `chars:readWardrobeImage` asks for a set's base frame by — what Erase artifacts cuts
+ * beside the sprites, so a single re-roll keeps the erase.
+ */
+export const BASE_IMAGE = 'base'
+
 /** Every sprite reference for one set — what the scene prompt offers RITA in the enum. */
 export function spriteRefsFor(set: OutfitSet): SpriteRef[] {
   return EMOTIONS.map((emotion) => spriteRef(emotion, set))

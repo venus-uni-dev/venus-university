@@ -17,7 +17,8 @@ import type { ComfyGpu } from './setupManifest'
 import type { ComfyModelPicks, ComfySource } from './comfyModels'
 import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
-import type { PromptEdit } from './imagePrompt'
+import type { KeptEdit } from './regenTags'
+import type { DefaultTagGroup } from './defaultTags'
 import type { SceneEventId } from './sceneEvents'
 
 /** Discriminated result envelope returned by every IPC handler. */
@@ -159,6 +160,8 @@ export interface CustomCg {
   voice?: CgVoice
   /** The act loop its main image plays; omitted means `sex`. */
   sfx?: CgSfx
+  /** The position LoRA both images are drawn through after hers; omitted where it has none. */
+  lora?: CharacterLora
 }
 
 /**
@@ -413,7 +416,7 @@ export interface Character {
    * Every group each regenerate button last sent, whole, keyed by what it renders; the modal
    * reopens on it. Omitted where no button has sent any.
    */
-  regenTags?: Partial<Record<RegenTarget, PromptEdit>>
+  regenTags?: Partial<Record<RegenTarget, KeptEdit>>
   /**
    * The LLM-written continuation of `ROOM_PROMPT_PREFIX` (shared/room.ts): her dorm room,
    * described for the cloud image model.
@@ -1467,6 +1470,12 @@ export interface BankedTextLedger {
  */
 export type BunnybotHandover = 'contact' | 'haunt'
 
+/** A lover the reader left by starting to date somebody else, and the girl he left her for. */
+export interface BreakupOwed {
+  charId: string
+  forCharId: string
+}
+
 /** On-disk save file — `/data/saves/{playthroughId}/{saveId}.json`. */
 export interface GameSave {
   schemaVersion: 13
@@ -1648,6 +1657,11 @@ export interface GameSave {
    * morning; absent before then and when nobody qualified.
    */
   homecomingVisitor?: string
+  /**
+   * The lovers a relationship set by hand on a contact page left, and who for, waiting for the
+   * next slot's opening to write their breakup texts; absent while none wait.
+   */
+  breakupsOwed?: BreakupOwed[]
   /**
    * The feed items that belong to today alone — the stranger's post the day surfaced and
    * the random student's — stamped with the date they were rolled for.
@@ -2289,6 +2303,11 @@ export interface Settings {
   /** The weight the player's own ComfyUI draws its LoRA at, kept apart like its picks. */
   comfyExternalLoraWeight?: number
   /**
+   * The default tags either ComfyUI's prompts open with, a group absent where it is the build's
+   * own; absent altogether where every group is.
+   */
+  comfyTags?: Partial<Record<DefaultTagGroup, string[]>>
+  /**
    * Whether a newer build the launch check finds is offered before the first screen; the main
    * menu's notice offers it either way. Optional on disk, absent meaning it is.
    */
@@ -2308,6 +2327,17 @@ export interface Settings {
    * absent meaning it does.
    */
   warnEndingEdit?: boolean
+  /**
+   * Whether the reader's cropped picture stands beside the box on a scene's narrated lines.
+   * Optional on disk, absent meaning it does not.
+   */
+  showProfilePictureInScenes?: boolean
+  /**
+   * Whether saving a crop asks about {@link showProfilePictureInScenes} while it is off. Its box
+   * turns it off, and nothing in the app turns it back on: only a hand edit does. Optional on
+   * disk, absent meaning it asks.
+   */
+  askProfilePictureInScenes?: boolean
   /**
    * Whether a fresh New Game opens on the New Game setup welcome. Its box turns it off, and
    * nothing in the app turns it back on: only a hand edit does. Optional on disk, absent meaning

@@ -80,6 +80,7 @@ const SAVE_REQUIRED: Record<
     | 'formerJobs'
     | 'transcript'
     | 'homecomingVisitor'
+    | 'breakupsOwed'
     | 'sceneEventsFired'
     | 'readerCold'
     | 'readerColdsHad'

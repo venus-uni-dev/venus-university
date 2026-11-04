@@ -1,4 +1,4 @@
-import { SUBJECT_TAGS } from '@shared/characterRules'
+import { withoutSubjectTags } from '@shared/defaultTags'
 import { loveLifeBlurb } from '@shared/relationship'
 import { hairColorOf, OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
 import { TRAIT_DESCRIPTIONS } from '@shared/traits'
@@ -73,11 +73,14 @@ function campusParagraph(): string {
   return found ?? ''
 }
 
-/** The description's sections, in order, each present only where she has something to say. */
-function descriptionSections(character: Character): string[] {
+/**
+ * The description's sections, in order, each present only where she has something to say;
+ * `subject` is the subject tags the settings name.
+ */
+function descriptionSections(character: Character, subject: readonly string[]): string[] {
   const sections: string[] = []
 
-  const appearance = character.baseAppearance.filter((tag) => !SUBJECT_TAGS.includes(tag))
+  const appearance = withoutSubjectTags(character.baseAppearance, subject)
   if (appearance.length > 0) sections.push(`Appearance: ${tagProse(appearance)}`)
 
   const outfit = wardrobeProse(character.outfit)
@@ -135,11 +138,18 @@ function firstMessageOf(character: Character): string {
   )
 }
 
-/** Builds the V2 and V3 cards a character's record fills, ready for the PNG's text chunks. */
-export function buildCharacterCard(character: Character, now: Date): { v2: CardV2; v3: CardV3 } {
+/**
+ * Builds the V2 and V3 cards a character's record fills, ready for the PNG's text chunks, her
+ * appearance without `subject`, the subject tags the settings name.
+ */
+export function buildCharacterCard(
+  character: Character,
+  now: Date,
+  subject: readonly string[]
+): { v2: CardV2; v3: CardV3 } {
   const data: CardV2Data = {
     name: fullNameOf(character),
-    description: descriptionSections(character).join('\n\n'),
+    description: descriptionSections(character, subject).join('\n\n'),
     personality: character.personality,
     scenario: scenarioOf(),
     first_mes: firstMessageOf(character),

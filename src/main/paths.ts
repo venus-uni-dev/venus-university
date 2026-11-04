@@ -300,6 +300,16 @@ export function getProfilePicturePath(playthroughId: string): string {
   return join(getPlaythroughPath(playthroughId), 'profile.png')
 }
 
+/** `/data/saves/{playthroughId}/profile-source.png` — the full picture the reader's is cut from. */
+export function getProfileSourcePath(playthroughId: string): string {
+  return join(getPlaythroughPath(playthroughId), 'profile-source.png')
+}
+
+/** `/data/saves/{playthroughId}/profile-source.json` — the frame it is cut through. */
+export function getProfileSourceRecordPath(playthroughId: string): string {
+  return join(getPlaythroughPath(playthroughId), 'profile-source.json')
+}
+
 /** `/data/saves/{playthroughId}/lorebook.json` — the playthrough's own lorebook. */
 export function getLorebookPath(playthroughId: string): string {
   return join(getPlaythroughPath(playthroughId), LOREBOOK_FILE_NAME)

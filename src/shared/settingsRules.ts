@@ -20,9 +20,9 @@ export const SETTINGS_SCHEMA_VERSION = 1
  * What the settings must carry; the three keys, the custom endpoint's URL, model ids, effort,
  * tier and reply cap, its images URL and model, the two dev switches, the service tier, the
  * hand-edited stream switch, the hand-edited ComfyUI build, which ComfyUI draws with its URL
- * and both sources' model picks and LoRA weights, Gemini's secondary model, the group
- * volumes, the browser build's key-remembering, the sampling fields, the memory and secret
- * budgets and the custom scene persona are all optional.
+ * and both sources' model picks and LoRA weights, the default tags, Gemini's secondary model,
+ * the group volumes, the browser build's key-remembering, the sampling fields, the memory and
+ * secret budgets and the custom scene persona are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -49,10 +49,13 @@ const SETTINGS_REQUIRED: Record<
     | 'comfyExternalModels'
     | 'comfyLoraWeight'
     | 'comfyExternalLoraWeight'
+    | 'comfyTags'
     | 'checkUpdates'
     | 'fullscreen'
     | 'warnEndingInterrupt'
     | 'warnEndingEdit'
+    | 'showProfilePictureInScenes'
+    | 'askProfilePictureInScenes'
     | 'newGameWelcome'
     | 'updateAsVersion'
     | 'updateFeed'
@@ -414,13 +417,14 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     // every save.
     comfyDeferred: patch.comfyDeferred,
     // Absent stays absent, and absent is the app's own ComfyUI, the default URL, the shipped
-    // models and the default LoRA weight.
+    // models, the default LoRA weight and the shipped default tags.
     comfySource: patch.comfySource,
     comfyUrl: patch.comfyUrl,
     comfyModels: patch.comfyModels,
     comfyExternalModels: patch.comfyExternalModels,
     comfyLoraWeight: patch.comfyLoraWeight,
     comfyExternalLoraWeight: patch.comfyExternalLoraWeight,
+    comfyTags: patch.comfyTags,
     // Absent stays absent, and absent is offering.
     checkUpdates: patch.checkUpdates,
     // Absent stays absent, and absent is fullscreen.
@@ -428,6 +432,9 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     // Absent stays absent, and absent is warning.
     warnEndingInterrupt: patch.warnEndingInterrupt,
     warnEndingEdit: patch.warnEndingEdit,
+    // Absent stays absent, and absent is off and asking.
+    showProfilePictureInScenes: patch.showProfilePictureInScenes,
+    askProfilePictureInScenes: patch.askProfilePictureInScenes,
     // Absent stays absent, and absent is welcoming.
     newGameWelcome: patch.newGameWelcome,
     noNsfwImages: patch.noNsfwImages,
@@ -451,21 +458,26 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
   }
 }
 
-/** The ComfyUI fields, which name a server and files on one machine and so stay its own. */
+/**
+ * The ComfyUI fields, which name a server and files on one machine, and the tags written for the
+ * models picked there, and so stay its own.
+ */
 const COMFY_FIELDS = [
   'comfySource',
   'comfyUrl',
   'comfyModels',
   'comfyExternalModels',
   'comfyLoraWeight',
-  'comfyExternalLoraWeight'
+  'comfyExternalLoraWeight',
+  'comfyTags'
 ] as const
 
 /**
  * The settings a restore leaves behind: the backup's, checked as the stored settings are and
  * brought up to this build, merged over `current` as a renderer patch is — so the keys, the dev
  * switches and the hand-edited switches stay the install's, as do whether the browser keeps
- * keys at all and which ComfyUI draws with what — with the roster's removals the backup's.
+ * keys at all and which ComfyUI draws with what, under which default tags — with the roster's
+ * removals the backup's.
  * Refuses with `malformed` before anything is written.
  */
 export function settingsFromBackup(

@@ -701,11 +701,7 @@ async function runReply(
   // The block lands under her last text, ahead of the scene check: a scene with somebody
   // *else* does not unmake a reply that landed. Nothing is left to classify, so the turn ends.
   if (blocked) {
-    const game = useGameStore.getState()
-    game.setBlocked(charId, true)
-    // Whatever she had asked him to do, she is no longer asking.
-    game.setPendingHangout(charId, null)
-    deliver(charId, chatMessage('system', `${character.firstName} blocked you.`))
+    blockContact(charId, isViewing(charId) ? 0 : 1)
     return
   }
 
@@ -1014,6 +1010,19 @@ export function addContact(
   const granting = !live.bunnymapUnlocked
   if (granting) live.unlockBunnymap()
   deliverBunnybotNow(bunnybotContactTexts(granting))
+}
+
+/** She has the reader blocked, and whatever she had asked him to do, she is no longer asking. */
+export function blockContact(charId: string, unread = 1): void {
+  const game = useGameStore.getState()
+  if (game.charInfo[charId]?.flags?.blocked) return
+
+  const name = game.characters[charId]?.firstName ?? 'She'
+  game.setBlocked(charId, true)
+  game.setPendingHangout(charId, null)
+  useGameStore
+    .getState()
+    .appendChatMessage(charId, chatMessage('system', `${name} blocked you.`), unread)
 }
 
 /**

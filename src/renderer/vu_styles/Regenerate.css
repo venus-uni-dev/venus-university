@@ -45,8 +45,9 @@
   flex: none;
 }
 
-/* And so do the name and the instructions under it, where the render is making a set rather
-   than replacing one. */
+/* And so do a custom CG's position LoRA under it, and the name and the instructions, where the
+   render is making a set rather than replacing one. */
+.vu-regen-lora,
 .vu-regen-name,
 .vu-regen-instructions {
   flex: none;

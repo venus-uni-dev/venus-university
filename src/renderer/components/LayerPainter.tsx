@@ -12,18 +12,19 @@ import { motion } from 'motion/react'
 import { spriteRef } from '@shared/outfits'
 import type { OutfitSet, WardrobeLayer } from '@shared/types'
 import { loadWardrobeImage, spriteUrl } from '../stores/characterStore'
-import { gestures, quietPress, rowLift, rowPress, toggleLift } from '../views/motion'
-import {
-  BrushIcon,
-  EraserIcon,
-  PipetteIcon,
-  RedoIcon,
-  UndoIcon,
-  ZoomInIcon,
-  ZoomOutIcon
-} from '../views/repairIcons'
+import { gestures, quietPress, toggleLift } from '../views/motion'
+import { BrushIcon, EraserIcon, PipetteIcon } from '../views/repairIcons'
 import { ColorWheel } from './ColorWheel'
-import { typingIn } from './useWindowKeydown'
+import {
+  BRUSH_MAX,
+  BRUSH_MIN,
+  BRUSH_NUDGE,
+  REPAIR_ZOOM,
+  RepairTools,
+  traceBrush,
+  useCanvasHistory,
+  useRepairKeys
+} from './RepairTools'
 import '../vu_styles/WardrobeFix.css'
 
 /** What the brush is doing: laying paint down, taking it back, or sampling it. */
@@ -35,15 +36,6 @@ const TOOLS: ReadonlyArray<{ key: Tool; label: string; Icon: () => JSX.Element }
   { key: 'eraser', label: 'Erase', Icon: EraserIcon },
   { key: 'dropper', label: 'Pick color', Icon: PipetteIcon }
 ]
-
-/** How many strokes can be taken back, each way. Each snapshot is a full-size frame. */
-const UNDO_DEPTH = 10
-
-/** The brush, in the sprite's own pixels. */
-const BRUSH_MIN = 2
-const BRUSH_MAX = 50
-/** One press of `[` or `]`. */
-const BRUSH_NUDGE = 4
 
 /** The sprite's natural size, learned from the image itself. */
 export interface PainterStage {
@@ -118,7 +110,7 @@ export function toPngBase64(canvas: HTMLCanvasElement): Promise<string> {
 }
 
 /** Whether anything at all is drawn on a layer — one pass over the alpha channel. */
-function hasInk(data: Uint8ClampedArray): boolean {
+export function hasInk(data: Uint8ClampedArray): boolean {
   for (let i = 3; i < data.length; i += 4) {
     if (data[i] !== 0) return true
   }
@@ -149,13 +141,9 @@ export function LayerPainter({
   const [color, setColor] = useState('#ffffff')
   const [brushSize, setBrushSize] = useState(20)
   const [tool, setTool] = useState<Tool>('brush')
-  const [canUndo, setCanUndo] = useState(false)
-  const [canRedo, setCanRedo] = useState(false)
   const [zoomed, setZoomed] = useState(false)
   const [over, setOver] = useState(false)
 
-  const undoStack = useRef<ImageData[]>([])
-  const redoStack = useRef<ImageData[]>([])
   const lastPoint = useRef<Point | null>(null)
   const restored = useRef(false)
 
@@ -169,7 +157,7 @@ export function LayerPainter({
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
     onChange({
-      dirty: undoStack.current.length > 0,
+      dirty: history.isDirty(),
       painted: hasInk(ctx.getImageData(0, 0, canvas.width, canvas.height).data)
     })
   }
@@ -201,84 +189,18 @@ export function LayerPainter({
     }
   }, [stage, charId, set, restoreFrom, version, canvasRef])
 
-  /** Takes one stroke back, snapshot by snapshot, and keeps it for a redo. */
-  const undo = (): void => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    const snapshot = undoStack.current.pop()
-    if (!canvas || !ctx || !snapshot) return
+  // A stroke taken back or put back is reported as one laid down is.
+  const history = useCanvasHistory(canvasRef, () => report.current())
+  const { snapshot, undo, redo } = history
 
-    redoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
-    if (redoStack.current.length > UNDO_DEPTH) redoStack.current.shift()
-    ctx.putImageData(snapshot, 0, 0)
-    setCanUndo(undoStack.current.length > 0)
-    setCanRedo(true)
-    report.current()
-  }
-
-  /** Puts back what {@link undo} took, until a new stroke makes the branch moot. */
-  const redo = (): void => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    const snapshot = redoStack.current.pop()
-    if (!canvas || !ctx || !snapshot) return
-
-    undoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
-    ctx.putImageData(snapshot, 0, 0)
-    setCanUndo(true)
-    setCanRedo(redoStack.current.length > 0)
-    report.current()
-  }
-
-  /** Remembers the canvas as it is now, so the stroke about to be made can be undone. */
-  const snapshot = (): void => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-
-    undoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
-    if (undoStack.current.length > UNDO_DEPTH) undoStack.current.shift()
-    // A new stroke is a new branch: what was undone is not coming back after it.
-    redoStack.current = []
-    setCanUndo(true)
-    setCanRedo(false)
-  }
-
-  const nudgeBrush = (by: number): void =>
-    setBrushSize((size) => Math.min(BRUSH_MAX, Math.max(BRUSH_MIN, size + by)))
-
-  /* The shortcuts a repair is worth: many small actions in a row, so Undo and Redo
-     are worth a key as well as a button, and the brush resizes without leaving the stage.
-     Held in a ref and re-pointed every render — a listener registered once would otherwise
-     close over the first render's `brushSize` for ever. */
-  const keys = useRef<(event: KeyboardEvent) => void>(() => {})
-  keys.current = (event: KeyboardEvent): void => {
+  useRepairKeys({
     // A job is running over these strokes: nothing may change under it.
-    if (disabled) return
-    if (typingIn(event)) return
-
-    const key = event.key.toLowerCase()
-    if (event.ctrlKey || event.metaKey) {
-      if (key === 'z' && event.shiftKey) redo()
-      else if (key === 'z') undo()
-      else if (key === 'y') redo()
-      else return
-      event.preventDefault()
-      return
-    }
-    if (event.key === '[') nudgeBrush(-BRUSH_NUDGE)
-    else if (event.key === ']') nudgeBrush(BRUSH_NUDGE)
-    else return
-    event.preventDefault()
-  }
-
-  useEffect(() => {
-    // Bubble phase, and nothing here answers Escape: the shell's own listener captures it
-    // first and stops it, so the modal in front is the one that closes.
-    const onKeyDown = (event: KeyboardEvent): void => keys.current(event)
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+    disabled,
+    undo,
+    redo,
+    nudge: (by) =>
+      setBrushSize((size) => Math.min(BRUSH_MAX, Math.max(BRUSH_MIN, size + by * BRUSH_NUDGE)))
+  })
 
   /**
    * Where a pointer position falls in the paint layer's own pixels; the stage is only a scaled
@@ -292,19 +214,8 @@ export function LayerPainter({
     }
   }
 
-  /* The ring follows the pointer through custom properties written straight onto the stage
-     node: a pointer move is delivered at the display's rate, and re-rendering a 360px rail for
-     each one would spend a frame drawing nothing that changed. */
-  const traceCursor = (event: PointerEvent<HTMLCanvasElement>): void => {
-    const node = stageRef.current
-    const canvas = canvasRef.current
-    if (!node || !canvas) return
-
-    const rect = canvas.getBoundingClientRect()
-    node.style.setProperty('--brush-x', String(event.clientX - rect.left))
-    node.style.setProperty('--brush-y', String(event.clientY - rect.top))
-    node.style.setProperty('--brush-d', String((brushSize * rect.width) / canvas.width))
-  }
+  const traceCursor = (event: PointerEvent<HTMLCanvasElement>): void =>
+    traceBrush(stageRef.current, canvasRef.current, event, brushSize)
 
   /** Samples what the player can see at a point — the stack in the order it is drawn in. */
   const sampleAt = async (point: Point): Promise<void> => {
@@ -457,7 +368,7 @@ export function LayerPainter({
             {
               '--stage-w': stage?.width ?? 1160,
               '--stage-h': stage?.height ?? 1696,
-              '--zoom': zoomed ? 3 : 1
+              '--zoom': zoomed ? REPAIR_ZOOM : 1
             } as CSSProperties
           }
         >
@@ -472,42 +383,16 @@ export function LayerPainter({
       <div className="vu-fix-rail">
         <p className="vu-fix-hint">{hint}</p>
 
-        <div className="vu-fix-tools">
-          <motion.button
-            id={`${idPrefix}-undo`}
-            className="vu-fix-tool"
-            type="button"
-            disabled={disabled || !canUndo}
-            {...gestures(disabled || !canUndo, rowLift, rowPress)}
-            onClick={undo}
-          >
-            <UndoIcon />
-            Undo
-          </motion.button>
-          <motion.button
-            id={`${idPrefix}-redo`}
-            className="vu-fix-tool"
-            type="button"
-            disabled={disabled || !canRedo}
-            {...gestures(disabled || !canRedo, rowLift, rowPress)}
-            onClick={redo}
-          >
-            <RedoIcon />
-            Redo
-          </motion.button>
-          {/* The zoom says which way it goes, so the label is the state and not a factor. */}
-          <motion.button
-            id={`${idPrefix}-zoom`}
-            className={`vu-fix-tool${zoomed ? ' vu-fix-tool--on' : ''}`}
-            type="button"
-            aria-pressed={zoomed}
-            {...gestures(false, toggleLift, rowPress)}
-            onClick={() => setZoomed((on) => !on)}
-          >
-            {zoomed ? <ZoomOutIcon /> : <ZoomInIcon />}
-            {zoomed ? 'Zoom out' : 'Zoom in'}
-          </motion.button>
-        </div>
+        <RepairTools
+          idPrefix={idPrefix}
+          disabled={disabled}
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
+          zoomed={zoomed}
+          onUndo={undo}
+          onRedo={redo}
+          onZoom={() => setZoomed((on) => !on)}
+        />
         {/* One control in three states rather than three switches, and the one in force
             is filled — so its hover may not animate a fill. */}
         <div className="vu-palette" role="group" aria-label="Tool">

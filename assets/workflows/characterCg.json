@@ -27,7 +27,7 @@
       "title": "Base Positive Prompt"
     },
     "inputs": {
-      "clip": ["100", 1],
+      "clip": ["101", 1],
       "text": "masterpiece, best_quality, very_aesthetic, 1girl, mature_female"
     }
   },
@@ -37,7 +37,7 @@
       "title": "Negative Prompt"
     },
     "inputs": {
-      "clip": ["100", 1],
+      "clip": ["101", 1],
       "text": "worst_quality, bad_quality, lowres"
     }
   },
@@ -67,7 +67,7 @@
       "title": "KSampler"
     },
     "inputs": {
-      "model": ["100", 0],
+      "model": ["101", 0],
       "positive": ["4", 0],
       "negative": ["5", 0],
       "latent_image": ["15", 0],
@@ -105,8 +105,8 @@
     },
     "inputs": {
       "image": ["8", 0],
-      "model": ["100", 0],
-      "clip": ["100", 1],
+      "model": ["101", 0],
+      "clip": ["101", 1],
       "vae": ["1", 2],
       "positive": ["51", 0],
       "negative": ["51", 1],
@@ -157,7 +157,7 @@
       "title": "Detailer Positive Prompt"
     },
     "inputs": {
-      "clip": ["100", 1],
+      "clip": ["101", 1],
       "text": "masterpiece, best_quality, very_aesthetic, 1girl, mature_female"
     }
   },
@@ -203,6 +203,19 @@
       "model": ["3", 0],
       "clip": ["3", 1],
       "lora_name": "characterLora.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1
+    }
+  },
+  "101": {
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Position LoRA"
+    },
+    "inputs": {
+      "model": ["100", 0],
+      "clip": ["100", 1],
+      "lora_name": "positionLora.safetensors",
       "strength_model": 1,
       "strength_clip": 1
     }

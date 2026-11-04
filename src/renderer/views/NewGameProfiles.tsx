@@ -428,7 +428,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
             <CheckField
               key={box}
               id={`profile-box-${box}`}
-              label={box === 'contact' ? 'Gave you her contact info' : milestoneLabel(box, name)}
+              label={milestoneLabel(box, name)}
               checked={shown[box]}
               disabled={box in locks}
               onChange={(checked) =>

@@ -1,4 +1,5 @@
 import type { CgSfx, CgVoice, Character, CustomCg, CustomCgSlot, Position } from './types'
+import { loraOf, loraToStore, type DrawnLora } from './comfyModels'
 import type { PromptEdit } from './imagePrompt'
 import { customOutfitInstructions, customOutfitName } from './outfits'
 import {
@@ -85,14 +86,30 @@ export function customCgSfxOf(
 }
 
 /**
+ * The position LoRA one of her CGs is drawn through — a custom pair's own, for either of its
+ * images — or null for a stock CG and a pair with none.
+ */
+export function customCgLoraOf(
+  character: Pick<Character, 'customCgs'>,
+  position: Position
+): DrawnLora | null {
+  const slot = customCgSlotOf(position)
+  return slot ? loraOf(character.customCgs?.[slot]?.lora) : null
+}
+
+/** A write to one CG pair: any of its fields, and its LoRA as a render draws it or `null`. */
+export type CustomCgPatch = Partial<Omit<CustomCg, 'lora'>> & { lora?: DrawnLora | null }
+
+/**
  * The record with a write merged into one player-authored CG pair: a field the patch leaves
- * `undefined` keeps what the slot holds, a name or instructions left blank are dropped, and a
- * voice or act loop outside the vocabulary is dropped, leaving what the slot held.
+ * `undefined` keeps what the slot holds, a name or instructions left blank are dropped, a voice
+ * or act loop outside the vocabulary is dropped, leaving what the slot held, and a LoRA of
+ * `null` is taken off.
  */
 export function withCustomCg(
   character: Character,
   slot: CustomCgSlot,
-  patch: Partial<CustomCg>
+  patch: CustomCgPatch
 ): Character {
   const held = character.customCgs?.[slot]
   const tags = patch.tags ?? held?.tags ?? []
@@ -102,6 +119,7 @@ export function withCustomCg(
   )
   const voice = isCgVoice(patch.voice) ? patch.voice : isCgVoice(held?.voice) ? held.voice : null
   const sfx = isCgSfx(patch.sfx) ? patch.sfx : isCgSfx(held?.sfx) ? held.sfx : null
+  const lora = loraOf(patch.lora !== undefined ? patch.lora : held?.lora)
   return {
     ...character,
     customCgs: {
@@ -111,7 +129,8 @@ export function withCustomCg(
         ...(name ? { name } : {}),
         ...(instructions ? { instructions } : {}),
         ...(voice ? { voice } : {}),
-        ...(sfx ? { sfx } : {})
+        ...(sfx ? { sfx } : {}),
+        ...(lora ? { lora: loraToStore(lora.name, lora.weight) } : {})
       }
     }
   }

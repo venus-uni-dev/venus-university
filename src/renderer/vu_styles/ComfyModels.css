@@ -1,6 +1,7 @@
 /* The ComfyUI controls Settings' ComfyUI tab and the setup's Use my own card share: a model
    picker per slot with its folder beside it, the row New Character and Edit Character stand a
-   character's own LoRA in. Imported from the components, never from index.css. */
+   character's own LoRA in and a custom CG's tag form its position LoRA. Imported from the
+   components, never from index.css. */
 
 /* The slots stand as a column at the rhythm of the fields around them. */
 .vu-comfy-models {

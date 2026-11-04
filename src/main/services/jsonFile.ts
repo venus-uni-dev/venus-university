@@ -16,6 +16,11 @@ const RENAME_RETRY_WAITS_MS = [10, 20, 40, 80, 160, 320, 640]
  * shared record check, and the atomic write.
  */
 
+/** Whether a filesystem error means another process is holding the path. */
+export function isHeldError(err: unknown): boolean {
+  return HELD_CODES.has((err as NodeJS.ErrnoException).code ?? '')
+}
+
 /** The `detail` shape every file error carries: which path, and what the OS said. */
 function detailOf(path: string, err: unknown): string {
   return `${path}: ${messageOf(err)}`
@@ -80,7 +85,7 @@ export async function renameWithPatience(from: string, to: string): Promise<void
       await rename(from, to)
       return
     } catch (err) {
-      if (!HELD_CODES.has((err as NodeJS.ErrnoException).code ?? '')) throw err
+      if (!isHeldError(err)) throw err
       await sleep(wait)
     }
   }

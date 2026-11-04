@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { characterLoraOf } from '@shared/comfyModels'
+import { customCgLabelOf, customCgLoraOf } from '@shared/customCgs'
+import { isCustomCgSlot } from '@shared/positions'
 import { pictureKeySet } from '@shared/settingsRules'
-import { fullNameOf, type Character } from '@shared/types'
+import { fullNameOf, type Character, type CustomCgSlot, type SetTarget } from '@shared/types'
 import { CharacterJobCard } from '../components/CharacterJobCard'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DeadNote } from '../components/DeadNote'
@@ -78,6 +80,13 @@ function missingLorasLine(names: readonly string[]): string {
     : `The LoRAs of ${namesPhrase(names)} are missing, so their sets will be generated without them.`
 }
 
+/** And where some of its custom CGs' position LoRAs are, each named as her CG: "Ana's bunny". */
+function missingPositionLorasLine(cgs: readonly string[]): string {
+  return cgs.length === 1
+    ? `The position LoRA of ${cgs[0]} is missing, so that CG will be generated without it.`
+    : `The position LoRAs of ${namesPhrase(cgs)} are missing, so those CGs will be generated without them.`
+}
+
 /**
  * Manage Characters: one grid for existing and in-flight characters, plus
  * local per-character modal state.
@@ -131,8 +140,12 @@ export function ManageCharactersView(): JSX.Element {
   const [filling, setFilling] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [stopping, setStopping] = useState(false)
-  // Which of the fill's characters will render without their missing LoRA, asked as it opens.
+  // Which of the fill's characters will render without their missing LoRA, and which of its
+  // custom CG pairs without their missing position LoRA, asked as it opens.
   const [fillWithoutLora, setFillWithoutLora] = useState<string[]>([])
+  const [fillWithoutCgLora, setFillWithoutCgLora] = useState<
+    { charId: string; slot: CustomCgSlot }[]
+  >([])
   const [checkingLoras, setCheckingLoras] = useState(false)
   // A resumed write whose LoRA is missing, waiting on the player's answer.
   const [retryLora, setRetryLora] = useState<{ charId: string; file: string } | null>(null)
@@ -205,26 +218,42 @@ export function ManageCharactersView(): JSX.Element {
   )
   const missingImages = missing.reduce((total, entry) => total + entry.missing, 0)
 
-  /** Which of these characters carry a LoRA the ComfyUI the settings name does not list. */
-  const missingLoraIds = async (charIds: readonly string[]): Promise<string[]> => {
-    const withLora = charIds.filter(
+  /**
+   * Which of these sets' characters carry a LoRA the ComfyUI the settings name does not list,
+   * and which of their custom CG pairs carry a position LoRA it does not.
+   */
+  const missingLorasOf = async (
+    sets: readonly { charId: string; target: SetTarget }[]
+  ): Promise<{ charIds: string[]; cgs: { charId: string; slot: CustomCgSlot }[] }> => {
+    const withLora = [...new Set(sets.map((entry) => entry.charId))].filter(
       (charId) => characters[charId] && characterLoraOf(characters[charId])
     )
-    if (withLora.length === 0) return []
+    const cgsWithLora = sets.flatMap(({ charId, target }) =>
+      characters[charId] && isCustomCgSlot(target) && customCgLoraOf(characters[charId], target)
+        ? [{ charId, slot: target }]
+        : []
+    )
+    if (withLora.length === 0 && cgsWithLora.length === 0) return { charIds: [], cgs: [] }
     const listed = await listLoras()
     // A list that cannot be had says nothing: the jobs then say for themselves.
-    if (listed === null) return []
-    return withLora.filter(
-      (charId) => !listed.includes(characterLoraOf(characters[charId])?.name ?? '')
-    )
+    if (listed === null) return { charIds: [], cgs: [] }
+    return {
+      charIds: withLora.filter(
+        (charId) => !listed.includes(characterLoraOf(characters[charId])?.name ?? '')
+      ),
+      cgs: cgsWithLora.filter(
+        ({ charId, slot }) => !listed.includes(customCgLoraOf(characters[charId], slot)?.name ?? '')
+      )
+    }
   }
 
-  /** Opens the fill confirm once it knows whose LoRA is missing. */
+  /** Opens the fill confirm once it knows whose LoRA, and which CG's, is missing. */
   const openFill = (): void => {
     setCheckingLoras(true)
-    void missingLoraIds([...new Set(missing.map((entry) => entry.charId))])
-      .then((ids) => {
-        setFillWithoutLora(ids)
+    void missingLorasOf(missing)
+      .then(({ charIds, cgs }) => {
+        setFillWithoutLora(charIds)
+        setFillWithoutCgLora(cgs)
         setFilling(true)
       })
       .finally(() => setCheckingLoras(false))
@@ -550,6 +579,18 @@ export function ManageCharactersView(): JSX.Element {
                       )
                     )
                   ]
+                : []),
+              ...(fillWithoutCgLora.length > 0
+                ? [
+                    missingPositionLorasLine(
+                      fillWithoutCgLora.map(({ charId, slot }) => {
+                        const character = characters[charId]
+                        return character
+                          ? `${nameOf(character)}'s ${customCgLabelOf(character, slot)}`
+                          : slot
+                      })
+                    )
+                  ]
                 : [])
             ]}
             confirmText="Generate"
@@ -557,7 +598,12 @@ export function ManageCharactersView(): JSX.Element {
             onConfirm={() => {
               setFilling(false)
               // The store recomputes the list: a bucket may have landed while the modal was open.
-              generateAllMissing(gates, new Set(fillWithoutLora))
+              generateAllMissing(gates, (charId, target) => ({
+                withoutLora: fillWithoutLora.includes(charId),
+                ...(fillWithoutCgLora.some((cg) => cg.charId === charId && cg.slot === target)
+                  ? { cgLora: null }
+                  : {})
+              }))
             }}
           />
         )}

@@ -1,6 +1,6 @@
 import { isEmotion } from './emotions'
 import { appError } from './errors'
-import { FIX_IMAGE, isOutfitSet, parseSpriteRef } from './outfits'
+import { BASE_IMAGE, FIX_IMAGE, isOutfitSet, parseSpriteRef } from './outfits'
 import { customCgSlotOf, isCustomCgSlot, isPosition, isStockPosition } from './positions'
 import { roomStem, roomVariantOfStem, ROOM_VARIANTS, type RoomVariant } from './room'
 import type { OutfitSet, SetTarget, SpriteRef, WardrobeLayer, WardrobeTarget } from './types'
@@ -195,9 +195,11 @@ export function spriteFileRel(target: WardrobeTarget, emotion: string): string {
   return target === 'default' ? expressionRel(emotion) : outfitRel(target, emotion)
 }
 
-/** One wardrobe image's relative path: the kept paint layer, or a sprite otherwise. */
+/** One wardrobe image's relative path: the kept paint layer, the base frame, or a sprite. */
 export function wardrobeImageRel(target: WardrobeTarget, image: string): string {
-  return image === FIX_IMAGE ? layerRel(target, 'fix') : spriteFileRel(target, image)
+  if (image === FIX_IMAGE) return layerRel(target, 'fix')
+  if (image === BASE_IMAGE) return baseRel(target === 'default' ? null : target)
+  return spriteFileRel(target, image)
 }
 
 /** Whether `name` is one of the two names the editor keeps beside a set's sprites. */

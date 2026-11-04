@@ -233,7 +233,13 @@ describe('deleting a playthrough', () => {
     await saves.createPlaythrough(record(), draft(), playthroughId)
     await saves.writeAutosave(playthroughId, draft())
     await saves.writeEndingArt(playthroughId, new Blob([new Uint8Array([1, 2, 3])]))
-    await saves.writeProfilePicture(playthroughId, new Blob([new Uint8Array([4, 5, 6])]))
+    await saves.writeProfilePicture(
+      playthroughId,
+      new Blob([new Uint8Array([4, 5, 6])]),
+      new Blob([new Uint8Array([7, 8, 9])]),
+      { x: 0, y: 0, width: 5, height: 6 }
+    )
+    expect(await saves.readProfileSource(playthroughId)).not.toBeNull()
 
     const other = await saves.writeEnrollment(enrollment())
     await saves.deletePlaythrough(playthroughId)
@@ -244,6 +250,7 @@ describe('deleting a playthrough', () => {
     expect((await saves.listSaves(playthroughId)).saves).toEqual([])
     expect(await saves.readEndingArt(playthroughId)).toBeNull()
     expect(await saves.readProfilePicture(playthroughId)).toBeNull()
+    expect(await saves.readProfileSource(playthroughId)).toBeNull()
   })
 
   it('takes its application with it', async () => {

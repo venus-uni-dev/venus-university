@@ -131,6 +131,23 @@
   align-self: center;
 }
 
+/* The reader's own picture, any shape it comes in. The panel takes a width of its own, so the
+   hint under the picture wraps rather than sizing it, and the box is a fixed size the whole
+   picture is fitted inside at its own ratio, nothing measured. */
+.vu-pic--full {
+  width: 820px;
+}
+
+.vu-pic--full .vu-pic-stage-box {
+  width: 100%;
+  container-type: size;
+}
+
+.vu-pic--full .vu-pic-stage {
+  width: min(100cqw, calc(100cqh * var(--stage-w, 5) / var(--stage-h, 6)));
+  height: auto;
+}
+
 /* A rule says which of the two the buttons under it are: what is above it moves the frame,
    what is below it closes the modal — the line the Edit panel draws over its name actions. */
 .vu-pic-answers {

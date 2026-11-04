@@ -6,7 +6,8 @@ import {
   storedCgOf,
   withCustomCg,
   withoutCustomCg,
-  writtenCgOf
+  writtenCgOf,
+  type CustomCgPatch
 } from '@shared/customCgs'
 import type { PromptEdit } from '@shared/imagePrompt'
 import { afterOf, STOCK_POSITIONS } from '@shared/positions'
@@ -153,12 +154,36 @@ describe('withCustomCg', () => {
   it('drops a voice or an act loop outside the vocabulary and keeps what the slot held', () => {
     // A hand-edited record or a stale write must not put a sound nothing can play on the pair.
     const held = character({ customCgs: { customcg1: { tags: [], voice: 'slow' } } })
-    const bad = { voice: 'loud', sfx: 'cuddle' } as unknown as Partial<CustomCg>
+    const bad = { voice: 'loud', sfx: 'cuddle' } as unknown as CustomCgPatch
     expect(withCustomCg(held, 'customcg1', bad).customCgs?.customcg1).toEqual({
       tags: [],
       voice: 'slow'
     })
     expect(withCustomCg(character(), 'customcg2', bad).customCgs?.customcg2).toEqual({ tags: [] })
+  })
+
+  it("keeps a pair's position LoRA through a write that leaves it out, clears it on null", () => {
+    // A rename or an instructions edit that dropped it would draw the pair without it, unseen.
+    const held = character({
+      customCgs: { customcg1: { tags: ['x'], lora: { name: 'pos.safetensors', weight: 0.8 } } }
+    })
+    expect(withCustomCg(held, 'customcg1', { name: 'bunny' }).customCgs?.customcg1?.lora).toEqual({
+      name: 'pos.safetensors',
+      weight: 0.8
+    })
+    expect(withCustomCg(held, 'customcg1', { lora: null }).customCgs?.customcg1).toEqual({
+      tags: ['x']
+    })
+
+    // The default weight is no weight at all, and a LoRA that names no file is none.
+    const fresh = withCustomCg(character(), 'customcg2', {
+      lora: { name: 'pos.safetensors', weight: 1 }
+    })
+    expect(fresh.customCgs?.customcg2?.lora).toEqual({ name: 'pos.safetensors' })
+    const nameless = { lora: { name: ' ', weight: 2 } } as unknown as CustomCgPatch
+    expect(withCustomCg(held, 'customcg1', nameless).customCgs?.customcg1).toEqual({
+      tags: ['x']
+    })
   })
 })
 

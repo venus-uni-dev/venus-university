@@ -33,7 +33,7 @@ import { isCustomCgSlot } from '@shared/positions'
 import { validateRecord } from '@shared/jsonValidate'
 import { ENDING_IMAGE_MODEL_ID } from '@shared/providers'
 import { keptReplayIds } from '@shared/replays'
-import { assertProfilePicture } from '@shared/profilePicture'
+import { assertProfilePicture, assertProfileSource } from '@shared/profilePicture'
 import { assertSafePlaythroughId } from '@shared/saveRules'
 import { storedEndpointKeyFor } from '@shared/settingsRules'
 import {
@@ -306,9 +306,9 @@ export function buildApi(): VenusUniversityApi {
           const bytes = await chars.readImage(charId, rel)
           return bytes === null ? null : new Uint8Array(bytes)
         }),
-      applyWardrobeFix: (charId, target, images, paintLayer, kind) =>
+      applyWardrobeFix: (charId, target, images, paintLayer, kind, base) =>
         result('save the repaired sprites', () =>
-          chars.applyWardrobeFix(charId, target, images, paintLayer, kind)
+          chars.applyWardrobeFix(charId, target, images, paintLayer, kind, base)
         ),
       discardWardrobeLayer: (charId, target, kind) =>
         result('clear the paint layer', () =>
@@ -401,12 +401,21 @@ export function buildApi(): VenusUniversityApi {
           const bytes = await saves.readProfilePicture(playthroughId)
           return bytes === null ? null : new Uint8Array(bytes)
         }),
-      writeProfilePicture: (playthroughId, png) =>
+      readProfileSource: (playthroughId) =>
+        result('read the profile picture', () => saves.readProfileSource(playthroughId)),
+      writeProfilePicture: (playthroughId, png, source) =>
         result('save the profile picture', async () => {
           assertSafePlaythroughId(playthroughId)
-          const bytes = base64ToBytes(png)
-          assertProfilePicture(bytes)
-          await saves.writeProfilePicture(playthroughId, imageBlob(bytes))
+          const crop = base64ToBytes(png)
+          assertProfilePicture(crop)
+          const image = source.image === undefined ? null : base64ToBytes(source.image)
+          if (image) assertProfileSource(image)
+          await saves.writeProfilePicture(
+            playthroughId,
+            imageBlob(crop),
+            image ? imageBlob(image) : null,
+            source.frame
+          )
         }),
       deleteProfilePicture: (playthroughId) =>
         result('remove the profile picture', () => saves.deleteProfilePicture(playthroughId))

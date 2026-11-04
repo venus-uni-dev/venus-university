@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AFTER_TAG, customCgAfterEdit } from '@shared/customCgs'
+import { SHIPPED_DEFAULT_TAGS as tags } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import {
   buildBasePrompt,
@@ -41,59 +42,69 @@ const poseTags = ['arms_at_sides', 'looking_ahead']
 
 describe("the draft is the builder's default", () => {
   it('renders the default base frame the same under its own draft', () => {
-    expect(buildBasePrompt(c, poseTags, spriteDraft(c, poseTags, null))).toEqual(
-      buildBasePrompt(c, poseTags)
+    expect(buildBasePrompt(c, poseTags, tags, spriteDraft(c, poseTags, null, tags))).toEqual(
+      buildBasePrompt(c, poseTags, tags)
     )
   })
 
   it('renders every wardrobe base frame the same under that set’s draft', () => {
     for (const set of [...STOCK_OUTFIT_SETS, 'custom1', 'custom12'] as const) {
-      expect(buildOutfitBasePrompt(c, poseTags, set, spriteDraft(c, poseTags, set))).toEqual(
-        buildOutfitBasePrompt(c, poseTags, set)
-      )
+      expect(
+        buildOutfitBasePrompt(c, poseTags, set, tags, spriteDraft(c, poseTags, set, tags))
+      ).toEqual(buildOutfitBasePrompt(c, poseTags, set, tags))
     }
   })
 
   it('renders every expression the same under either draft a face pass is edited by', () => {
     for (const emotion of EMOTIONS) {
-      const plain = buildImagePrompt(c, poseTags, emotion)
-      expect(buildImagePrompt(c, poseTags, emotion, spriteDraft(c, poseTags, null))).toEqual(plain)
-      expect(buildImagePrompt(c, poseTags, emotion, expressionDraft(c, emotion))).toEqual(plain)
+      const plain = buildImagePrompt(c, poseTags, emotion, tags)
+      expect(
+        buildImagePrompt(c, poseTags, emotion, tags, spriteDraft(c, poseTags, null, tags))
+      ).toEqual(plain)
+      expect(buildImagePrompt(c, poseTags, emotion, tags, expressionDraft(c, emotion))).toEqual(
+        plain
+      )
     }
   })
 
   it('renders every CG the same under its own draft and under the set’s', () => {
     for (const position of [...STOCK_POSITIONS, 'customcg1', 'customcg12_after'] as const) {
-      const plain = buildCgPrompt(c, position, poseTags)
-      expect(buildCgPrompt(c, position, poseTags, cgDraft(c, position))).toEqual(plain)
-      expect(buildCgPrompt(c, position, poseTags, cgSetDraft(c))).toEqual(plain)
+      const plain = buildCgPrompt(c, position, poseTags, tags)
+      expect(buildCgPrompt(c, position, poseTags, tags, cgDraft(c, position, tags))).toEqual(plain)
+      expect(buildCgPrompt(c, position, poseTags, tags, cgSetDraft(c, tags))).toEqual(plain)
     }
   })
 
   it('a builder ignores an edit of another kind', () => {
-    expect(buildBasePrompt(c, poseTags, expressionDraft(c, 'happy'))).toEqual(
-      buildBasePrompt(c, poseTags)
+    expect(buildBasePrompt(c, poseTags, tags, expressionDraft(c, 'happy'))).toEqual(
+      buildBasePrompt(c, poseTags, tags)
     )
-    expect(buildCgPrompt(c, 'sex', poseTags, spriteDraft(c, poseTags, null))).toEqual(
-      buildCgPrompt(c, 'sex', poseTags)
+    expect(buildCgPrompt(c, 'sex', poseTags, tags, spriteDraft(c, poseTags, null, tags))).toEqual(
+      buildCgPrompt(c, 'sex', poseTags, tags)
     )
   })
 })
 
 describe('a custom CG pair', () => {
   it('draws its after from its main with the after tag added once', () => {
-    expect(cgDraft(c, 'customcg1').position).toEqual(['doggystyle', 'from_behind'])
-    expect(cgDraft(c, 'customcg1_after')).toEqual(customCgAfterEdit(cgDraft(c, 'customcg1'), c))
+    expect(cgDraft(c, 'customcg1', tags).position).toEqual(['doggystyle', 'from_behind'])
+    expect(cgDraft(c, 'customcg1_after', tags)).toEqual(
+      customCgAfterEdit(cgDraft(c, 'customcg1', tags), c)
+    )
 
     const tagged = character({ customCgs: { customcg1: { tags: ['doggystyle', AFTER_TAG] } } })
-    expect(cgDraft(tagged, 'customcg1_after').position).toEqual(['doggystyle', AFTER_TAG])
+    expect(cgDraft(tagged, 'customcg1_after', tags).position).toEqual(['doggystyle', AFTER_TAG])
   })
 
   it('carries the after tag to the face detailer, aroused in the main and happy after', () => {
-    expect(buildCgPrompt(c, 'customcg1_after', poseTags).detailerPositive).toContain(AFTER_TAG)
-    expect(buildCgPrompt(c, 'customcg1', poseTags).detailerPositive).not.toContain(AFTER_TAG)
-    expect(cgDraft(c, 'customcg1').expression).toEqual(expressionTags.aroused)
-    expect(cgDraft(c, 'customcg1_after').expression).toEqual(expressionTags.happy)
-    expect(cgDraft(c, 'sex_after').expression).toEqual(expressionTags.happy)
+    expect(buildCgPrompt(c, 'customcg1_after', poseTags, tags).detailerPositive).toContain(
+      AFTER_TAG
+    )
+    expect(buildCgPrompt(c, 'customcg1', poseTags, tags).detailerPositive).not.toContain(
+      AFTER_TAG
+    )
+    expect(cgDraft(c, 'customcg1', tags).expression).toEqual(expressionTags.aroused)
+    expect(cgDraft(c, 'customcg1_after', tags).expression).toEqual(expressionTags.happy)
+    expect(cgDraft(c, 'sex_after', tags).expression).toEqual(expressionTags.happy)
   })
 })

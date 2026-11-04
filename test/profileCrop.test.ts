@@ -67,6 +67,13 @@ describe('clampProfileCrop', () => {
     expect(far.y + far.height).toBe(H)
   })
 
+  it('keeps the largest frame inside a picture whose height rounds up past itself', () => {
+    expect(clampProfileCrop({ seed: 0, x: 0, y: 0, width: 999, height: 999 }, 500, 9)).toMatchObject({
+      y: 0,
+      height: 9
+    })
+  })
+
   it('caps a frame taller than the sprite rather than letting it hang off the bottom', () => {
     const crop = clampProfileCrop({ seed: 1, x: 0, y: 0, width: W, height: H }, W, H)
     expect(crop.height).toBeLessThanOrEqual(H)

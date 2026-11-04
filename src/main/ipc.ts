@@ -155,6 +155,7 @@ import {
   type OccasionsFile
 } from '@shared/occasionsFile'
 import { photoExportName, type PhotoMeta, type PhotoRequest } from '@shared/photos'
+import type { ProfileSourceWrite } from '@shared/profilePicture'
 import { exportFileName } from '@shared/characterTransfer'
 import { endingArtExportName } from '@shared/endingPicture'
 import type { ExportKind } from '@shared/sillyTavern'
@@ -174,6 +175,7 @@ import { copyEndingArtTo, generateEndingArt, readEndingArt } from './services/en
 import {
   deleteProfilePicture,
   readProfilePicture,
+  readProfileSource,
   writeProfilePicture
 } from './services/profilePictureService'
 import {
@@ -511,8 +513,13 @@ export function registerIpcHandlers(): void {
   handle('saves:readProfilePicture', (_event, playthroughId: string) =>
     readProfilePicture(playthroughId)
   )
-  handle('saves:writeProfilePicture', (_event, playthroughId: string, png: string) =>
-    writeProfilePicture(playthroughId, png)
+  handle('saves:readProfileSource', (_event, playthroughId: string) =>
+    readProfileSource(playthroughId)
+  )
+  handle(
+    'saves:writeProfilePicture',
+    (_event, playthroughId: string, png: string, source: ProfileSourceWrite) =>
+      writeProfilePicture(playthroughId, png, source)
   )
   handle('saves:deleteProfilePicture', (_event, playthroughId: string) =>
     deleteProfilePicture(playthroughId)
@@ -843,8 +850,9 @@ export function registerIpcHandlers(): void {
       target: WardrobeTarget,
       images: WardrobeFixImage[],
       paintLayer: string | null,
-      kind: WardrobeLayer
-    ) => applyWardrobeFix(charId, target, images, paintLayer, kind)
+      kind: WardrobeLayer,
+      base?: string
+    ) => applyWardrobeFix(charId, target, images, paintLayer, kind, base)
   )
   // The hand repair's own housekeeping: strokes outlive the hand they placed a finger on.
   handle(
