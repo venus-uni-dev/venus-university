@@ -9,6 +9,7 @@
     "Stridley",
     "Evigan",
     "Elric",
+    "cgrd",
     "Donka",
     "0hrichi",
     "NihilBaxter",
@@ -28,6 +29,10 @@
   "handles": [
     {
       "name": "0hrichi",
+      "marbles": 4
+    },
+    {
+      "name": "cgrd",
       "marbles": 4
     },
     {
