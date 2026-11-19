@@ -88,7 +88,13 @@ describe('buildStatusSteps', () => {
       ledgerNotes: [],
       // Her verb was coloured where the sentence was written; the crush hint arrives plain.
       memories: [
-        memoryStatusLine('Sarah', { type: 'loved', desc: 'you walked her home' }, 'female', 'he'),
+        memoryStatusLine(
+          'Sarah',
+          { type: 'loved', desc: 'the reader walked her home' },
+          'Seth',
+          'female',
+          'he'
+        ),
         { speaker: '', text: 'Your Heart needs to be at least Warm to catch her interest.' }
       ],
       milestones: []

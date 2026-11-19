@@ -8,11 +8,11 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 
 import { genderOf } from '@shared/gender'
-import { storedMemoryDesc } from '@shared/readerVoice'
+import { shownMemoryDesc, typedMemoryDesc } from '@shared/readerVoice'
 import { rewordedMemory } from '@shared/relationship'
 import type { CharMemory } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { MemoryRow } from '../components/MemoryRow'
+import { MemoryRow, memoryNameHint } from '../components/MemoryRow'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import { useGameStore } from '../stores/gameStore'
@@ -42,25 +42,30 @@ export function EditMemoryModal({
 }: EditMemoryModalProps): JSX.Element | null {
   const holder = genderOf(useGameStore((s) => s.characters[charId]))
   const pronouns = useGameStore((s) => s.playerPronouns)
+  const readerName = useGameStore((s) => s.playerFirstName)
   const [type, setType] = useState(memory.type)
-  // Opens in the reader's voice, the one it is filed in, whichever voice it was written in.
-  const [desc, setDesc] = useState(() => storedMemoryDesc(memory.desc, holder, pronouns))
+  // Opens as the contact page reads it, the reader by his name; kept to compare against.
+  const [opened] = useState(() => shownMemoryDesc(memory.desc, readerName, holder, pronouns))
+  const [desc, setDesc] = useState(opened)
   const blank = desc.trim() === ''
   // The gate in front of leaving with the verb or the words changed.
   const [closing, setClosing] = useState(false)
 
   /** The gate in front of leaving, asked on Cancel, on Escape and on an outside click alike. */
   function requestClose(): void {
-    if (type !== memory.type || desc !== storedMemoryDesc(memory.desc, holder, pronouns)) {
-      setClosing(true)
-    } else onClose()
+    if (type !== memory.type || desc !== opened) setClosing(true)
+    else onClose()
   }
 
-  /** Save: a blank line saves nothing, and new words leave the ledger's second person behind. */
+  /**
+   * Save: a blank line saves nothing; words left as they opened keep the filed desc exactly, and
+   * new ones are filed with the reader's name back to "the reader".
+   */
   function save(): void {
     if (blank) return
-    const next = rewordedMemory(memory, type, storedMemoryDesc(desc, holder, pronouns))
-    useGameStore.getState().replaceMemory(charId, memory, next)
+    const words =
+      desc === opened ? memory.desc : typedMemoryDesc(desc, readerName, holder, pronouns)
+    useGameStore.getState().replaceMemory(charId, memory, rewordedMemory(memory, type, words))
     onClose()
   }
 
@@ -99,6 +104,8 @@ export function EditMemoryModal({
           {...primaryProps}
         >
           <TitleTab>Edit memory</TitleTab>
+
+          <p className="vu-note-text">{memoryNameHint(readerName)}</p>
 
           <MemoryRow
             id="edit-memory-row"

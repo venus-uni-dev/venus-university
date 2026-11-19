@@ -28,7 +28,7 @@ import {
   turnedDownDesc,
   type CrushStanding
 } from '@shared/relationship'
-import { storedMemoryDesc, storedYouDesc } from '@shared/readerVoice'
+import { storedMemoryDesc } from '@shared/readerVoice'
 import { customCgSlotOf, stockCgsInPlay } from '@shared/positions'
 import { cgAction, parseAction, showAction, spriteAction } from '@shared/sceneActions'
 import { splitSentences } from '@shared/sentences'
@@ -378,29 +378,21 @@ export interface ValidMemory {
   charId: string
   type: MemoryType
   desc: string
-  /** The ledger's second-person words for it, where they could be kept. */
-  youDesc?: string
 }
 
-/** One ledger row as it is filed: the reader's voice, and the second person beside it if kept. */
+/** One ledger row as it is filed, in the reader's voice. */
 function validMemory(
   charId: string,
-  entry: { type: MemoryType; desc: string; youDesc?: string },
+  entry: { type: MemoryType; desc: string },
   holder: Gender,
   reader: ReaderPronouns
 ): ValidMemory {
-  const desc = storedMemoryDesc(entry.desc, holder, reader)
-  const kept: ValidMemory = { charId, type: entry.type, desc }
-  const youDesc = storedYouDesc(entry.youDesc)
-  if (youDesc !== undefined) kept.youDesc = youDesc
-  return kept
+  return { charId, type: entry.type, desc: storedMemoryDesc(entry.desc, holder, reader) }
 }
 
-/** A filed memory as it is kept on her entry, dated `date`, carrying no absent key. */
+/** A filed memory as it is kept on her entry, dated `date`. */
 function memoryOn(date: number, entry: Omit<ValidMemory, 'charId'>): CharMemory {
-  const memory: CharMemory = { date, type: entry.type, desc: entry.desc }
-  if (entry.youDesc !== undefined) memory.youDesc = entry.youDesc
-  return memory
+  return { date, type: entry.type, desc: entry.desc }
 }
 
 /**
@@ -589,7 +581,7 @@ export function memoryStatusLines(
   ignoredVents: readonly string[] = [],
   projected: Readonly<Record<string, CharInfo>> = useGameStore.getState().charInfo
 ): SceneLine[] {
-  const { characters, playerPronouns } = useGameStore.getState()
+  const { characters, playerPronouns, playerFirstName: readerName } = useGameStore.getState()
   const texted = new Map(
     (ledger ? ledgerTextMemories(ledger, false) : []).map((entry) => [entry.charId, entry])
   )
@@ -626,19 +618,19 @@ export function memoryStatusLines(
   for (const charId of ignored) {
     const holder = genderOf(characters[charId])
     const entry = { type: 'disliked', desc: ignoredTextDesc(holder) } as const
-    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+    lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // The invitation he did answer, and said no to.
   for (const charId of turnedDown) {
     const holder = genderOf(characters[charId])
     const entry = { type: 'disliked', desc: turnedDownDesc(holder) } as const
-    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+    lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // The vent he left unanswered, in the texting memory's own words.
   for (const charId of ignoredVents) {
     const holder = genderOf(characters[charId])
     const entry = { type: 'disliked', desc: overTextDesc(ignoredVentDesc(holder)) } as const
-    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+    lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // A present to a girl the ledger left nothing about still lands, at the end.
   for (const gift of given)
@@ -684,8 +676,14 @@ function crushStatusLine(
 
 /** One memory as the player reads it, and the base its texting sibling extends. */
 function memoryStatusLine(entry: ValidMemory): SceneLine {
-  const { characters, playerPronouns } = useGameStore.getState()
-  return memoryLineOf(statusNameOf(entry.charId), entry, genderOf(characters[entry.charId]), playerPronouns)
+  const { characters, playerPronouns, playerFirstName } = useGameStore.getState()
+  return memoryLineOf(
+    statusNameOf(entry.charId),
+    entry,
+    playerFirstName,
+    genderOf(characters[entry.charId]),
+    playerPronouns
+  )
 }
 
 /**
@@ -693,10 +691,11 @@ function memoryStatusLine(entry: ValidMemory): SceneLine {
  * that says where it came from.
  */
 function textMemoryStatusLine(entry: ValidMemory): SceneLine {
-  const { characters, playerPronouns } = useGameStore.getState()
+  const { characters, playerPronouns, playerFirstName } = useGameStore.getState()
   return memoryLineOf(
     statusNameOf(entry.charId),
     overTextMemory(entry),
+    playerFirstName,
     genderOf(characters[entry.charId]),
     playerPronouns
   )

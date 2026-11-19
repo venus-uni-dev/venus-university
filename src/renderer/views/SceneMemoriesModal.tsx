@@ -9,8 +9,9 @@ import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
 import { genderOf } from '@shared/gender'
+import { shownMemoryDesc } from '@shared/readerVoice'
 import { CheckField } from '../components/CheckField'
-import { MemoryRow } from '../components/MemoryRow'
+import { MemoryRow, memoryNameHint } from '../components/MemoryRow'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { UNKNOWN_NAME, useGameStore } from '../stores/gameStore'
@@ -38,9 +39,17 @@ export function SceneMemoriesModal({
 }: SceneMemoriesModalProps): JSX.Element | null {
   const characters = useGameStore((s) => s.characters)
   const charInfo = useGameStore((s) => s.charInfo)
-  // Each row opens on the memory the ledger filed, or on a blank sentence where it filed none.
+  const pronouns = useGameStore((s) => s.playerPronouns)
+  const readerName = useGameStore((s) => s.playerFirstName)
+  // Each row opens on the memory the ledger filed, the reader by his name, or on a blank sentence
+  // where it filed none.
   const [drafts, setDrafts] = useState<MemoryAnswer[]>(() =>
-    rows.map((row) => ({ type: row.applied?.type ?? 'liked', desc: row.applied?.desc ?? '' }))
+    rows.map(({ charId, applied }) => ({
+      type: applied?.type ?? 'liked',
+      desc: applied
+        ? shownMemoryDesc(applied.desc, readerName, genderOf(characters[charId]), pronouns)
+        : ''
+    }))
   )
   const [keepReplay, setKeepReplay] = useState(true)
   // The shell reads its close and its primary at the moment either fires, so a dismissal or a
@@ -89,7 +98,7 @@ export function SceneMemoriesModal({
         <p className="vu-note-text">
           Add anything else the characters should remember after this scene. Keep it short and
           include only important things to avoid context bloat, since this is injected in every
-          scene the character is in. Use past-tense and refer to yourself as “the reader”.
+          scene the character is in. {memoryNameHint(readerName)}
         </p>
 
         <div className="vu-scroll-box">

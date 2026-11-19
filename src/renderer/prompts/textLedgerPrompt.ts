@@ -72,12 +72,11 @@ function textLedgerSchema(
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['charKey', 'type', 'desc', 'youDesc'],
+        required: ['charKey', 'type', 'desc'],
         properties: {
           charKey,
           type: { type: 'string', enum: [...MEMORY_TYPES] },
-          desc: { type: 'string' },
-          youDesc: { type: 'string' }
+          desc: { type: 'string' }
         }
       }
     },

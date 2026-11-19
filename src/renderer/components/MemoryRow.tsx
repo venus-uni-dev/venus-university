@@ -27,6 +27,17 @@ export interface MemoryRowProps {
 }
 
 /**
+ * How a memory the player types should call them: by their own first name, which is filed as
+ * "the reader" wherever it stands as a word.
+ */
+export function memoryNameHint(name: string): string {
+  return (
+    `Use past-tense and refer to yourself as “${name}”. Don't use your name as a regular word ` +
+    `anywhere else, since every “${name}” is read as you.`
+  )
+}
+
+/**
  * One memory laid out as the sentence it is read as: her face, her name, a picker for how she
  * remembers it, and three lines of field for what. The end-of-scene list and the contact page's
  * single edit both draw it.

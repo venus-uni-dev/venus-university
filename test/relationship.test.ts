@@ -343,9 +343,15 @@ describe('memoryStatusLine', () => {
   ]
 
   it.each(cases)('paints %s in the colour of which way it went', (type, tone) => {
-    const line = memoryStatusLine('Sarah', { type, desc: 'you walked her home' }, 'female', 'he')
+    const line = memoryStatusLine(
+      'Sarah',
+      { type, desc: 'the reader walked her home' },
+      'Seth',
+      'female',
+      'he'
+    )
 
-    expect(line.text).toBe(`Sarah ${type} that you walked her home.`)
+    expect(line.text).toBe(`Sarah ${type} that Seth walked her home.`)
     const marks = line.status?.marks ?? []
     expect(marks).toHaveLength(1)
     expect(line.text.slice(marks[0].start, marks[0].end)).toBe(type)
@@ -355,25 +361,27 @@ describe('memoryStatusLine', () => {
   it('marks the verb of a memory that punctuates itself', () => {
     const line = memoryStatusLine(
       'Mina',
-      { type: 'hated', desc: 'you ignored her all night!' },
+      { type: 'hated', desc: 'the reader ignored her all night!' },
+      'Seth',
       'female',
       'he'
     )
 
-    expect(line.text).toBe('Mina hated that you ignored her all night!')
+    expect(line.text).toBe('Mina hated that Seth ignored her all night!')
     const mark = (line.status?.marks ?? [])[0]
     expect(line.text.slice(mark.start, mark.end)).toBe('hated')
   })
 
-  it('shows a memory filed in the reader’s voice to the player as "you", the verb agreeing', () => {
+  it('shows an older save’s second-person memory with the reader’s name, the verb agreeing', () => {
     const line = memoryStatusLine(
       'Sarah',
-      { type: 'liked', desc: 'the reader was nice to her' },
+      { type: 'liked', desc: 'you were nice to her' },
+      'Seth',
       'female',
       'he'
     )
 
-    expect(line.text).toBe('Sarah liked that you were nice to her.')
+    expect(line.text).toBe('Sarah liked that Seth was nice to her.')
     const mark = (line.status?.marks ?? [])[0]
     expect(line.text.slice(mark.start, mark.end)).toBe('liked')
   })

@@ -630,56 +630,6 @@ describe('applyLedger', () => {
     })
   })
 
-  it('files the ledger’s second-person words beside the memory, the texting memory’s too', () => {
-    applyLedger({
-      memories: [
-        {
-          charKey: 'sarah_rose',
-          type: 'liked',
-          desc: 'the reader said they were great friends',
-          youDesc: ' You said the two of you were great friends '
-        }
-      ],
-      textMemories: [
-        {
-          charKey: 'sarah_rose',
-          type: 'loved',
-          desc: 'the reader asked about her recital',
-          youDesc: 'you asked about her recital'
-        }
-      ],
-      events: []
-    })
-    const info = useGameStore.getState().charInfo.a
-    expect(info.memories).toEqual([
-      {
-        date: 7,
-        type: 'liked',
-        desc: 'the reader said they were great friends',
-        youDesc: 'you said the two of you were great friends'
-      }
-    ])
-    expect(info.textMemory).toMatchObject({ youDesc: 'you asked about her recital' })
-  })
-
-  it('files the memory without second-person words that are blank or still say "the reader"', () => {
-    applyLedger({
-      memories: [
-        { charKey: 'sarah_rose', type: 'liked', desc: 'the reader was kind', youDesc: '  ' },
-        {
-          charKey: 'mina_kwon',
-          type: 'liked',
-          desc: 'the reader was kind',
-          youDesc: 'the reader was kind'
-        }
-      ],
-      events: []
-    })
-    const { a, b } = useGameStore.getState().charInfo
-    expect(a.memories).toEqual([{ date: 7, type: 'liked', desc: 'the reader was kind' }])
-    expect(b.memories).toEqual([{ date: 7, type: 'liked', desc: 'the reader was kind' }])
-  })
-
   // JSON Schema cannot say "at most one row per enum value", so the cap is the
   // sanitizer's. First row wins — a second is a mistake, not a correction.
   it('keeps only the first texting memory per character', () => {

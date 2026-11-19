@@ -12,7 +12,7 @@ import {
   type StatKey,
   type StatTier
 } from './playerStats'
-import { secondPerson } from './readerVoice'
+import { shownMemoryDesc } from './readerVoice'
 import { markedLine, markedRuns } from './statusMark'
 import { hasTrait } from './traits'
 import type {
@@ -115,14 +115,9 @@ function replacedIn(
   return replaced
 }
 
-/**
- * `memory` with a new verb and words, its ledger's second-person words kept only while its own
- * words stand.
- */
+/** `memory` with a new verb and words, on its own date. */
 export function rewordedMemory(memory: CharMemory, type: MemoryType, desc: string): CharMemory {
-  const next: CharMemory = { ...memory, type, desc }
-  if (desc !== memory.desc) delete next.youDesc
-  return next
+  return { ...memory, type, desc }
 }
 
 /**
@@ -218,30 +213,31 @@ export function affectionFor(
 
 /**
  * The three parts of a memory sentence, cut where the word it is coloured by begins and ends:
- * its ledger's own second-person words where it kept them, else its desc turned to the second
- * person as its holder's gender and the reader's pronouns have it.
+ * its desc with the reader called `readerName`.
  */
 function memoryParts(
   name: string,
-  entry: Pick<CharMemory, 'type' | 'desc' | 'youDesc'>,
+  entry: Pick<CharMemory, 'type' | 'desc'>,
+  readerName: string,
   holder: Gender,
   reader: ReaderPronouns
 ): { before: string; run: string; after: string } {
-  const desc = sentence(entry.youDesc ?? secondPerson(entry.desc, holder, reader))
+  const desc = sentence(shownMemoryDesc(entry.desc, readerName, holder, reader))
   return { before: `${name} `, run: entry.type, after: ` that ${desc}` }
 }
 
 /**
- * `"Mika liked that you walked her home."` off "the reader walked her home" — the one phrasing
- * of a memory, used by the post-scene status lines and by Bunnyboard's history alike.
+ * `"Mika liked that Seth walked her home."` off "the reader walked her home" — the one phrasing
+ * of a memory, used by the post-scene status lines and by her contact page alike.
  */
 export function memorySentence(
   name: string,
-  entry: Pick<CharMemory, 'type' | 'desc' | 'youDesc'>,
+  entry: Pick<CharMemory, 'type' | 'desc'>,
+  readerName: string,
   holder: Gender,
   reader: ReaderPronouns
 ): string {
-  const { before, run, after } = memoryParts(name, entry, holder, reader)
+  const { before, run, after } = memoryParts(name, entry, readerName, holder, reader)
   return `${before}${run}${after}`
 }
 
@@ -250,11 +246,9 @@ export function overTextDesc(desc: string): string {
   return `${desc.replace(/[.!?…]+$/, '')} over text.`
 }
 
-/** A texting memory with the clause that says where it came from, in both of its voices. */
-export function overTextMemory<T extends Pick<CharMemory, 'desc' | 'youDesc'>>(entry: T): T {
-  const said = { ...entry, desc: overTextDesc(entry.desc) }
-  if (entry.youDesc !== undefined) said.youDesc = overTextDesc(entry.youDesc)
-  return said
+/** A texting memory with the clause that says where it came from. */
+export function overTextMemory<T extends Pick<CharMemory, 'desc'>>(entry: T): T {
+  return { ...entry, desc: overTextDesc(entry.desc) }
 }
 
 /** Which way each of the four verbs went, for the run the status box paints. */
@@ -271,11 +265,12 @@ const MEMORY_TONES: Record<MemoryType, TextMark['tone']> = {
  */
 export function memoryStatusLine(
   name: string,
-  entry: Pick<CharMemory, 'type' | 'desc' | 'youDesc'>,
+  entry: Pick<CharMemory, 'type' | 'desc'>,
+  readerName: string,
   holder: Gender,
   reader: ReaderPronouns
 ): SceneLine {
-  const { before, run, after } = memoryParts(name, entry, holder, reader)
+  const { before, run, after } = memoryParts(name, entry, readerName, holder, reader)
   return markedLine(before, run, after, MEMORY_TONES[entry.type])
 }
 

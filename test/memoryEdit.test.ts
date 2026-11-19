@@ -50,44 +50,48 @@ describe('memoryEditsOf reads each answer as the edit it makes', () => {
   ]
   const answer = (type: MemoryType, desc: string): MemoryAnswer => ({ type, desc })
 
-  it('makes no edit for an answer left as it was filed', () => {
-    const answers = [answer('liked', 'the reader was kind'), answer('liked', '')]
-    expect(memoryEditsOf(rows, answers, 9, {}, 'he')).toEqual([])
+  it('makes no edit for an answer left as it opened, the reader by his name', () => {
+    const answers = [answer('liked', 'Seth was kind'), answer('liked', '')]
+    expect(memoryEditsOf(rows, answers, 9, {}, 'he', 'Seth')).toEqual([])
   })
 
   it('rewrites a memory whose verb alone changed, keeping its date', () => {
-    const answers = [answer('loved', 'the reader was kind'), answer('liked', ' ')]
-    expect(memoryEditsOf(rows, answers, 9, {}, 'he')).toEqual([
+    const answers = [answer('loved', 'Seth was kind'), answer('liked', ' ')]
+    expect(memoryEditsOf(rows, answers, 9, {}, 'he', 'Seth')).toEqual([
       { charId: 'a', match: filed, next: { date: 4, type: 'loved', desc: 'the reader was kind' } }
     ])
   })
 
   it('forgets a memory whose words were blanked', () => {
     const answers = [answer('liked', '  '), answer('liked', '')]
-    expect(memoryEditsOf(rows, answers, 9, {}, 'he')).toEqual([{ charId: 'a', match: filed, next: null }])
+    expect(memoryEditsOf(rows, answers, 9, {}, 'he', 'Seth')).toEqual([{ charId: 'a', match: filed, next: null }])
   })
 
   it('records a filled blank row on the boundary’s date, typed words in the reader’s voice', () => {
-    const answers = [answer('liked', 'the reader was kind'), answer('disliked', 'you were late')]
-    expect(memoryEditsOf(rows, answers, 9, {}, 'he')).toEqual([
+    const answers = [answer('liked', 'Seth was kind'), answer('disliked', 'seth was late')]
+    expect(memoryEditsOf(rows, answers, 9, {}, 'he', 'Seth')).toEqual([
       { charId: 'b', match: null, next: { date: 9, type: 'disliked', desc: 'the reader was late' } }
     ])
   })
 
-  it('keeps the ledger’s second-person words while the words stand, and drops them once rewritten', () => {
-    const [row] = memoryEditRows(
-      ['a'],
-      [{ charId: 'a', type: 'liked', desc: 'the reader was kind', youDesc: 'you were kind' }],
-      4
-    )
-    const verb = memoryEditsOf([row], [answer('loved', 'the reader was kind')], 9, {}, 'he')
-    expect(verb[0].next).toEqual({
-      date: 4,
-      type: 'loved',
-      desc: 'the reader was kind',
-      youDesc: 'you were kind'
-    })
-    const words = memoryEditsOf([row], [answer('liked', 'the reader was sweet')], 9, {}, 'he')
-    expect(words[0].next).toEqual({ date: 4, type: 'liked', desc: 'the reader was sweet' })
+  it('files typed words with the reader’s name, in any case, as "the reader"', () => {
+    const answers = [answer('liked', "SETH was kind to seth's sister"), answer('liked', '')]
+    expect(memoryEditsOf(rows, answers, 9, {}, 'he', 'Seth')).toEqual([
+      {
+        charId: 'a',
+        match: filed,
+        next: { date: 4, type: 'liked', desc: "the reader was kind to the reader's sister" }
+      }
+    ])
+  })
+
+  it('never turns a word the name shares in words left as they opened', () => {
+    const lucky: CharMemory = { date: 4, type: 'liked', desc: 'the reader got lucky' }
+    const row: MemoryEditRow = { charId: 'a', applied: lucky }
+    const shown = 'Lucky got lucky'
+    expect(memoryEditsOf([row], [answer('liked', shown)], 9, {}, 'he', 'Lucky')).toEqual([])
+    expect(memoryEditsOf([row], [answer('loved', shown)], 9, {}, 'he', 'Lucky')).toEqual([
+      { charId: 'a', match: lucky, next: { ...lucky, type: 'loved' } }
+    ])
   })
 })

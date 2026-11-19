@@ -2931,9 +2931,10 @@ function askMemoryEdits(
 
 /** Files what the answers changed: a filed memory rewritten or dropped, a blank row recorded. */
 function fileMemoryEdits(rows: readonly MemoryEditRow[], answers: readonly MemoryAnswer[]): void {
-  const { date, characters, playerPronouns } = useGameStore.getState()
+  const { date, characters, playerPronouns, playerFirstName } = useGameStore.getState()
   const genders = gendersOf(rows.map(({ charId }) => charId), characters)
-  for (const { charId, match, next } of memoryEditsOf(rows, answers, date, genders, playerPronouns)) {
+  const edits = memoryEditsOf(rows, answers, date, genders, playerPronouns, playerFirstName)
+  for (const { charId, match, next } of edits) {
     if (match) useGameStore.getState().replaceMemory(charId, match, next)
     else if (next) useGameStore.getState().recordMemory(charId, next)
   }

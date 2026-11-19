@@ -95,6 +95,7 @@ export function ContactPage({
   const classes = useGameStore((s) => s.classes)
   const characters = useGameStore((s) => s.characters)
   const pronouns = useGameStore((s) => s.playerPronouns)
+  const readerName = useGameStore((s) => s.playerFirstName)
   const romance = useGameStore((s) => s.romance)
   const chars = useGameStore((s) => s.chars)
   const alumni = useGameStore((s) => s.alumni)
@@ -471,7 +472,17 @@ export function ContactPage({
                 {recent.map((memory, index) => (
                   <Fragment key={`${memory.date}-${index}`}>
                     <span className="vu-contact-when">{formatShortGameDate(memory.date, season)}</span>
-                    <span>“{memorySentence(character.firstName, memory, genderOf(character), pronouns)}”</span>
+                    <span>
+                      “
+                      {memorySentence(
+                        character.firstName,
+                        memory,
+                        readerName,
+                        genderOf(character),
+                        pronouns
+                      )}
+                      ”
+                    </span>
                     <motion.button
                       className="vu-square vu-contact-memory-edit"
                       type="button"

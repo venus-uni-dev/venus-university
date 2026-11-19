@@ -1,5 +1,5 @@
 import type { ReaderPronouns } from '@shared/gender'
-import { storedMemoryDesc } from '@shared/readerVoice'
+import { shownMemoryDesc, typedMemoryDesc } from '@shared/readerVoice'
 import { rewordedMemory } from '@shared/relationship'
 import type { CharMemory, Gender, MemoryType } from '@shared/types'
 
@@ -11,7 +11,7 @@ export interface MemoryEditRow {
   applied: CharMemory | null
 }
 
-/** What the player left in a row: the verb and the words as typed. */
+/** What the player left in a row: the verb and the words as typed, the reader by his name. */
 export interface MemoryAnswer {
   type: MemoryType
   desc: string
@@ -30,7 +30,7 @@ export interface MemoryEdit {
  */
 export function memoryEditRows(
   cast: readonly string[],
-  filed: readonly { charId: string; type: MemoryType; desc: string; youDesc?: string }[],
+  filed: readonly { charId: string; type: MemoryType; desc: string }[],
   date: number
 ): MemoryEditRow[] {
   const rows: MemoryEditRow[] = []
@@ -44,9 +44,7 @@ export function memoryEditRows(
       const key = JSON.stringify([charId, entry.type, entry.desc])
       if (seen.has(key)) continue
       seen.add(key)
-      const applied: CharMemory = { date, type: entry.type, desc: entry.desc }
-      if (entry.youDesc !== undefined) applied.youDesc = entry.youDesc
-      rows.push({ charId, applied })
+      rows.push({ charId, applied: { date, type: entry.type, desc: entry.desc } })
     }
     if (!any) rows.push({ charId, applied: null })
   }
@@ -67,30 +65,38 @@ export function memoryEditRows(
 /**
  * The edits the answers make, `answers[i]` answering `rows[i]`: a filed memory blanked is
  * dropped, changed is rewritten on its own date, and a blank row filled is recorded on `date`.
- * Each is filed in the reader's voice as its holder's gender in `genders` has it, absent being
- * female, and as the reader's own `pronouns` do; a rewritten one keeps the ledger's second-person
- * words only where its own words stand.
+ * Words the player typed are filed with `readerName` back to "the reader", in the reader's voice
+ * as its holder's gender in `genders` has it, absent being female, and as the reader's own
+ * `pronouns` do. A row's words left as they opened keep the filed desc exactly, so a name that
+ * is also a word in it, or somebody else's name, is never turned.
  */
 export function memoryEditsOf(
   rows: readonly MemoryEditRow[],
   answers: readonly MemoryAnswer[],
   date: number,
   genders: Readonly<Record<string, Gender>>,
-  pronouns: ReaderPronouns
+  pronouns: ReaderPronouns,
+  readerName: string
 ): MemoryEdit[] {
   const edits: MemoryEdit[] = []
   rows.forEach(({ charId, applied }, index) => {
     const answer = answers[index]
     if (!answer) return
-    const desc = storedMemoryDesc(answer.desc, genders[charId] ?? 'female', pronouns)
+    const holder = genders[charId] ?? 'female'
     if (applied) {
+      const opened = shownMemoryDesc(applied.desc, readerName, holder, pronouns)
+      const desc =
+        answer.desc === opened
+          ? applied.desc
+          : typedMemoryDesc(answer.desc, readerName, holder, pronouns)
       if (!desc) {
         edits.push({ charId, match: applied, next: null })
       } else if (answer.type !== applied.type || desc !== applied.desc) {
         edits.push({ charId, match: applied, next: rewordedMemory(applied, answer.type, desc) })
       }
-    } else if (desc) {
-      edits.push({ charId, match: null, next: { date, type: answer.type, desc } })
+    } else {
+      const desc = typedMemoryDesc(answer.desc, readerName, holder, pronouns)
+      if (desc) edits.push({ charId, match: null, next: { date, type: answer.type, desc } })
     }
   })
   return edits

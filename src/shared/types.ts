@@ -534,11 +534,6 @@ export interface CharMemory {
   type: MemoryType
   desc: string
   /**
-   * `desc` as the player reads it, the reader called "you", in the ledger's own words; absent
-   * on a memory the app turns into the second person itself.
-   */
-  youDesc?: string
-  /**
    * The days of the breaks between semesters it was carried across, which its age does not
    * count; absent on a memory of the semester it was made in.
    */
@@ -2713,7 +2708,7 @@ export interface SceneResponse {
  */
 export interface LedgerResponse {
   /** Both cast-scoped arrays are absent for a solo scene, whose schema omits them. */
-  memories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
+  memories?: Array<{ charKey: string; type: MemoryType; desc: string }>
   events?: Array<{ charKey: string; event: RelationshipEvent }>
   /**
    * Every kiss and every night the hour held, one row per kind per set of girls; absent for a
@@ -2724,7 +2719,7 @@ export interface LedgerResponse {
    * What this slot's texting left each girl with — one per character, at most. The texting
    * ledger's field, scoped to whoever actually texted this slot.
    */
-  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
+  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string }>
   /**
    * The plans the slot settled on — the scene's from the scene ledger, the texts'
    * from the texting ledger, deduped by the merge.
