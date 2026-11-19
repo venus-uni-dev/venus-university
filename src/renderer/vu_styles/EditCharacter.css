@@ -271,9 +271,9 @@
   justify-content: center;
 }
 
-/* The wrapper that hears the pointer for a dead Fix fingers stands in the row where the link
-   itself stood, so it carries the link the way the row lays one out rather than as a line of
-   text with a strut of its own. */
+/* The wrapper that hears the pointer for a dead Fix fingers or Repaint stands in the row where
+   the link itself stood, so it carries the link the way the row lays one out rather than as a
+   line of text with a strut of its own. */
 .vu-wardrobe-links-row > .vu-deadnote {
   display: flex;
 }
@@ -656,3 +656,21 @@
   margin-left: auto;
 }
 
+/* The love life's three boxes, spaced as the form's fields are, and the hint under the last one
+   as close as a label's second line. */
+.vu-edit-attraction {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vu-edit-attraction .vu-field-hint {
+  margin: -6px 0 0;
+}
+
+/* A written value is read, not edited: no well, no border, no field around it. */
+.vu-view-prose {
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 14px/1.55 var(--font-body);
+}

@@ -8,14 +8,26 @@
 import { fullDescriptionOf, kindSentenceOf } from '@shared/academics'
 import { slotFullLabel, yearLabel } from '@shared/classes'
 import { dormSentence } from '@shared/dorms'
-import { jobDefOf } from '@shared/jobs'
+import { genderOf, PRONOUNS, type Pronouns } from '@shared/gender'
+import { jobDefOf, slotFromId } from '@shared/jobs'
 import { editOf, type LorebookRecord } from '@shared/lorebookRecord'
-import { npcBestFriendOf, type NpcRelationshipMap } from '@shared/npcRelationships'
+import {
+  npcBestFriendOf,
+  npcPartnersOf,
+  type NpcRelationshipMap
+} from '@shared/npcRelationships'
 import { affectionFor } from '@shared/relationship'
 import { andList, escapeRegExp, splitSentences } from '@shared/sentences'
 import { eyeColorOf, hairColorOf, skinTonesOf } from '@shared/tags'
-import { fullNameOf, type CharInfo, type Character, type ClassEntry } from '@shared/types'
-import { HOMECOMING_VISIT_SENTENCE } from './homecoming'
+import {
+  fullNameOf,
+  type CharInfo,
+  type Character,
+  type ClassEntry,
+  type Season
+} from '@shared/types'
+import { formatGameDate } from './gameDate'
+import { homecomingVisitSentence } from './homecoming'
 import { npcStandingLine } from './npcRelationship'
 import { readerStandingLine } from './relationship'
 
@@ -368,9 +380,24 @@ export function loreText(entry: LoreEntry): string {
   return entry.text.replace(/\s*\n\s*/g, ' ')
 }
 
-/** The sentence that says a described character is not here. */
-function absentNote(firstName: string): string {
-  return `${firstName} is NOT here and is background information only — do not have her appear, speak, be shown, or send messages.`
+/**
+ * The date a transfer student arrived on, through the semester she transferred in; empty for
+ * everybody else.
+ */
+export function transferLines(
+  who: Pick<Character, 'firstName' | 'gender'>,
+  info: CharInfo | undefined,
+  season: Season
+): string[] {
+  if (info?.transferredAt === undefined) return []
+  return [
+    `${who.firstName} transferred to Venus University on ${formatGameDate(slotFromId(info.transferredAt).date, season)}.`
+  ]
+}
+
+/** The sentence that says a described character is not here, in their own pronoun. */
+function absentNote(firstName: string, p: Pronouns): string {
+  return `${firstName} is NOT here and is background information only — do not have ${p.them} appear, speak, be shown, or send messages.`
 }
 
 /**
@@ -383,6 +410,7 @@ export function characterLore(
   roster: readonly Character[],
   charInfo: Record<string, CharInfo>,
   date: number,
+  season: Season,
   relations?: LoreRelations,
   plans?: LorePlans,
   visitor?: string
@@ -393,6 +421,7 @@ export function characterLore(
     ),
     charInfo,
     date,
+    season,
     relations,
     plans,
     visitor
@@ -404,16 +433,18 @@ export function characterLoreForIds(
   mentions: readonly Character[],
   charInfo: Record<string, CharInfo>,
   date: number,
+  season: Season,
   relations?: LoreRelations,
   plans?: LorePlans,
   visitor?: string
 ): string[] {
-  return characterParagraphs(mentions, charInfo, date, relations, plans, visitor)
+  return characterParagraphs(mentions, charInfo, date, season, relations, plans, visitor)
 }
 
 /**
  * The absent characters a prompt describes though nothing named them: each present girl's
- * closest friend. In `absent`'s order, deduped; callers dedup against their own routes.
+ * closest friend and everyone she is dating. In `absent`'s order, deduped; callers dedup against
+ * their own routes.
  */
 export function ambientLoreCharacters(
   absent: readonly Character[],
@@ -425,6 +456,9 @@ export function ambientLoreCharacters(
   for (const member of present) {
     const friend = npcBestFriendOf(relationships, member.charId, absentIds)
     if (friend !== null) wanted.add(friend)
+    for (const partner of npcPartnersOf(relationships, member.charId, absentIds)) {
+      wanted.add(partner)
+    }
   }
   return absent.filter((character) => wanted.has(character.charId))
 }
@@ -442,19 +476,23 @@ export interface LoreRelations {
 export type LorePlans = Readonly<Record<string, readonly string[]>>
 
 /**
- * Where a described character stands with everybody the prompt is about: one
- * sentence apiece, in `npcStandingLine`'s words so it cannot differ from the `CAST` block.
+ * Where a described character stands with everybody the prompt is about on `date`, in
+ * `npcStandingLine`'s words so it cannot differ from the `CAST` block.
  */
-function standingSentences(character: Character, relations: LoreRelations | undefined): string {
+function standingSentences(
+  character: Character,
+  relations: LoreRelations | undefined,
+  date: number
+): string {
   if (!relations) return ''
   return relations.present
     .filter((other) => other.charId !== character.charId)
-    .map((other) => ` ${npcStandingLine(character, other, relations.relationships)}`)
+    .map((other) => ` ${npcStandingLine(character, other, relations.relationships, date)}`)
     .join('')
 }
 
-/** What she looks like: hair, eyes and skin, the tags that are set joined into one sentence. */
-function appearanceSentence(character: Character): string {
+/** What they look like: hair, eyes and skin, the tags that are set joined into one sentence. */
+function appearanceSentence(character: Character, p: Pronouns): string {
   const tags = character.baseAppearance
   const hair = hairColorOf(tags)
   const eyes = eyeColorOf(tags)
@@ -469,7 +507,7 @@ function appearanceSentence(character: Character): string {
     parts.length === 1
       ? parts[0]
       : `${parts.slice(0, -1).join(', ')}${parts.length > 2 ? ',' : ''} and ${parts[parts.length - 1]}`
-  return ` She has ${list}.`
+  return ` ${p.They} has ${list}.`
 }
 
 /**
@@ -480,6 +518,7 @@ function characterParagraphs(
   characters: readonly Character[],
   charInfo: Record<string, CharInfo>,
   date: number,
+  season: Season,
   relations?: LoreRelations,
   plans?: LorePlans,
   visitor?: string
@@ -492,19 +531,23 @@ function characterParagraphs(
       info.job && (info.job.startsOn ?? 0) <= date ? jobDefOf(info.job.jobId)?.employer : undefined
     const affection = affectionFor(info, date, character)
     const reader = readerStandingLine(character.firstName, info.flags, affection)
+    const g = genderOf(character)
+    const p = PRONOUNS[g]
     // A graduate's life since, where anybody else's year, major and dorm would be.
-    const away = character.charId === visitor ? HOMECOMING_VISIT_SENTENCE : 'She is out of town.'
+    const away =
+      character.charId === visitor ? homecomingVisitSentence(g) : `${p.They} is out of town.`
     const who =
       info.pursuing !== undefined
-        ? `${fullNameOf(character)} graduated from Venus University, where she majored in ${info.major}, moved away from Veridan, and is now ${info.pursuing}. ${away}`
+        ? `${fullNameOf(character)} graduated from Venus University, where ${p.they} majored in ${info.major}, moved away from Veridan, and is now ${info.pursuing}. ${away}`
         : `${fullNameOf(character)} is a ${yearLabel(info.year).toLowerCase()} majoring in ${info.major}.`
     lines.push(
       who +
-        appearanceSentence(character) +
-        (info.pursuing !== undefined ? '' : dormSentence(info.dorm)) +
-        `${employer ? ` She works part-time at ${employer}.` : ''}` +
-        ` ${character.personality} ${absentNote(character.firstName)}` +
-        standingSentences(character, relations) +
+        transferLines(character, info, season).map((line) => ` ${line}`).join('') +
+        appearanceSentence(character, p) +
+        (info.pursuing !== undefined ? '' : dormSentence(info.dorm, g)) +
+        `${employer ? ` ${p.They} works part-time at ${employer}.` : ''}` +
+        ` ${character.personality} ${absentNote(character.firstName, p)}` +
+        standingSentences(character, relations, date) +
         `${reader ? ` ${reader}` : ''}` +
         (plans?.[character.charId] ?? []).map((plan) => ` ${plan}`).join('')
     )

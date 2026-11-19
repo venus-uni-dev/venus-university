@@ -10,6 +10,7 @@ import type {
   StockOutfitSet
 } from './types'
 import { EMOTIONS, isEmotion } from './emotions'
+import { genderOf } from './gender'
 import { withoutRegenEdits } from './regenTags'
 
 /** The three wardrobes every character has, in a stable order. */
@@ -117,6 +118,18 @@ const NUDE_OUTFIT_TAGS: readonly string[] = [
   'barefoot'
 ] as const
 
+/** The nude set's tags for a male character. */
+const MALE_NUDE_OUTFIT_TAGS: readonly string[] = [
+  'nude',
+  'nipples',
+  'navel',
+  'penis',
+  'bare_arms',
+  'bare_legs',
+  'bare_shoulders',
+  'barefoot'
+] as const
+
 /** Extra negatives the swimsuit set renders under: garments that survive the re-dressing. */
 const SWIM_NEGATIVE_TAGS: readonly string[] = [
   'pantyhose',
@@ -126,13 +139,15 @@ const SWIM_NEGATIVE_TAGS: readonly string[] = [
 ] as const
 
 /**
- * The booru tags one outfit set renders from. A custom slot's are read defensively, since a
- * hand-edited record reaches the prompt builder unvalidated.
+ * The booru tags one outfit set renders from, the nude set's by her gender. A custom slot's are
+ * read defensively, since a hand-edited record reaches the prompt builder unvalidated.
  */
 export function outfitTagsFor(character: Character, set: OutfitSet): readonly string[] {
   if (set === 'pe') return character.peOutfit
   if (set === 'swim') return character.swimOutfit
-  if (set === 'nude') return NUDE_OUTFIT_TAGS
+  if (set === 'nude') {
+    return genderOf(character) === 'male' ? MALE_NUDE_OUTFIT_TAGS : NUDE_OUTFIT_TAGS
+  }
   const tags = character.customOutfits?.[set]?.tags
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === 'string') : []
 }
@@ -282,9 +297,15 @@ export const FIX_IMAGE = 'fix'
 
 /**
  * The name `chars:readWardrobeImage` asks for a set's base frame by — what Erase artifacts cuts
- * beside the sprites, so a single re-roll keeps the erase.
+ * and Repaint redraws beside the sprites, so a single re-roll keeps either.
  */
 export const BASE_IMAGE = 'base'
+
+/**
+ * How far Repaint's strength slider runs and where it opens, as the detailer's denoise: low
+ * keeps the painted colours flat, high lets the redraw wander from them.
+ */
+export const REPAINT_STRENGTH = { min: 0.2, max: 0.9, initial: 0.6 } as const
 
 /** Every sprite reference for one set — what the scene prompt offers RITA in the enum. */
 export function spriteRefsFor(set: OutfitSet): SpriteRef[] {

@@ -2,14 +2,33 @@
    its floor — her face and name, the slider between its two ends, and the square that plays it.
    Imported from the view module, never from index.css. */
 
-/* Two columns read down first, so a roster of twelve is two stacks of six and the panel never
-   scrolls; the rows share the width, so a long name ellipsizes rather than pushing the slider. */
+/* A roster too long for the stage would run the panel off it, so the panel stops short of it —
+   the room the sheets leave for the tab above and the shadow below — and the list scrolls inside. */
+.vu-voices {
+  max-height: calc(100% - 100px);
+}
+
+/* The scroller's own padding is room for the arches' shadows, which it would clip, and the holding
+   box takes the foot's share back as well, so a roster that fits stands where it would unpadded. */
+.vu-voices-scroll {
+  margin-bottom: -10px;
+}
+
+/* Two columns read down first, and each stack is half the roster (`--voice-rows`, which is six
+   at twelve girls or fewer): twelve are two stacks of six with the panel never scrolling, and a
+   longer roster deepens both stacks rather than adding a third column, which would be too
+   narrow for a row. The rows share the width, so a long name ellipsizes rather than pushing the
+   slider. */
 .vu-voices-list {
   display: grid;
+  flex: 1;
   grid-auto-flow: column;
-  grid-template-rows: repeat(6, auto);
+  grid-template-rows: repeat(var(--voice-rows, 6), auto);
   grid-auto-columns: minmax(0, 1fr);
   gap: 12px 48px;
+  min-width: 0;
+  padding: 4px 6px 10px;
+  overflow: hidden auto;
 }
 
 .vu-voices-row {

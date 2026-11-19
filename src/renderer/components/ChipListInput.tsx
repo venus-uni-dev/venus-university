@@ -21,6 +21,38 @@ function tagOf(value: string): string {
   return value.trim().replace(/\s+/g, '_')
 }
 
+/** Tags whose underscores are part of the face they draw, so a space would break them. */
+const KAOMOJI = new Set([
+  '0_0',
+  '(o)_(o)',
+  '+_+',
+  '+_-',
+  '._.',
+  '<o>_<o>',
+  '<|>_<|>',
+  '=_=',
+  '>_<',
+  '3_3',
+  '6_9',
+  '>_o',
+  '@_@',
+  '^_^',
+  'o_o',
+  'u_u',
+  'x_x',
+  '|_|',
+  '||_||'
+])
+
+/**
+ * A booru tag as the player reads it: every underscore a space, but for a kaomoji and an
+ * embedding's file name, which are shown as written. Typing it back in closes the spaces up again.
+ */
+export function tagLabel(tag: string): string {
+  if (KAOMOJI.has(tag) || tag.startsWith('embedding:')) return tag
+  return tag.replace(/_/g, ' ')
+}
+
 /** Turns typed text into a phrase: trimmed, whitespace runs made one space. */
 function phraseOf(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
@@ -36,8 +68,8 @@ export function withTypedTags(
   phrases = false
 ): string[] {
   const clean = phrases ? phraseOf : tagOf
-  // Two phrases differing only in case are one phrase.
-  const key = (tag: string): string => (phrases ? tag.toLowerCase() : tag)
+  // Two phrases differing only in case are one phrase, and two tags that read alike are one tag.
+  const key = (tag: string): string => (phrases ? tag.toLowerCase() : tagLabel(tag))
   // Deduped against itself too: "a, a" is one tag, by the same rule.
   const next = [...values]
   for (const tag of text.split(',').map(clean)) {
@@ -106,11 +138,11 @@ export function ChipListInput({
     <div className="vu-chips">
       {values.map((tag) => (
         <span key={tag} className="vu-chip-tag">
-          {tag}
+          {phrases ? tag : tagLabel(tag)}
           <button
             className="vu-chip-x"
             type="button"
-            aria-label={`Remove ${tag}`}
+            aria-label={`Remove ${phrases ? tag : tagLabel(tag)}`}
             onClick={() => remove(tag)}
           >
             ×

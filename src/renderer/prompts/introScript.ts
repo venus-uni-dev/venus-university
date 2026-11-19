@@ -1,6 +1,8 @@
+import { genderOf, PRONOUNS, readerWords, type ReaderPronouns } from '@shared/gender'
 import { describeReaderToPlayer, statsMaxed, type PlayerStats } from '@shared/playerStats'
-import type { SceneLine, TimeSlot } from '@shared/types'
+import type { Character, SceneLine, TimeSlot } from '@shared/types'
 import { formatDatePart } from './gameDate'
+import { readerAmongCast } from './setting'
 
 /**
  * The authored opening of a playthrough: the arrival scroll and the
@@ -83,38 +85,46 @@ export function introScrollLines(stats: PlayerStats, date: number): SceneLine[] 
   ].map((line) => ({ speaker: '', ...line }))
 }
 
-/** Who the orientation scene is cast with, as its premise reads her. */
+/** Who the orientation scene is cast with, as its premise reads them. */
 export interface OrientationPick {
-  firstName: string
-  /** She is a freshman too; otherwise she is the upperclassman leading his group. */
+  /** The character the scene is cast with: the name, and the pronouns the premise uses. */
+  who: Pick<Character, 'firstName' | 'gender'>
+  /** A freshman too; otherwise the upperclassman leading his group. */
   freshman: boolean
-  /** The reader knew her before he came here. */
+  /** The reader knew them before he came here. */
   met: boolean
-  /** The reader knew somebody on the roster before he came here, her or another. */
+  /** The reader knew somebody on the roster before he came here, them or another. */
   knowsSomebody: boolean
 }
 
 /**
  * The orientation scene's action text, written *about* the reader rather than by him; the loop
- * does not log it as one of his lines. A girl he already knows is a familiar face rather than
- * somebody new.
+ * does not log it as one of his lines. Somebody he already knows is a familiar face rather than
+ * somebody new, and a premise names the reader outright where the reader's pronoun would read as
+ * theirs.
  */
-export function orientationPremise(pick: OrientationPick): string {
-  const { firstName } = pick
+export function orientationPremise(pick: OrientationPick, reader: ReaderPronouns): string {
+  const { firstName } = pick.who
+  const g = genderOf(pick.who)
+  const male = g === 'male'
+  const p = PRONOUNS[g]
+  const alone = readerWords(reader)
+  const beside = readerWords(reader, g)
+  const amongGirls = readerAmongCast(reader)
   if (pick.freshman && pick.met) {
-    return `The reader is standing with his orientation group in the Venus Quad, and ${firstName}, another freshman, turns out to be in it too. The two of them already knew each other before either came here — write the scene with that feeling: a familiar face on the first day, everything here still ahead of them both.`
+    return `The reader is standing with ${alone.his} orientation group in the Venus Quad, and ${firstName}, another freshman, turns out to be in it too. The two of them already knew each other before either came here — write the scene with that feeling: a familiar face on the first day, everything here still ahead of them both.`
   }
   if (pick.met) {
-    return `The reader's orientation group is short of half its people. ${firstName}, the upperclassman leading the group, is somebody he already knows from before he came here, and the two of them talk while the stragglers turn up. She knows her way around and is in no hurry. Write the scene with that first-day feeling: a familiar face in a new place, and everything here still ahead of him.`
+    return `The reader's orientation group is short of half its people. ${firstName}, the upperclassman leading the group, is somebody ${beside.he} already knows from before ${amongGirls.he} came here, and the two of them talk while the stragglers turn up. ${male ? firstName : 'She'} knows ${p.their} way around and is in no hurry. Write the scene with that first-day feeling: a familiar face in a new place, and everything here still ahead of ${beside.him}.`
   }
   if (pick.freshman) {
     const strangers = pick.knowsSomebody
       ? 'The two of them have never met'
       : 'Neither of them knows anybody here yet'
-    return `The reader is standing with his orientation group in the Venus Quad. One of the other freshmen stands out to him. ${strangers} and neither knows whether this is the start of anything at all — write the scene with that feeling: first day, everything still ahead, nothing decided.`
+    return `The reader is standing with ${alone.his} orientation group in the Venus Quad. One of the other freshmen stands out to ${amongGirls.him}. ${strangers} and neither knows whether this is the start of anything at all — write the scene with that feeling: first day, everything still ahead, nothing decided.`
   }
-  const him = pick.knowsSomebody ? 'he is new here' : 'he knows nobody at all'
-  return `The reader's orientation group is short of half its people. ${firstName}, the upperclassman leading the group, introduces herself to him, and the two of them talk while the stragglers turn up. She already knows her way around and is in no hurry; ${him}. Write the scene with that first-day feeling: an easy, unhurried conversation between two people who have just met, and the open question of whether it leads anywhere.`
+  const him = pick.knowsSomebody ? `${beside.he} is new here` : `${beside.he} knows nobody at all`
+  return `The reader's orientation group is short of half its people. ${firstName}, the upperclassman leading the group, introduces ${p.themself} to ${beside.him}, and the two of them talk while the stragglers turn up. ${male ? firstName : 'She'} already knows ${p.their} way around and is in no hurry; ${him}. Write the scene with that first-day feeling: an easy, unhurried conversation between two people who have just met, and the open question of whether it leads anywhere.`
 }
 
 /**

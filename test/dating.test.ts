@@ -147,6 +147,62 @@ describe('settleDating', () => {
     expect(outcome).toEqual({ charInfo: {}, breakups: [] })
   })
 
+  it('ends the couple a new lover was in, unless she is open', () => {
+    // Nia dates Bea, Dita dates Hana; both start with the reader, and only Dita is Promiscuous.
+    const before = { n: girl(), b: girl(), d: girl({ harem: true }), h: girl() }
+    const after = { ...before, n: girl({ isLover: true }), d: girl({ isLover: true, harem: true }) }
+    const npcRelationships = { 'b|n': { affinity: 5, dating: 1 }, 'd|h': { affinity: 5, dating: 1 } }
+    const outcome = run(before, after, { npcRelationships, promiscuous: ['d'] })
+
+    expect(outcome.left).toEqual([{ charId: 'n', partner: 'b' }])
+    expect(entryOf(outcome, 'b').jealousyMemories).toEqual([
+      { date: DATE, type: 'hated', desc: 'Nia left her for the reader' }
+    ])
+    expect(outcome.charInfo.h).toBeUndefined()
+    expect(outcome.breakups).toEqual([])
+  })
+
+  it('leaves every other lover and her own partner for the one who closed it', () => {
+    // Hana shared him with Ana and Bea, and was dating Fay; she has agreed to see only him.
+    const before = {
+      h: girl({ isLover: true, harem: true }),
+      a: girl({ isLover: true, harem: true }),
+      b: girl({ isLover: true }),
+      f: girl(),
+      c: girl({ hasCrush: true })
+    }
+    const after = { ...before, h: girl({ isLover: true }) }
+    const outcome = run(before, after, {
+      npcRelationships: { 'f|h': { affinity: 5, dating: 1 } },
+      promiscuous: ['h'],
+      closed: ['h']
+    })
+
+    expect(outcome.breakups).toEqual([
+      { charId: 'a', forCharId: 'h', closed: true },
+      { charId: 'b', forCharId: 'h', closed: true }
+    ])
+    for (const charId of ['a', 'b']) {
+      const left = entryOf(outcome, charId)
+      expect(left.flags.isLover).toBe(false)
+      expect(left.brokeUpOn).toBe(DATE)
+      expect(left.leftFor).toBeUndefined()
+      expect(left.jealousyMemories?.[0].desc).toBe(
+        'the reader broke her heart by choosing to see only Hana'
+      )
+    }
+    expect(outcome.left).toEqual([{ charId: 'h', partner: 'f' }])
+    expect(entryOf(outcome, 'f').jealousyMemories?.[0].desc).toBe('Hana left her for the reader')
+    // Nobody started dating anybody, so a crush on him holds nothing against it.
+    expect(outcome.charInfo.c).toBeUndefined()
+  })
+
+  it('moves nothing for sharing cleared without the closed milestone', () => {
+    const before = { h: girl({ isLover: true, harem: true }), a: girl({ isLover: true, harem: true }) }
+    const after = { ...before, h: girl({ isLover: true }) }
+    expect(run(before, after, { promiscuous: ['h'] })).toEqual({ charInfo: {}, breakups: [] })
+  })
+
   it('settles the same input the same way twice', () => {
     const before = { a: girl({ isLover: true }), n: girl(), c: girl({ hasCrush: true }) }
     const after = { ...before, n: girl({ isLover: true }) }

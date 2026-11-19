@@ -16,7 +16,7 @@ import {
   type ProfileField
 } from '@shared/application'
 import { DORM_IDS, FALLBACK_DORM, isDorm, type DormId } from '@shared/dorms'
-import { JOB_CATALOG, jobDefOf } from '@shared/jobs'
+import { JOB_CATALOG, jobDefOf, type JobDef } from '@shared/jobs'
 import {
   ACTIVITY_LOCATIONS,
   FUN_LOCATIONS,
@@ -27,6 +27,7 @@ import {
   locationMenuLines
 } from '@shared/locations'
 import { fallbackHandleOf } from '@shared/feed'
+import { pronounsOf } from '@shared/gender'
 import { appError } from '@shared/errors'
 import {
   clamp,
@@ -36,10 +37,19 @@ import {
   type ClassGenReply
 } from './classPrompt'
 import { keyPattern, loreEntryById } from './lorebook'
-import { objectSchema } from './schema'
+import { notesLines } from './scenePrompt'
+import { foldGroup, keyedArray, objectSchema } from './schema'
+import {
+  SECRETS_ROLE,
+  secretEntryLines,
+  secretFields,
+  secretLines,
+  type SecretsEntry
+} from './secretsPrompt'
 
 /**
- * Builds and validates the one-shot student-profile request; pure, no IO.
+ * Builds and validates New Game's student requests — the roster's majors, then one per student —
+ * and the profiles they come to; pure, no IO.
  */
 
 /** How many shifts a working character may be given. */
@@ -153,161 +163,254 @@ function profileSystem(setting: string): string {
 
 /** How many classes she takes, asked of every student the call profiles in full. */
 const CLASSES_TAKEN_LINES = [
-  'classesTaken: how many classes she takes. The vast majority of students take 4.',
+  'classesTaken: how many classes they take. The vast majority of students take 4.',
   'Give 3 only to a genuine slacker, and 5 or 6 only to a genuine overachiever.'
+]
+
+/**
+ * The employers as the profile prompt lists them: the catalog's order with the library last, the
+ * job a student weighed alone reaches for first.
+ */
+const PROMPT_EMPLOYERS: readonly JobDef[] = [
+  ...JOB_CATALOG.filter((def) => def.id !== 'kendall_library'),
+  ...JOB_CATALOG.filter((def) => def.id === 'kendall_library')
 ]
 
 /** Her job, and the employers she may hold one at. */
 function workLines(): string[] {
-  const employers = JOB_CATALOG.map((def) => `${def.id} — ${def.employer}, ${def.title}: ${def.blurb}`)
+  const menu = PROMPT_EMPLOYERS.map((def) => `${def.id} — ${def.employer}, ${def.title}: ${def.blurb}`)
   return [
     'PART-TIME WORK',
     'If the student works a part-time job, you can describe it as follows:',
-    'job: the id of the employer she works for, exactly as written below. Leave empty if she has no job.',
-    `jobShifts: how many shifts a week she works, 1 or ${MAX_NPC_SHIFTS} when she has a job, and 0 when she does not.`,
+    'job: the id of the employer they work for, exactly as written below. Only give a student a job if it would make sense for them to sign up for one; otherwise leave it empty.',
+    `jobShifts: how many shifts a week they work, 1 or ${MAX_NPC_SHIFTS} when they have a job, and 0 when they do not.`,
     '',
     'EMPLOYERS',
-    ...employers,
+    ...menu,
     ''
   ]
 }
 
-/** Where she habitually goes, and the menus each habit is picked from. */
-function hauntLines(): string[] {
-  return [
-    'WHERE SHE SPENDS HER FREE TIME',
-    'Decide some places where she goes by habit. Answer with the keys below, exactly as written:',
-    `homeSlots: how many times a week she stays in her own room, ${MIN_HOME_SLOTS} to ${MAX_HOME_SLOTS}.`,
-    'study: where she goes to study, or an empty string if she studies in her own room.',
-    `fun: 0 to ${MAX_FUN_LOCATIONS} places she goes out to enjoy herself. Leave it empty for somebody who does not go out.`,
-    'activity: a specific interest of hers that she pursues somewhere every week, as one short lowercase phrase starting with an -ing verb that names both what she does and where she does it: "sketching at the Whitman Greenhouse", "jogging at Green Hill Park", "practicing cello in the practice rooms under Thorne Auditorium". It has to be something she does over and over, not a one-off, and it must happen at one of the ACTIVITY LOCATIONS. An empty string for a student with no such interest, which is most of them.',
-    'activityLocation: the key of the place activity names, exactly as written below. An empty string when activity is empty.',
-    'meal: one place she eats out at, about once a week. An empty string for somebody who cooks for herself or eats in the dorm kitchens.',
-    '',
-    'STUDY LOCATIONS',
-    ...locationMenuLines(STUDY_LOCATIONS),
-    '',
-    'FUN LOCATIONS',
-    ...locationMenuLines(FUN_LOCATIONS),
-    '',
-    'MEAL LOCATIONS',
-    ...locationMenuLines(MEAL_LOCATIONS),
-    '',
-    'ACTIVITY LOCATIONS',
-    ...locationMenuLines(ACTIVITY_LOCATIONS),
-    ''
-  ]
-}
 
 /** How her handle is asked for. */
 const HANDLE_LINE =
-  'handle: the username she posts under. some examples: "GinaHayes", "gina.hayes", "ginahayes12", "gina_says_hay", "gina_hayes", "ghayes", "gina.h".'
+  'handle: the username they post under. some examples: "GinaHayes", "gina.hayes", "ginahayes12", "gina_says_hay", "gina_hayes", "ghayes", "gina.h".'
 
 /** How the posts she made over a break are asked for, `field` being the field that holds them. */
 function breakPostsLine(field: string, breakName: string): string {
-  return `${field}: nought to ${MAX_WINTER_POSTS} short status updates she posted over the ${breakName}, oldest first. Keep these casual, using lowercase and/or emoji if it suits her. Don't address them to anyone, like other students or the reader.`
+  return `${field}: nought to ${MAX_WINTER_POSTS} short status updates they posted over the ${breakName}, oldest first. Keep these casual, using lowercase and/or emoji if it suits the student. Don't address them to anyone, like other students or the reader.`
 }
 
 /** How her spring break plans are asked for. */
 const SPRING_BREAK_LINES = [
   'SPRING BREAK',
-  'springBreakPlans: what she does with the week off in March, as one short phrase in the infinitive, ending in a full stop: "Go home to Russia to see her parents.", "Drive down to her aunt\'s place on the coast with her roommate."',
+  'springBreakPlans: what they do with the week off in March, as one short phrase in the infinitive, ending in a full stop: "Go home to Russia to see family.", "Drive down to an aunt\'s place on the coast with a roommate."',
   'All plans must include leaving campus and don\'t include other students or the reader.'
 ]
 
-/** One student the profile call writes for, with whatever of her profile is already decided. */
-export interface ProfileStudent {
-  character: Character
-  /** Her decided fields in the reply's own vocabulary, as {@link decidedProfileOf} gives them. */
-  decided: Partial<CharProfileDraft>
-}
-
-/** Everything New Game's profile call is built from. */
-export interface ProfilePromptInput {
-  /** The roster girls with something left to write, in roster order. */
-  students: readonly ProfileStudent[]
-  /** The majors decided for the girls the call leaves out, which another may share. */
-  otherMajors: readonly string[]
-  /**
-   * A later semester's: its season, the returning girls asked their break, the graduates their
-   * lives since.
-   */
-  next?: NextProfileInput
-  setting: string
-}
-
-/** Who a later semester's profile call asks beside its new students, and before which season. */
-export interface NextProfileInput {
-  season: Season
-  /** The roster girls coming back, asked only for their break. */
-  returning: readonly Character[]
-  graduates: readonly GraduateBrief[]
-}
-
-/** How a decided value is said to the model: the field and the value, as the reply would hold them. */
-function decidedLine(decided: Readonly<Record<string, unknown>>): string | null {
+/**
+ * How a decided value is said to the model: the field and the value, as the reply would hold
+ * them, after `lead`.
+ */
+function decidedLine(
+  decided: Readonly<Record<string, unknown>>,
+  lead = 'Already decided, to be answered exactly as written'
+): string | null {
   const fields = Object.entries(decided).filter(([, value]) => value !== undefined)
   if (fields.length === 0) return null
-  return `Already decided, to be answered exactly as written: ${fields
+  return `${lead}: ${fields
     .map(([field, value]) => `${field}: ${JSON.stringify(value)}`)
     .join('; ')}.`
 }
 
-/**
- * What each new student is asked, under `heading`: her winter break posts only where `posts`, her
- * spring break plans only where `plans`.
- */
-function newStudentLines(heading: string, posts: boolean, plans: boolean): string[] {
+/** How her major is asked for. */
+const MAJOR_LINE =
+  'major: the field they study. Pick one that fits their personality. Collapse similar majors like Business Studies and Business Science into a single major like Business Administration.'
+
+/** The line naming the majors other students already hold, or nothing where there are none. */
+function otherMajorsLines(otherMajors: readonly string[]): string[] {
+  if (otherMajors.length === 0) return []
   return [
-    heading,
-    'year: 1 = Freshman, 2 = Sophomore, 3 = Junior, 4 = Senior.',
-    'major: the field she studies. Pick one that fits her personality. Collapse similar majors like Business Studies and Business Science into a single major like Business Administration.',
-    ...CLASSES_TAKEN_LINES,
-    'majorClassesTaken: how many of those classes are in her major, from 1 to 3.',
+    `Other students already major in ${[...otherMajors].sort().join(', ')}; a student below may share one of them where it fits them.`,
+    ''
+  ]
+}
+
+/** Everything New Game's majors call is built from. */
+export interface MajorPromptInput {
+  /** The new girls whose major is left to generate, in roster order. */
+  students: readonly Character[]
+  /** The majors already held: returning girls', then the ones the player typed. */
+  otherMajors: readonly string[]
+  /** The player's notes on whoever the call names, by charKey; a girl with none is absent. */
+  notes?: Readonly<Record<string, string>>
+  setting: string
+}
+
+/** Builds the majors request, or null when nobody is left without one. */
+export function buildMajorPrompt(input: MajorPromptInput): StructuredRequest | null {
+  if (input.students.length === 0) return null
+  const { keys, cast } = rosterCastLines(input.students)
+  const notes = input.notes ?? {}
+  const preamble = ['FOR EACH STUDENT', MAJOR_LINE, '---', ''].join('\n')
+
+  // Below the '---' divider: the roster is all that varies, and the console log starts here.
+  const rest = [
+    'characters holds one entry per student below, its key exactly as written before their name, in the order listed.',
     '',
-    ...workLines(),
-    'HOUSING',
-    'dorm: where she lives on campus. lowrise_1 through lowrise_5 are the ordinary apartment-style dorms that house the bulk of students; elysium is Elysium Village, the coveted upperclassman townhouses claimed through a housing lottery.',
-    'Spread the rest across the five Lowrises rather than piling everyone into one building.',
-    '',
-    ...hauntLines(),
-    'SOCIAL MEDIA',
-    HANDLE_LINE,
-    ...(posts
+    ...otherMajorsLines(input.otherMajors),
+    'STUDENTS',
+    ...input.students.flatMap((student, index) => [
+      ...cast.slice(index * 3, index * 3 + 2),
+      ...notesLines(student.firstName, notes[keys[index]]),
+      ''
+    ])
+  ].join('\n')
+
+  return {
+    system: profileSystem(input.setting),
+    user: `${preamble}\n${rest}`,
+    schema: objectSchema('student_majors', ['characters'], {
+      characters: keyedArray(keys, { major: { type: 'string' } })
+    }),
+    cacheKey: 'venus-university-major-generation',
+    logFrom: preamble.length + 1
+  }
+}
+
+/** Validates the majors reply into each girl's major by charKey, refusing a girl left without one. */
+export function validateMajorDraft(
+  reply: unknown,
+  students: readonly Character[]
+): Record<string, string> {
+  const keys = students.map((c) => charKeyOf(c.firstName, c.lastName))
+  const folded = foldGroup<{ key: string; major?: unknown }>(
+    (reply as { characters?: unknown } | undefined)?.characters,
+    new Set(keys),
+    'characters'
+  )
+  const majors: Record<string, string> = {}
+  students.forEach((character, index) => {
+    const raw = folded[keys[index]]?.major
+    const major = typeof raw === 'string' ? raw.trim().replace(/\s+/g, ' ') : ''
+    if (major === '') invalid(`${fullNameOf(character)} was given no major.`)
+    majors[keys[index]] = major
+  })
+  return majors
+}
+
+/** The fields of the reply each profile field is answered in. */
+const REPLY_FIELDS: Record<Exclude<ProfileField, 'major'>, readonly string[]> = {
+  year: ['year'],
+  classesTaken: ['classesTaken'],
+  majorClassesTaken: ['majorClassesTaken'],
+  job: ['job', 'jobShifts'],
+  dorm: ['dorm'],
+  homeSlots: ['homeSlots'],
+  study: ['study'],
+  fun: ['fun'],
+  activity: ['activity', 'activityLocation'],
+  meal: ['meal'],
+  handle: ['handle'],
+  breakPosts: ['winterPosts'],
+  springBreakPlans: ['springBreakPlans']
+}
+
+/** The places a student goes by habit, as the profile fields that hold them. */
+const HAUNT_FIELDS = ['homeSlots', 'study', 'fun', 'activity', 'meal'] as const
+
+/** What a Lowrise is answered as: which one she lives in is dealt. */
+const LOWRISE = 'lowrise'
+
+/** Her free time: the lines of the habits asked, and the menus they are picked from. */
+function hauntLines(asked: ReadonlySet<ProfileField>): string[] {
+  if (!HAUNT_FIELDS.some((field) => asked.has(field))) return []
+  const menu = (field: ProfileField, heading: string, locations: Readonly<Record<string, string>>) =>
+    asked.has(field) ? ['', heading, ...locationMenuLines(locations)] : []
+  return [
+    'WHERE THEY SPEND THEIR FREE TIME',
+    'Decide some places where they go by habit. Answer with the keys below, exactly as written:',
+    ...(asked.has('homeSlots')
+      ? [`homeSlots: how many times a week they stay in their own room, ${MIN_HOME_SLOTS} to ${MAX_HOME_SLOTS}.`]
+      : []),
+    ...(asked.has('study')
+      ? ['study: where they go to study, or an empty string if they study in their own room.']
+      : []),
+    ...(asked.has('fun')
+      ? [
+          `fun: 0 to ${MAX_FUN_LOCATIONS} places they go out to enjoy themselves. Leave it empty for somebody who does not go out.`
+        ]
+      : []),
+    ...(asked.has('activity')
+      ? [
+          'activity: a specific interest of theirs that they pursue somewhere every week, as one short lowercase phrase starting with an -ing verb that names both what they do and where they do it: "sketching at the Whitman Greenhouse", "jogging at Green Hill Park", "practicing cello in the practice rooms under Thorne Auditorium". It has to be something they do over and over, not a one-off, and it must happen at one of the ACTIVITY LOCATIONS. An empty string for a student with no such interest, which is most of them.',
+          'activityLocation: the key of the place activity names, exactly as written below. An empty string when activity is empty.'
+        ]
+      : []),
+    ...(asked.has('meal')
+      ? [
+          'meal: one place they eat out at, about once a week. An empty string for somebody who cooks for themselves or eats in the dorm kitchens.'
+        ]
+      : []),
+    ...menu('study', 'STUDY LOCATIONS', STUDY_LOCATIONS),
+    ...menu('fun', 'FUN LOCATIONS', FUN_LOCATIONS),
+    ...menu('meal', 'MEAL LOCATIONS', MEAL_LOCATIONS),
+    ...menu('activity', 'ACTIVITY LOCATIONS', ACTIVITY_LOCATIONS),
+    ''
+  ]
+}
+
+/** The rules of each profile field asked of one student, and only those. */
+function profileLines(asked: ReadonlySet<ProfileField>, decided: boolean): string[] {
+  const has = (field: ProfileField): boolean => asked.has(field)
+  const academics = [
+    ...(has('year') ? ['year: 1 = Freshman, 2 = Sophomore, 3 = Junior, 4 = Senior.'] : []),
+    ...(has('classesTaken') ? CLASSES_TAKEN_LINES : []),
+    ...(has('majorClassesTaken')
+      ? ['majorClassesTaken: how many of those classes are in their major, from 1 to 3.']
+      : [])
+  ]
+  const social = [
+    ...(has('handle') ? [HANDLE_LINE] : []),
+    ...(has('breakPosts')
       ? [
           breakPostsLine('winterPosts', 'winter break'),
           'First-year students get no posts, leave the array empty. Everyone else gets at least one.'
         ]
+      : [])
+  ]
+  return [
+    'FOR THIS STUDENT',
+    ...(academics.length > 0 ? [...academics, ''] : []),
+    ...(has('job') ? workLines() : []),
+    ...(has('dorm')
+      ? [
+          'HOUSING',
+          `dorm: where they live on campus. ${LOWRISE} is the Lowrises, the ordinary apartment-style dorms that house the bulk of students; elysium is Elysium Village, the coveted upperclassman townhouses claimed through a housing lottery.`,
+          ''
+        ]
       : []),
-    '',
-    ...(plans ? [...SPRING_BREAK_LINES, ''] : []),
-    'DECIDED FIELDS',
-    'Some of a student\'s fields may already be decided, written under her name. Answer those exactly as written, and fit the rest of her profile around them.'
+    ...hauntLines(asked),
+    ...(social.length > 0 ? ['SOCIAL MEDIA', ...social, ''] : []),
+    ...(has('springBreakPlans') ? [...SPRING_BREAK_LINES, ''] : []),
+    ...(decided
+      ? [
+          'DECIDED FIELDS',
+          'Some of their fields are already decided, written under their name. Fit the rest of the profile around them.'
+        ]
+      : [])
   ]
 }
 
-/** Each new student's cast line, her decided fields under it, then her personality. */
-function newStudentBlock(students: readonly ProfileStudent[], cast: readonly string[]): string[] {
-  return students.flatMap((student, index) => {
-    const [line, personality] = cast.slice(index * 3, index * 3 + 2)
-    const decided = decidedLine(student.decided)
-    return [line, ...(decided ? [decided] : []), personality, '']
-  })
-}
-
-/**
- * The fields a new student's entry holds, in the order she is answered in: her winter break
- * posts only where `posts`, her spring break plans only where `plans`.
- */
-function newStudentProperties(posts: boolean, plans: boolean): Record<string, unknown> {
-  return {
+/** The schema of each profile field asked of one student, in the order she is answered in. */
+function profileProperties(asked: ReadonlySet<ProfileField>): Record<string, unknown> {
+  const all: Record<string, unknown> = {
     year: intField(1, 4),
-    major: { type: 'string' },
     classesTaken: intField(3, 6),
     majorClassesTaken: intField(1, 3),
-    // Closed like `job`: the dorm list is code, identical in every save.
-    dorm: { type: 'string', enum: [...DORM_IDS] },
-    job: { type: 'string', enum: ['', ...JOB_CATALOG.map((def) => def.id)] },
+    dorm: { type: 'string', enum: [LOWRISE, 'elysium'] },
+    // Closed: the employer list is code, identical in every save, in the menu's order.
+    job: { type: 'string', enum: ['', ...PROMPT_EMPLOYERS.map((def) => def.id)] },
     jobShifts: intField(0, MAX_NPC_SHIFTS),
     homeSlots: intField(MIN_HOME_SLOTS, MAX_HOME_SLOTS),
     // Closed for `job`'s reason; `''` is legal in the two optional ones and is the ordinary answer.
@@ -320,171 +423,236 @@ function newStudentProperties(posts: boolean, plans: boolean): Record<string, un
     // Her own phrase, unlike the closed menus: the place it happens at rides `activityLocation`.
     activity: { type: 'string' },
     handle: { type: 'string' },
-    ...(posts
-      ? { winterPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } } }
-      : {}),
-    ...(plans ? { springBreakPlans: { type: 'string' } } : {}),
+    winterPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } },
+    springBreakPlans: { type: 'string' },
     activityLocation: { type: 'string', enum: ['', ...Object.keys(ACTIVITY_LOCATIONS)] },
     meal: { type: 'string', enum: ['', ...Object.keys(MEAL_LOCATIONS)] }
   }
+  const wanted = new Set(
+    [...asked].flatMap((field) => (field === 'major' ? [] : REPLY_FIELDS[field]))
+  )
+  return Object.fromEntries(Object.entries(all).filter(([field]) => wanted.has(field)))
 }
 
-/** Builds the student-profile request, or null when nobody is left to ask anything. */
-export function buildProfilePrompt(input: ProfilePromptInput): StructuredRequest | null {
-  if (input.next) return buildNextProfilePrompt(input, input.next)
-  if (input.students.length === 0) return null
-  const { keys, cast } = rosterCastLines(input.students.map((student) => student.character))
+/** The system prompt of a call writing her profile, her secrets, or both. */
+function studentSystem(setting: string, profile: boolean, secrets: boolean): string {
+  if (profile && !secrets) return profileSystem(setting)
+  const role =
+    profile && secrets
+      ? 'You are a novelist writing up one student of a story set at a university: their student affairs profile and the secrets they keep.'
+      : SECRETS_ROLE
+  return [`${role} You return a single JSON object matching the provided schema exactly.`, '', 'SETTING', setting].join(
+    '\n'
+  )
+}
 
-  const preamble = [...newStudentLines('FOR EACH STUDENT', true, true), '---', ''].join('\n')
+/** What a student's secrets may not touch, where the same reply writes more of her. */
+const BESIDE = 'anything asked of them above'
 
-  // Below the '---' divider: the roster is all that varies, and the console log starts here.
-  const rest = [
-    'characters holds one entry per student below, its key exactly as written before her name, in the order listed.',
-    '',
-    ...(input.otherMajors.length > 0
-      ? [
-          `Other students already major in ${[...input.otherMajors].sort().join(', ')}; a student below may share one of them where it fits her.`,
-          ''
-        ]
-      : []),
-    'STUDENTS',
-    ...newStudentBlock(input.students, cast)
-  ].join('\n')
+/** Her block where no secret is asked: who she is, what is decided of her, and the player's notes. */
+function studentLines(character: Character, decided: string | null, notes?: string): string[] {
+  const { cast } = rosterCastLines([character])
+  return [
+    cast[0],
+    ...(decided ? [decided] : []),
+    character.personality,
+    ...(character.backstory.trim() ? [`Backstory: ${character.backstory.trim()}`] : []),
+    ...(character.likes.length > 0 ? [`Likes: ${character.likes.join(', ')}`] : []),
+    ...(character.dislikes.length > 0 ? [`Dislikes: ${character.dislikes.join(', ')}`] : []),
+    ...notesLines(character.firstName, notes)
+  ]
+}
 
-  // Gemini rejects a schema past a complexity cap with a bare INVALID_ARGUMENT: this record
-  // keyed once per roster member passes at ten students and fails at eleven, while one item
-  // schema in an array costs the same at any roster size. Left boundless — minItems or
-  // maxItems on the array trips the cap again.
-  const schema = objectSchema('student_profiles', ['characters'], {
-    characters: keyedArray(keys, newStudentProperties(true, true))
-  })
-
-  // The roster is in the prompt, so this caches only across retries of the same New Game.
-  return {
-    system: profileSystem(input.setting),
-    user: `${preamble}\n${rest}`,
-    schema,
-    cacheKey: 'venus-university-profile-generation',
-    logFrom: preamble.length + 1
-  }
+/** One new girl the student call writes for: the fields and secrets left to her. */
+export interface StudentPromptInput {
+  character: Character
+  /** Her decided fields in the reply's own vocabulary, her major among them. */
+  decided: Partial<CharProfileDraft>
+  /** The profile fields asked of her, never her major, which the majors call writes. */
+  fields: readonly ProfileField[]
+  /** Her secrets, where any tier is asked. */
+  secrets?: SecretsEntry
+  /** The player's notes on her. */
+  notes?: string
+  setting: string
 }
 
 /**
- * A later semester's profile request: its new students as New Game asks them but for break posts,
- * the returning girls' break, and every graduate's life since; null when nobody is asked.
+ * Builds one new girl's request: every profile field she left blank but her major, and every
+ * secret tier she left blank, written in one reply; null when nothing is left.
  */
-function buildNextProfilePrompt(
-  input: ProfilePromptInput,
-  next: NextProfileInput
-): StructuredRequest | null {
-  const { students } = input
-  const { returning, graduates } = next
-  if (students.length + returning.length + graduates.length === 0) return null
-  const breakName = breakNameOf(next.season)
-  const spring = next.season === 'spring'
-
-  const sections: string[][] = []
-  /** One group of the reply: its key, the heading its students stand under, and their lines. */
-  const groups: { group: string; heading: string; lines: string[]; schema: unknown }[] = []
-
-  if (students.length > 0) {
-    sections.push(newStudentLines('FOR EACH NEW STUDENT', false, spring))
-    const { keys, cast } = rosterCastLines(students.map((student) => student.character))
-    groups.push({
-      group: 'characters',
-      heading: 'NEW STUDENTS',
-      lines: newStudentBlock(students, cast),
-      schema: keyedArray(keys, newStudentProperties(false, spring))
-    })
-  }
-
-  if (returning.length > 0) {
-    sections.push([
-      'FOR EACH RETURNING STUDENT',
-      breakPostsLine('breakPosts', breakName),
-      'Everyone gets at least one.',
-      ...(spring ? [SPRING_BREAK_LINES[1], SPRING_BREAK_LINES[2]] : [])
-    ])
-    const { keys, cast } = rosterCastLines(returning)
-    groups.push({
-      group: 'returning',
-      heading: 'RETURNING STUDENTS',
-      lines: cast,
-      schema: keyedArray(keys, {
-        breakPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } },
-        ...(spring ? { springBreakPlans: { type: 'string' } } : {})
-      })
-    })
-  }
-
-  if (graduates.length > 0) {
-    sections.push([
-      'FOR EACH GRADUATE',
-      ...GRADUATE_LINES,
-      breakPostsLine('breakPosts', breakName),
-      'Everyone gets at least one.',
-      ...(graduates.some((graduate) => graduate.decided)
-        ? [
-            'A graduate\'s pursuing may already be decided, written under her name. Answer it exactly as written, and fit her posts around it.'
-          ]
-        : [])
-    ])
-    const { keys, cast } = rosterCastLines(graduates.map((graduate) => graduate.character))
-    groups.push({
-      group: 'graduates',
-      heading: 'GRADUATES',
-      lines: graduates.flatMap((graduate, index) => {
-        const [line, personality] = cast.slice(index * 3, index * 3 + 2)
-        const decided = graduate.decided ? decidedLine({ pursuing: graduate.decided }) : null
-        return [
-          line,
-          `Majored in ${graduate.major}.`,
-          ...(graduate.pursuing ? [`Last semester she was ${graduate.pursuing}.`] : []),
-          ...(decided ? [decided] : []),
-          personality,
-          ''
-        ]
-      }),
-      schema: keyedArray(keys, {
-        pursuing: { type: 'string' },
-        breakPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } }
-      })
-    })
-  }
+export function buildStudentPrompt(input: StudentPromptInput): StructuredRequest | null {
+  const asked = new Set(input.fields.filter((field) => field !== 'major'))
+  const secrets = input.secrets && input.secrets.tiers.length > 0 ? input.secrets : undefined
+  const profile = asked.size > 0
+  if (!profile && !secrets) return null
+  // Her decided fields are not in the schema: the model only reads them.
+  const decided = decidedLine(input.decided, 'Already decided')
 
   const preamble = [
-    ...sections.flatMap((section, index) => (index === 0 ? section : ['', ...section])),
+    ...(profile ? profileLines(asked, decided !== null) : []),
+    ...(profile && secrets ? [''] : []),
+    ...(secrets ? secretLines(secrets.tiers, profile ? BESIDE : undefined) : []),
     '---',
     ''
   ].join('\n')
 
-  // Below the '---' divider: the students are all that varies, and the console log starts here.
-  const named = groups.map(({ group, heading }) => `${group} under ${heading}`)
+  // Below the '---' divider: she is all that varies, and the console log starts here.
   const rest = [
-    groups.length === 1
-      ? `${groups[0].group} holds one entry per student under ${groups[0].heading} below, its key exactly as written before her name, in the order listed.`
-      : `${groups.map(({ group }) => group).join(', ')} each hold one entry per student under their headings below (${named.join(', ')}), its key exactly as written before her name, in the order listed.`,
-    '',
-    ...(input.otherMajors.length > 0
-      ? [
-          `Other students already major in ${[...input.otherMajors].sort().join(', ')}; a student below may share one of them where it fits her.`,
-          ''
-        ]
-      : []),
-    ...groups.flatMap(({ heading, lines }) => [heading, ...lines])
+    'STUDENT',
+    ...(secrets
+      ? secretEntryLines(secrets, decided)
+      : studentLines(input.character, decided, input.notes))
   ].join('\n')
 
+  const properties = {
+    ...(profile ? profileProperties(asked) : {}),
+    ...(secrets ? secretFields(secrets.tiers) : {})
+  }
+  return {
+    system: studentSystem(input.setting, profile, secrets !== undefined),
+    user: `${preamble}\n${rest}`,
+    schema: objectSchema('student_profile', Object.keys(properties), properties),
+    cacheKey: 'venus-university-student-generation',
+    logFrom: preamble.length + 1
+  }
+}
+
+/** One returning girl the next semester's call writes for: her break, and any secret she is owed. */
+export interface ReturningPromptInput {
+  character: Character
+  season: Season
+  secrets?: SecretsEntry
+  notes?: string
+  setting: string
+}
+
+/** Builds one returning girl's request: her posts over the break, her plans before a spring, her new secrets. */
+export function buildReturningPrompt(input: ReturningPromptInput): StructuredRequest {
+  const spring = input.season === 'spring'
+  const secrets = input.secrets && input.secrets.tiers.length > 0 ? input.secrets : undefined
+  const preamble = [
+    'FOR THIS RETURNING STUDENT',
+    breakPostsLine('breakPosts', breakNameOf(input.season)),
+    'They get at least one.',
+    ...(spring ? [SPRING_BREAK_LINES[1], SPRING_BREAK_LINES[2]] : []),
+    ...(secrets ? ['', ...secretLines(secrets.tiers, BESIDE)] : []),
+    '---',
+    ''
+  ].join('\n')
+  const { cast } = rosterCastLines([input.character])
+  const rest = [
+    'RETURNING STUDENT',
+    ...(secrets
+      ? secretEntryLines(secrets)
+      : [...cast.slice(0, 2), ...notesLines(input.character.firstName, input.notes)])
+  ].join('\n')
+  const properties = {
+    breakPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } },
+    ...(spring ? { springBreakPlans: { type: 'string' } } : {}),
+    ...(secrets ? secretFields(secrets.tiers) : {})
+  }
+  return {
+    system: studentSystem(input.setting, true, secrets !== undefined),
+    user: `${preamble}\n${rest}`,
+    schema: objectSchema('returning_student', Object.keys(properties), properties),
+    cacheKey: `venus-university-returning-generation-${input.season}`,
+    logFrom: preamble.length + 1
+  }
+}
+
+/** One graduate the next semester's call writes for. */
+export interface GraduatePromptInput {
+  graduate: GraduateBrief
+  season: Season
+  notes?: string
+  setting: string
+}
+
+/** Builds one graduate's request: her life since, and her posts over the break. */
+export function buildGraduatePrompt(input: GraduatePromptInput): StructuredRequest {
+  const { graduate } = input
+  const preamble = [
+    'FOR THIS GRADUATE',
+    ...GRADUATE_LINES,
+    breakPostsLine('breakPosts', breakNameOf(input.season)),
+    'They get at least one.',
+    ...(graduate.decided
+      ? [
+          'Their pursuing may already be decided, written under their name. Answer it exactly as written, and fit their posts around it.'
+        ]
+      : []),
+    '---',
+    ''
+  ].join('\n')
+  const { cast } = rosterCastLines([graduate.character])
+  const decided = graduate.decided ? decidedLine({ pursuing: graduate.decided }) : null
+  const rest = [
+    'GRADUATE',
+    cast[0],
+    `Majored in ${graduate.major}.`,
+    ...(graduate.pursuing
+      ? [`Last semester ${pronounsOf(graduate.character).they} was ${graduate.pursuing}.`]
+      : []),
+    ...(decided ? [decided] : []),
+    cast[1],
+    ...notesLines(graduate.character.firstName, input.notes)
+  ].join('\n')
   return {
     system: profileSystem(input.setting),
     user: `${preamble}\n${rest}`,
-    schema: objectSchema(
-      'student_profiles',
-      groups.map(({ group }) => group),
-      Object.fromEntries(groups.map(({ group, schema }) => [group, schema]))
-    ),
-    cacheKey: `venus-university-profile-continued-${next.season}`,
+    schema: objectSchema('graduate', ['pursuing', 'breakPosts'], {
+      pursuing: { type: 'string' },
+      breakPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } }
+    }),
+    cacheKey: `venus-university-graduate-generation-${input.season}`,
     logFrom: preamble.length + 1
   }
+}
+
+/** A reply as a record, or an empty one where it is not an object. */
+export function replyRecord(raw: unknown): Record<string, unknown> {
+  return typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : {}
+}
+
+/**
+ * The Lowrise each girl who answered a Lowrise lives in, by charKey: in order, each takes the one
+ * fewest live in, counting `held`, the dorms already decided, a tie going to the lowest.
+ */
+export function dealLowrises(
+  answered: readonly string[],
+  held: readonly (DormId | undefined)[]
+): Record<string, DormId> {
+  const lowrises = DORM_IDS.filter((dorm) => dorm !== 'elysium')
+  const counts = new Map<DormId, number>(lowrises.map((dorm) => [dorm, 0]))
+  for (const dorm of held) {
+    if (dorm && counts.has(dorm)) counts.set(dorm, (counts.get(dorm) ?? 0) + 1)
+  }
+  const dealt: Record<string, DormId> = {}
+  for (const key of answered) {
+    let pick = lowrises[0]
+    for (const dorm of lowrises) {
+      if ((counts.get(dorm) ?? 0) < (counts.get(pick) ?? 0)) pick = dorm
+    }
+    counts.set(pick, (counts.get(pick) ?? 0) + 1)
+    dealt[key] = pick
+  }
+  return dealt
+}
+
+/** Whether a reply answered her dorm as a Lowrise, to be dealt one. */
+export function answeredLowrise(dorm: unknown): boolean {
+  return dorm === LOWRISE
+}
+
+/** What a later semester's profile parts read beside the new students: its season, the returning girls and the graduates. */
+export interface NextProfileInput {
+  season: Season
+  /** The roster girls coming back, asked only for their break. */
+  returning: readonly Character[]
+  graduates: readonly GraduateBrief[]
 }
 
 /** The menu key a location id is offered under, or null where the menu does not offer it. */
@@ -766,48 +934,13 @@ function breakNameOf(season: Season): string {
 
 /** What a graduate is, and how her life since is asked for. */
 const GRADUATE_LINES = [
-  'She has graduated from Venus University and moved away from Veridan.',
-  'pursuing: what she is doing with her life now, as one short lowercase phrase starting with an -ing verb, somewhere other than Veridan: "teaching English in Seoul", "interning at a law firm in Chicago", "backpacking through Patagonia". Where she had one last semester, write where it has led her since rather than repeating it.'
+  'They have graduated from Venus University and moved away from Veridan.',
+  'pursuing: what they are doing with their life now, as one short lowercase phrase starting with an -ing verb, somewhere other than Veridan: "teaching English in Seoul", "interning at a law firm in Chicago", "backpacking through Patagonia". Where they had one last semester, write where it has led them since rather than repeating it.'
 ]
 
 /** What a graduate is doing when the model gave nothing usable: last semester's, or a placeholder. */
 export function fallbackPursuit(previous: string | undefined): string {
   return previous && previous.trim() !== '' ? previous.trim() : 'settling into life after college'
-}
-
-/**
- * One array of records keyed by charKey: the shape a record per student has to take, since a
- * record keyed once per student trips Gemini's schema-complexity cap past ten of them.
- */
-export function keyedArray(keys: readonly string[], properties: Record<string, unknown>): unknown {
-  return {
-    type: 'array',
-    items: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['key', ...Object.keys(properties)],
-      properties: { key: { type: 'string', enum: [...keys] }, ...properties }
-    }
-  }
-}
-
-/** The records of one group keyed by charKey, an unknown or repeated key dropped. */
-function foldGroup<T extends { key: string }>(
-  list: unknown,
-  keys: ReadonlySet<string>,
-  group: string
-): Record<string, T> {
-  const folded: Record<string, T> = {}
-  for (const raw of Array.isArray(list) ? list : []) {
-    if (typeof raw !== 'object' || raw === null) continue
-    const key = typeof (raw as { key?: unknown }).key === 'string' ? (raw as T).key.trim() : ''
-    if (!keys.has(key) || folded[key]) {
-      console.warn(`[profiles] a ${group} entry named "${key}", unknown or repeated; skipping it.`)
-      continue
-    }
-    folded[key] = raw as T
-  }
-  return folded
 }
 
 /** Up to the cap of non-blank posts out of whatever the model sent. */

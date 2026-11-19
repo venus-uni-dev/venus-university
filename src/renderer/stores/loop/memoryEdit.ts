@@ -1,5 +1,7 @@
+import type { ReaderPronouns } from '@shared/gender'
 import { storedMemoryDesc } from '@shared/readerVoice'
-import type { CharMemory, MemoryType } from '@shared/types'
+import { rewordedMemory } from '@shared/relationship'
+import type { CharMemory, Gender, MemoryType } from '@shared/types'
 
 /** The boundary's memory question as data — its rows off the ledger, and what the answers change. */
 
@@ -28,7 +30,7 @@ export interface MemoryEdit {
  */
 export function memoryEditRows(
   cast: readonly string[],
-  filed: readonly { charId: string; type: MemoryType; desc: string }[],
+  filed: readonly { charId: string; type: MemoryType; desc: string; youDesc?: string }[],
   date: number
 ): MemoryEditRow[] {
   const rows: MemoryEditRow[] = []
@@ -42,7 +44,9 @@ export function memoryEditRows(
       const key = JSON.stringify([charId, entry.type, entry.desc])
       if (seen.has(key)) continue
       seen.add(key)
-      rows.push({ charId, applied: { date, type: entry.type, desc: entry.desc } })
+      const applied: CharMemory = { date, type: entry.type, desc: entry.desc }
+      if (entry.youDesc !== undefined) applied.youDesc = entry.youDesc
+      rows.push({ charId, applied })
     }
     if (!any) rows.push({ charId, applied: null })
   }
@@ -63,23 +67,27 @@ export function memoryEditRows(
 /**
  * The edits the answers make, `answers[i]` answering `rows[i]`: a filed memory blanked is
  * dropped, changed is rewritten on its own date, and a blank row filled is recorded on `date`.
+ * Each is filed in the reader's voice as its holder's gender in `genders` has it, absent being
+ * female, and as the reader's own `pronouns` do; a rewritten one keeps the ledger's second-person
+ * words only where its own words stand.
  */
 export function memoryEditsOf(
   rows: readonly MemoryEditRow[],
   answers: readonly MemoryAnswer[],
-  date: number
+  date: number,
+  genders: Readonly<Record<string, Gender>>,
+  pronouns: ReaderPronouns
 ): MemoryEdit[] {
   const edits: MemoryEdit[] = []
   rows.forEach(({ charId, applied }, index) => {
     const answer = answers[index]
     if (!answer) return
-    const desc = storedMemoryDesc(answer.desc)
+    const desc = storedMemoryDesc(answer.desc, genders[charId] ?? 'female', pronouns)
     if (applied) {
       if (!desc) {
         edits.push({ charId, match: applied, next: null })
       } else if (answer.type !== applied.type || desc !== applied.desc) {
-        const next: CharMemory = { ...applied, type: answer.type, desc }
-        edits.push({ charId, match: applied, next })
+        edits.push({ charId, match: applied, next: rewordedMemory(applied, answer.type, desc) })
       }
     } else if (desc) {
       edits.push({ charId, match: null, next: { date, type: answer.type, desc } })

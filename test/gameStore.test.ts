@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_RAISES, RAISE_EVERY } from '@shared/jobs'
+import { validateRecord } from '@shared/jsonValidate'
+import { SAVE_READ, stampSave } from '@shared/saveRules'
 import { giftMemoryDesc, itemDefOf, type ItemDef } from '@shared/shop'
 import type { ReaderTallies } from '@shared/tallies'
 import {
@@ -20,6 +22,7 @@ import {
   charactersById,
   charInfo,
   charJob,
+  classEntry,
   playthroughRecord,
   sceneLines
 } from './fixtures'
@@ -1356,7 +1359,7 @@ describe('the shop and gifting', () => {
     })
     useGameStore.getState().recordGifts()
     expect(useGameStore.getState().charInfo.a.giftMemories).toEqual([
-      { date: 12, type: 'loved', desc: giftMemoryDesc(itemDefOf(ROSE)!) }
+      { date: 12, type: 'loved', desc: giftMemoryDesc(itemDefOf(ROSE)!, 'female') }
     ])
     // Nobody resents a present that missed — he still went and chose something.
     expect(useGameStore.getState().charInfo.b.giftMemories).toBeUndefined()
@@ -1657,6 +1660,7 @@ describe('toGameSave', () => {
       'lastSlotCast',
       'midtermStandingDone',
       'money',
+      'npcCouples',
       'npcFriendships',
       'npcOverlay',
       'npcRelationships',
@@ -1720,6 +1724,109 @@ describe('toGameSave', () => {
       {}
     )
     expect(weatherAt(useGameStore.getState().weather, 0, 1)).toBe('storm')
+  })
+})
+
+/**
+ * A transfer's settled half rides the save rather than the record: dropped on load she is a girl
+ * the roster never had, written twice she is a profile the next semester carries wrong, and
+ * admitted twice she is a duplicate roster entry in every save after.
+ */
+describe('transfers', () => {
+  const profile = {
+    year: 2,
+    dorm: 'lowrise_2' as const,
+    major: 'Botany',
+    schedule: {},
+    transferredAt: 41
+  }
+  const state = { memories: [], flags: charInfo().flags, nameKnown: false }
+
+  it('joins an arrived transfer onto the roster and holds a waiting one apart', () => {
+    useGameStore.setState({
+      chars: ['a'],
+      charInfo: { a: charInfo(), m: charInfo({ ...profile, gifts: ['x'] }) },
+      transfers: [{ charId: 'm', profile }],
+      pendingTransfers: [
+        { charId: 'w', profile, state },
+        { charId: 'gone', profile, state }
+      ]
+    })
+    const save = useGameStore.getState().toGameSave() as GameSave
+    expect(save.charInfo.m).not.toHaveProperty('transferredAt')
+    expect(save.transfers).toEqual([{ charId: 'm', profile }])
+
+    useGameStore.getState().loadSave(
+      save,
+      playthroughRecord({ chars: ['a'] }),
+      charactersById(
+        character({ charId: 'a', firstName: 'Ana' }),
+        character({ charId: 'm', firstName: 'Mia' }),
+        character({ charId: 'w', firstName: 'Wren' })
+      )
+    )
+    const loaded = useGameStore.getState()
+    expect(loaded.chars).toEqual(['a', 'm'])
+    expect(loaded.charInfo.m).toMatchObject({ ...profile, gifts: ['x'] })
+    expect(loaded.transfers).toEqual([{ charId: 'm', profile }])
+    // The waiting girl whose character is gone is dropped; the other waits outside the roster.
+    expect(loaded.pendingTransfers.map((entry) => entry.charId)).toEqual(['w'])
+    expect(Object.keys(loaded.pendingCharacters)).toEqual(['w'])
+    expect(Object.keys(loaded.characters).sort()).toEqual(['a', 'm'])
+    expect(Object.values(loaded.charKeyToId)).not.toContain('w')
+  })
+
+  it('writes neither list while it is empty, and a save without them still reads', () => {
+    const save = useGameStore.getState().toGameSave()
+    expect(save).not.toHaveProperty('transfers')
+    expect(save).not.toHaveProperty('pendingTransfers')
+    const stamped = stampSave(save, '1700000000000', '1700000000001', 1_700_000_000_500)
+    const read = (): unknown => validateRecord(JSON.parse(JSON.stringify(stamped)), 'save', SAVE_READ)
+    expect(read).not.toThrow()
+
+    useGameStore.getState().loadSave(stamped, playthroughRecord(), {})
+    expect(useGameStore.getState().transfers).toEqual([])
+    expect(useGameStore.getState().pendingTransfers).toEqual([])
+  })
+
+  it('admits a waiting transfer once, however often the boundary replays', () => {
+    const catalog = { 'BIO 210': classEntry() }
+    const hers = { 'KNT 101': classEntry({ code: 'KNT 101', category: 'interest', slot: 3 }) }
+    useGameStore.setState({ chars: ['a'], charInfo: { a: charInfo() }, classes: catalog })
+    const wren = character({ charId: 'w', firstName: 'Wren' })
+    useGameStore.getState().addPendingTransfer({ charId: 'w', profile, state, classes: hers }, wren)
+    useGameStore.getState().admitTransfers()
+    useGameStore.getState().admitTransfers()
+
+    const admitted = useGameStore.getState()
+    expect(admitted.chars).toEqual(['a', 'w'])
+    expect(admitted.transfers).toEqual([{ charId: 'w', profile, classes: hers }])
+    expect(admitted.classes).toEqual({ ...catalog, ...hers })
+    expect(admitted.charInfo.w).toMatchObject(profile)
+    expect(admitted.characters.w?.firstName).toBe('Wren')
+    expect(admitted.pendingTransfers).toEqual([])
+    expect(admitted.pendingCharacters).toEqual({})
+  })
+
+  it('keeps a cancelled transfer’s class with the waiting girl seated in it', () => {
+    const knit = classEntry({ code: 'KNT 101', category: 'interest', slot: 3 })
+    const opera = classEntry({ code: 'OPR 101', category: 'interest', slot: 5 })
+    useGameStore.setState({ chars: ['a'], charInfo: { a: charInfo() }, classes: {} })
+    useGameStore.getState().addPendingTransfer(
+      { charId: 'w', profile, state, classes: { 'KNT 101': knit, 'OPR 101': opera } },
+      character({ charId: 'w', firstName: 'Wren' })
+    )
+    useGameStore.getState().addPendingTransfer(
+      { charId: 'v', profile: { ...profile, schedule: { 3: 'KNT 101' } }, state },
+      character({ charId: 'v', firstName: 'Vera' })
+    )
+    useGameStore.getState().dropPendingTransfer('w')
+    useGameStore.getState().admitTransfers()
+
+    const admitted = useGameStore.getState()
+    expect(admitted.chars).toEqual(['a', 'v'])
+    expect(admitted.classes).toEqual({ 'KNT 101': knit })
+    expect(admitted.transfers[0].classes).toEqual({ 'KNT 101': knit })
   })
 })
 

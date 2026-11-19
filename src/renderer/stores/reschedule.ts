@@ -60,7 +60,7 @@ function readerVerdict(event: CalendarEvent, date: number, time: TimeSlot): Verd
  */
 function attendeeVerdict(event: CalendarEvent, date: number, time: TimeSlot): Verdict {
   const game = useGameStore.getState()
-  const nameOf = (charId: string): string => game.characters[charId]?.firstName ?? 'She'
+  const nameOf = (charId: string): string => game.characters[charId]?.firstName ?? 'This contact'
 
   const gone = event.charIds.find((charId) => charAwayNow(charId, date))
   if (gone) return { blocked: 'away', label: `${nameOf(gone)} away` }

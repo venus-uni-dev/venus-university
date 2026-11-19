@@ -49,7 +49,9 @@ import {
   spriteDraft,
   type PromptEdit
 } from '@shared/imagePrompt'
+import { poseKeysFor } from '@shared/assetRules'
 import { defaultTagsOf, type DefaultTags } from '@shared/defaultTags'
+import { genderOf, pronounsOf } from '@shared/gender'
 import {
   CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
   CUSTOM_OUTFIT_NAME_MAX,
@@ -62,13 +64,15 @@ import {
   outfitLabelOf
 } from '@shared/outfits'
 import { isStatKey, type StatKey } from '@shared/playerStats'
+import { attractionOf, isDefaultAttraction } from '@shared/relationship'
 import {
   afterOf,
   customCgSlotAt,
   customCgSlotNumber,
   customCgSlotOf,
   isCustomCgSlot,
-  STOCK_POSITIONS
+  STOCK_POSITIONS,
+  stockCgsFor
 } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
 import { withRegenTags, type PromptGroup } from '@shared/regenTags'
@@ -80,6 +84,7 @@ import { isCharacterTrait } from '@shared/traits'
 import type { CharacterTrait } from '@shared/traits'
 import { fullNameOf } from '@shared/types'
 import type {
+  Attraction,
   Character,
   CharacterBehavior,
   CustomCgSlot,
@@ -89,7 +94,7 @@ import type {
   RegenTarget,
   SetTarget
 } from '@shared/types'
-import { poseKeysOf, useAssetStore } from '../stores/assetStore'
+import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import {
   cgTargetFor,
@@ -101,6 +106,7 @@ import {
   liveExpressionTasks,
   liveTaskFor,
   profileUrl,
+  readyCustomCgs,
   roomUrl,
   seedPrefillFor,
   stagedOf,
@@ -114,10 +120,11 @@ import { renameMentions } from '../stores/renameMentions'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import {
-  APPEARANCE_COLOR_HINT,
-  BEHAVIOR_FIELDS,
-  CG_INSTRUCTIONS_HINT,
+  appearanceColorHint,
+  behaviorFields,
+  cgInstructionsHint,
   CG_NAME_HINT,
+  GENERATION_TYPE_LABELS,
   GIFT_CATEGORY_OPTIONS,
   listText,
   loraMissingCopy,
@@ -148,6 +155,7 @@ import {
 import { SetHeightModal } from './SetHeightModal'
 import { EraseArtifactsModal } from './EraseArtifactsModal'
 import { FingerFixModal } from './FingerFixModal'
+import { RepaintModal } from './RepaintModal'
 import { committedWeightText, useCharacterLora, weightTextAfterPick } from './useCharacterLora'
 import { TransparencyFixModal } from './TransparencyFixModal'
 import {
@@ -256,6 +264,8 @@ interface Form {
   datingPreference: string
   kinks: string
   isVirgin: boolean
+  /** Who she is attracted to, never nobody: the box left ticked alone cannot be cleared. */
+  attractedTo: Attraction
   /** Likes and dislikes are edited one per line, so they are text until Save. */
   likes: string
   dislikes: string
@@ -289,6 +299,7 @@ function formOf(character: Character): Form {
     datingPreference: character.datingPreference,
     kinks: character.kinks,
     isVirgin: character.isVirgin,
+    attractedTo: attractionOf(character),
     likes: listText(character.likes),
     dislikes: listText(character.dislikes),
     behavior: character.behavior,
@@ -343,7 +354,7 @@ export function EditCharacterModal({
   const [fixing, setFixing] = useState<{
     set: OutfitSet | null
     title: string
-    kind: 'fix' | 'hands' | 'erase'
+    kind: 'fix' | 'hands' | 'erase' | 'repaint'
   } | null>(null)
   const [framing, setFraming] = useState(false)
   // Whether the portrait is being pointed at, which is what raises the mark over it.
@@ -381,8 +392,17 @@ export function EditCharacterModal({
   const setBehaviorField = (key: keyof CharacterBehavior) => (value: string) =>
     setForm((prev) => ({ ...prev, behavior: { ...prev.behavior, [key]: value } }))
 
-  // What each prose field shows while it is empty, told about her by name.
-  const placeholders = sheetPlaceholders(form.firstName.trim() || 'She')
+  // Set when the character is made and never edited, so the record's own is the form's.
+  const gender = genderOf(character)
+  // Whether the stock eight CGs are hers: a male character has his own pairs alone.
+  const stockCgs = stockCgsFor(character)
+
+  // What each prose field shows while it is empty, told about the character by name.
+  const placeholders = sheetPlaceholders(
+    form.firstName.trim() || pronounsOf(character).They,
+    gender
+  )
+  const behaviors = behaviorFields(gender)
 
   // The voice the last preview played, seeded with the one she has: a release that left the
   // slider where it was — tabbing onto it, closing the modal off it — plays nothing.
@@ -393,9 +413,11 @@ export function EditCharacterModal({
     const pitch = clampVoicePitch(value)
     if (previewedVoice.current === pitch) return
     previewedVoice.current = pitch
-    // A muted NSFW slider skips the breath rather than leaving a silent gap before the blips.
-    const breath = volumesOf(useSettingsStore.getState().settings?.volumes).nsfw > 0
-    useAudioStore.getState().previewVoice(pitch, breath)
+    // A muted NSFW slider skips the breath rather than leaving a silent gap before the blips,
+    // and a male character, whose CGs play none, has no breath to preview.
+    const breath =
+      gender === 'female' && volumesOf(useSettingsStore.getState().settings?.volumes).nsfw > 0
+    useAudioStore.getState().previewVoice(pitch, gender, breath)
   }
 
   const poses = useAssetStore((s) => s.poses)
@@ -458,12 +480,14 @@ export function EditCharacterModal({
   const advancedShut = comfyMissing && !webBuild
   const keyNote = picturesReady ? null : customWriter ? 'Requires Image API key' : 'Requires API key'
 
-  // Her own pose first, if this install's manifest carries no skeleton for it — otherwise the
-  // select would show blank for a record saved somewhere that had one.
-  const poseKeys = poseKeysOf(poses)
+  // The poses of her gender, and her own first where it is not one of them — otherwise the
+  // select would show blank for a record saved somewhere that had it. Each reads without the
+  // male poses' `male_` prefix, the value keeping it.
+  const poseKeys = poseKeysFor(poses, gender)
+  const poseOption = (key: string) => ({ value: key, label: key.replace(/^male_/, '') })
   const poseOptions = [
-    ...(form.pose && !poseKeys.includes(form.pose) ? [{ value: form.pose, label: form.pose }] : []),
-    ...poseKeys.map((key) => ({ value: key, label: key }))
+    ...(form.pose && !poseKeys.includes(form.pose) ? [poseOption(form.pose)] : []),
+    ...poseKeys.map(poseOption)
   ]
 
   const defaultsPresent = doneCountOf(expressions, charId) === EMOTIONS.length
@@ -514,9 +538,9 @@ export function EditCharacterModal({
     return !neutral
   }
 
-  /* The hand repair is the transparency repair plus a render, so it owes the render's gate
-     as well as the repair's: the fix itself is a ComfyUI job. */
-  const fingersBlocked = (target: SetTarget, set: OutfitSet | null): boolean =>
+  /* The hand repair and Repaint are the transparency repair's gate plus a render, so they owe
+     the render's gate as well as the repair's: each is a ComfyUI job. */
+  const renderRepairBlocked = (target: SetTarget, set: OutfitSet | null): boolean =>
     comfyMissing || fixBlocked(target, set)
 
   // The portrait is a slice of the default neutral, so it is gated on the same things the
@@ -559,6 +583,16 @@ export function EditCharacterModal({
     if (next.negativeTags?.length === 0) delete next.negativeTags
     // Likewise absent and centre, so a voice nobody moved is left out too.
     if (next.voicePitch === 0) delete next.voicePitch
+    // Her sexuality as the record holds it where the form left it alone, and an absent field
+    // for the other gender alone, which is what one reads as.
+    const attraction = attractionOf(character)
+    if (
+      form.attractedTo.female !== attraction.female ||
+      form.attractedTo.male !== attraction.male
+    ) {
+      if (isDefaultAttraction(character, form.attractedTo)) delete next.attractedTo
+      else next.attractedTo = form.attractedTo
+    }
     // Her LoRA as the record holds it where the form left it alone, so a hand-written one never
     // reads as an edit; text that is not a weight keeps the one she has.
     const held = characterLoraOf(character)
@@ -751,7 +785,7 @@ export function EditCharacterModal({
     const poseTags = useAssetStore.getState().poses[current.pose]?.tags ?? []
     const tags = defaultTagsOf(useSettingsStore.getState().settings)
     const { draft, ...request } = build(current, poseTags, tags)
-    const kept = withRegenTags(draft, current.regenTags?.[request.target], tags)
+    const kept = withRegenTags(draft, current.regenTags?.[request.target], tags, genderOf(current))
     // A custom slot's Outfit group, and a custom CG pair's Position group for either of its
     // images, are her record, whatever the button last sent.
     const edit =
@@ -904,10 +938,13 @@ export function EditCharacterModal({
                 instructions: {
                   value: customOutfitInstructions(current.customCgs?.[slot]?.instructions),
                   maxLength: CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
-                  hint: () => CG_INSTRUCTIONS_HINT
+                  hint: () => cgInstructionsHint(genderOf(current))
                 },
+                // A male character's pair plays no breath, so its form asks for none.
                 sounds: {
-                  voice: customCgVoiceOf(current, slot),
+                  ...(genderOf(current) === 'female'
+                    ? { voice: customCgVoiceOf(current, slot) }
+                    : {}),
                   sfx: customCgSfxOf(current, slot)
                 },
                 paste: { label: 'Paste CG', group: 'position', from: pastedCg() },
@@ -1074,9 +1111,10 @@ export function EditCharacterModal({
             onFixTransparency: () => setFixing({ set, title, kind: 'fix' }),
             fixDisabled: fixBlocked(target, set),
             onFixFingers: () => setFixing({ set, title, kind: 'hands' }),
-            fingersDisabled: fingersBlocked(target, set),
-            fingersNote: comfyNote,
-            onEraseArtifacts: () => setFixing({ set, title, kind: 'erase' })
+            renderDisabled: renderRepairBlocked(target, set),
+            renderNote: comfyNote,
+            onEraseArtifacts: () => setFixing({ set, title, kind: 'erase' }),
+            onRepaint: () => setFixing({ set, title, kind: 'repaint' })
           }
 
     /* What only a player-authored wardrobe offers: the plus that writes an empty slot, and —
@@ -1211,19 +1249,33 @@ export function EditCharacterModal({
                 control={control('room', roomOnDisk, ROOM_VARIANTS.length)}
                 onShow={() => setRoomGallery(true)}
               />
-              <LandscapeTile
-                title="NSFW CG"
-                what="the CGs"
-                shownDone={shownDone('cgs', cgsOnDisk)}
-                total={STOCK_POSITIONS.length}
-                control={
-                  cgsWithheld ? undefined : control('cgs', cgsOnDisk, STOCK_POSITIONS.length)
-                }
-                onShow={() => setGallery(true)}
-                showLocked={noNsfwImages}
-                showLockedReason="Hidden by SFW setting"
-                hug
-              />
+              {/* A male character has no stock CGs, so his tile counts his whole pairs, offers
+                  no render of its own and opens his pairs straight away. */}
+              {stockCgs ? (
+                <LandscapeTile
+                  title="NSFW CG"
+                  what="the CGs"
+                  shownDone={shownDone('cgs', cgsOnDisk)}
+                  total={STOCK_POSITIONS.length}
+                  control={
+                    cgsWithheld ? undefined : control('cgs', cgsOnDisk, STOCK_POSITIONS.length)
+                  }
+                  onShow={() => setGallery(true)}
+                  showLocked={noNsfwImages}
+                  showLockedReason="Hidden by SFW setting"
+                  hug
+                />
+              ) : (
+                <LandscapeTile
+                  title="NSFW CG"
+                  what="the CGs"
+                  shownDone={readyCustomCgs(cgs).length}
+                  onShow={() => setCustomCgs(true)}
+                  showLocked={noNsfwImages}
+                  showLockedReason="Hidden by SFW setting"
+                  auto
+                />
+              )}
             </div>
           </div>
 
@@ -1503,13 +1555,36 @@ export function EditCharacterModal({
                     autoGrow
                   />
 
-                  {/* Whether she was a virgin before the reader; a save never writes this back. */}
-                  <CheckField
-                    id="edit-is-virgin"
-                    label="Virgin"
-                    checked={form.isVirgin}
-                    onChange={setField('isVirgin')}
-                  />
+                  <div className="vu-edit-attraction">
+                    {/* Whether she was a virgin before the reader; a save never writes it back. */}
+                    <CheckField
+                      id="edit-is-virgin"
+                      label="Virgin"
+                      checked={form.isVirgin}
+                      onChange={setField('isVirgin')}
+                    />
+                    {/* Never nobody: whichever box is ticked alone is held. */}
+                    <CheckField
+                      id="edit-attracted-male"
+                      label="Attracted to men"
+                      checked={form.attractedTo.male}
+                      disabled={form.attractedTo.male && !form.attractedTo.female}
+                      onChange={(male) => setField('attractedTo')({ ...form.attractedTo, male })}
+                    />
+                    <CheckField
+                      id="edit-attracted-female"
+                      label="Attracted to women"
+                      checked={form.attractedTo.female}
+                      disabled={form.attractedTo.female && !form.attractedTo.male}
+                      onChange={(female) =>
+                        setField('attractedTo')({ ...form.attractedTo, female })
+                      }
+                    />
+                    <p className="vu-field-hint">
+                      Changing who {pronounsOf(character).they}&apos;s attracted to won&apos;t
+                      affect playthroughs already in progress.
+                    </p>
+                  </div>
 
                   <TextField
                     id="edit-likes"
@@ -1532,7 +1607,7 @@ export function EditCharacterModal({
                     autoGrow
                   />
 
-                  {BEHAVIOR_FIELDS.map(({ key, label, around }) => (
+                  {behaviors.map(({ key, label, around }) => (
                     <TextField
                       key={key}
                       id={`edit-${key}`}
@@ -1615,6 +1690,12 @@ export function EditCharacterModal({
                     Generation settings <span className="vu-disc-note">(Advanced)</span>
                   </motion.summary>
                   <div className="vu-disc-body">
+                    {/* What she was generated as, chosen when she was made: read, never edited. */}
+                    <div className="vu-field">
+                      <span className="vu-field-label">Generation type</span>
+                      <p className="vu-view-prose">{GENERATION_TYPE_LABELS[gender]}</p>
+                    </div>
+
                     {!webBuild && (
                       <>
                         {/* The pose every render of her stands in, the description under it
@@ -1663,7 +1744,7 @@ export function EditCharacterModal({
                             key={key}
                             id={id}
                             label={label}
-                            hint={key === 'baseAppearance' ? APPEARANCE_COLOR_HINT : undefined}
+                            hint={key === 'baseAppearance' ? appearanceColorHint(gender) : undefined}
                             values={form[key]}
                             onChange={setField(key)}
                             placeholder="Enter or comma to add a tag"
@@ -1857,6 +1938,16 @@ export function EditCharacterModal({
         {fixing?.kind === 'erase' && (
           <EraseArtifactsModal
             key="erase-artifacts"
+            charId={charId}
+            set={fixing.set}
+            title={fixing.title}
+            theme={theme}
+            onClose={() => setFixing(null)}
+          />
+        )}
+        {fixing?.kind === 'repaint' && (
+          <RepaintModal
+            key="repaint"
             charId={charId}
             set={fixing.set}
             title={fixing.title}

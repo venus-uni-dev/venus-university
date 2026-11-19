@@ -1,5 +1,6 @@
 import { settleDating } from '@shared/dating'
 import type { EditMilestone, EditMilestones } from '@shared/milestoneEdit'
+import { withCouplesLeft } from '@shared/npcRelationships'
 import type { IntimateAct } from '@shared/types'
 import { useGameStore } from './gameStore'
 import { datingInputOf } from './sceneSanitizer'
@@ -34,6 +35,13 @@ export function saveMilestones(
   const dating = settleDating(datingInputOf(before, live.charInfo, live.date))
   live.applyDatingSettle(dating)
   useGameStore.getState().addBreakupsOwed(dating.breakups)
+  // Whoever a new lover was dating is left for him, as a scene leaves them.
+  if (dating.left) {
+    const { npcRelationships } = useGameStore.getState()
+    useGameStore
+      .getState()
+      .setNpcRelationships(withCouplesLeft(npcRelationships, dating.left, live.date))
+  }
 
   const acts: IntimateAct[] = []
   if (on('kissed')) acts.push({ kind: 'kiss', inPublic: false, charIds: [charId] })

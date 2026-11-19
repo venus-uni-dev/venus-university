@@ -30,6 +30,28 @@ export function friendCharIds(): string[] {
 }
 
 /**
+ * The `limit` friends he is closest to, in roster order: who the graduation picture draws when
+ * more friends than it holds are his. A tie keeps the earlier girl.
+ */
+export function closestFriendCharIds(limit: number): string[] {
+  const game = useGameStore.getState()
+  const friends = friendCharIds()
+  if (friends.length <= limit) return friends
+  const kept = new Set(
+    friends
+      .map((charId) => ({
+        charId,
+        affection: affectionFor(game.charInfo[charId], game.date, game.characters[charId])
+      }))
+      // The sort is stable, so a tie stays in roster order.
+      .sort((a, b) => b.affection - a.affection)
+      .slice(0, limit)
+      .map((entry) => entry.charId)
+  )
+  return friends.filter((charId) => kept.has(charId))
+}
+
+/**
  * The goodbyes the menu can still offer: {@link friendCharIds} minus the ones already said,
  * lowest affection first, so the one he is closest to is the last goodbye. A tie keeps roster
  * order.

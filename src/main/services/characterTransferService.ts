@@ -10,16 +10,21 @@ import {
   MANIFEST_NAME,
   MANIFEST_READ,
   MANIFEST_UNREADABLE,
+  memberName,
+  packMembers,
+  packRefusal,
   portableOf,
   readManifestRecord,
   stripWrapper,
-  type CharacterManifest
+  type CharacterManifest,
+  type RefusedMember
 } from '@shared/characterTransfer'
-import { appError, messageOf } from '@shared/errors'
+import { appError, messageOf, toAppError } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import type { ExportKind } from '@shared/sillyTavern'
-import type { Character } from '@shared/types'
+import type { Character, CharacterImport } from '@shared/types'
 import { randomId } from '@shared/uuid'
+import { PACK_ZIP_LIMITS } from '@shared/zipRules'
 import { getCharacterPath, getCharactersPath } from '../paths'
 import {
   checkExtractedContent,
@@ -27,6 +32,7 @@ import {
   createZip,
   discard,
   extractZip,
+  listZip,
   relPathsUnder,
   scratchDir,
   stripWrapperDir
@@ -114,10 +120,11 @@ async function adoptFolder(
   tempDir: string,
   character: Character,
   code: string,
-  verb: string
+  verb: string,
+  adoptedAt = Date.now()
 ): Promise<Character> {
   // The other write path stamps in `writeCharacter`.
-  const adopted = adoptStamp(character, Date.now())
+  const adopted = adoptStamp(character, adoptedAt)
   await writeAtomicJson(join(tempDir, CHARACTER_FILE_NAME), adopted, {
     code,
     message: `Could not write the ${verb} character.`
@@ -196,9 +203,12 @@ async function readManifest(dir: string): Promise<CharacterManifest> {
 
 /**
  * Adopts a character zip: validates it, gives her a fresh identity and moves the folder into
- * `/data/characters`.
+ * `/data/characters`, stamped `adoptedAt`.
  */
-export async function importCharacter(archivePath: string): Promise<Character> {
+export async function importCharacter(
+  archivePath: string,
+  adoptedAt = Date.now()
+): Promise<Character> {
   const tempDir = scratchDir('import')
 
   try {
@@ -231,9 +241,43 @@ export async function importCharacter(archivePath: string): Promise<Character> {
     // An older package's pictures arrive as PNG and are kept as WebP, before she is the player's.
     await convertFolderImages(tempDir)
 
-    return await adoptFolder(tempDir, character, 'IMPORT_FAILED', 'imported')
+    return await adoptFolder(tempDir, character, 'IMPORT_FAILED', 'imported', adoptedAt)
   } catch (err) {
     await discard(tempDir)
     throw err
+  }
+}
+
+/**
+ * Adopts whatever Import character ZIP was handed: one character zip, or a pack of them, every
+ * member that passes adopted in name order and the rest named in one error.
+ */
+export async function importArchive(archivePath: string): Promise<CharacterImport> {
+  const members = packMembers((await listZip(archivePath)).map((entry) => entry.path))
+  if (members === null) return { characters: [await importCharacter(archivePath)], refused: null }
+
+  const packDir = scratchDir('import-pack')
+  try {
+    await extractZip(archivePath, packDir, PACK_ZIP_LIMITS)
+
+    const characters: Character[] = []
+    const refused: RefusedMember[] = []
+    const start = Date.now()
+    for (const [i, member] of members.entries()) {
+      const memberPath = join(packDir, member)
+      try {
+        characters.push(await importCharacter(memberPath, start + i))
+      } catch (err) {
+        const error = toAppError(err, 'IMPORT_FAILED')
+        console.warn(`[transfer] refused ${memberName(member)}: ${error.code} ${error.message}`)
+        refused.push({ name: memberName(member), error })
+      }
+      // Done with either way, so the pack's scratch shrinks as it goes.
+      await rm(memberPath, { force: true }).catch(() => {})
+    }
+
+    return { characters, refused: packRefusal(members.length, refused) }
+  } finally {
+    await discard(packDir)
   }
 }

@@ -1,4 +1,4 @@
-import type { NpcFriendship } from '@shared/npcRelationships'
+import type { NpcCouple, NpcFriendship } from '@shared/npcRelationships'
 import {
   fullNameOf,
   type Character,
@@ -22,6 +22,13 @@ export interface FeedPostEntry {
 /** One "are now friends" row, with both girls it names. */
 export interface FeedFriendshipEntry {
   pair: NpcFriendship
+  one: Character
+  two: Character
+}
+
+/** One "are now dating" row, with both of them. */
+export interface FeedCoupleEntry {
+  couple: NpcCouple
   one: Character
   two: Character
 }
@@ -67,13 +74,38 @@ export function visibleFriendships(
   charInfo: Readonly<Record<string, CharInfo | undefined>>
 ): FeedFriendshipEntry[] {
   return npcFriendships.flatMap((pair) => {
-    const one = characters[pair.a]
-    const two = characters[pair.b]
-    if (!one || !two) return []
-    if (!charInfo[pair.a]?.nameKnown || !charInfo[pair.b]?.nameKnown) return []
-    if (!isFeedContact(charInfo[pair.a]) && !isFeedContact(charInfo[pair.b])) return []
-    return [{ pair, one, two }]
+    const both = nameablePair(pair, characters, charInfo)
+    return both ? [{ pair, ...both }] : []
   })
+}
+
+/** The couples the tab shows, under the same rule as the friendships. */
+export function visibleCouples(
+  npcCouples: readonly NpcCouple[],
+  characters: Readonly<Record<string, Character | undefined>>,
+  charInfo: Readonly<Record<string, CharInfo | undefined>>
+): FeedCoupleEntry[] {
+  return npcCouples.flatMap((couple) => {
+    const both = nameablePair(couple, characters, charInfo)
+    return both ? [{ couple, ...both }] : []
+  })
+}
+
+/**
+ * The two a row names, where the tab may show it: he can name both of them, and at least one is
+ * somebody whose feed he is reading. Null otherwise.
+ */
+function nameablePair(
+  pair: { a: string; b: string },
+  characters: Readonly<Record<string, Character | undefined>>,
+  charInfo: Readonly<Record<string, CharInfo | undefined>>
+): { one: Character; two: Character } | null {
+  const one = characters[pair.a]
+  const two = characters[pair.b]
+  if (!one || !two) return null
+  if (!charInfo[pair.a]?.nameKnown || !charInfo[pair.b]?.nameKnown) return null
+  if (!isFeedContact(charInfo[pair.a]) && !isFeedContact(charInfo[pair.b])) return null
+  return { one, two }
 }
 
 /** One girl the slot could run an "updated their location" row for, and what it would say. */
@@ -84,12 +116,13 @@ export interface FeedCheckIn {
 }
 
 /**
- * One dated thing on the Updates feed: a post, the day two of them became friends, where
- * somebody is right now, or the slot's own student.
+ * One dated thing on the Updates feed: a post, the day two of them became friends or got
+ * together, where somebody is right now, or the slot's own student.
  */
 export type FeedEntry =
   | ({ kind: 'post'; stranger: boolean; name: string; handle?: string } & FeedPostEntry)
   | ({ kind: 'friendship' } & FeedFriendshipEntry)
+  | ({ kind: 'couple' } & FeedCoupleEntry)
   | { kind: 'checkIn'; charId: string; name: string; label: string; date: number; time: TimeSlot }
   | {
       kind: 'random'
@@ -100,15 +133,16 @@ export type FeedEntry =
 export const FEED_PAGE = 30
 
 /**
- * The whole feed in draw order: contacts' posts and strangers who became friends, newest first,
- * woven with this slot's check-ins (capped at one more than the day has posts) and closed by the
- * day's random student. Pure over the slot, so the same slot always reads the same way.
+ * The whole feed in draw order: contacts' posts and strangers who became friends or got
+ * together, newest first, woven with this slot's check-ins (capped at one more than the day has
+ * posts) and closed by the day's random student. Pure over the slot, so the same slot always reads the same way.
  */
 export function updatesFeed(input: {
   chars: readonly string[]
   characters: Readonly<Record<string, Character | undefined>>
   charInfo: Readonly<Record<string, CharInfo | undefined>>
   npcFriendships: readonly NpcFriendship[]
+  npcCouples: readonly NpcCouple[]
   feedExtras: FeedExtras | null
   /** Everybody the slot owes a check-in, in roster order; the cap is applied here. */
   checkIns: readonly FeedCheckIn[]
@@ -154,6 +188,9 @@ export function updatesFeed(input: {
   for (const made of visibleFriendships(input.npcFriendships, characters, charInfo)) {
     entries.push({ kind: 'friendship', ...made })
   }
+  for (const together of visibleCouples(input.npcCouples, characters, charInfo)) {
+    entries.push({ kind: 'couple', ...together })
+  }
   entries.sort((a, b) => newestFirst(stampOf(a), stampOf(b)))
 
   // Every row this slot stamped, as one run in the sorted list. It is not the top of the list:
@@ -192,6 +229,7 @@ export function updatesFeed(input: {
 /** When an entry happened, whichever kind it is — what the one sort reads. */
 function stampOf(entry: FeedEntry): { date: number; time: TimeSlot } {
   if (entry.kind === 'friendship') return entry.pair
+  if (entry.kind === 'couple') return entry.couple
   return entry.kind === 'checkIn' ? entry : entry.post
 }
 

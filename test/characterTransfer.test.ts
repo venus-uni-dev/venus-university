@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { unzipSync } from 'fflate'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
 const { createCharacter, getCharacter, writeCharacter } = await import(
   '../src/main/services/characterService'
 )
-const { duplicateCharacter, exportCharacter, importCharacter } = await import(
+const { duplicateCharacter, exportCharacter, importArchive, importCharacter } = await import(
   '../src/main/services/characterTransferService'
 )
 const {
@@ -30,6 +30,7 @@ const {
   buildManifest,
   checkManifest,
   classifyImportEntry,
+  packMembers,
   portableOf,
   stripWrapper
 } = await import('../src/shared/characterTransfer')
@@ -66,7 +67,7 @@ const WEBP_BYTES = Uint8Array.from([
 /** A character on disk with sprites, a CG and a staging tree to leave behind, under `extension`. */
 async function seedCharacter(extension = '.png'): Promise<Character> {
   const bytes = extension === '.png' ? PNG_BYTES : WEBP_BYTES
-  const character = await createCharacter('Mina', 'Aoki')
+  const character = await createCharacter('Mina', 'Aoki', 'female')
   const charId = character.charId
 
   await mkdir(getCharacterExpressionsPath(charId), { recursive: true })
@@ -181,7 +182,7 @@ describe('exportCharacter', () => {
 
   it('replaces an export written over, rather than merging into it', async () => {
     const first = await seedCharacter()
-    const second = await createCharacter('Rei', 'Sato')
+    const second = await createCharacter('Rei', 'Sato', 'female')
     await writeCharacter({ ...second, pose: 'standing' })
     const archive = archivePath()
 
@@ -408,6 +409,77 @@ describe('importCharacter', () => {
   })
 })
 
+describe('importArchive', () => {
+  /** Two exports, written in the opposite order to their names, for a pack to carry. */
+  async function twoExports(): Promise<string[]> {
+    const yui = await writeCharacter({ ...(await seedCharacter()), firstName: 'Yui' })
+    await exportCharacter(yui.charId, archivePath('Yui_Aoki.zip'))
+    await writeCharacter({ ...yui, firstName: 'Mina' })
+    await exportCharacter(yui.charId, archivePath('Mina_Aoki.zip'))
+    return [archivePath('Yui_Aoki.zip'), archivePath('Mina_Aoki.zip')]
+  }
+
+  it('adopts every character a pack carries in name order, at its root or under one folder', async () => {
+    const exports = await twoExports()
+
+    for (const folder of ['', 'My pack']) {
+      const pack = await zipOf(`pack-${folder === '' ? 'root' : 'wrapped'}`, async (dir) => {
+        await mkdir(join(dir, folder), { recursive: true })
+        for (const file of exports) await copyFile(file, join(dir, folder, basename(file)))
+      })
+      const before = await charFolders()
+
+      const { characters, refused } = await importArchive(pack)
+
+      expect(refused).toBeNull()
+      expect(characters.map((her) => her.firstName)).toEqual(['Mina', 'Yui'])
+      // Stamped in that order too, so a reload sorts them as they arrived.
+      expect(characters[0].updatedAt!).toBeLessThan(characters[1].updatedAt!)
+      for (const her of characters) {
+        expect(before).not.toContain(her.charId)
+        expect((await getCharacter(her.charId)).personality).toBe('Quietly stubborn.')
+      }
+      expect(await charFolders()).toHaveLength(before.length + 2)
+      expect(await transferScratch()).toEqual([])
+    }
+  })
+
+  it('adopts the members that pass and names the one it refused', async () => {
+    const [good] = await twoExports()
+    const stray = await zipOf('Stray', async (dir) => {
+      await writeFile(join(dir, 'character.json'), JSON.stringify(portableCharacter()))
+      await writeFile(join(dir, MANIFEST_NAME), JSON.stringify(manifest()))
+      await writeFile(join(dir, 'evil.txt'), 'nothing of ours')
+    })
+    const pack = await zipOf('pack', async (dir) => {
+      await copyFile(good, join(dir, 'Yui_Aoki.zip'))
+      await copyFile(stray, join(dir, 'Stray.zip'))
+    })
+    const before = await charFolders()
+
+    const { characters, refused } = await importArchive(pack)
+
+    expect(characters.map((her) => her.firstName)).toEqual(['Yui'])
+    expect(refused?.code).toBe('IMPORT_PACK_PARTIAL')
+    expect(refused?.message).toBe('1 of the 2 characters in that pack could not be imported.')
+    expect(refused?.detail).toMatch(/^Stray\.zip: .*\[IMPORT_BAD_CONTENT\]/)
+    expect(await charFolders()).toHaveLength(before.length + 1)
+    expect(await transferScratch()).toEqual([])
+  })
+
+  it('reads a zip that is not a pack as the one character it is', async () => {
+    const character = await seedCharacter()
+    const archive = archivePath()
+    await exportCharacter(character.charId, archive)
+
+    const { characters, refused } = await importArchive(archive)
+
+    expect(refused).toBeNull()
+    expect(characters).toHaveLength(1)
+    expect(characters[0].charId).not.toBe(character.charId)
+  })
+})
+
 describe('duplicateCharacter', () => {
   it('copies her under a new identity, images and all', async () => {
     const original = await seedCharacter()
@@ -516,6 +588,20 @@ describe('the package rules', () => {
     ]
 
     expect(stripWrapper(entries)).toBe('Mina_Aoki')
+  })
+
+  it('knows a pack by its holding nothing but zips, at its root or under one folder', () => {
+    expect(packMembers(['Yui.zip', 'mina.zip', '.DS_Store'])).toEqual(['mina.zip', 'Yui.zip'])
+    // 7-Zip lists a Windows path with backslashes, and the paths come back as listed.
+    expect(packMembers(['Pack', 'Pack\\b.ZIP', 'Pack\\a.zip', '__MACOSX/._a.zip'])).toEqual([
+      'Pack\\a.zip',
+      'Pack\\b.ZIP'
+    ])
+    // A character's own zip, a zip beside her files, a zip a folder down and an empty archive.
+    expect(packMembers(['character.json', 'manifest.json', 'cg/sex.png'])).toBeNull()
+    expect(packMembers(['a.zip', 'character.json'])).toBeNull()
+    expect(packMembers(['Pack/girls/a.zip', 'Pack/b.zip'])).toBeNull()
+    expect(packMembers([])).toBeNull()
   })
 
   it('sorts an entry into what it is allowed to be', () => {

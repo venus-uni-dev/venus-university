@@ -1,5 +1,6 @@
+import { PRONOUNS } from '@shared/gender'
 import { isPositive } from '@shared/relationship'
-import type { CharInfo, Season, TimeSlot } from '@shared/types'
+import type { CharInfo, Gender, Season, TimeSlot } from '@shared/types'
 import { HOMECOMING_DATE } from './occasions'
 
 /** Which graduate comes back to campus for the fall's Homecoming, and what is said about it. */
@@ -37,6 +38,7 @@ export function pickHomecomingVisitor(
   return ranked[0]?.charId ?? null
 }
 
-/** What a graduate's entry says in place of her being out of town while she is back for the day. */
-export const HOMECOMING_VISIT_SENTENCE =
-  'She is back in town to visit campus for Homecoming and leaves again tomorrow morning.'
+/** What a graduate's entry says in place of being out of town while back for the day. */
+export function homecomingVisitSentence(g: Gender): string {
+  return `${PRONOUNS[g].They} is back in town to visit campus for Homecoming and leaves again tomorrow morning.`
+}

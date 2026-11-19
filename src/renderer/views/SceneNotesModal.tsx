@@ -114,7 +114,7 @@ export function SceneNotesModal({
             id="scene-notes-discard"
             theme={theme}
             title="Discard changes?"
-            message="Her notes have not been saved."
+            message="Your notes have not been saved."
             confirmText="Discard changes"
             cancelText="Keep editing"
             // Taken down before the panel goes, so the two do not leave as one exiting child

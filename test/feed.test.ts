@@ -251,6 +251,7 @@ describe('updatesFeed', () => {
         s: charInfo({ nameKnown: true, feed: [post({ id: 's1', date: TODAY, time: NOW })] })
       },
       npcFriendships: [{ a: 'a', b: 'b', date: TODAY, time: NOW }],
+      npcCouples: [],
       feedExtras: {
         date: TODAY,
         time: NOW,
@@ -290,6 +291,7 @@ describe('updatesFeed', () => {
     const entries = feed({
       charInfo: { a: reader([post({ id: 'a0', date: 2, time: 0 })]), b: reader([]) },
       npcFriendships: [],
+      npcCouples: [],
       feedExtras: null,
       checkIns: candidates.slice(0, 3)
     })

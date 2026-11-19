@@ -3,12 +3,15 @@ import { create } from 'zustand'
 import {
   APPLICATION_SCREENS,
   CALL_SCREEN,
+  callOfPart,
   callsOfScreen,
   emptyCatalog,
   entriesOf,
   isSkipped,
   maskedOf,
   NEW_GAME_CALLS,
+  ROSTER_MAX,
+  ROSTER_MIN,
   screenIndex,
   screenPassed,
   withoutRandomPicks,
@@ -21,6 +24,7 @@ import {
   type StartResult
 } from '@shared/application'
 import { toAppError } from '@shared/errors'
+import { readerPronounsOf } from '@shared/gender'
 import {
   MAX_FILE_OCCASIONS,
   OCCASION_FIRST_DAY,
@@ -62,7 +66,7 @@ import {
   composeApplication,
   majorsOf,
   needOf,
-  type CallRequest,
+  type CallPart,
   type RequestWorld
 } from './applicationCompose'
 import { finalizedOf } from './applicationFinalize'
@@ -79,20 +83,23 @@ import { useUiStore } from './uiStore'
 
 /**
  * The application being filled in — a New Game in progress — and the calls that generate what
- * it leaves blank. Each call goes out once the screen whose Next sends it has been passed, and
- * only while something is left to generate; its reply is banked on the application under a hash
- * of its request, and a call whose banked or in-flight request still answers it is not sent
- * again. A failure past the silent retries is held for the wait to report. From its first change
+ * it leaves blank. Each call goes out in parts, every part that can be built at once, once the
+ * screen whose Next sends it has been passed and only while something is left to generate; each
+ * part's reply is banked on the application under a hash of its request, and a part whose banked
+ * or in-flight request still answers it is not sent again. A failure past the silent retries is
+ * held for the wait to report, the call's other parts going on without it. From its first change
  * or Next the application is written as it changes, one write at a time: a first semester's into
  * a playthrough folder its first write makes, a later one's beside its playthrough's record.
  */
 
-/** Where one call stands, as the wait reads it. */
-export type CallState =
-  | { status: 'idle' }
-  | { status: 'pending' }
-  | { status: 'failed'; error: AppError }
-  | { status: 'banked' }
+/**
+ * Where one call stands, as the wait reads it: how many of its parts are out, and the first
+ * failure among them held for Retry.
+ */
+export interface CallState {
+  out: number
+  failed: AppError | null
+}
 
 interface ApplicationState {
   application: ApplicationDraft | null
@@ -103,7 +110,9 @@ interface ApplicationState {
 
 /** Every call idle. */
 function idleCalls(): Record<NewGameCall, CallState> {
-  return { occasions: { status: 'idle' }, profiles: { status: 'idle' }, secrets: { status: 'idle' }, classes: { status: 'idle' } }
+  return Object.fromEntries(
+    NEW_GAME_CALLS.map((call) => [call, { out: 0, failed: null }])
+  ) as Record<NewGameCall, CallState>
 }
 
 export const useApplicationStore = create<ApplicationState>(() => ({
@@ -126,8 +135,9 @@ export const CALL_LABELS: Record<NewGameCall, string> = {
   classes: 'the class catalog'
 }
 
-/** One send out, until it lands, fails for good or is superseded. */
+/** One part's send out, until it lands, fails for good or is superseded. */
 interface Send {
+  call: NewGameCall
   key: string
   /** Its own cancellation group, so a late cancel never reaches a newer send. */
   group: string
@@ -135,8 +145,11 @@ interface Send {
   wake?: () => void
 }
 
-/** The sends out now, by call. */
-const flying: Partial<Record<NewGameCall, Send>> = {}
+/** The sends out now, by part id. */
+const flying = new Map<string, Send>()
+
+/** The parts whose last send failed past its retries, by part id, against the request it sent. */
+const failures = new Map<string, { key: string; error: AppError }>()
 
 /** How many groups have been minted, for the next one's name. */
 let groups = 0
@@ -237,6 +250,11 @@ export function keepApplication(): Promise<string | null> {
   return keeping ? folderOf(keeping) : Promise.resolve(null)
 }
 
+/** The application in hand's folder where it already has one, writing nothing to find it. */
+export function keptFolder(): string | null {
+  return keeping?.folder ?? null
+}
+
 /** Whether the application in hand is being kept on disk, so leaving it loses nothing. */
 export function applicationKept(): boolean {
   return keeping?.kept ?? false
@@ -252,12 +270,18 @@ export function applicationWritesPending(): boolean {
   return writesOut > 0
 }
 
-/** Each call's channel. */
+/** Each call's channel; the secrets call sends nothing of its own, riding the profile call's parts. */
 const SENDERS: Record<NewGameCall, (request: StructuredRequest, group: string) => Promise<Result<unknown>>> = {
   occasions: (request, group) => window.api.llm.generateOccasions(request, group),
   profiles: (request, group) => window.api.llm.generateProfiles(request, group),
-  secrets: (request, group) => window.api.llm.generateSecrets(request, group),
+  secrets: (request, group) => window.api.llm.generateProfiles(request, group),
   classes: (request, group) => window.api.llm.generateClasses(request, group)
+}
+
+/** Stops every part out, and forgets every failure. */
+function cancelAll(): void {
+  for (const id of [...flying.keys()]) cancelSend(id)
+  failures.clear()
 }
 
 /** The application's roster, each girl as the character store holds her now. */
@@ -286,9 +310,20 @@ export function tokensNow(): number {
   return tokenBase + useGameStore.getState().tallies.tokensGenerated
 }
 
-/** Sets one call's state. */
-function setCall(call: NewGameCall, state: CallState): void {
-  useApplicationStore.setState((s) => ({ calls: { ...s.calls, [call]: state } }))
+/** Reads one call's state off its parts out and failed. */
+function refreshCall(call: NewGameCall): void {
+  let out = 0
+  for (const send of flying.values()) if (send.call === call) out += 1
+  let failed: AppError | null = null
+  for (const [id, failure] of failures) {
+    if (callOfPart(id) === call) {
+      failed = failure.error
+      break
+    }
+  }
+  const now = useApplicationStore.getState().calls[call]
+  if (now.out === out && now.failed === failed) return
+  useApplicationStore.setState((s) => ({ calls: { ...s.calls, [call]: { out, failed } } }))
 }
 
 /** Changes the application held, where one is, and writes it; a change that changes nothing writes nothing. */
@@ -301,59 +336,72 @@ export function updateApplication(change: (draft: ApplicationDraft) => Applicati
   if (keeping) void queueWrite(keeping, after)
 }
 
-/** Takes one call's banked reply off the application. */
-function dropBank(call: NewGameCall): void {
+/** Takes off the application every banked reply of `call` that `keep` does not keep. */
+function dropBanks(call: NewGameCall, keep: (id: string, banked: BankedReply) => boolean = () => false): void {
   updateApplication((draft) => {
-    if (!draft.replies[call]) return draft
-    const { [call]: _dropped, ...replies } = draft.replies
+    const dropped = Object.entries(draft.replies).filter(
+      ([id, banked]) => callOfPart(id) === call && !keep(id, banked)
+    )
+    if (dropped.length === 0) return draft
+    const replies = { ...draft.replies }
+    for (const [id] of dropped) delete replies[id]
     return { ...draft, replies }
   })
 }
 
-/** Stops one call's send, whose reply is then dropped if it still lands. */
-function cancelSend(call: NewGameCall): void {
-  const send = flying[call]
+/** Stops one part's send, whose reply is then dropped if it still lands. */
+function cancelSend(id: string): void {
+  const send = flying.get(id)
   if (!send) return
-  delete flying[call]
+  flying.delete(id)
   send.wake?.()
   void window.api.jobs.cancelGroup(send.group)
 }
 
-/** Sends one call until it lands, fails past its retries, or is superseded or left. */
-async function send(call: NewGameCall, need: CallRequest): Promise<void> {
-  const mine: Send = { key: need.key, group: `newGame:${call}:${++groups}` }
-  flying[call] = mine
-  setCall(call, { status: 'pending' })
-  const current = (): boolean => flying[call] === mine
+/** Stops every send of `call`, and forgets its failures. */
+function dropCall(call: NewGameCall): void {
+  for (const [id, send] of [...flying]) if (send.call === call) cancelSend(id)
+  for (const id of [...failures.keys()]) if (callOfPart(id) === call) failures.delete(id)
+  dropBanks(call)
+  refreshCall(call)
+}
+
+/** Sends one part until it lands, fails past its retries, or is superseded or left. */
+async function send(call: NewGameCall, part: CallPart): Promise<void> {
+  const mine: Send = { call, key: part.key, group: `newGame:${part.id}:${++groups}` }
+  flying.set(part.id, mine)
+  failures.delete(part.id)
+  refreshCall(call)
+  const current = (): boolean => flying.get(part.id) === mine
 
   let spent = 0
   for (;;) {
-    let result = await SENDERS[call](need.request, mine.group)
+    let result = await SENDERS[call](part.request, mine.group)
     if (!current()) return
     if (result.ok) {
       try {
-        need.check(result.data)
+        part.check(result.data)
       } catch (err) {
         result = { ok: false, error: toAppError(err) }
       }
     }
 
     if (result.ok) {
-      const banked: BankedReply = { key: need.key, reply: result.data }
-      delete flying[call]
+      const banked: BankedReply = { key: part.key, reply: result.data }
+      flying.delete(part.id)
       updateApplication((draft) => ({
         ...draft,
-        replies: { ...draft.replies, [call]: banked },
+        replies: { ...draft.replies, [part.id]: banked },
         tokensGenerated: tokensNow()
       }))
-      // The class call waits on the majors this reply decides; a call that failed waits for Retry.
-      if (call === 'profiles') sendCalls(['classes'])
-      setCall(call, { status: 'banked' })
+      refreshCall(call)
+      // The students' parts and the catalog's wait on the majors; a part that failed waits for Retry.
+      if (call === 'profiles') sendCalls(['profiles', 'classes'], { retry: false })
       return
     }
 
-    console.warn(`[newGame] ${call} failed:`, result.error)
-    const retried = await retrySilently(`newGame:${call}`, result.error, spent, {
+    console.warn(`[newGame] ${part.id} failed:`, result.error)
+    const retried = await retrySilently(`newGame:${part.id}`, result.error, spent, {
       onSleep: (cancel) => {
         mine.wake = cancel
       }
@@ -361,18 +409,14 @@ async function send(call: NewGameCall, need: CallRequest): Promise<void> {
     mine.wake = undefined
     if (!current()) return
     if (!retried) {
-      delete flying[call]
+      flying.delete(part.id)
+      failures.set(part.id, { key: part.key, error: result.error })
       updateApplication((draft) => ({ ...draft, tokensGenerated: tokensNow() }))
-      setCall(call, { status: 'failed', error: result.error })
+      refreshCall(call)
       return
     }
     spent += 1
   }
-}
-
-/** Whether a send out answers a call's need as a banked reply would. */
-function sendAnswers(send: Send | undefined, need: CallRequest): boolean {
-  return send !== undefined && send.key === need.key
 }
 
 /** The grab bags' draw, as the skip pools are dealt. */
@@ -390,14 +434,20 @@ function dealMissingMajors(): void {
 }
 
 /**
- * Sends every call the passed screens are owed: one skipped, with nothing to generate, or
- * waiting on a major, goes out not at all, and one whose banked or in-flight request still
- * answers it is left be; any other has its old send cancelled and its old reply dropped, and
- * goes out afresh. A skipped profile call's missing majors are picked first, since the catalog is
- * built around them. Called by every Next and Skip, by a resume and by Retry over every call, and
- * by a profile reply landing over the class call alone. Nothing goes once the semester is composed.
+ * Sends every part the passed screens' calls are owed: a call skipped or with nothing to generate
+ * sends none, and a part waiting on a major is not built yet. Whatever of a call is no longer owed
+ * as it stands — a reply banked or a send out for a request that changed, or a reply banked before
+ * calls went in parts — is dropped; a part whose banked or in-flight request still answers it is
+ * left be, and so, without `retry`, is one whose last send of the same request failed. A skipped
+ * profile call's missing majors are picked first, since the catalog is built around them. Called
+ * by every Next and Skip, by a resume and by Retry over every call, by a Back without `retry`,
+ * and by a profile part landing over the profiles and the catalog without it. Nothing goes once
+ * the semester is composed.
  */
-export function sendCalls(calls: readonly NewGameCall[] = NEW_GAME_CALLS): void {
+export function sendCalls(
+  calls: readonly NewGameCall[] = NEW_GAME_CALLS,
+  { retry = true }: { retry?: boolean } = {}
+): void {
   if (useApplicationStore.getState().application?.composed) return
   dealMissingMajors()
   for (const call of calls) {
@@ -405,15 +455,23 @@ export function sendCalls(calls: readonly NewGameCall[] = NEW_GAME_CALLS): void 
     if (!draft) return
     if (!screenPassed(draft.screen, CALL_SCREEN[call])) continue
     const need = needOf(call, draft, rosterOf(draft), requestWorld())
-    if (need === 'none' || need === 'waiting') continue
-    if (sendAnswers(flying[call], need)) continue
-    if (bankAnswers(draft.replies[call], need)) {
-      setCall(call, { status: 'banked' })
-      continue
+    const owed = new Map((need === 'none' ? [] : need.parts).map((part) => [part.id, part]))
+    const answers = (id: string, key: string): boolean => owed.get(id)?.key === key
+
+    dropBanks(call, (id, banked) => answers(id, banked.key))
+    for (const [id, out] of [...flying]) if (out.call === call && !answers(id, out.key)) cancelSend(id)
+    for (const [id, failure] of [...failures]) {
+      if (callOfPart(id) === call && !answers(id, failure.key)) failures.delete(id)
     }
-    cancelSend(call)
-    dropBank(call)
-    void send(call, need)
+
+    const banked = useApplicationStore.getState().application?.replies ?? {}
+    for (const part of owed.values()) {
+      if (flying.get(part.id)?.key === part.key) continue
+      if (bankAnswers(banked, part)) continue
+      if (!retry && failures.get(part.id)?.key === part.key) continue
+      void send(call, part)
+    }
+    refreshCall(call)
   }
 }
 
@@ -422,25 +480,25 @@ function callsFrom(screen: ApplicationScreen): NewGameCall[] {
   return NEW_GAME_CALLS.filter((call) => screenIndex(CALL_SCREEN[call]) >= screenIndex(screen))
 }
 
-/** Whether a Back onto `screen` would throw away a call out or a reply banked. */
+/** Whether a Back onto `screen` would throw away a part out or a reply banked. */
 function callsHeldFrom(screen: ApplicationScreen): boolean {
-  const draft = useApplicationStore.getState().application
-  return callsFrom(screen).some((call) => flying[call] !== undefined || draft?.replies[call] !== undefined)
+  const calls = new Set<string>(callsFrom(screen))
+  const replies = useApplicationStore.getState().application?.replies ?? {}
+  return (
+    [...flying.values()].some((send) => calls.has(send.call)) ||
+    Object.keys(replies).some((id) => calls.has(callOfPart(id)))
+  )
 }
 
 /**
- * A Back onto `screen`: every call sent at its Next or a later one's is cancelled and its reply
- * dropped, since what it was built from can change from there, and the majors a skipped profile
- * call picked go with the profiles. Answers whether any call went.
+ * A Back onto `screen`: every part of every call sent at its Next or a later one's is cancelled
+ * and its reply dropped, since what it was built from can change from there, and the majors a
+ * skipped profile call picked go with the profiles. Answers whether any call went.
  */
 export function discardCallsFrom(screen: ApplicationScreen): boolean {
   const held = callsHeldFrom(screen)
   const calls = callsFrom(screen)
-  for (const call of calls) {
-    cancelSend(call)
-    dropBank(call)
-    setCall(call, { status: 'idle' })
-  }
+  for (const call of calls) dropCall(call)
   if (calls.includes('profiles')) {
     updateApplication((draft) => {
       if (draft.dealtMajors === undefined) return draft
@@ -502,6 +560,9 @@ export function backScreen(): void {
   })
   const now = useApplicationStore.getState().application
   entered = now ? entriesOf(now) : null
+  // A reply banked before calls went in parts answers nothing now: whatever the screens left are
+  // owed goes, a failure held for its Retry.
+  sendCalls(NEW_GAME_CALLS, { retry: false })
 }
 
 /**
@@ -516,13 +577,7 @@ export function passScreen(skip = false, randomPicks: readonly string[] = []): v
   const next = APPLICATION_SCREENS[screenIndex(draft.screen) + 1]
   if (!next) return
   const calls = callsOfScreen(draft.screen)
-  if (skip) {
-    for (const call of calls) {
-      cancelSend(call)
-      dropBank(call)
-      setCall(call, { status: 'idle' })
-    }
-  }
+  if (skip) for (const call of calls) dropCall(call)
   updateApplication(({ skipped: marked, ...rest }) => {
     const marks = new Set(marked ?? [])
     for (const call of calls) {
@@ -851,10 +906,8 @@ export function openApplication(
   else lorebook.beginNewGame(k.home)
   tokenBase = draft.tokensGenerated ?? 0
   useGameStore.setState({ tallies: emptyTallies() })
-  const calls = idleCalls()
-  for (const call of NEW_GAME_CALLS) if (draft.replies[call]) calls[call] = { status: 'banked' }
   entered = entriesOf(draft)
-  useApplicationStore.setState({ application: draft, calls, resuming: false })
+  useApplicationStore.setState({ application: draft, calls: idleCalls(), resuming: false })
   return book
 }
 
@@ -939,9 +992,10 @@ function reopens(
 /**
  * The ending's Continue onto the next semester's New Game: reopens the application saved for
  * that semester where one is still unsettled and its roster resolves, else opens a fresh one on
- * the Setting screen — the continuing girls on its roster, the reader as the ending left him —
- * not written until its first change or Next, when it replaces whatever was saved. A lorebook
- * that cannot be read answers `'refused'`; `'left'` is a Continue superseded or left meanwhile.
+ * the Setting screen — the continuing girls on a roster the size of the last one, the reader as
+ * the ending left him — not written until its first change or Next, when it replaces whatever
+ * was saved. A lorebook that cannot be read answers `'refused'`; `'left'` is a Continue
+ * superseded or left meanwhile.
  */
 export async function beginNextApplication(
   next: Continuation
@@ -965,11 +1019,17 @@ export async function beginNextApplication(
   const season = seasonOf(handoff.index)
   // The fixed occasions open as the line's last semester of this season left them.
   const fixedEdits = keptFixedEdits(season, carriedFixedEdits(record, next.from, season))
+  // The roster opens at the size the last semester's held.
+  const size = Math.min(
+    ROSTER_MAX,
+    Math.max(ROSTER_MIN, handoff.continuing.length + handoff.graduated.length)
+  )
   const opened = openApplication(
     {
       screen: 'setting',
       season,
       chars: handoff.continuing.filter((charId) => characters[charId] !== undefined),
+      size,
       plan: planOf(season, fixedEdits),
       occasions: {},
       ...(Object.keys(fixedEdits).length > 0 ? { fixedEdits } : {}),
@@ -981,6 +1041,7 @@ export async function beginNextApplication(
       reader: {
         firstName: record.playerFirstName,
         lastName: record.playerLastName,
+        pronouns: readerPronounsOf(record),
         stats: handoff.carry.stats,
         ...(handoff.carry.bio ? { bio: handoff.carry.bio } : {})
       }
@@ -1015,7 +1076,7 @@ export function leaveApplication(): void {
   continuing = null
   keeping = null
   entered = null
-  for (const call of NEW_GAME_CALLS) cancelSend(call)
+  cancelAll()
   useApplicationStore.setState({ application: null, calls: idleCalls(), resuming: false })
 }
 
@@ -1052,7 +1113,7 @@ export function adoptFolder(playthroughId: string): void {
  */
 export async function closeApplication(): Promise<void> {
   const k = keeping
-  for (const call of NEW_GAME_CALLS) cancelSend(call)
+  cancelAll()
   const draft = useApplicationStore.getState().application
   if (k?.kept && draft) {
     const tokens = tokensNow()
@@ -1071,7 +1132,7 @@ export async function closeApplication(): Promise<void> {
 function verdictOf(): StartOutcome | null {
   const { application: draft, calls } = useApplicationStore.getState()
   if (!draft) return { status: 'cancelled' }
-  if (NEW_GAME_CALLS.some((call) => flying[call])) return null
+  if (flying.size > 0) return null
 
   const roster = rosterOf(draft)
   const world = requestWorld()
@@ -1081,14 +1142,15 @@ function verdictOf(): StartOutcome | null {
     const need = needOf(call, draft, roster, world)
     if (need === 'none') continue
     // A skipped catalog waits on majors: ones a skipped profile call is about to pick, or the
-    // profile reply, which the verdict names on its own.
-    if (need === 'waiting' && isSkipped(draft, call)) {
+    // profile call's, which the verdict names on its own.
+    if (need.waiting && isSkipped(draft, call)) {
       if (isSkipped(draft, 'profiles')) return null
       continue
     }
-    if (need !== 'waiting' && bankAnswers(draft.replies[call], need)) continue
-    // A call owed a send nobody has made yet is about to go out; a failed one is held.
-    if (need !== 'waiting' && calls[call].status !== 'failed') return null
+    const unbanked = need.parts.filter((part) => !bankAnswers(draft.replies, part))
+    if (!need.waiting && unbanked.length === 0) continue
+    // A part owed a send nobody has made yet is about to go out; a failed one is held.
+    if (unbanked.some((part) => failures.get(part.id)?.key !== part.key)) return null
     missing.push(call)
   }
 
@@ -1101,8 +1163,8 @@ function verdictOf(): StartOutcome | null {
     }
   }
   const failed = missing.flatMap((call) => {
-    const state = calls[call]
-    return state.status === 'failed' ? [state.error] : []
+    const error = calls[call].failed
+    return error ? [error] : []
   })
   return {
     status: 'failed',
@@ -1131,13 +1193,11 @@ export function settledOutcome(): Promise<StartOutcome> {
   })
 }
 
-/** What the wait's caption says: the earliest call still out, or null with none out. */
+/** What the wait's caption says: the earliest call with a part still out, or null with none out. */
 export function captionOf(state: Pick<ApplicationState, 'calls'>): string | null {
-  if (state.calls.occasions.status === 'pending') return 'Generating occasions'
-  if (state.calls.profiles.status === 'pending' || state.calls.secrets.status === 'pending') {
-    return 'Generating profiles'
-  }
-  if (state.calls.classes.status === 'pending') return 'Generating class schedule'
+  if (state.calls.occasions.out > 0) return 'Generating occasions'
+  if (state.calls.profiles.out > 0 || state.calls.secrets.out > 0) return 'Generating profiles'
+  if (state.calls.classes.out > 0) return 'Generating class schedule'
   return null
 }
 

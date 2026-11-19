@@ -13,7 +13,7 @@ import {
 } from './odds'
 import type { Disposition } from './relationship'
 import { receivedGiftPool } from './shop'
-import type { SceneEvent, SceneEventsFired, TimeSlot } from './types'
+import type { Gender, SceneEvent, SceneEventsFired, TimeSlot } from './types'
 
 /** Every scene event, grouped by the scene it fits; appended, never reordered. */
 export const SCENE_EVENT_IDS = [
@@ -258,11 +258,16 @@ export function withFiredEvent(
   return { ...fired, [id]: date }
 }
 
-/** What the present's roll weighs: what she invited him to and how close the two are. */
+/**
+ * What the present's roll weighs: what she invited him to and how close the two are. Being his
+ * lover and the reader's gender (off the reader's pronouns, null for they/them) also pick what she
+ * may bring.
+ */
 export interface ReceivedGiftInput {
   invite: 'herRoom' | 'hisRoom'
   disposition: Disposition
   lover: boolean
+  reader: Gender | null
 }
 
 /** Her odds of bringing him a present: the invitation's own, times what closeness adds. */
@@ -283,7 +288,7 @@ export function rollReceivedGift(
   rand: () => number = Math.random
 ): string | null {
   if (rand() >= receivedGiftChance(input)) return null
-  const pool = receivedGiftPool(input.disposition)
+  const pool = receivedGiftPool(input.disposition, input.reader, input.lover)
   if (pool.length === 0) return null
   return pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))].id
 }

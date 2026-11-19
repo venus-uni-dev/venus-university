@@ -350,19 +350,27 @@ export function raiseTo(
   return THINKING_LEVELS.slice(floorIndex).find((candidate) => accepted.includes(candidate)) ?? level
 }
 
+/** The next of `accepted` above `level`, or `level` itself where none is. */
+export function stepUp(level: ThinkingLevel, accepted: readonly ThinkingLevel[]): ThinkingLevel {
+  const above = THINKING_LEVELS.slice(THINKING_LEVELS.indexOf(level) + 1)
+  return above.find((candidate) => accepted.includes(candidate)) ?? level
+}
+
 /**
  * The level a call names. Gemini reads its own setting, a custom endpoint the reasoning effort
  * beside it — an absent one reading as minimal — and either is resolved against the model that
- * will run, with a floor raising it.
+ * will run, with a floor raising it and `raise` then taking it one accepted level higher.
  */
 export function reasoningToSend(
   settings: Settings,
   modelId: string,
-  floor?: ThinkingLevel
+  floor?: ThinkingLevel,
+  raise?: boolean
 ): ThinkingLevel {
   const stored =
     settings.apiProvider === 'openai' ? (settings.reasoningEffort ?? '') : settings.thinkingLevel
-  return thinkingLevelFor(settings.apiProvider, modelId, stored, floor)
+  const level = thinkingLevelFor(settings.apiProvider, modelId, stored, floor)
+  return raise ? stepUp(level, modelFor(settings.apiProvider, modelId).thinkingLevels) : level
 }
 
 /**

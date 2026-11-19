@@ -26,7 +26,7 @@ import {
   SAFE_CHAR_ID,
   withRemovedDefault
 } from '@shared/characterRules'
-import { defaultTagsOf } from '@shared/defaultTags'
+import { defaultTagsOf, subjectTagsOf } from '@shared/defaultTags'
 import { appError, messageOf } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
@@ -41,6 +41,7 @@ import type {
   CustomOutfitSlot,
   DefaultsStatus,
   Emotion,
+  Gender,
   OutfitSet,
   Position,
   ProfileCrop,
@@ -274,20 +275,22 @@ export async function restoreDefaults(): Promise<void> {
 }
 
 /**
- * Creates the character folder and pre-LLM `character.json`; empty `pose` marks
- * appearance as not generated yet. The reference picture lands before the record, so
- * `brief.reference` is only ever true with the file already beside it.
+ * Creates the character folder and pre-LLM `character.json` of `gender`, opening on its subject
+ * tags; empty `pose` marks appearance as not generated yet. The reference picture lands before
+ * the record, so `brief.reference` is only ever true with the file already beside it.
  */
 export async function createCharacter(
   firstName: string,
   lastName: string,
+  gender: Gender,
   brief?: CharacterBrief,
   reference?: ReferenceImage
 ): Promise<Character> {
   const character = newCharacter(
     firstName,
     lastName,
-    defaultTagsOf(await getSettings()).subject,
+    gender,
+    subjectTagsOf(defaultTagsOf(await getSettings()), gender),
     brief
   )
 

@@ -1,6 +1,10 @@
 import { coldPassOf, COLD_READER, type ColdContact, type ColdContactKind } from '@shared/colds'
 import { globalSlotOf } from '@shared/jobs'
-import type { NpcEncounterGroup } from '@shared/npcRelationships'
+import {
+  npcPairOf,
+  type NpcEncounterGroup,
+  type NpcRelationshipMap
+} from '@shared/npcRelationships'
 import { tierOf, type PlayerStats } from '@shared/playerStats'
 import type { ColdPass, LedgerResponse } from '@shared/types'
 import { isGraduationSlot } from '../../prompts/graduation'
@@ -28,6 +32,29 @@ function contactKindOf(group: NpcEncounterGroup): ColdContactKind {
 }
 
 /**
+ * One encounter group's contacts: the group as one, or, where a couple spent it together outside
+ * a lecture, pair by pair, the couple's own as close as a private scene.
+ */
+function groupContacts(group: NpcEncounterGroup, relationships: NpcRelationshipMap): ColdContact[] {
+  const kind = contactKindOf(group)
+  const { members } = group
+  const dating = (a: string, b: string): boolean =>
+    npcPairOf(relationships, a, b)?.dating !== undefined
+  const couple =
+    group.kind !== 'class' &&
+    members.some((a, i) => members.slice(i + 1).some((b) => dating(a, b)))
+  if (!couple) return [{ kind, members }]
+  const contacts: ColdContact[] = []
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const pair = [members[i], members[j]]
+      contacts.push({ kind: dating(pair[0], pair[1]) ? 'private' : kind, members: pair })
+    }
+  }
+  return contacts
+}
+
+/**
  * Rolls who caught a cold in the finished slot off everybody who was together in it — the scene,
  * its kisses and nights, and `groups`, the slot's own encounters — and whether a new strain
  * reached campus, writing nothing. `stats` are the reader's after the scene.
@@ -50,7 +77,7 @@ export function rollColdPass(
     const members = act.charIds.filter((charId) => cast.includes(charId))
     if (members.length > 0) contacts.push({ kind: act.kind, members: [COLD_READER, ...members] })
   }
-  for (const group of groups) contacts.push({ kind: contactKindOf(group), members: group.members })
+  for (const group of groups) contacts.push(...groupContacts(group, game.npcRelationships))
 
   return coldPassOf({
     slot: globalSlotOf(date, time),

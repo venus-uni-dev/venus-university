@@ -110,7 +110,8 @@ export interface SeedPrefill {
 
 /** The breath and the act loop a custom CG's main image plays. */
 export interface CgSounds {
-  voice: CgVoice
+  /** Absent for a male character's CG, which plays no breath and is asked for none. */
+  voice?: CgVoice
   sfx: CgSfx
 }
 
@@ -148,7 +149,10 @@ export interface RegenerateModalProps {
    * hint may be worded for the name as it is typed.
    */
   instructions?: { value: string; maxLength: number; hint: (name: string) => string }
-  /** Asks under the instructions which loops a CG being made plays, opening on these. */
+  /**
+   * Asks under the instructions which loops a CG being made plays, opening on these; the breath
+   * only where these name one.
+   */
   sounds?: CgSounds
   /** Asks under the seed which position LoRA a custom CG draws, opening on this one or None. */
   lora?: { value: DrawnLora | null }
@@ -207,6 +211,8 @@ export function RegenerateModal({
   const [random, setRandom] = useState(() => seed.random)
   const [nameText, setNameText] = useState(() => name?.value ?? '')
   const [instructionsText, setInstructionsText] = useState(() => instructions?.value ?? '')
+  // Whether the form asks for a breath at all, which a male character's CG never plays.
+  const voiced = sounds?.voice !== undefined
   const [voice, setVoice] = useState<CgVoice>(() => sounds?.voice ?? DEFAULT_CG_VOICE)
   const [sfx, setSfx] = useState<CgSfx>(() => sounds?.sfx ?? DEFAULT_CG_SFX)
   // Which well's copy mark wears the check.
@@ -252,7 +258,7 @@ export function RegenerateModal({
     if (name) setNameText(from.name ?? '')
     if (instructions) setInstructionsText(from.instructions ?? '')
     if (sounds && from.sounds) {
-      setVoice(from.sounds.voice)
+      if (voiced && from.sounds.voice) setVoice(from.sounds.voice)
       setSfx(from.sounds.sfx)
     }
     if (lora) {
@@ -276,7 +282,7 @@ export function RegenerateModal({
       random ? null : Number(seedText),
       name && typed !== '' ? typed : undefined,
       instructions ? instructionsText.trim() : undefined,
-      sounds ? { voice, sfx } : undefined,
+      sounds ? (voiced ? { voice, sfx } : { sfx }) : undefined,
       lora ? { pick: pickedLora(), drawn } : undefined
     )
   }
@@ -445,15 +451,17 @@ export function RegenerateModal({
 
           {sounds && (
             <div className="vu-regen-sounds">
-              <SelectField
-                id={`${id}-voice`}
-                label="Voice loop"
-                value={voice}
-                onChange={(value) => {
-                  if (isCgVoice(value)) setVoice(value)
-                }}
-                options={CG_VOICE_OPTIONS}
-              />
+              {voiced && (
+                <SelectField
+                  id={`${id}-voice`}
+                  label="Voice loop"
+                  value={voice}
+                  onChange={(value) => {
+                    if (isCgVoice(value)) setVoice(value)
+                  }}
+                  options={CG_VOICE_OPTIONS}
+                />
+              )}
               <SelectField
                 id={`${id}-sfx`}
                 label="SFX loop"

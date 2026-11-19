@@ -2,9 +2,9 @@
    anchors to the stage, which is 1080 tall at every window size; everything the player reads
    is ordinary flex and grid.
 
-   The screen names no `z-index`: an absolutely positioned layer paints over static content,
-   so every content block is `position: relative` and written after the backdrop, and tree
-   order does the rest. */
+   The screen names one `z-index`, the header's over the roster grid that scrolls up toward it:
+   otherwise an absolutely positioned layer paints over static content, so every content block
+   is `position: relative` and written after the backdrop, and tree order does the rest. */
 
 .vu-newgame {
   position: relative;
@@ -90,6 +90,12 @@
   gap: 16px;
 }
 
+/* The forward layer over the roster grid, which reaches up into the gap under it: a card scrolled
+   there would otherwise paint over the controls' shadows. */
+.vu-newgame:has(.vu-newgame-grid) .vu-newgame-header {
+  z-index: 1;
+}
+
 .vu-newgame-head-row {
   display: flex;
   align-items: center;
@@ -162,6 +168,27 @@
   font: 700 16px var(--font-mono);
 }
 
+/* How many the roster holds, between the two squares that step it: the figure keeps one width,
+   so neither square moves as it changes. */
+.vu-newgame-size {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+}
+
+.vu-newgame-size-label {
+  font: 700 17px var(--font-body);
+}
+
+.vu-newgame-size-value {
+  min-width: 2ch;
+  color: var(--vu-text);
+  font: 700 16px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 /* Which semester a Continue opens on, read beside the title in the bookkeeping voice. */
 .vu-newgame-semester {
   flex: none;
@@ -180,16 +207,37 @@
 
 /* ---- the grid -------------------------------------------------------------- */
 
-/* Six across and two down: all twelve are on screen from the first frame, so the cap is
-   legible before the first pick and nothing here ever scrolls. */
+/* The box the grid scrolls in takes the room between the header and the foot. Its negative
+   margin hands back the grid's padding, so the first column still lines up under the header and
+   the grid's foot reaches into the gap above the screen's. */
+.vu-newgame-grid-box {
+  flex: 1;
+  min-height: 0;
+  margin: -14px -28px -34px -14px;
+}
+
+/* Six across: twelve, the least a roster holds, stand in two rows on screen from the first frame,
+   so the count is legible before the first pick, and the rows of a larger roster scroll. A grid
+   that scrolls clips in both axes, so it pads for a card's lift and its shadow on every side
+   they reach, the shadow's offset to the right most, and for the fade at its foot.
+
+   The fade is a mask rather than a strip of the ground, since the corner archway stands behind
+   the grid's foot and a strip would show over it. It covers only the foot's padding, where
+   nothing stands but a row still to scroll to, and leaves the scrollbar's column whole. */
 .vu-newgame-grid {
   position: relative;
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(6, 1fr);
+  align-content: start;
   gap: 24px;
   margin: 0;
-  padding: 0;
+  padding: 14px 28px 34px 14px;
+  overflow: hidden auto;
   list-style: none;
+  mask-image:
+    linear-gradient(#000 calc(100% - 34px), transparent),
+    linear-gradient(to left, #000 7px, transparent 7px);
 }
 
 /* Half again as close as the grid's own crop: the roster is the largest a card ever gets,

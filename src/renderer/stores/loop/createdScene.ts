@@ -1,4 +1,6 @@
+import { asReaderPronouns, pronounsOf } from '@shared/gender'
 import { customOutfitInstructions, isCustomOutfitSlot } from '@shared/outfits'
+import { ALL_ROMANCE, attractionOf } from '@shared/relationship'
 import {
   flagsOfEntry,
   npcRelationshipsOf,
@@ -6,12 +8,13 @@ import {
   sceneNameOf,
   statsOfReader,
   weatherTableOf,
+  withDatingAttraction,
   type SavedScene,
   type SceneSetup
 } from '@shared/sceneCreator'
 import { itemsInShop, SHOPS } from '@shared/shop'
 import {
-  DEFAULT_PLAYER_FIRST_NAME,
+  DEFAULT_PLAYER_FIRST_NAMES,
   DEFAULT_PLAYER_LAST_NAME,
   fullNameOf,
   READER_SPEAKER,
@@ -30,8 +33,13 @@ import { useUiStore } from '../uiStore'
  * been played is worth keeping, and the write that keeps it.
  */
 
-/** What a custom outfit picked to open the scene in is offered under when it carries no instructions. */
-const OPENING_ONLY_INSTRUCTIONS = 'she is wearing it at the start of this scene'
+/**
+ * What a custom outfit picked to open the scene in is offered under when it carries no
+ * instructions, in its wearer's pronoun.
+ */
+function openingOnlyInstructions(character: Pick<Character, 'gender'>): string {
+  return `${pronounsOf(character).they} is wearing it at the start of this scene`
+}
 
 /** One of every item the shops sell — a created scene's gift bag. */
 function oneOfEveryGift(): OwnedItem[] {
@@ -61,7 +69,7 @@ export function sceneCharactersOf(
             ...character,
             customOutfits: {
               ...character.customOutfits,
-              [slot]: { ...outfit, instructions: OPENING_ONLY_INSTRUCTIONS }
+              [slot]: { ...outfit, instructions: openingOnlyInstructions(character) }
             }
           }
         : character
@@ -75,13 +83,26 @@ export function createdSceneFields(
   characters: Readonly<Record<string, Character>>
 ): CreatedSceneFields {
   const cast = setup.cast.map((entry) => entry.charId)
+  const pronouns = asReaderPronouns(setup.reader.pronouns)
+  const people = Object.fromEntries(
+    setup.cast.map((entry) => [
+      entry.charId,
+      { character: characters[entry.charId], flags: flagsOfEntry(entry, characters[entry.charId]) }
+    ])
+  )
+  const npcRelationships = npcRelationshipsOf(cast, setup.pairs, setup.date, people)
   const charInfo: CreatedSceneFields['charInfo'] = {}
   for (const entry of setup.cast) {
     const notes = entry.notes.trim()
+    const character = characters[entry.charId]
+    const attraction = attractionOf(character)
+    // Whoever she is set to date, she is attracted to for the scene.
+    const dated = withDatingAttraction(attraction, entry.charId, npcRelationships, characters)
     charInfo[entry.charId] = {
       ...blankCharInfo(),
-      flags: flagsOfEntry(entry, characters[entry.charId]),
+      flags: flagsOfEntry(entry, character),
       nameKnown: entry.milestones.met,
+      ...(dated !== attraction ? { attractedTo: dated } : {}),
       ...(notes ? { notes } : {})
     }
   }
@@ -89,15 +110,18 @@ export function createdSceneFields(
     date: setup.date,
     time: setup.time,
     chars: cast,
-    playerFirstName: setup.reader.firstName.trim() || DEFAULT_PLAYER_FIRST_NAME,
+    playerFirstName: setup.reader.firstName.trim() || DEFAULT_PLAYER_FIRST_NAMES[pronouns],
     playerLastName: setup.reader.lastName.trim() || DEFAULT_PLAYER_LAST_NAME,
+    playerPronouns: pronouns,
     stats: statsOfReader(setup.reader),
     bio: setup.reader.bio,
     charInfo,
-    npcRelationships: npcRelationshipsOf(cast, setup.pairs),
+    npcRelationships,
     weather: weatherTableOf(setup.date, setup.time, setup.weather),
     inventory: oneOfEveryGift(),
-    bunnyshopUnlocked: true
+    bunnyshopUnlocked: true,
+    // A created scene is no playthrough's: anyone in it may be romanced.
+    romance: ALL_ROMANCE
   }
 }
 

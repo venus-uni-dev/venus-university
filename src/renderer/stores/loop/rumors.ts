@@ -1,7 +1,9 @@
+import { genderOf } from '@shared/gender'
 import { globalSlotOf } from '@shared/jobs'
+import { isOpen, type NpcRelationshipMap } from '@shared/npcRelationships'
 import { rumorPass, upsertJealousyMemory, type RumorPassOutcome } from '@shared/rumors'
 import type { CharInfo, LedgerResponse, TimeSlot } from '@shared/types'
-import { stageContextOf, useGameStore } from '../gameStore'
+import { gendersOf, stageContextOf, useGameStore } from '../gameStore'
 import { ledgerActs } from '../sceneSanitizer'
 import { stageAt } from '../stageStep'
 import { charHiddenLocationNow, charUnavailableNow } from '../timetable'
@@ -41,11 +43,13 @@ function groupmatesNow(date: number, time: TimeSlot): Record<string, string[]> {
  */
 export function rollRumorPass(
   ledger: LedgerResponse | null,
-  charInfo: Readonly<Record<string, CharInfo>> = useGameStore.getState().charInfo
+  charInfo: Readonly<Record<string, CharInfo>> = useGameStore.getState().charInfo,
+  npcRelationships: NpcRelationshipMap = useGameStore.getState().npcRelationships
 ): RumorPassOutcome {
   const game = useGameStore.getState()
+  const roster = [...game.chars, ...game.alumni]
   const firstNames: Record<string, string> = {}
-  for (const charId of [...game.chars, ...game.alumni]) {
+  for (const charId of roster) {
     const character = game.characters[charId]
     if (character) firstNames[charId] = character.firstName
   }
@@ -60,10 +64,12 @@ export function rollRumorPass(
     roster: game.chars,
     alumni: game.alumni,
     charInfo,
-    npcRelationships: game.npcRelationships,
+    npcRelationships,
     groupmates: groupmatesNow(game.date, game.time),
     loose: looseNow(game.date, game.time),
-    firstNames
+    firstNames,
+    genders: gendersOf(roster, game.characters),
+    open: roster.filter((charId) => isOpen(game.characters[charId], charInfo[charId]?.flags))
   })
 }
 
@@ -78,7 +84,9 @@ export function applyRumorPass(outcome: RumorPassOutcome): void {
     useGameStore.getState().setSuspicions(charId, records)
   }
   for (const { charId, memory } of outcome.memories) {
-    const held = useGameStore.getState().charInfo[charId]?.jealousyMemories
-    useGameStore.getState().setJealousyMemories(charId, upsertJealousyMemory(held, memory))
+    const { charInfo, characters } = useGameStore.getState()
+    const held = charInfo[charId]?.jealousyMemories
+    const holder = genderOf(characters[charId])
+    useGameStore.getState().setJealousyMemories(charId, upsertJealousyMemory(held, memory, holder))
   }
 }

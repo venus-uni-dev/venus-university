@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  charProfileOf,
+  charStateOf,
   graduatesOf,
   hasSemester,
   readerYearOf,
@@ -7,10 +9,11 @@ import {
   semesterChain,
   semesterName,
   semesterOf,
-  seasonOf
+  seasonOf,
+  withTransfers
 } from '@shared/semesters'
 import type { CharProfile, SemesterRecord } from '@shared/types'
-import { playthroughRecord } from './fixtures'
+import { charInfo, classEntry, playthroughRecord } from './fixtures'
 
 /**
  * Reading a playthrough as its semesters: a save read against the wrong semester's roster or
@@ -132,5 +135,73 @@ describe('semesterOf and semesterChain', () => {
 
   it('counts every replay a log names as the record’s to keep', () => {
     expect([...recordReplayIds(record)]).toEqual(['f'.repeat(32)])
+  })
+})
+
+describe('transfers', () => {
+  const arrived = { ...profile(2, 'spring'), transferredAt: 41 }
+
+  it('joins a semester’s transfers onto its roster once, and leaves a view with none as it is', () => {
+    const view = semesterOf(playthroughRecord({ chars: ['a'], profiles: { a: profile(1) } }))
+    expect(withTransfers(view, null)).toBe(view)
+    expect(withTransfers(view, { transfers: [] })).toBe(view)
+
+    const joined = withTransfers(view, {
+      transfers: [
+        { charId: 'm', profile: arrived },
+        { charId: 'm', profile: arrived }
+      ]
+    })
+    expect(joined.chars).toEqual(['a', 'm'])
+    expect(joined.profiles.m).toEqual(arrived)
+    // The record's own view is not written through.
+    expect(view.chars).toEqual(['a'])
+    expect(view.profiles.m).toBeUndefined()
+  })
+
+  it('lays the classes a transfer brought over the catalog, the record’s own left alone', () => {
+    const catalog = { 'BIO 210': classEntry() }
+    const view = semesterOf(playthroughRecord({ chars: ['a'], classes: catalog }))
+    const hers = classEntry({ code: 'KNT 101', category: 'interest', slot: 3 })
+    const joined = withTransfers(view, {
+      transfers: [
+        { charId: 'm', profile: arrived, classes: { 'KNT 101': hers } },
+        { charId: 'n', profile: arrived }
+      ]
+    })
+    expect(Object.keys(joined.classes).sort()).toEqual(['BIO 210', 'KNT 101'])
+    expect(joined.classes['KNT 101']).toEqual(hers)
+    expect(view.classes).toEqual(catalog)
+    // Transfers who brought none keep the catalog object itself.
+    expect(withTransfers(view, { transfers: [{ charId: 'n', profile: arrived }] }).classes).toBe(
+      view.classes
+    )
+  })
+
+  it('seats a finished semester’s transfers off the log its next semester holds', () => {
+    const record = playthroughRecord({
+      chars: ['a'],
+      semesters: {
+        '200': semester({
+          chars: ['a', 'm'],
+          before: {
+            history: {},
+            playerSchedule: {},
+            events: [],
+            transfers: [{ charId: 'm', profile: arrived }]
+          }
+        })
+      }
+    })
+    const chain = semesterChain(record, '200')
+    expect(chain[0].view.chars).toEqual(['a', 'm'])
+    expect(chain[0].view.profiles.m).toEqual(arrived)
+    expect(chain[1].view.chars).toEqual(['a', 'm'])
+  })
+
+  it('keeps her arrival out of the half a save carries', () => {
+    const info = { ...charInfo(), transferredAt: 41 }
+    expect(charStateOf(info)).not.toHaveProperty('transferredAt')
+    expect(charProfileOf(info).transferredAt).toBe(41)
   })
 })

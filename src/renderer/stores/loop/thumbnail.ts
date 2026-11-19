@@ -19,7 +19,8 @@ import { isEpilogueNight } from '../../prompts/graduation'
 import { bgThumbUrl, customBackgroundOf, roomOwnerOf, SLOT_BG } from '../../views/bgAssets'
 import { useAssetStore } from '../assetStore'
 import { stageContextOf, useGameStore } from '../gameStore'
-import { noNsfwImagesOf, useSettingsStore } from '../settingsStore'
+import { matchCgBiologyOf, noNsfwImagesOf, useSettingsStore } from '../settingsStore'
+import { stockCgsInPlay } from '@shared/positions'
 import { displayedCgOf, displaySlotsOf, displaySpriteRef } from '../stageDisplay'
 import { stageOnLoad } from '../stageStep'
 import { blobToBase64, canvasToWebpOr } from './encode'
@@ -202,6 +203,10 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
   // A CG stands in for the whole row, as it does on the stage, and a locked one is drawn over an
   // empty row as well.
   const shown = displaySlotsOf(stage.slots, stage.stageOverride)
+  const stockCgs = stockCgsInPlay(
+    game.playerPronouns,
+    matchCgBiologyOf(useSettingsStore.getState())
+  )
   const row = shown.filter(
     (charId): charId is string => charId !== null && Boolean(game.characters[charId])
   )
@@ -210,7 +215,7 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
     emotions: stage.emotions,
     lock: scene.cgLock,
     hasCharacter: (charId) => Boolean(game.characters[charId]),
-    ready: { cgReady: game.cgReady, customCgReady: game.customCgReady },
+    ready: { cgReady: game.cgReady, customCgReady: game.customCgReady, stockCgs },
     noNsfwImages: noNsfwImagesOf(useSettingsStore.getState())
   })
   // Nobody on the stage and no CG — the landing, an exam, a scene everyone has left — is drawn
@@ -246,7 +251,8 @@ export async function composeStageThumbnail(scene: SceneState): Promise<string |
           stage.emotions[charId] ?? 'neutral',
           scene.outfitLock?.[charId],
           game.outfitReady[charId],
-          game.customCgReady[charId]
+          game.customCgReady[charId],
+          stockCgs
         )
         // A portrait's height is her scale's alone; only its width waits on the decoded image.
         const height = stagePortraitPlacement(index, row.length, scale, 1).height

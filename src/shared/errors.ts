@@ -117,6 +117,8 @@ const PERMANENT_CODES = new Set([
   // A wardrobe fix that carries nothing, or bytes that are not the PNG it needs.
   'FIX_EMPTY',
   'FIX_NOT_PNG',
+  // A repaint strength outside the slider's range.
+  'REPAINT_STRENGTH_INVALID',
   // A graduation picture request with a bad reference sheet or character count.
   'ENDING_REQUEST_INVALID',
   // A face-pass job whose set has no base frame yet.
@@ -167,6 +169,8 @@ const PERMANENT_CODES = new Set([
   'IMPORT_MANIFEST_INVALID',
   'IMPORT_SCHEMA_VERSION',
   'IMPORT_CHARACTER_MISSING',
+  // A pack some of whose members were refused; the rest were adopted.
+  'IMPORT_PACK_PARTIAL',
   // A night room job whose day image is not on disk yet, or is not an image.
   'ROOM_DAY_MISSING',
   'ROOM_DAY_INVALID',

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Application } from '@shared/application'
 import { playthroughLabel, playthroughNameOf, renamedRecord } from '@shared/saveRules'
-import { semesterOf, type SemesterView } from '@shared/semesters'
+import { semesterOf, withTransfers, type SemesterView } from '@shared/semesters'
 import {
   charKeyOf,
   fullNameOf,
@@ -44,8 +44,8 @@ export interface LoadedSave {
   save: GameSave
   record: PlaythroughRecord
   /**
-   * Resolved characters of the save's semester, its roster in order and then its graduates.
-   * Missing ones are absent.
+   * Resolved characters of the save's semester, its roster in order, then its graduates, then
+   * its waiting transfers. Missing ones are absent.
    */
   characters: Character[]
   /** Why this save cannot be loaded, or null when it can. */
@@ -248,8 +248,10 @@ async function resolvedSavesOf(playthroughId: string): Promise<ResolvedSave[] | 
   const resolved = useSaveStore.getState().characters
   const { record, error: recordError, saves } = result.data
   return saves.map(({ saveId, savedAt, summary, error }) => {
-    // Each save is read against its own semester, which saves in one folder need not share.
-    const semester = record && summary ? semesterOfSave(record, summary.semester) : null
+    // Each save is read against its own semester, which saves in one folder need not share, with
+    // whoever transferred into it joined on.
+    const read = record && summary ? semesterOfSave(record, summary.semester) : null
+    const semester = read ? withTransfers(read, summary) : null
     return {
       saveId,
       savedAt,
@@ -319,11 +321,13 @@ export const useSaveStore = create<SaveStoreState>((set, get) => ({
     const { record, save } = result.data
     const resolved = get().characters
     // The service refuses a save whose semester the record does not hold.
-    const semester = semesterOf(record, save.semester)
+    const semester = withTransfers(semesterOf(record, save.semester), save)
+    // A waiting transfer whose character is gone gates nothing: the load drops her.
+    const waiting = (save.pendingTransfers ?? []).map((entry) => entry.charId)
     return {
       save,
       record,
-      characters: castOf([...semester.chars, ...semester.alumni], resolved),
+      characters: castOf([...semester.chars, ...semester.alumni, ...waiting], resolved),
       unloadable: unloadableReason(semester.chars, resolved, semester.alumni)
     }
   },

@@ -56,12 +56,14 @@ const JUNE_START: CharStart = {
 function openingSave(
   carried: SemesterCarry,
   starts: Record<string, CharStart> = {},
-  pairs = {}
+  pairs = {},
+  notes?: Record<string, string>
 ): ReturnType<typeof continuedStartOf>['save'] {
   const draft = enrollment({
     chars: ROSTER.map((c) => c.charId),
     starts,
     pairs,
+    ...(notes ? { notes } : {}),
     continued: {
       id: '300',
       index: 1,
@@ -76,10 +78,16 @@ function openingSave(
 
 describe('a later semester’s opening save', () => {
   it('opens a newcomer where the Profiles screen set her, and another as a stranger', () => {
-    const save = openingSave(carry(), { june: JUNE_START })
+    const save = openingSave(carry(), { june: JUNE_START }, {}, { liv: 'Liv is pre-med.' })
 
     expect(save.charInfo.june).toMatchObject(JUNE_START)
-    expect(save.charInfo.liv).toMatchObject({ memories: [], nameKnown: false })
+    expect(save.charInfo.june.notes).toBeUndefined()
+    expect(save.charInfo.liv).toMatchObject({
+      memories: [],
+      nameKnown: false,
+      notes: 'Liv is pre-med.'
+    })
+    expect(save.charInfo.liv.flags.hasMet).toBe(false)
     expect(save.charInfo.liv.flags.gaveContactInfo).toBe(false)
     expect(save.charInfo.liv.datingSince).toBeUndefined()
   })

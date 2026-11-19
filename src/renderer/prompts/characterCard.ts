@@ -1,5 +1,6 @@
 import { withoutSubjectTags } from '@shared/defaultTags'
-import { loveLifeBlurb } from '@shared/relationship'
+import { genderOf, pronounsOf } from '@shared/gender'
+import { attractionOf, loveLifeBlurb } from '@shared/relationship'
 import { hairColorOf, OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
 import { TRAIT_DESCRIPTIONS } from '@shared/traits'
 import { fullNameOf, type Character } from '@shared/types'
@@ -75,12 +76,13 @@ function campusParagraph(): string {
 
 /**
  * The description's sections, in order, each present only where she has something to say;
- * `subject` is the subject tags the settings name.
+ * `subject` is the subject tags the settings name for her gender.
  */
 function descriptionSections(character: Character, subject: readonly string[]): string[] {
   const sections: string[] = []
+  const gender = genderOf(character)
 
-  const appearance = withoutSubjectTags(character.baseAppearance, subject)
+  const appearance = withoutSubjectTags(character.baseAppearance, gender, subject)
   if (appearance.length > 0) sections.push(`Appearance: ${tagProse(appearance)}`)
 
   const outfit = wardrobeProse(character.outfit)
@@ -94,7 +96,7 @@ function descriptionSections(character: Character, subject: readonly string[]): 
 
   if (character.backstory) sections.push(`Backstory: ${character.backstory}`)
 
-  const loveLife = loveLifeBlurb(character, { hadSex: false })
+  const loveLife = loveLifeBlurb(character, { hadSex: false }, attractionOf(character))
   if (loveLife) sections.push(`Love life: ${loveLife}`)
 
   if (character.likes.length > 0) sections.push(`Likes: ${character.likes.join(', ')}`)
@@ -126,21 +128,25 @@ function scenarioOf(): string {
   return `${campusParagraph()} {{char}} is a student there, and {{user}} is a fellow student.`
 }
 
-/** The card's `first_mes`: the two of them meeting at orientation, before anyone else arrives. */
+/**
+ * The card's `first_mes`: the two of them meeting at orientation, before anyone else arrives,
+ * the character told of as a girl or a guy.
+ */
 function firstMessageOf(character: Character): string {
+  const { noun, They } = pronounsOf(character)
   const hair = hairColorOf(character.baseAppearance)
-  const girl = hair ? `a girl with ${hair} hair` : 'a girl'
+  const who = hair ? `a ${noun} with ${hair} hair` : `a ${noun}`
   return (
     'Today is freshman orientation at Venus University. The air here is pleasantly cool, and the ' +
     'smell of blooming flowers is everywhere. You follow the instructions on your phone to find ' +
     'your orientation group. When you get there, it seems no one else has arrived except for ' +
-    `${girl}. She notices you and an awkward silence sets in between the two of you.`
+    `${who}. ${They} notices you and an awkward silence sets in between the two of you.`
   )
 }
 
 /**
  * Builds the V2 and V3 cards a character's record fills, ready for the PNG's text chunks, her
- * appearance without `subject`, the subject tags the settings name.
+ * appearance without `subject`, the subject tags the settings name for her gender.
  */
 export function buildCharacterCard(
   character: Character,

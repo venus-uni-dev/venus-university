@@ -62,7 +62,7 @@ export function bunnybotCatalog(playerFirstName: string): readonly BunnybotMessa
       texts: [
         `that money burning a hole in your pocket yet? why not buy a gift for someone? i added the BunnyShop app to your sidebar just now`,
         `a gift is a great way to show your appreciation for someone and get closer to them... as long as you choose something they'd actually like`,
-        `you can give a gift to a girl when you're meeting them face-to-face via the gift icon next to the response box`
+        `you can give a gift to someone when you're meeting them face-to-face via the gift icon next to the response box`
       ]
     },
     {
@@ -70,8 +70,8 @@ export function bunnybotCatalog(playerFirstName: string): readonly BunnybotMessa
       // The second Saturday morning, a week after the shop.
       triggerSlot: globalSlotOf(12, 0),
       texts: [
-        `not having much luck with the ladies yet? the first thing to try is to spend more time with them. but if that's not working, maybe you need to work on yourself`,
-        `you have to be at least Good in a girl's preferred stat to catch their interest. for those with High Standards, you also have to be at least Decent in every other stat too`,
+        `not having much luck in the romance department yet? the first thing to try is to spend more time with whoever you're into. but if that's not working, maybe you need to work on yourself`,
+        `you have to be at least Good in someone's preferred stat to catch their interest. for those with High Standards, you also have to be at least Decent in every other stat too`,
         `and the better you are in their preferred stat, the better your chances will be`
       ]
     }

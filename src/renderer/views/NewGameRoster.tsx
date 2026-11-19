@@ -1,5 +1,6 @@
-import { useMemo, useState, type JSX } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { firstNameKeyOf } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
 import { shuffle } from '@shared/shuffle'
 import { fullNameOf, type Character } from '@shared/types'
@@ -21,18 +22,6 @@ import {
 } from './motion'
 import { CloseIcon } from './screenIcons'
 import { LoadCharacterModal } from './LoadCharacterModal'
-
-/**
- * How many characters a game starts with — exact, not a cap. The registrar offers only the
- * classes a roster girl attends, and twelve girls' loads are what leave the player enough
- * non-PE courses in distinct slots to finalize a legal schedule.
- */
-export const ROSTER_SIZE = 12
-
-/** What two roster entries may not share. */
-function firstNameKeyOf(character: Character): string {
-  return character.firstName.trim().toLowerCase()
-}
 
 /**
  * Up to `count` of the eligible characters at random, no two sharing a first name with each
@@ -63,6 +52,8 @@ const GRID_IN = dealt(0.25, 0.04)
 /** A roster being picked: who could still join it, who clashes, and the two modals it opens. */
 export interface Roster {
   roster: Character[]
+  /** How many characters it holds once filled: every tile the grid draws. */
+  size: number
   /** Characters that could still be added: fully rendered, not already picked, not graduated. */
   eligible: string[]
   isDuplicate: (character: Character) => boolean
@@ -87,11 +78,12 @@ export interface Roster {
 }
 
 /**
- * The roster a New Game or a next semester's New Game+ is picking. `alumni` are never pickable
- * and their first names are taken; `locked` girls stay on it.
+ * The roster a New Game or a next semester's New Game+ is picking, `size` of them once filled.
+ * `alumni` are never pickable and their first names are taken; `locked` girls stay on it.
  */
 export function useRoster(
   roster: Character[],
+  size: number,
   setRoster: (next: Character[]) => void,
   alumni: readonly string[],
   locked: ReadonlySet<string>
@@ -142,7 +134,7 @@ export function useRoster(
     return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([key]) => key))
   }, [roster, graduates])
 
-  const empty = ROSTER_SIZE - roster.length
+  const empty = size - roster.length
 
   function fillRandom(): void {
     const picked = drawUnique(eligible, characters, [...roster, ...graduates], empty)
@@ -156,6 +148,7 @@ export function useRoster(
 
   return {
     roster,
+    size,
     eligible,
     isDuplicate: (character) => duplicateKeys.has(firstNameKeyOf(character)),
     duplicates: () =>
@@ -179,29 +172,53 @@ export function useRoster(
 }
 
 /**
- * All ROSTER_SIZE tiles, filled ones first, so the count reads at a glance. An empty tile holds
- * a `?`, since Next fills it at random.
+ * Every tile the roster holds, filled ones first, so the count reads at a glance. An empty tile
+ * holds a `?`, since Next fills it at random. A roster grown by a step scrolls its new last tile
+ * into view.
  */
 export function RosterGrid({ roster: state }: { roster: Roster }): JSX.Element {
-  const { roster, locked, isDuplicate, setInspecting, setRoster, setPicking } = state
+  const { roster, size, locked, isDuplicate, setInspecting, setRoster, setPicking } = state
+  const grid = useRef<HTMLUListElement>(null)
+  const still = useReducedMotion()
+  // The size the grid last drew, so only a step up scrolls and the grid arriving does not.
+  const drawn = useRef(size)
+
+  useEffect(() => {
+    const grew = size > drawn.current
+    drawn.current = size
+    const node = grid.current
+    if (!grew || !node) return
+    // The new tile is the last, so the end of the scroll is where it stands clear of the fade at
+    // the grid's foot.
+    node.scrollTo({ top: node.scrollHeight, behavior: still ? 'auto' : 'smooth' })
+  }, [size, still])
+
   return (
-    <motion.ul className="vu-newgame-grid" variants={GRID_IN} initial="hidden" animate="shown">
-      {Array.from({ length: ROSTER_SIZE }, (_, index) => {
-        const character = roster[index]
-        return character ? (
-          <RosterTile
-            key={character.charId}
-            character={character}
-            duplicate={isDuplicate(character)}
-            locked={locked.has(character.charId)}
-            onOpen={() => setInspecting(character.charId)}
-            onRemove={() => setRoster(roster.filter((c) => c.charId !== character.charId))}
-          />
-        ) : (
-          <EmptyTile key={`slot-${index}`} onPick={() => setPicking(true)} />
-        )
-      })}
-    </motion.ul>
+    <div className="vu-scroll-box vu-newgame-grid-box">
+      <motion.ul
+        ref={grid}
+        className="vu-newgame-grid"
+        variants={GRID_IN}
+        initial="hidden"
+        animate="shown"
+      >
+        {Array.from({ length: size }, (_, index) => {
+          const character = roster[index]
+          return character ? (
+            <RosterTile
+              key={character.charId}
+              character={character}
+              duplicate={isDuplicate(character)}
+              locked={locked.has(character.charId)}
+              onOpen={() => setInspecting(character.charId)}
+              onRemove={() => setRoster(roster.filter((c) => c.charId !== character.charId))}
+            />
+          ) : (
+            <EmptyTile key={`slot-${index}`} onPick={() => setPicking(true)} />
+          )
+        })}
+      </motion.ul>
+    </div>
   )
 }
 

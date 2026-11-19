@@ -1,0 +1,102 @@
+/* The transfer students' sheet: who is waiting for the next timeslot, those being generated,
+   and the ask after a pick. Imported from the view module, never from index.css.
+
+   The veil, the sheet, the note, the row, the card, the check, the buttons and the foot are
+   base.css's. */
+
+/* Narrower than the list chassis: a row holds a face, a name and one answer. */
+.vu-transfer {
+  width: min(1000px, 100% - 60px);
+}
+
+/* The scroller the rows stand in, padded for a hover's swell and the box around it taking that
+   back. */
+.vu-transfer-rows {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  overflow: hidden auto;
+}
+
+.vu-transfer-row {
+  gap: 16px;
+}
+
+/* Her face, lifted onto the surface off the row's own recessed ground, which the archway's quiet
+   fill would vanish into. */
+.vu-transfer-face {
+  --paper-face: var(--vu-surface);
+  flex: none;
+  width: 60px;
+  height: 72px;
+  background: var(--vu-surface);
+}
+
+.vu-transfer-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vu-transfer-name {
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 18px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What she is waiting on, the ring before the word while she is still being generated. */
+.vu-transfer-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* A generation stopped by a failure, which waits on the player's answer. */
+.vu-transfer-state--failed {
+  color: var(--vu-danger);
+}
+
+/* The row's answer on the surface rather than the recessed fill it shares with the row. */
+.vu-transfer-cancel {
+  flex: none;
+  background: var(--vu-surface);
+}
+
+/* ---- the ask ---------------------------------------------------------------- */
+
+.vu-transfer-ask {
+  width: min(860px, 100% - 60px);
+}
+
+/* Her card beside what the transfer says and the box it carries. */
+.vu-transfer-ask-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 34px;
+}
+
+/* The tile she was in the picker, at the size a face is picked at. */
+.vu-transfer-card {
+  flex: none;
+  width: 150px;
+}
+
+.vu-transfer-arch {
+  height: 180px;
+}
+
+.vu-transfer-ask-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}

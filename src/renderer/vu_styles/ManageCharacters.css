@@ -118,6 +118,18 @@
   margin-left: auto;
 }
 
+/* The grid's order, on a line of its own under the actions and at the row's end: the actions
+   leave no room for it beside them at any stage width. Inside the header, so it is the forward
+   layer the grid reaches up under too. It holds a pill's height with no pill in it — the
+   15px label, its 11px padding and the 2.5px border — so the grid stays put as the roster
+   lands. */
+.vu-manage-sort {
+  display: flex;
+  flex-basis: 100%;
+  justify-content: flex-end;
+  min-height: 48px;
+}
+
 /* The shape is `.vu-pill`; what this screen adds is the one sweep that destroys
    something, drawn in the danger tone rather than as a second primary. */
 .vu-manage-pill--danger {

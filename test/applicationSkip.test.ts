@@ -7,6 +7,7 @@ import {
   type PlannedOccasion
 } from '@shared/application'
 import { MAX_CLASS_SIZE, scheduleComplaint } from '@shared/classes'
+import { fillPronouns } from '@shared/gender'
 import { drawManyFromBag } from '@shared/grabBag'
 import { secretText } from '@shared/secrets'
 import { shuffle } from '@shared/shuffle'
@@ -23,7 +24,12 @@ import {
   type Deal
 } from '../src/renderer/stores/applicationSkip'
 import { CLASS_POOLS } from '../src/renderer/prompts/classPool'
-import { PURSUITS, SPRING_BREAK_PLANS } from '../src/renderer/prompts/profilePool'
+import {
+  poolLineText,
+  PURSUITS,
+  SPRING_BREAK_PLANS,
+  type PoolLine
+} from '../src/renderer/prompts/profilePool'
 import { SECRET_POOLS, secretFor } from '../src/renderer/prompts/secretPool'
 import { character, charInfo, legalPick } from './fixtures'
 
@@ -54,6 +60,10 @@ const anyOf: Deal = (_bag, items, count) => shuffle(items).slice(0, count)
 /** Each pool's items off a fresh grab bag, those `accept` passes first. */
 const bagged: Deal = (_bag, items, count, keyOf, accept) =>
   drawManyFromBag(items, [], keyOf ?? String, count, Math.random, accept).items
+
+/** A pool's lines as a girl is dealt them. */
+const saidOfAGirl = (pool: readonly PoolLine[]): string[] =>
+  pool.map((line) => fillPronouns(poolLineText(line), 'female'))
 
 /** An application with every screen passed, every call skipped and nothing written. */
 function skippedDraft(roster: readonly Character[], over: Partial<ApplicationDraft> = {}): ApplicationDraft {
@@ -211,7 +221,9 @@ describe('a skipped later semester', () => {
   })
 
   /** Every devoted secret but the last, which Anna has already told. */
-  const TOLD = SECRET_POOLS.devoted.slice(0, -1).map((template) => secretFor(template, 'Anna'))
+  const TOLD = SECRET_POOLS.devoted
+    .slice(0, -1)
+    .map((line) => secretFor(poolLineText(line), 'Anna', 'female'))
 
   /** A later spring, every call skipped, the classes the semesters before it ran as `taken`. */
   function laterDraft(taken: ApplicationContinuation['taken'] = []): ApplicationDraft {
@@ -245,13 +257,17 @@ describe('a skipped later semester', () => {
       expect(semester.feeds[charId].winterPosts).toEqual([])
     }
     expect(semester.feeds.anna.handle).toBe('anna.b')
-    expect(SPRING_BREAK_PLANS).toContain(semester.springBreakPlans.anna)
+    expect(saidOfAGirl(SPRING_BREAK_PLANS)).toContain(semester.springBreakPlans.anna)
     vi.restoreAllMocks()
   })
 
   it('never deals a returning girl a secret she already holds', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const last = secretFor(SECRET_POOLS.devoted[SECRET_POOLS.devoted.length - 1], 'Anna')
+    const last = secretFor(
+      poolLineText(SECRET_POOLS.devoted[SECRET_POOLS.devoted.length - 1]),
+      'Anna',
+      'female'
+    )
     for (let run = 0; run < 20; run++) {
       const semester = composeSkipped(laterDraft(), ROSTER, bagged, LATER_WORLD)
       expect(semester.secrets.anna).toEqual([{ text: secretText(last), tier: 'devoted' }])
@@ -264,7 +280,7 @@ describe('a skipped later semester', () => {
     const { fill } = dealtSkips(laterDraft(), ROSTER, anyOf, LATER_WORLD)
     expect(Object.keys(fill.pursuits)).toEqual(['grace'])
     const semester = composeSkipped(laterDraft(), ROSTER, anyOf, LATER_WORLD)
-    expect(PURSUITS).toContain(semester.pursuits?.grace)
+    expect(saidOfAGirl(PURSUITS)).toContain(semester.pursuits?.grace)
     expect(semester.pursuits?.olive).toBe('teaching in Seoul')
     vi.restoreAllMocks()
   })
@@ -287,5 +303,78 @@ describe('a skipped later semester', () => {
       expect(dealt.length).toBeGreaterThan(0)
       for (const entry of dealt) expect(takenCodes.has(entry.code)).toBe(false)
     }
+  })
+})
+
+describe('a skipped roster of both genders', () => {
+  const BEN = character({ charId: 'ben', firstName: 'Ben', lastName: 'Cole', gender: 'male' })
+  const MAX = character({ charId: 'max', firstName: 'Max', lastName: 'Hale', gender: 'male' })
+  const NORA = character({ charId: 'nora', firstName: 'Nora', lastName: 'Lane' })
+  const OWEN = character({ charId: 'owen', firstName: 'Owen', lastName: 'Park', gender: 'male' })
+  const ROSTER = [BEN, MAX, NORA]
+  const LATER_WORLD: RequestWorld = { ...WORLD, graduates: [OWEN] }
+
+  /** Whether a pooled item is marked as fitting one gender alone. */
+  const marked = (item: unknown): boolean =>
+    typeof item === 'object' && item !== null && 'gender' in item
+
+  /** Every pooled line that fits a girl alone, said of one guy. */
+  const girlsOnly = (firstName: string): Set<string> =>
+    new Set(
+      [...Object.values(SECRET_POOLS).flat(), ...SPRING_BREAK_PLANS, ...PURSUITS]
+        .filter((line) => typeof line !== 'string' && line.gender === 'female')
+        .map((line) => fillPronouns(poolLineText(line), 'male', firstName))
+    )
+
+  /** Each pool's marked lines first, whatever `accept` passes: the worst a shortfall can deal. */
+  const markedFirst: Deal = (_bag, items, count) =>
+    [...items.filter(marked), ...items.filter((item) => !marked(item))].slice(0, count)
+
+  /** A later spring, every call skipped: Ben returning and owed every tier, Owen just graduated. */
+  const draft = skippedDraft(ROSTER, {
+    continued: {
+      id: 'later',
+      index: 2,
+      continuing: ['ben'],
+      graduated: ['owen'],
+      alumni: ['owen'],
+      priorProfiles: {
+        ben: { year: 2, dorm: 'lowrise_1', major: 'History', schedule: {}, handle: 'ben.c' },
+        owen: { year: 4, dorm: 'lowrise_2', major: 'Art', schedule: {} }
+      },
+      jobs: {},
+      haunts: { ben: { homeSlots: 2, study: null, fun: [], activity: null, meal: null } },
+      majorLoads: { ben: 1 },
+      carry: { charInfo: { ben: charInfo() } } as unknown as SemesterCarry,
+      taken: []
+    }
+  })
+
+  it('never deals a guy a line that fits a girl alone, and leaves no token in any line', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const deal of [markedFirst, firstOf, bagged, anyOf]) {
+      for (let run = 0; run < 20; run++) {
+        const { fill } = dealtSkips(draft, ROSTER, deal, LATER_WORLD)
+        /** Every pooled line one character was dealt. */
+        const lines = (charId: string): string[] =>
+          [
+            ...Object.values(fill.secrets[charId] ?? {}),
+            fill.profiles[charId]?.springBreakPlans,
+            fill.profiles[charId]?.activity?.doing,
+            fill.springBreakPlans[charId],
+            fill.pursuits[charId]
+          ].filter((line): line is string => typeof line === 'string')
+
+        for (const guy of [BEN, MAX, OWEN]) {
+          expect(lines(guy.charId).length).toBeGreaterThan(0)
+          const banned = girlsOnly(guy.firstName)
+          for (const line of lines(guy.charId)) expect(banned.has(line)).toBe(false)
+        }
+        for (const c of [BEN, MAX, NORA, OWEN]) {
+          for (const line of lines(c.charId)) expect(line).not.toMatch(/\{\w+\}/)
+        }
+      }
+    }
+    vi.restoreAllMocks()
   })
 })

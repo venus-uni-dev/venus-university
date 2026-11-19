@@ -24,9 +24,19 @@ describe('clampSpriteScale', () => {
 
 describe('defaultSpriteScale', () => {
   it('reads the breast tag, and small wins where freehand tags carry both', () => {
-    expect(defaultSpriteScale(['small_breasts'])).toBe(0.94)
-    expect(defaultSpriteScale(['big_breasts'])).toBe(1)
-    expect(defaultSpriteScale([])).toBe(0.97)
-    expect(defaultSpriteScale(['small_breasts', 'big_breasts'])).toBe(0.94)
+    expect(defaultSpriteScale(['small_breasts'], 'female')).toBe(0.94)
+    expect(defaultSpriteScale(['big_breasts'], 'female')).toBe(1)
+    expect(defaultSpriteScale([], 'female')).toBe(0.97)
+    expect(defaultSpriteScale(['small_breasts', 'big_breasts'], 'female')).toBe(0.94)
+  })
+
+  it("reads a guy's build tag, and bishounen wins where freehand tags carry both", () => {
+    expect(defaultSpriteScale(['muscular_male'], 'male')).toBe(1.05)
+    expect(defaultSpriteScale(['bishounen'], 'male')).toBe(1.03)
+    expect(defaultSpriteScale([], 'male')).toBe(1)
+    expect(defaultSpriteScale(['muscular_male', 'bishounen'], 'male')).toBe(1.03)
+    // Each gender reads its own tag alone.
+    expect(defaultSpriteScale(['muscular_male'], 'female')).toBe(0.97)
+    expect(defaultSpriteScale(['big_breasts'], 'male')).toBe(1)
   })
 })

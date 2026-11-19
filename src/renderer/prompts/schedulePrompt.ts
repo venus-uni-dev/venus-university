@@ -244,7 +244,7 @@ export function scheduleBlocks(input: SchedulePromptInput, wantPlans: boolean): 
     ...now,
     '',
     // The keys the reply copies; without it the model invents one that resolves to nobody.
-    'CHARACTERS — everyone the reader knows. Each line is the key for that person, then who she is.',
+    'CHARACTERS — everyone the reader knows. Each line is the key for that person, then who they are.',
     "'''",
     ...scheduleRosterLines(input.characters),
     "'''",

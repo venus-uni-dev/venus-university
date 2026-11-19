@@ -100,6 +100,82 @@ export const RECEIVED_GIFT_CHANCE = { herRoom: 0.05, hisRoom: 0.1 } as const
 /** What closeness multiplies the present's odds by: her tier, plus a lover's bonus on top. */
 export const RECEIVED_GIFT_CLOSENESS = { trusted: 1.5, devoted: 2, lover: 0.5 } as const
 
+// ─── Redrafts ──────────────────────────────────────────────────────────────────
+
+/**
+ * What each cast scene's ending adds to the next cast scene's odds of a redrafted opening; rolled
+ * as a cast scene opens, back to nothing once one is.
+ */
+export const REDRAFT_CHANCE_STEP = 0.1
+
+// ─── A guy's day ───────────────────────────────────────────────────────────────
+
+/**
+ * A guy's weight on each kind of day before the week and yesterday shift it; drawn once a day
+ * for every male character, off his mood offset and the date.
+ */
+export const GUY_DAY_WEIGHT = {
+  ordinary: 30,
+  upbeat: 8,
+  pumped: 6,
+  social: 7,
+  restless: 5,
+  hangry: 4,
+  tired: 6,
+  irritable: 5,
+  stressed: 5,
+  down: 3,
+  dread: 0,
+  lustful: 6.5,
+  hungover: 2,
+  funk: 4.8,
+  drained: 4.8
+} as const
+
+/** Every kind of day a guy can be having. */
+export type GuyDayKind = keyof typeof GUY_DAY_WEIGHT
+
+/** The kinds of day that keep a guy in his room, as a girl's stay-in days keep her. */
+export const GUY_STAY_IN_DAYS: readonly GuyDayKind[] = ['hungover', 'funk', 'drained']
+
+/** What each day of the week, Monday first, multiplies a kind's weight by. */
+export const GUY_WEEKDAY_SHIFT: readonly Partial<Record<GuyDayKind, number>>[] = [
+  { tired: 1.5, irritable: 1.3, upbeat: 0.8 },
+  {},
+  {},
+  {},
+  { upbeat: 1.3, social: 1.5, restless: 1.3, stressed: 0.7 },
+  { upbeat: 1.3, social: 1.3, stressed: 0.5, hungover: 4 },
+  { hungover: 3, stressed: 0.7 }
+]
+
+/** The weight a Sunday's dread of the week ahead takes; no other day draws it. */
+export const GUY_DREAD_WEIGHT = 6
+
+/**
+ * What the kind of day he had yesterday multiplies today's weights by: a night out leaves a
+ * hangover or a short night, sleep lost carries over, a funk lingers.
+ */
+export const GUY_CARRY_SHIFT: Partial<Record<GuyDayKind, Partial<Record<GuyDayKind, number>>>> = {
+  social: { hungover: 3, tired: 1.5 },
+  restless: { hungover: 3, tired: 1.5 },
+  tired: { tired: 1.4, irritable: 1.4 },
+  funk: { funk: 3, down: 1.5 },
+  down: { funk: 1.5, down: 1.5 }
+}
+
+/**
+ * What Mood-swings adds to a guy's weights, taken out of an ordinary day so his stay-in days
+ * keep their share: twice the lustful days, and the highs and lows felt harder.
+ */
+export const GUY_SWINGS_DELTA: Partial<Record<GuyDayKind, number>> = {
+  lustful: 6,
+  upbeat: 2,
+  down: 2,
+  irritable: 2,
+  ordinary: -12
+}
+
 // ─── Colds ─────────────────────────────────────────────────────────────────────
 
 /** Odds a new strain reaches campus; rolled at every scene ending once the cooldown is over. */
@@ -226,6 +302,59 @@ export const UP_PERCENT = { sour: 65, warming: 60, close: 50 }
 
 /** Percentage points a Good-natured girl adds to an encounter's odds, and a Disagreeable one takes off. */
 export const TRAIT_PERCENT = 10
+
+// ─── The roster's love lives ───────────────────────────────────────────────────
+
+/** Odds one character falls for another after a good meeting; rolled per side as the slot's pairs settle. */
+export const CRUSH_CHANCE = 0.05
+
+/** What a trait multiplies a love-life roll by where it tilts one, or divides it by. */
+export const ROMANCE_TRAIT_FACTOR = 1.5
+
+/** What being taken, and not open, multiplies a character's odds of falling for anybody by. */
+export const TAKEN_CRUSH_FACTOR = 0.1
+
+/** Odds two with a crush on each other get together after a good meeting; rolled as the slot's pairs settle. */
+export const COUPLE_CHANCE = 0.5
+
+/** Days after getting together in which an argument costs a couple nothing and nothing parts them. */
+export const HONEYMOON_DAYS = 14
+
+/** Odds a couple below friends breaks up after an argument; rolled as the slot's pairs settle. */
+export const BREAKUP_CHANCE = 0.25
+
+/** What either of a couple holding a crush on somebody else multiplies the break-up odds by. */
+export const BREAKUP_CRUSH_FACTOR = 3
+
+/** Odds one of a couple joins the other's slot; rolled per couple as the slot's overlay is dealt. */
+export const TOGETHER_CHANCE = 0.5
+
+/** Odds a couple is seen together by one who has a crush on either; rolled per couple per slot spent in one group. */
+export const SEEN_TOGETHER_CHANCE = 0.1
+
+/** Odds a couple with one graduate moves a step; rolled per such couple at each night's ending. */
+export const LONG_DISTANCE_STEP_CHANCE = 0.5
+
+/** Of those steps, the share that go well. */
+export const LONG_DISTANCE_GOOD_CHANCE = 0.4
+
+/** The steps a couple drops when one of them sees the other with the reader. */
+export const AFFAIR_SEEN_DROP = 4
+
+/** The steps a couple drops when one of them hears the other was with the reader. */
+export const AFFAIR_HEARD_DROP = 2
+
+/** The steps a friend of the one cheated on drops with the one who cheated, on seeing or hearing it. */
+export const AFFAIR_FRIEND_DROP = 1
+
+/** Odds one of a couple who just argued texts the reader to vent about it; rolled per such member at the ending. */
+export const VENT_CHANCE = 0.25
+
+/** Odds one with a crush she has not asked him about texts the reader for advice on it; rolled per such character each slot. */
+export const ADVICE_CHANCE = 0.03
+
+/** Odds a confession the reader advised is accepted where the crush is not mutual. */
+export const CONFESSION_ACCEPT_CHANCE = 0.33
 
 // ─── The feed ──────────────────────────────────────────────────────────────────
 

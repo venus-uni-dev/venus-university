@@ -31,9 +31,9 @@ export const TRAIT_DESCRIPTIONS: Readonly<Record<CharacterTrait, string>> = {
   'Terminally Online':
     'addicted to social media or online content',
   Promiscuous:
-    'hooks-up frequently and doesn\'t get jealous of her partners',
+    'hooks-up frequently and doesn\'t get jealous of their partners',
   'High Standards':
-    'picky about who she\'s attracted to'
+    'picky about who they\'re attracted to'
 }
 
 /** Guard for a trait echoed back by the LLM. */

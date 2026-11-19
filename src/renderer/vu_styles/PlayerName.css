@@ -1,10 +1,11 @@
-/* The reader's own question: his name, and the three stats he starts the semester on.
+/* The reader's own question: his name and pronouns, his picture, and the three stats he starts
+   the semester on.
    No mock — derived from the form modals already built, which is what it is. Imported from
    the view module, never from index.css.
 
    The veil, the fields, the squares, the buttons and the foot are base.css's. */
 
-/* Shorter than the form chassis, because there is less in it: two fields and three rows.
+/* Shorter than the form chassis, because there is less in it: a row of fields and three rows.
    At 980 the shadow still clears the top edge — the tilt lifts the far corner by half the
    width times its sine, 17px at the base -2°, against the 11px the offset puts it down by —
    so this panel keeps the shared angle rather than the long panel's relaxed one.
@@ -33,6 +34,28 @@
 .vu-who-names > .vu-field {
   flex: 1;
   min-width: 0;
+}
+
+/* The pronouns are one more answer in the same row, at the width their longest option needs, so
+   the two names keep sharing the rest. */
+.vu-who-names > .vu-field:last-child {
+  flex: 0 0 168px;
+}
+
+/* His picture stands in the round end the fields are padded clear of, centred on the panel's
+   height whatever the form below it holds: the label over the archway, the promise under it. */
+.vu-who-picture {
+  position: absolute;
+  top: 50%;
+  left: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 160px;
+  text-align: center;
+  white-space: nowrap;
+  translate: 0 -50%;
 }
 
 /* What the modal promises about a blank field, and what it costs to answer. Said at rest

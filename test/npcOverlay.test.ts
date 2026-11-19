@@ -109,6 +109,42 @@ describe('rollNpcOverlay', () => {
     }
   })
 
+  it('never fills a place past three, counting the girls who keep a haunt there', () => {
+    const chars: Record<string, OverlayCharInput> = {
+      a: input({ haunt: 'arcade', friends: ['f1', 'f2', 'f3', 'f4'] }),
+      b: input({ haunt: 'arcade', friends: ['f1', 'f2', 'f3', 'f4'] }),
+      f1: input({ friends: ['a', 'b'] }),
+      f2: input({ friends: ['a', 'b'] }),
+      f3: input({ friends: ['a', 'b'] }),
+      f4: input({ friends: ['a', 'b'] })
+    }
+    // rand() === 0 passes every pull, so each host pulls all the room she is given.
+    for (const rand of [() => 0, Math.random]) {
+      for (let run = 0; run < RUNS; run++) {
+        const overlay = rollNpcOverlay(0, 0, 'weekend', chars, [...SPOTS, 'arcade'], rand)
+        const atArcade = new Set(['a', 'b'])
+        for (const group of overlay.groups) {
+          if (group.location === 'arcade') for (const member of group.members) atArcade.add(member)
+        }
+        expect(atArcade.size).toBeLessThanOrEqual(3)
+      }
+    }
+  })
+
+  it('never sends an outing to a place somebody keeps a haunt at', () => {
+    const chars: Record<string, OverlayCharInput> = {
+      stays: input({ haunt: 'beach' }),
+      a: input({ friends: ['b'] }),
+      b: input({ friends: ['a'] }),
+      c: input()
+    }
+    for (let run = 0; run < RUNS; run++) {
+      for (const group of rollNpcOverlay(0, 0, 'weekend', chars, SPOTS).groups) {
+        expect(group.location).not.toBe('beach')
+      }
+    }
+  })
+
   it('places nobody in two groups at once', () => {
     const chars: Record<string, OverlayCharInput> = {}
     const everyone = ['a', 'b', 'c', 'd', 'e']
@@ -213,5 +249,47 @@ describe('rollNpcOverlay', () => {
     }
     const overlay = rollNpcOverlay(0, 0, null, chars, SPOTS, () => 0)
     expect(overlay.groups).toEqual([])
+  })
+
+  it('brings a couple together only where one of them already is, never past three', () => {
+    const chars: Record<string, OverlayCharInput> = {
+      a: input({ haunt: 'arcade', partners: ['b'], friends: ['c', 'd'] }),
+      b: input({ partners: ['a'] }),
+      c: input({ haunt: 'arcade', friends: ['a'] }),
+      d: input({ friends: ['a'] }),
+      e: input({ partners: ['f'] }),
+      f: input({ partners: ['e'] }),
+      g: input({ haunt: 'library', partners: ['h'] }),
+      h: input({ haunt: 'museum', partners: ['g'] })
+    }
+    for (let run = 0; run < RUNS; run++) {
+      const overlay = rollNpcOverlay(0, 1, 'weekend', chars, SPOTS)
+      const members = placed(overlay)
+      expect(new Set(members).size).toBe(members.length)
+      for (const place of new Set(overlay.groups.map((group) => group.location))) {
+        if (place === ROOM_LOCATION) continue
+        const keepers = ['a', 'c', 'g', 'h'].filter((id) => chars[id].haunt === place)
+        const others = overlay.groups
+          .filter((group) => group.location === place)
+          .flatMap((group) => group.members)
+          .filter((id) => !keepers.includes(id))
+        expect(keepers.length + others.length).toBeLessThanOrEqual(3)
+      }
+      // Two who each keep a haunt stay where they are.
+      expect(groupOf(overlay, 'g')?.members ?? ['g']).not.toContain('h')
+      const withA = groupOf(overlay, 'b')
+      if (withA?.members.includes('a')) expect(withA.location).toBe('arcade')
+    }
+  })
+
+  it('keeps two free lovers in one of their rooms on a passing roll', () => {
+    const chars: Record<string, OverlayCharInput> = {
+      e: input({ partners: ['f'] }),
+      f: input({ partners: ['e'] })
+    }
+    const overlay = rollNpcOverlay(0, 1, null, chars, SPOTS, () => 0)
+    expect(overlay.groups).toHaveLength(1)
+    expect(overlay.groups[0].location).toBe(ROOM_LOCATION)
+    expect(overlay.groups[0].members.sort()).toEqual(['e', 'f'])
   })
 })

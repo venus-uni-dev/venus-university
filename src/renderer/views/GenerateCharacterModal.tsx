@@ -2,11 +2,11 @@ import { useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { EMOTIONS } from '@shared/emotions'
-import { STOCK_POSITIONS } from '@shared/positions'
+import { STOCK_POSITIONS, stockCgsFor } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
 import { sfwWithholds } from '@shared/sfw'
 import { DEFAULT_LORA_WEIGHT, loraWeightText, parseLoraWeight } from '@shared/comfyModels'
-import type { CharacterLoraBrief, GenerateOptions, ReferenceImage } from '@shared/types'
+import type { CharacterLoraBrief, Gender, GenerateOptions, ReferenceImage } from '@shared/types'
 import { CheckField } from '../components/CheckField'
 import { ChipListInput } from '../components/ChipListInput'
 import { ComfyModelRow } from '../components/ComfyModelPicker'
@@ -23,10 +23,11 @@ import {
   press,
   quietLift,
   quietPress,
+  toggleLift,
   veilIn
 } from './motion'
-import { APPEARANCE_COLOR_HINT, LORA_REPLACE_NOTE } from './characterFields'
-import { DiceIcon } from './screenIcons'
+import { appearanceColorHint, LORA_REPLACE_NOTE } from './characterFields'
+import { DiceIcon, FemaleIcon, MaleIcon } from './screenIcons'
 import { committedWeightText, useCharacterLora, weightTextAfterPick } from './useCharacterLora'
 import '../vu_styles/GenerateCharacter.css'
 
@@ -35,19 +36,21 @@ export interface GenerateCharacterModalProps {
     firstName: string,
     lastName: string,
     prompt: string,
+    gender: Gender,
     namesAreSuggestions: boolean,
     options: GenerateOptions,
     reference?: ReferenceImage,
     lora?: CharacterLoraBrief
   ) => void
   /**
-   * A blank character written from the names, the description and her LoRA's tags alone, with
-   * no LLM call.
+   * A blank character of the picked gender written from the names, the description and her
+   * LoRA's tags alone, with no LLM call.
    */
   onCreateBlank: (
     firstName: string,
     lastName: string,
     personality: string,
+    gender: Gender,
     lora?: CharacterLoraBrief
   ) => void
   onClose: () => void
@@ -66,15 +69,26 @@ const SPRITES = `+${EMOTIONS.length} sprites`
 const CGS = `+${STOCK_POSITIONS.length} images`
 const ROOM = ROOM_VARIANTS.join(' + ')
 
+/** The two generation types, each a mark over its word. */
+const GENDERS: readonly { gender: Gender; word: string; Mark: () => JSX.Element }[] = [
+  { gender: 'female', word: 'Female', Mark: FemaleIcon },
+  { gender: 'male', word: 'Male', Mark: MaleIcon }
+]
+
+/** Whether a character of `gender` has the stock CGs, by the rule every stock-CG path reads. */
+function hasStockCgs(gender: Gender): boolean {
+  return stockCgsFor(gender === 'male' ? { gender } : null)
+}
+
 /** A trigger word as a tag: trimmed, whitespace runs closed up into underscores. */
 function triggerTag(text: string): string {
   return text.trim().replace(/\s+/g, '_')
 }
 
 /**
- * Collects optional inputs for a new character; blanks submit the shown suggestion. Skip LLM
- * filling turns that off: nothing renders and nothing is written but the names, the description
- * and her LoRA's tags.
+ * Collects optional inputs for a new character of the generation type picked first; blanks
+ * submit the shown suggestion. Skip LLM filling turns that off: nothing renders and nothing is
+ * written but the names, the description and her LoRA's tags.
  */
 export function GenerateCharacterModal({
   onSubmit,
@@ -82,6 +96,7 @@ export function GenerateCharacterModal({
   onClose,
   theme
 }: GenerateCharacterModalProps): JSX.Element | null {
+  const [gender, setGender] = useState<Gender>('female')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -103,14 +118,30 @@ export function GenerateCharacterModal({
   const [loraOutfit, setLoraOutfit] = useState<string[]>([])
   const [replace, setReplace] = useState(true)
   const loras = useCharacterLora(true)
-  // Lazy initializer: drawn once on open, only the dice draw again.
-  const [suggestions, setSuggestions] = useState(pickSuggestions)
+  // Lazy initializer: drawn once on open, and again only by the dice or a generation type.
+  const [suggestions, setSuggestions] = useState(() => pickSuggestions('female'))
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
+  // The stock CGs are offered only to the generation type that has them.
+  const stockCgs = hasStockCgs(gender)
+
+  /**
+   * Switches the generation type: fresh placeholders of that gender, with whatever was typed
+   * kept, and the NSFW CGs cleared where it has none.
+   */
+  const pickGender = (next: Gender): void => {
+    if (next === gender) return
+    setGender(next)
+    setSuggestions(pickSuggestions(next))
+    if (!hasStockCgs(next)) setCgs(false)
+  }
 
   /** Rolls one name field's placeholder and clears what was typed there. */
   const rollFirstName = (): void => {
     setFirstName('')
-    setSuggestions((current) => ({ ...current, firstName: pickFirstName(current.firstName) }))
+    setSuggestions((current) => ({
+      ...current,
+      firstName: pickFirstName(gender, current.firstName)
+    }))
   }
 
   const rollLastName = (): void => {
@@ -200,6 +231,33 @@ export function GenerateCharacterModal({
         {/* The column that grows with her LoRA's fields scrolls inside the capped panel. */}
         <div className="vu-scroll-box vu-generate-scroll">
         <div className="vu-generate-form">
+          {/* First, since it decides what every suggestion below is drawn from. One control in
+              two states, the one in force filled — so its hover may not animate a fill. */}
+          <div className="vu-field vu-generate-gender">
+            <span className="vu-field-label" id="generate-gender-label">
+              Generation type
+            </span>
+            <div className="vu-palette" role="group" aria-labelledby="generate-gender-label">
+              {GENDERS.map((entry) => {
+                const on = entry.gender === gender
+                return (
+                  <motion.button
+                    key={entry.gender}
+                    id={`generate-gender-${entry.gender}`}
+                    className={`vu-palette-btn${on ? ' vu-palette-btn--on' : ''}`}
+                    type="button"
+                    aria-pressed={on}
+                    {...gestures(false, toggleLift, quietPress)}
+                    onClick={() => pickGender(entry.gender)}
+                  >
+                    <entry.Mark />
+                    {entry.word}
+                  </motion.button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Every field is a suggestion in ghost italic: an untouched Generate still casts
               a complete character, so nothing here is ever required. With Skip LLM filling on,
               the description is instead her personality, and an empty one stays empty. */}
@@ -350,7 +408,7 @@ export function GenerateCharacterModal({
               />
               <label className="vu-field" htmlFor="generate-lora-appearance">
                 <span className="vu-field-label">Appearance tags</span>
-                <span className="vu-field-hint">{APPEARANCE_COLOR_HINT}</span>
+                <span className="vu-field-hint">{appearanceColorHint(gender)}</span>
                 <ChipListInput
                   id="generate-lora-appearance"
                   values={loraAppearance}
@@ -394,7 +452,7 @@ export function GenerateCharacterModal({
             checked={blank}
             onChange={setBlank}
           />
-          <span className="vu-field-label">Also render</span>
+          <span className="vu-field-label">Also render (Optional)</span>
           <CheckField
             id="generate-pe"
             label="PE outfit"
@@ -428,12 +486,12 @@ export function GenerateCharacterModal({
               meta={CGS}
               checked={cgs}
               onChange={setCgs}
-              disabled={blank}
+              disabled={blank || !stockCgs}
             />
           )}
           <CheckField
             id="generate-room"
-            label="Her dorm room"
+            label="Dorm room"
             meta={ROOM}
             checked={room}
             onChange={setRoom}
@@ -463,14 +521,16 @@ export function GenerateCharacterModal({
                       firstName.trim() || suggestions.firstName,
                       lastName.trim() || suggestions.lastName,
                       prompt.trim(),
+                      gender,
                       loraBrief()
                     )
                   : onSubmit(
                       firstName.trim() || suggestions.firstName,
                       lastName.trim() || suggestions.lastName,
                       prompt.trim() || suggestions.prompt,
+                      gender,
                       !firstName.trim() && !lastName.trim(),
-                      { pe, swim, nude, cgs, room },
+                      { pe, swim, nude, cgs: cgs && stockCgs, room },
                       reference ?? undefined,
                       loraBrief()
                     )

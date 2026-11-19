@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SUBJECT_TAGS } from '@shared/defaultTags'
+import { MALE_SUBJECT_TAGS, SUBJECT_TAGS } from '@shared/defaultTags'
 import type { PoseManifest } from '@shared/types'
 import {
   draftToCharacter,
@@ -34,6 +34,8 @@ function draft(over: Partial<CharacterDraft> = {}): CharacterDraft {
     datingPreference: 'She wants something that lasts',
     kinks: 'She fantasizes about being praised',
     isVirgin: false,
+    attractedToMale: true,
+    attractedToFemale: false,
     likes: ['quiet mornings'],
     dislikes: ['being interrupted'],
     giftPreferences: { liked: ['cozy'], disliked: ['edgy'] },
@@ -96,6 +98,15 @@ describe('draftToCharacter', () => {
     expect('voicePitch' in flatten({ voice: 'sultry' })).toBe(false)
   })
 
+  /** Absent is the other gender alone, so that answer and an answer of nobody write nothing. */
+  it('writes her sexuality only where it is not the other gender alone', () => {
+    expect('attractedTo' in flatten()).toBe(false)
+    expect('attractedTo' in flatten({ attractedToMale: false })).toBe(false)
+    expect(flatten({ attractedToFemale: true }).attractedTo).toEqual({ female: true, male: true })
+    const base = character({ attractedTo: { female: true, male: true } })
+    expect('attractedTo' in draftToCharacter(base, draft(), POSES, SUBJECT_TAGS)).toBe(false)
+  })
+
   /** The brief is what an unwritten record is resumed from, and this write is the sheet. */
   it('drops the brief the record was created with', () => {
     const base = character({
@@ -108,6 +119,45 @@ describe('draftToCharacter', () => {
   it('never lets one category sit on both lists', () => {
     const filled = flatten({ giftPreferences: { liked: ['cozy'], disliked: ['cozy', 'edgy'] } })
     expect(filled.giftPreferences).toEqual({ liked: ['cozy'], disliked: ['edgy'] })
+  })
+
+  /**
+   * His sheet is what every render and prompt reads his gender and build off: a breast tag, a
+   * girl's swimsuit or a girl's pose written here draws him wrong for the life of the record.
+   */
+  it('writes a guy as one, with no breast or makeup tag, his swimwear and a pose of his own', () => {
+    const poses: PoseManifest = {
+      ...POSES,
+      male_bold: { tags: ['standing'], description: 'legs apart', gender: 'male' }
+    }
+    const filled = draftToCharacter(
+      character({ gender: 'male' }),
+      draft({
+        appearance: {
+          ...draft().appearance,
+          makeup: ['eyeshadow'],
+          breastSize: ['big'],
+          facialHair: ['stubble', 'beard'],
+          build: ['bishounen', 'muscular_male']
+        }
+      }),
+      poses,
+      MALE_SUBJECT_TAGS
+    )
+    expect(filled.gender).toBe('male')
+    expect(filled.baseAppearance.slice(0, MALE_SUBJECT_TAGS.length)).toEqual(MALE_SUBJECT_TAGS)
+    expect(filled.baseAppearance).toContain('stubble')
+    expect(filled.baseAppearance).not.toContain('beard')
+    expect(filled.baseAppearance).toContain('bishounen')
+    expect(filled.baseAppearance).not.toContain('muscular_male')
+    expect(filled.height).toBe(1.03)
+    expect(filled.baseAppearance.some((tag) => tag.includes('breasts') || tag === 'eyeshadow')).toBe(
+      false
+    )
+    // Every guy's swimwear is the same: the draft's bikini is dropped.
+    expect(filled.swimOutfit).toEqual(['bare_legs', 'bare_feet', 'topless_male', 'male_swimwear'])
+    // The draft's girl's pose is not his to stand in.
+    expect(filled.pose).toBe('male_bold')
   })
 })
 

@@ -515,6 +515,28 @@ export function SkyIcon(): JSX.Element {
   )
 }
 
+/** A female character: the Venus mark. */
+export function FemaleIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <circle cx="12" cy="9" r="6" />
+      <path d="M12 15v7" />
+      <path d="M9 19h6" />
+    </svg>
+  )
+}
+
+/** A male character: the Mars mark. */
+export function MaleIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <circle cx="10" cy="14" r="6" />
+      <path d="M16 3h5v5" />
+      <path d="m21 3-6.75 6.75" />
+    </svg>
+  )
+}
+
 export function SlidersIcon(): JSX.Element {
   return (
     <svg {...APP_MARK}>

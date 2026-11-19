@@ -1,5 +1,6 @@
 import type { ClassKind } from './academics'
 import type { DormId } from './dorms'
+import { genderOf, type ReaderPronouns } from './gender'
 import { pairKeyOf } from './npcRelationships'
 import type { PlayerStats } from './playerStats'
 import { storedMemoryDesc } from './readerVoice'
@@ -18,6 +19,7 @@ import { SECRET_TIERS } from './secrets'
 import type {
   Character,
   CharMemory,
+  ClassCategory,
   CharSecret,
   CharStart,
   FeedAssignment,
@@ -25,6 +27,7 @@ import type {
   HiddenScheduleAssignment,
   JobAssignment,
   Occasion,
+  RomanceSetting,
   ScheduleResult,
   Season,
   SecretTier,
@@ -60,6 +63,14 @@ export const CALL_SCREEN: Record<NewGameCall, ApplicationScreen> = {
   profiles: 'profiles',
   secrets: 'profiles',
   classes: 'classes'
+}
+
+/**
+ * The call a banked reply's part answers: a part's id opens with its call's name, and a reply
+ * banked before calls were sent in parts carries the bare name.
+ */
+export function callOfPart(id: string): string {
+  return id.split(':')[0]
 }
 
 /** The calls a screen's Next sends and its Skip generation skips. */
@@ -202,9 +213,11 @@ export interface ApplicationGirl {
   milestones?: StartMilestones
   /** What she remembers of the reader from before the semester, dated before day 0. */
   memories: CharMemory[]
+  /** The player's own notes on her, as typed; absent when there are none. */
+  notes?: string
 }
 
-/** One call's reply as it landed, kept against the request it answered. */
+/** One part's reply as it landed, kept against the request it answered. */
 export interface BankedReply {
   /** The hash of the request's system, user and schema. */
   key: string
@@ -215,6 +228,8 @@ export interface BankedReply {
 export interface ApplicationReader {
   firstName: string
   lastName: string
+  /** Absent on a reader named before pronouns were asked, read as he/him. */
+  pronouns?: ReaderPronouns
   stats: PlayerStats
   bio?: string
 }
@@ -229,7 +244,7 @@ export type ApplicationContinuation = SemesterHandoff & {
   id: string
   parent?: string
   ending?: string
-  taken: { code: string; name: string }[]
+  taken: { code: string; name: string; category?: ClassCategory; major?: string }[]
 }
 
 /** Everything the four New Game calls produce, settled together: the semester Finalize reviews. */
@@ -248,6 +263,8 @@ export interface StartResult {
   fixedEdits: FixedOccasionEdits
   /** The secrets each girl starts the semester with, by charId. */
   secrets: Record<string, CharSecret[]>
+  /** The player's notes on each girl new to the roster, trimmed, by charId; absent where none. */
+  notes?: Record<string, string>
   /** Where each girl the reader already knows stands with him, by charId; a stranger has none. */
   starts: Record<string, CharStart>
   /** How the roster girls the player set stand with each other, by `pairKeyOf`; the rest are rolled. */
@@ -309,6 +326,15 @@ export interface FinalEdits {
   girls?: Record<string, FinalGirlEdit>
 }
 
+/**
+ * How many characters a semester's roster holds — exact, not a cap — between these two. The
+ * registrar offers only the classes a roster girl attends, and twelve girls' loads are what leave
+ * the player enough non-PE courses in distinct slots to finalize a legal schedule; twenty-four
+ * stays under the thirty seats ten PE classes of three hold.
+ */
+export const ROSTER_MIN = 12
+export const ROSTER_MAX = 24
+
 /** A New Game in progress. */
 export interface ApplicationDraft {
   /** The screen the player is on. */
@@ -316,6 +342,11 @@ export interface ApplicationDraft {
   season: Season
   /** The roster, in order, by charId. */
   chars: string[]
+  /**
+   * How many characters the roster holds once Characters' Next fills it, from {@link ROSTER_MIN}
+   * to {@link ROSTER_MAX}; absent reads as the least.
+   */
+  size?: number
   /** The occasions the semester invents, placed and seeded once. */
   plan: PlannedOccasion[]
   /**
@@ -336,7 +367,8 @@ export interface ApplicationDraft {
   /** How two roster girls stand with each other, by `pairKeyOf`; an absent pair is rolled. */
   pairs: Record<string, SceneRelation>
   reader?: ApplicationReader
-  replies: Partial<Record<NewGameCall, BankedReply>>
+  /** By part id, see {@link callOfPart}. */
+  replies: Record<string, BankedReply>
   /** The calls the player skipped generation for, in call order: their blanks are filled from pools. */
   skipped?: NewGameCall[]
   /**
@@ -371,6 +403,11 @@ export interface ApplicationDraft {
   composed?: StartResult
   /** The player's changes to {@link composed} on Finalize; absent where there are none. */
   finalEdits?: FinalEdits
+  /**
+   * How each gender takes to the reader, as Loading asked a first semester's; absent before it
+   * is asked and on a later semester's.
+   */
+  romance?: RomanceSetting
 }
 
 /**
@@ -396,6 +433,7 @@ export type ApplicationEntries = Pick<
   | 'occasions'
   | 'fixedEdits'
   | 'chars'
+  | 'size'
   | 'catalog'
   | 'girls'
   | 'pairs'
@@ -404,8 +442,18 @@ export type ApplicationEntries = Pick<
 
 /** What the player has entered in an application, and nothing generated or banked. */
 export function entriesOf(draft: ApplicationDraft): ApplicationEntries {
-  const { plan, planChanged, occasions, fixedEdits, chars, catalog, girls, pairs, pursuits } = draft
-  return { plan, planChanged, occasions, fixedEdits, chars, catalog, girls, pairs, pursuits }
+  const { plan, planChanged, occasions, fixedEdits, chars, size, catalog, girls, pairs, pursuits } =
+    draft
+  return { plan, planChanged, occasions, fixedEdits, chars, size, catalog, girls, pairs, pursuits }
+}
+
+/**
+ * How many characters the roster holds: the size picked, the least where none is, and never
+ * fewer than are on it already.
+ */
+export function rosterSizeOf(draft: Pick<ApplicationDraft, 'size' | 'chars'>): number {
+  const size = Math.min(ROSTER_MAX, draft.size ?? ROSTER_MIN)
+  return Math.max(ROSTER_MIN, draft.chars.length, size)
 }
 
 /** Whether she continues from the last semester rather than joining the roster in this one. */
@@ -703,13 +751,21 @@ export function withSecret(
   return out
 }
 
+/** Her with her notes as typed, empty ones dropped; the same girl where nothing changes. */
+export function withNotes(girl: ApplicationGirl, text: string): ApplicationGirl {
+  if ((girl.notes ?? '') === text) return girl
+  const { notes: _dropped, ...rest } = girl
+  return text === '' ? rest : { ...rest, notes: text }
+}
+
 /** Whether nothing at all is set for her. */
 function girlEmpty(girl: ApplicationGirl): boolean {
   return (
     Object.keys(girl.profile).length === 0 &&
     Object.keys(girl.secrets).length === 0 &&
     girl.milestones === undefined &&
-    girl.memories.length === 0
+    girl.memories.length === 0 &&
+    girl.notes === undefined
   )
 }
 
@@ -762,23 +818,34 @@ export function keptStartMilestones(milestones: StartMilestones): StartMilestone
   return anything ? out : undefined
 }
 
+/** Every memory she starts the semester with, as the player wrote it: those with words, oldest first. */
+export function writtenStartMemories(girl: Pick<ApplicationGirl, 'memories'>): CharMemory[] {
+  return girl.memories.filter((memory) => written(memory.desc)).sort((a, b) => a.date - b.date)
+}
+
 /**
  * What she remembers of the reader as the semester opens: every memory with words, each filed in
- * the reader's voice, oldest first.
+ * the reader's voice as her own gender and the reader's pronouns hold it, oldest first.
  */
-export function startMemoriesOf(girl: Pick<ApplicationGirl, 'memories'>): CharMemory[] {
-  return girl.memories
-    .filter((memory) => written(memory.desc))
-    .map((memory) => ({ date: memory.date, type: memory.type, desc: storedMemoryDesc(memory.desc) }))
-    .sort((a, b) => a.date - b.date)
+export function startMemoriesOf(
+  girl: Pick<ApplicationGirl, 'memories'>,
+  character: Pick<Character, 'gender'> | undefined,
+  reader: ReaderPronouns
+): CharMemory[] {
+  const holder = genderOf(character)
+  return writtenStartMemories(girl).map((memory) => ({
+    date: memory.date,
+    type: memory.type,
+    desc: storedMemoryDesc(memory.desc, holder, reader)
+  }))
 }
 
 /** Her affection on day 0, off exactly the memories the first save is written with. */
 function startAffectionOf(
   girl: Pick<ApplicationGirl, 'memories'>,
-  character: Pick<Character, 'traits'> | undefined
+  character: Pick<Character, 'traits' | 'gender'> | undefined
 ): number {
-  return affectionFor({ memories: startMemoriesOf(girl) }, 0, character)
+  return affectionFor({ memories: writtenStartMemories(girl) }, 0, character)
 }
 
 /**
@@ -789,11 +856,11 @@ function startAffectionOf(
  */
 export function startMilestonesOf(
   girl: Pick<ApplicationGirl, 'memories' | 'milestones'>,
-  character: Pick<Character, 'traits'> | undefined
+  character: Pick<Character, 'traits' | 'gender'> | undefined
 ): StartMilestones {
   const set = girl.milestones ?? emptyStartMilestones()
   const affection = startAffectionOf(girl, character)
-  const met = set.met || startMemoriesOf(girl).length > 0
+  const met = set.met || writtenStartMemories(girl).length > 0
   const scene = normalizeMilestones(
     { ...set, met, crush: set.crush && affection >= 0 },
     dispositionOf(affection),
@@ -810,7 +877,7 @@ export function startMilestonesOf(
 /** Her disposition as the semester opens, or null for a girl the reader has not met. */
 export function startDispositionOf(
   girl: Pick<ApplicationGirl, 'memories' | 'milestones'>,
-  character: Pick<Character, 'traits'> | undefined
+  character: Pick<Character, 'traits' | 'gender'> | undefined
 ): Disposition | null {
   if (!startMilestonesOf(girl, character).met) return null
   return dispositionOf(startAffectionOf(girl, character))
@@ -819,7 +886,7 @@ export function startDispositionOf(
 /** The boxes the screen holds where the others put them, each with the value it is held at. */
 export function startLocksOf(
   girl: Pick<ApplicationGirl, 'memories' | 'milestones'>,
-  character: Pick<Character, 'traits'> | undefined
+  character: Pick<Character, 'traits' | 'gender'> | undefined
 ): Partial<Record<StartBox, boolean>> {
   const shown = startMilestonesOf(girl, character)
   const affection = startAffectionOf(girl, character)
@@ -828,7 +895,7 @@ export function startLocksOf(
     dispositionOf(affection),
     character
   )
-  if (startMemoriesOf(girl).length > 0) locked.met = true
+  if (writtenStartMemories(girl).length > 0) locked.met = true
   if (affection < 0 && !('crush' in locked)) locked.crush = false
   if (!shown.met) locked.contact = false
   return locked
@@ -840,7 +907,7 @@ export function startLocksOf(
  */
 export function startMilestonesWith(
   girl: Pick<ApplicationGirl, 'memories' | 'milestones'>,
-  character: Pick<Character, 'traits'> | undefined,
+  character: Pick<Character, 'traits' | 'gender'> | undefined,
   box: StartBox,
   value: boolean
 ): StartMilestones {
@@ -854,11 +921,12 @@ export function startMilestonesWith(
  * Where she stands with the reader as the first save opens, or null for a girl he has not met:
  * her memories, her flags as the milestones would have left them with the reveals her tier
  * opens, her name known, and the day a lover's or an ex's standing runs from. Her romance is
- * settled, its count left absent.
+ * settled, its count left absent. Her memories are filed in the reader's own pronouns.
  */
 export function charStartOf(
   girl: ApplicationGirl | undefined,
-  character: Pick<Character, 'traits'> | undefined
+  character: Pick<Character, 'traits' | 'gender'> | undefined,
+  reader: ReaderPronouns
 ): CharStart | null {
   if (!girl) return null
   const milestones = startMilestonesOf(girl, character)
@@ -866,7 +934,7 @@ export function charStartOf(
   const affection = startAffectionOf(girl, character)
   const flags = flagsOfEntry({ disposition: dispositionOf(affection), milestones }, character)
   return {
-    memories: startMemoriesOf(girl),
+    memories: startMemoriesOf(girl, character, reader),
     flags: refreshedFlags({ ...flags, gaveContactInfo: milestones.contact }, affection),
     nameKnown: true,
     ...(milestones.datingSince !== undefined ? { datingSince: milestones.datingSince } : {}),

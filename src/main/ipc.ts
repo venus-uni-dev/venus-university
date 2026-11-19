@@ -53,6 +53,7 @@ import { keptReplayIds, type SlotReplay } from '@shared/replays'
 import type { RoomVariant } from '@shared/room'
 import type { SavedScene } from '@shared/sceneCreator'
 import { appError, toAppError, truncate } from '@shared/errors'
+import { asGender } from '@shared/gender'
 import {
   getAvailablePoses,
   getQuickstart,
@@ -107,7 +108,7 @@ import {
 import {
   duplicateCharacter,
   exportCharacter,
-  importCharacter,
+  importArchive,
   saveExportFile
 } from './services/characterTransferService'
 import { exportBackup, importBackup } from './services/backupService'
@@ -125,12 +126,14 @@ import {
   listLocalModels,
   modelFolderOf,
   probe as probeComfy,
+  repaintWardrobe,
   resolveTarget as resolveComfyTarget,
   setStateSink as setComfyStateSink,
   start as startComfy,
   type ComfyTarget,
   stopByHand as stopComfyByHand
 } from './services/comfyService'
+import { REPAINT_STRENGTH } from '@shared/outfits'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generatePhoto } from '@shared/llm/cloudImage'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
@@ -731,6 +734,53 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  /*
+   * Repaint's render, queued and cancellable as the hand repair's is, and answering with bytes
+   * for the same reason: nothing is written until the player has looked at it.
+   */
+  handle(
+    'comfy:repaint',
+    (
+      _event,
+      character: Character,
+      target: WardrobeTarget,
+      source: string,
+      paintLayer: string,
+      mask: string,
+      strength: number,
+      seed: number
+    ) => {
+      // Decoded and checked before the queue, so a bad input fails now rather than an hour in.
+      const sourceBytes = decodePng(source, 'the repaint source')
+      const paint = decodePng(paintLayer, 'the paint layer')
+      const maskBytes = decodePng(mask, 'the repaint mask')
+      if (
+        typeof strength !== 'number' ||
+        !Number.isFinite(strength) ||
+        strength < REPAINT_STRENGTH.min ||
+        strength > REPAINT_STRENGTH.max
+      ) {
+        throw appError(
+          'REPAINT_STRENGTH_INVALID',
+          'That repaint strength is out of range.',
+          String(strength)
+        )
+      }
+      return enqueueComfyJob(character, `repaint:${target}`, (options) =>
+        repaintWardrobe(
+          character,
+          target === 'default' ? null : target,
+          sourceBytes,
+          paint,
+          maskBytes,
+          strength,
+          seed,
+          options
+        )
+      )
+    }
+  )
+
   handle('jobs:cancelGroup', (_event, group: string) => cancelGroup(group))
 
   // The per-set axis: cancels one set's keys without touching the character's other work.
@@ -760,11 +810,6 @@ export function registerIpcHandlers(): void {
 
   // The third one-shot New Game call, on the same terms.
   handle('llm:generateOccasions', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
-  )
-
-  // The roster's secrets, the fourth one-shot, on the same terms.
-  handle('llm:generateSecrets', (_event, request: StructuredRequest, group: string) =>
     runAbortable(group, (signal) => completeStructured(request, signal))
   )
 
@@ -805,9 +850,10 @@ export function registerIpcHandlers(): void {
       _event,
       firstName: string,
       lastName: string,
+      gender: unknown,
       brief?: CharacterBrief,
       reference?: ReferenceImage
-    ) => createCharacter(firstName, lastName, brief, reference)
+    ) => createCharacter(firstName, lastName, asGender(gender), brief, reference)
   )
   // The picture her brief was submitted with, for a resumed write.
   handle('chars:reference', (_event, charId: string) => readReference(charId))
@@ -886,7 +932,7 @@ export function registerIpcHandlers(): void {
     })
     if (canceled || filePaths.length === 0) return null
 
-    return importCharacter(filePaths[0])
+    return importArchive(filePaths[0])
   })
   // The third transfer channel, with no dialog.
   handle('chars:duplicate', (_event, charId: string) => duplicateCharacter(charId))

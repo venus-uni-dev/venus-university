@@ -7,7 +7,8 @@ import { placeUnder } from '../components/popupPlace'
 import { useDismissLayer, useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { PORTRAIT_SLOTS, UNKNOWN_NAME, useGameStore } from '../stores/gameStore'
-import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
+import { matchCgBiologyOf, noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
+import { stockCgsInPlay } from '@shared/positions'
 import { cgKnownMissing, displaySlotsOf } from '../stores/stageDisplay'
 import { profileUrl, useCharacterStore } from '../stores/characterStore'
 import { CgPickerModal } from './CgPickerModal'
@@ -42,6 +43,10 @@ export function CastModal({ theme, onClose }: CastModalProps): JSX.Element | nul
   const toggleStageChar = useGameStore((s) => s.toggleStageChar)
   const setOutfitLock = useGameStore((s) => s.setOutfitLock)
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
+  const stockCgs = stockCgsInPlay(
+    useGameStore((s) => s.playerPronouns),
+    useSettingsStore(matchCgBiologyOf)
+  )
   // Reframing a portrait re-cuts the file behind its URL, so a row reads the version.
   const versions = useCharacterStore((s) => s.spriteVersion)
   // The frame the floating wardrobe lists are placed against, and the one row whose list is up.
@@ -105,12 +110,14 @@ export function CastModal({ theme, onClose }: CastModalProps): JSX.Element | nul
                   // Her CG over the stage, by the same rule the stage draws it by.
                   const cgOn =
                     cgLock?.charId === charId &&
-                    !cgKnownMissing(charId, cgLock.position, { cgReady, customCgReady })
+                    !cgKnownMissing(charId, cgLock.position, { cgReady, customCgReady, stockCgs })
                   // Absent while her pictures are withheld, and while she has no CG set whole
                   // on disk unless one of hers still stands over the stage to be taken off.
                   const cgs =
                     !noNsfwImages &&
-                    (cgReady[charId] === true || (customCgReady[charId]?.length ?? 0) > 0 || cgOn)
+                    ((stockCgs && cgReady[charId] === true) ||
+                      (customCgReady[charId]?.length ?? 0) > 0 ||
+                      cgOn)
 
                   return (
                     <div className="vu-row vu-cast-row" key={charId}>

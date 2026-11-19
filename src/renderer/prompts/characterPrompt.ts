@@ -1,5 +1,8 @@
+import { poseKeysFor } from '@shared/assetRules'
 import { withoutSubjectTags } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
+import { genderOf, PRONOUNS } from '@shared/gender'
+import { asAttraction, attractionOf, isDefaultAttraction } from '@shared/relationship'
 import {
   BREAST_SIZES,
   EXPRESSION_EYEBROWS,
@@ -8,6 +11,7 @@ import {
   EXPRESSION_MOUTH,
   EXPRESSION_OTHER,
   EYE_COLORS,
+  FACIAL_HAIR,
   HAIR_BANGS,
   HAIR_COLORS,
   HAIR_LENGTHS,
@@ -15,6 +19,11 @@ import {
   HAIR_TEXTURES,
   HEAD_ACCESSORIES,
   MAKEUP_TAGS,
+  MALE_BUILDS,
+  MALE_HAIR_STYLES,
+  MALE_HAIR_TEXTURES,
+  MALE_HEAD_ACCESSORIES,
+  MALE_SKIN_TAGS,
   OUTFIT_SKIN_EXPOSURE,
   SHADES,
   SKIN_TAGS
@@ -23,6 +32,7 @@ import type {
   Character,
   CharacterBehavior,
   Emotion,
+  Gender,
   PoseManifest,
   ReferenceImage,
   StructuredRequest
@@ -39,7 +49,6 @@ import {
   type GiftCategory,
   type GiftPreferences
 } from '@shared/shop'
-import { poseKeysOf } from '../stores/assetStore'
 import { objectSchema } from './schema'
 import { seedWordBlock } from './seedWords'
 
@@ -52,11 +61,13 @@ export interface CharacterDraft {
   personality: string
   behavior: CharacterBehavior
   backstory: string
-  /** The four love-life answers from character generation. */
+  /** The love-life answers from character generation. */
   datingHistory: string
   datingPreference: string
   kinks: string
   isVirgin: boolean
+  attractedToMale: boolean
+  attractedToFemale: boolean
   likes: string[]
   dislikes: string[]
   /**
@@ -86,14 +97,19 @@ export interface CharacterDraft {
     hairStyle: string[]
     hairBangs: string[]
     headAccessories: string[]
-    makeup: string[]
-    breastSize: string[]
+    /** Asked of a female character only. */
+    makeup?: string[]
+    breastSize?: string[]
+    /** Asked of a male character only. */
+    facialHair?: string[]
+    build?: string[]
     skin: string[]
   }
   outfit: string[]
   /** The two alternate wardrobes, always written whether or not they get rendered. */
   peOutfit: string[]
-  swimOutfit: string[]
+  /** Asked of a female character only. */
+  swimOutfit?: string[]
   pose: string
   /** Flat tag list per emotion, free-form so the model can reweight a tag. */
   expressions: Record<Emotion, string[]>
@@ -140,33 +156,198 @@ const SYSTEM = [
   'And you\'re totally anal retentive: you always return a single, fully-formed JSON object matching the provided schema exactly.'
 ].join(' ')
 
-/** The character-generation reference-image instruction, empty when no image was attached. */
-function referenceBlock(reference?: ReferenceImage): string[] {
+/**
+ * The character-generation reference-image instruction in the character's pronouns, empty when
+ * no image was attached.
+ */
+function referenceBlock(gender: Gender, reference?: ReferenceImage): string[] {
   if (!reference) return []
+  const p = PRONOUNS[gender]
   return [
     '',
     'REFERENCE IMAGE',
-    'A picture of the character is attached. Use it as inspiration for her appearance and her default outfit, noting the colors and vibe.',
-    'Don\'t copy the image exactly, try and imagine how she\'d look as a university student in our world.',
+    `A picture of the character is attached. Use it as inspiration for ${p.their} appearance and ${p.their} default outfit, noting the colors and vibe.`,
+    `Don't copy the image exactly, try and imagine how ${p.they}'d look as a university student in our world.`,
   ]
 }
 
+/** The name the BEHAVIOR example sentence is written about, one per gender. */
+const EXAMPLE_NAMES: Readonly<Record<Gender, string>> = { female: 'Sarah', male: 'Jason' }
+
+/** The APPEARANCE questions, each gender asked from its own vocabulary. */
+const APPEARANCE_LINES: Readonly<Record<Gender, readonly string[]>> = {
+  female: [
+    'What does she look like? Interesting answers only. Form your answer from these categories below:',
+    `hairColor/eyeColor: ${EYE_COLORS.join(', ')} (blonde for hairColor)`,
+    `For hairShade/eyeShade, you can optionally pick (0-1): ${SHADES.join(', ')}.`,
+    `hairLength: ${HAIR_LENGTHS.join(', ')}`,
+    `hairTexture: ${HAIR_TEXTURES.join(', ')}`,
+    `hairStyle (pick 1 or more): ${HAIR_STYLES.join(', ')}`,
+    `hairBangs (pick 0 or more): ${HAIR_BANGS.join(', ')}`,
+    `headAccessories (pick 1 or more, and specify the color or material): ${HEAD_ACCESSORIES.join(', ')}`,
+    `makeup (pick 0-2, specify color for eyeshadow): ${MAKEUP_TAGS.join(', ')}`,
+    `breastSize (pick 1, omit for medium size): ${BREAST_SIZES.join(', ')}`,
+    `skin (pick 1, omit for fair skin): ${SKIN_TAGS.join(', ')}`
+  ],
+  male: [
+    'What does he look like? Interesting answers only. Form your answer from these categories below:',
+    `hairColor/eyeColor: ${EYE_COLORS.join(', ')} (blonde for hairColor)`,
+    `For hairShade/eyeShade, you can optionally pick (0-1): ${SHADES.join(', ')}.`,
+    `hairLength: ${HAIR_LENGTHS.join(', ')}`,
+    `hairTexture: ${MALE_HAIR_TEXTURES.join(', ')}`,
+    `hairStyle (pick 1 or more): ${MALE_HAIR_STYLES.join(', ')}`,
+    `hairBangs (pick 0 or more): ${HAIR_BANGS.join(', ')}`,
+    `headAccessories (pick 0 or more, and specify the color or material): ${MALE_HEAD_ACCESSORIES.join(', ')}`,
+    `facialHair (pick 0-1, omit for clean-shaven): ${FACIAL_HAIR.join(', ')}`,
+    `build (pick 0-1, omit for a petite build): ${MALE_BUILDS.join(', ')}`,
+    `skin (pick 1, omit for fair skin): ${MALE_SKIN_TAGS.join(', ')}`
+  ]
+}
+
+/** The OUTFIT instructions, each gender dressed in its own words. */
+const OUTFIT_LINES: Readonly<Record<Gender, readonly string[]>> = {
+  female: [
+    'What outfit does she rock? Time to go shopping, RITA! Pick out a wardrobe and describe it in booru-style comma separated tags.',
+    'Be specific! Every clothing item must ALSO name at least one colour or material inside the tag. Use common words like "green" or "leather".',
+    `Lock in the exact characteristics of the outfit by naming what skin is exposed using these tags: ${OUTFIT_SKIN_EXPOSURE.join(', ')}`,
+    'bare_legs is only for fully bare legs, use "thighs" if you want to describe the bit of skin showing above thighhighs or socks.',
+    'Pick as many items as you want, just keep in mind: Fashionable characters ONLY!',
+    'Just because she\'s shy or silly doesn\'t mean she\'s allowed to be frumpy. Everyone has to SLAY with a cute, hot, or sexy fit',
+    'Try layering, accessorizing, or skin exposure. You can even combine all three if it makes sense.',
+    'Take inspiration from modern Asian fashion and anime character design.',
+    'Oh, and this is her casual, everyday outfit: NOT a costume. She can wear a fancy dress if that\'s who she is, but no tutus for ballet dancers or scrubs for med students. Her interests and activities do not dress her.',
+    'And do NOT make her carry anything: no handbags, backpacks, totes, umbrellas, phones. Her hands are empty.',
+    'Nothing on her head either, like hats or cat ears. Accessories like earrings go in headAccessories above.'
+  ],
+  male: [
+    'What outfit does he rock? Time to go shopping, RITA! Pick out a wardrobe and describe it in booru-style comma separated tags.',
+    'Be specific! Every clothing item must ALSO name at least one colour or material inside the tag. Use common words like "green" or "leather".',
+    'Pick as many items as you want, just keep in mind: Fashionable characters ONLY!',
+    'Just because he\'s shy or nerdy doesn\'t mean he\'s allowed to be a slob. Everyone has to SLAY with a sharp, hot, or sexy fit. Try layering and/or accessorizing.',
+    'Take inspiration from modern Asian fashion and anime character design.',
+    'Oh, and this is his casual, everyday outfit: NOT a costume. He can wear a suit if that\'s who he is, but no jerseys for jocks or scrubs for med students. His interests and activities do not dress him.',
+    'And do NOT make him carry anything: no bags, backpacks, guitars, umbrellas, phones. His hands are empty.',
+    'Nothing on his head either, like hats or cat ears. Accessories like earrings go in headAccessories above.'
+  ]
+}
+
+/** The SWIMSUIT section, asked of a female character only. */
+const SWIMSUIT_LINES: readonly string[] = [
+  'SWIMSUIT',
+  'And something for the pool or the beach. You\'ll probably use most of the skin exposure tags here.',
+  ''
+]
+
+/** A male character's swimsuit, the same for every guy and never asked for. */
+const MALE_SWIM_OUTFIT_TAGS: readonly string[] = [
+  'bare_legs',
+  'bare_feet',
+  'topless_male',
+  'male_swimwear'
+] as const
+
+/** What the PE OUTFIT instruction adds for each gender after asking for the kit. */
+const PE_OUTFIT_LINES: Readonly<Record<Gender, readonly string[]>> = {
+  female: ['Make sure to include skin exposure tags.'],
+  male: []
+}
+
 /**
- * Builds the character-generation request. `poses` is the available set — those that can
- * actually render.
+ * The appearance object one gender's draft is asked for: a female character's with makeup and a
+ * breast size, a male one's with facial hair and a build, each from its own vocabulary.
+ */
+function appearanceSchemaOf(gender: Gender): Record<string, unknown> {
+  if (gender === 'male') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'hairColor',
+        'eyeColor',
+        'hairShade',
+        'eyeShade',
+        'hairLength',
+        'hairTexture',
+        'hairStyle',
+        'hairBangs',
+        'headAccessories',
+        'facialHair',
+        'build',
+        'skin'
+      ],
+      properties: {
+        hairColor: enumField(HAIR_COLORS),
+        eyeColor: enumField(EYE_COLORS),
+        // Arrays because the pick is 0–1 and the strict subset has no optional key.
+        hairShade: enumArray(SHADES),
+        eyeShade: enumArray(SHADES),
+        hairLength: enumField(HAIR_LENGTHS),
+        hairTexture: enumField(MALE_HAIR_TEXTURES),
+        hairStyle: enumArray(MALE_HAIR_STYLES),
+        hairBangs: enumArray(HAIR_BANGS),
+        // Free-form so a pick can carry the colour or material the prompt asks for.
+        headAccessories: stringArray(),
+        facialHair: enumArray(FACIAL_HAIR),
+        build: enumArray(MALE_BUILDS),
+        skin: enumArray(MALE_SKIN_TAGS)
+      }
+    }
+  }
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'hairColor',
+      'eyeColor',
+      'hairShade',
+      'eyeShade',
+      'hairLength',
+      'hairTexture',
+      'hairStyle',
+      'hairBangs',
+      'headAccessories',
+      'makeup',
+      'breastSize',
+      'skin'
+    ],
+    properties: {
+      hairColor: enumField(HAIR_COLORS),
+      eyeColor: enumField(EYE_COLORS),
+      // Arrays because the pick is 0–1 and the strict subset has no optional key.
+      hairShade: enumArray(SHADES),
+      eyeShade: enumArray(SHADES),
+      hairLength: enumField(HAIR_LENGTHS),
+      hairTexture: enumField(HAIR_TEXTURES),
+      hairStyle: enumArray(HAIR_STYLES),
+      hairBangs: enumArray(HAIR_BANGS),
+      // Free-form so a pick can carry the colour or material the prompt asks for.
+      headAccessories: stringArray(),
+      makeup: stringArray(),
+      breastSize: enumArray(BREAST_SIZES),
+      skin: enumArray(SKIN_TAGS)
+    }
+  }
+}
+
+/**
+ * Builds the character-generation request for a character of `gender`, written in its pronouns
+ * and from its vocabulary under a cacheKey of its own. `poses` is the available set — those that
+ * can actually render — of which the gender's own are offered.
  */
 export function buildCharacterPrompt(
   firstName: string,
   lastName: string,
   userPrompt: string,
+  gender: Gender,
   poses: PoseManifest,
   seedWord: string,
   namesAreSuggestions = false,
   reference?: ReferenceImage
 ): StructuredRequest {
-  const brief = userPrompt.trim() || 'A college girl.'
+  const p = PRONOUNS[gender]
+  const brief = userPrompt.trim() || `A college ${p.noun}.`
   // Sorted, so the prefix stays identical for prompt caching.
-  const poseKeys = poseKeysOf(poses)
+  const poseKeys = poseKeysFor(poses, gender)
   // A half-given name gets its partner matched by culture.
   const first = firstName.trim()
   const last = lastName.trim()
@@ -184,102 +365,84 @@ export function buildCharacterPrompt(
 
   // Invariant tag lists lead so prompt caching can reuse the bulky prefix.
   const preamble = [
-    'Alright, RITA! Let\'s create a complex female character design. Consider the following:',
+    `Alright, RITA! Let's create a complex ${gender} character design. Consider the following:`,
     '',
     'PERSONALITY',
     'Concoct an interesting mix of answers to the below questions, then weave them into a single colorful paragraph:',
-    '- What is her archetype? Begin with <Name> is a gamer/med student/serial flirt/immortal demigod, etc.',
-    '- How does she choose to present herself to others?',
-    '- Who is she really, when her guard drops?',
-    '- What does she actually need/desire from other people, even if she doesn\'t know it?',
-    '- What flaw of hers pushes others away and keeps her from getting what she wants?',
-    '- Optional: Verbal tics, habits, or other quirks that make her unique.',
+    `- What is ${p.their} archetype? Begin with <Name> is a gamer/med student/serial flirt/immortal demigod, etc.`,
+    `- How does ${p.they} choose to present ${p.themself} to others?`,
+    `- Who is ${p.they} really, when ${p.their} guard drops?`,
+    `- What does ${p.they} actually need/desire from other people, even if ${p.they} doesn't know it?`,
+    `- What flaw of ${p.theirs} pushes others away and keeps ${p.them} from getting what ${p.they} wants?`,
+    `- Optional: Verbal tics, habits, or other quirks that make ${p.them} unique.`,
     '',
     'BEHAVIOR',
-    'How does she treat other people? Check out the five categories below and describe her behavior.',
-    'Write them in the third person, use her name, and name the stage inside the sentence, like: "Around friends, Sarah drops the polite voice and gets loud, and she..."',
+    `How does ${p.they} treat other people? Check out the five categories below and describe ${p.their} behavior.`,
+    `Write them in the third person, use ${p.their} name, and name the stage inside the sentence, like: "Around friends, ${EXAMPLE_NAMES[gender]} drops the polite voice and gets loud, and ${p.they}..."`,
     'Remember! Real people are inconsistent and contradictory. Make sure you figure out something different for all five categories.',
     '- withStrangers: strangers and passing acquaintances.',
-    '- withFriends: people she trusts.',
-    '- withCrush: someone she has unspoken romantic feelings for.',
-    '- withLover: someone she is actually with.',
-    '- withEnemy: someone she dislikes.',
+    `- withFriends: people ${p.they} trusts.`,
+    `- withCrush: someone ${p.they} has unspoken romantic feelings for.`,
+    `- withLover: someone ${p.they} is actually with.`,
+    `- withEnemy: someone ${p.they} dislikes.`,
     '',
     'BACKSTORY',
-    'What\'s something in her past that still affects the way she acts?',
-    'It can be positive or negative, like inspiring her to become a firefighter or making her afraid of loud places.',
-    'Try and tell us something that isn\'t already in her personality description.',
+    `What's something in ${p.their} past that still affects the way ${p.they} acts?`,
+    `It can be positive or negative, like inspiring ${p.them} to become a firefighter or making ${p.them} afraid of loud places.`,
+    `Try and tell us something that isn't already in ${p.their} personality description.`,
     '',
     'LOVE LIFE',
-    'Four separate answers here, and keep them from bleeding into each other:',
-    '- datingHistory: Who has she been with, and how did it go? Exes, flings, crushes that went nowhere, or nobody at all.',
-    '- datingPreference: Is she after something casual or something long term? Say plainly whether she sleeps with people casually.',
-    '- kinks: What does she fantasize about? Name a specific kink or fetish of hers, giving or receiving.',
-    '- isVirgin: true if she has never had sex, false if she has.',
-    'Keep each one to a sentence or two, and make the four of them add up to a person: her history shapes what she wants, and what she wants is often not what she does.',
+    'Separate answers here, and keep them from bleeding into each other:',
+    `- datingHistory: Who has ${p.they} been with, and how did it go? Exes, flings, crushes that went nowhere, or nobody at all.`,
+    `- datingPreference: Is ${p.they} after something casual or something long term? Say plainly whether ${p.they} sleeps with people casually.`,
+    `- kinks: What does ${p.they} fantasize about? Name a specific kink or fetish of ${p.theirs}, giving or receiving.`,
+    `- isVirgin: true if ${p.they} has never had sex, false if ${p.they} has.`,
+    `- attractedToMale and attractedToFemale: whether ${p.they}'s attracted to men, and whether ${p.they}'s attracted to women. At least one must be true.`,
+    `Keep each one to a sentence or two, and make them add up to a person: ${p.their} history shapes what ${p.they} wants, and what ${p.they} wants is often not what ${p.they} does.`,
     '',
     'LIKES AND DISLIKES',
     'Give us a handful of likes and a handful of dislikes. Concrete things, and don\'t be too specific: "pizza" over "cold pizza for breakfast".',
-    'Fill them with her tastes in food, drink, media and entertainment, plus any pet peeves. No need to cover every category.',
+    `Fill them with ${p.their} tastes in food, drink, media and entertainment, plus any pet peeves. No need to cover every category.`,
     '',
     'GIFT PREFERENCES',
-    'What kinds of gifts does she like, and what kinds wouldn\'t impress her?',
+    `What kinds of gifts does ${p.they} like, and what kinds wouldn't impress ${p.them}?`,
     'Pick from the categories below:',
     ...GIFT_CATEGORIES.map((cat) => `- ${cat}: ${GIFT_CATEGORY_DESCRIPTIONS[cat]}.`),
-    'Simply don\'t mention any categories that she\'s neutral on.',
+    `Simply don't mention any categories that ${p.they}'s neutral on.`,
     '',
     'TRAITS',
     'Below is a short list of traits. Fill the traits array with every one that genuinely fits the character you just wrote:',
     ...CHARACTER_TRAITS.map((trait) => `- ${trait}: ${TRAIT_DESCRIPTIONS[trait]}.`),
-    'Only pick a trait if it\'s really true of her. If none of them fit, return an empty array. Most characters get none.',
+    `Only pick a trait if it's really true of ${p.them}. If none of them fit, return an empty array. Most characters get none.`,
     '',
     'ATTRACTION',
-    'What kind of guys does she like? Pick one:',
-    ...STAT_KEYS.map((key) => `- ${key}: she goes for ${STAT_ATTRACTIONS[key]}.`),
+    `What kind of people does ${p.they} go wild for? Pick one:`,
+    ...STAT_KEYS.map((key) => `- ${key}: ${p.they} goes for ${STAT_ATTRACTIONS[key]}.`),
     '',
     'VOICE',
-    `How high is her vocal pitch? Pick one of: ${VOICE_TIERS.join(', ')}.`,
+    `How high is ${p.their} vocal pitch? Pick one of: ${VOICE_TIERS.join(', ')}.`,
     '',
     'APPEARANCE',
-    'What does she look like? Interesting answers only. Form your answer from these categories below:',
-    `hairColor/eyeColor: ${EYE_COLORS.join(', ')} (blonde for hairColor)`,
-    `For hairShade/eyeShade, you can optionally pick (0-1): ${SHADES.join(', ')}.`,
-    `hairLength: ${HAIR_LENGTHS.join(', ')}`,
-    `hairTexture: ${HAIR_TEXTURES.join(', ')}`,
-    `hairStyle (pick 1 or more): ${HAIR_STYLES.join(', ')}`,
-    `hairBangs (pick 1 or more): ${HAIR_BANGS.join(', ')}`,
-    `headAccessories (pick 1 or more, and specify the color or material): ${HEAD_ACCESSORIES.join(', ')}`,
-    `makeup (pick 0-2, specify color for eyeshadow): ${MAKEUP_TAGS.join(', ')}`,
-    `breastSize (pick 1, omit for medium size): ${BREAST_SIZES.join(', ')}`,
-    `skin (pick 1, omit for fair skin): ${SKIN_TAGS.join(', ')}`,
+    ...APPEARANCE_LINES[gender],
     '',
     'OUTFIT',
-    'What outfit does she rock? Time to go shopping, RITA! Pick out a wardrobe and describe it in booru-style comma separated tags.',
-    'Be specific! Every clothing item must ALSO name at least one colour or material inside the tag.',
-    `Lock in the exact characteristics of the outfit by naming what skin is exposed using these tags: ${OUTFIT_SKIN_EXPOSURE.join(', ')}`,
-    'bare_legs is only for fully bare legs, use "thighs" if you want to describe the bit of skin showing above thighhighs or socks.',
-    'Pick as many items as you want, just keep in mind: Fashionable characters ONLY!',
-    'Just because she\'s shy or silly doesn\'t mean she\'s allowed to be frumpy. Everyone has to SLAY with a cute, hot, or sexy fit',
-    'Try layering, accessorizing, or skin exposure. You can even combine all three if it makes sense.',
-    'Take inspiration from modern Asian fashion and anime character design.',
-    'Oh, and this is her casual, everyday outfit: NOT a costume. She can wear a fancy dress if that\'s who she is, but no tutus for ballet dancers or scrubs for med students. Her interests and activities do not dress her.',
-    'And do NOT make her carry anything: no handbags, backpacks, totes, umbrellas, phones. Her hands are empty.',
-    'Nothing on her head or ears, either: no hats or cat ears. Accessories like earrings go in headAccessories above.',
+    ...OUTFIT_LINES[gender],
     '',
     'PE OUTFIT',
-    'Pick out something for her that she\'ll change into for gym class or workouts. Make sure to include skin exposure tags.',
+    [
+      `Pick out something for ${p.them} that ${p.they}'ll change into for gym class or workouts.`,
+      ...PE_OUTFIT_LINES[gender]
+    ].join(' '),
     '',
-    'SWIMSUIT',
-    'And something for the pool or the beach. You\'ll probably use most of the skin exposure tags here.',
-    '',
+    ...(gender === 'male' ? [] : SWIMSUIT_LINES),
     'ROOM',
-    'And just for fun, what does her room look like? We\'ll feed an image model a prompt that starts exactly like this:',
+    `And just for fun, what does ${p.their} room look like? We'll feed an image model a prompt that starts exactly like this:`,
     `"${ROOM_PROMPT_PREFIX}..."`,
     'Write ONLY the continuation of that sentence as roomPrompt. Include furnishings, the color palette, the general mood and lighting.',
     '',
     'POSE',
-    'How does she usually stand? That tells us a lot about her.',
-    'Read the options below carefully, then pick the one that suits her best.',
+    `How does ${p.they} usually stand? That tells us a lot about ${p.them}.`,
+    `Read the options below carefully, then pick the one that suits ${p.them} best.`,
     ...poseKeys.map((key) => {
       const description = poses[key]?.description
       return description ? `- ${key}: ${description}` : `- ${key}`
@@ -295,7 +458,7 @@ export function buildCharacterPrompt(
     `other: ${EXPRESSION_OTHER.join(', ')}`,
     'Skip any group that has nothing fitting. Not every emotion needs a general tag.',
     'Some tags carry a weight, like (sad:0.7). That number is a LOWER BOUND, not a fixed value.',
-    'For expressive gals, you can raise the weight up anywhere to a max of 0.9 and return the tag with your number in it, like (sad:0.9).',
+    'For expressive characters, you can raise the weight up anywhere to a max of 0.9 and return the tag with your number in it, like (sad:0.9).',
     '',
     '---',
     ''
@@ -310,7 +473,7 @@ export function buildCharacterPrompt(
     '',
     ...seedWordBlock(seedWord),
     // Last, so it sits directly above the image part the adapter appends.
-    ...referenceBlock(reference)
+    ...referenceBlock(gender, reference)
   ].join('\n')
 
   const schema = objectSchema(
@@ -325,6 +488,8 @@ export function buildCharacterPrompt(
       'datingPreference',
       'kinks',
       'isVirgin',
+      'attractedToMale',
+      'attractedToFemale',
       'likes',
       'dislikes',
       'giftPreferences',
@@ -333,7 +498,7 @@ export function buildCharacterPrompt(
       'appearance',
       'outfit',
       'peOutfit',
-      'swimOutfit',
+      ...(gender === 'male' ? [] : ['swimOutfit']),
       'pose',
       'expressions',
       'roomPrompt',
@@ -353,8 +518,10 @@ export function buildCharacterPrompt(
       datingHistory: { type: 'string' },
       datingPreference: { type: 'string' },
       kinks: { type: 'string' },
-      // The only love-life field code reads.
+      // The love-life fields code reads.
       isVirgin: { type: 'boolean' },
+      attractedToMale: { type: 'boolean' },
+      attractedToFemale: { type: 'boolean' },
       // `minItems` is outside the strict structured-output subset, so counts live in the prose.
       likes: stringArray(),
       dislikes: stringArray(),
@@ -372,44 +539,11 @@ export function buildCharacterPrompt(
       traits: enumArray(CHARACTER_TRAITS),
       // Closed and single-valued: she is drawn to exactly one.
       preferredStat: enumField(STAT_KEYS),
-      appearance: {
-        type: 'object',
-        additionalProperties: false,
-        required: [
-          'hairColor',
-          'eyeColor',
-          'hairShade',
-          'eyeShade',
-          'hairLength',
-          'hairTexture',
-          'hairStyle',
-          'hairBangs',
-          'headAccessories',
-          'makeup',
-          'breastSize',
-          'skin'
-        ],
-        properties: {
-          hairColor: enumField(HAIR_COLORS),
-          eyeColor: enumField(EYE_COLORS),
-          // Arrays because the pick is 0–1 and the strict subset has no optional key.
-          hairShade: enumArray(SHADES),
-          eyeShade: enumArray(SHADES),
-          hairLength: enumField(HAIR_LENGTHS),
-          hairTexture: enumField(HAIR_TEXTURES),
-          hairStyle: enumArray(HAIR_STYLES),
-          hairBangs: enumArray(HAIR_BANGS),
-          // Free-form so a pick can carry the colour or material the prompt asks for.
-          headAccessories: stringArray(),
-          makeup: stringArray(),
-          breastSize: enumArray(BREAST_SIZES),
-          skin: enumArray(SKIN_TAGS)
-        }
-      },
-      // Free-form: the wardrobe is open.
+      appearance: appearanceSchemaOf(gender),
+      // Free-form: the wardrobe is open. A guy is not asked for a swimsuit at all.
       outfit: stringArray(),
       peOutfit: stringArray(),
-      swimOutfit: stringArray(),
+      ...(gender === 'male' ? {} : { swimOutfit: stringArray() }),
       pose: enumField(poseKeys),
       // Free-form so a tag can carry a raised weight.
       expressions: {
@@ -424,14 +558,20 @@ export function buildCharacterPrompt(
     }
   )
 
-  // The prefix above is identical across every character generation, so they share a cacheKey.
+  // The prefix above is identical across every character generation of one gender, so they
+  // share a cacheKey.
   return {
     system: SYSTEM,
     user: `${preamble}\n${rest}`,
     schema,
-    cacheKey: 'venus-university-character-generation',
+    cacheKey:
+      gender === 'male'
+        ? 'venus-university-character-generation-male'
+        : 'venus-university-character-generation',
     ...(reference ? { images: [reference] } : {}),
-    logFrom: preamble.length + 1
+    logFrom: preamble.length + 1,
+    // Character generation is judged better at medium, whatever the setting says.
+    minThinking: 'medium'
   }
 }
 
@@ -464,9 +604,11 @@ function cleanTags(values: readonly string[] | undefined): string[] {
 }
 
 /**
- * Flattens a draft into `Character`, her appearance opening on `subject`, the subject tags in
- * force. Tags pass through as written (Appendix A); only `pose` is checked, since a pose with no
- * skeleton file cannot render.
+ * Flattens a draft into `Character` by the gender `base` records, the appearance opening on
+ * `subject`, that gender's subject tags in force: a male character's carries his facial hair and
+ * his build, never a female one's makeup or breast size. Tags pass through as written
+ * (Appendix A); only `pose` is checked, against the gender's poses, since a pose with no skeleton
+ * cannot render.
  */
 export function draftToCharacter(
   base: Character,
@@ -474,7 +616,8 @@ export function draftToCharacter(
   poses: PoseManifest,
   subject: readonly string[]
 ): Character {
-  const poseKeys = poseKeysOf(poses)
+  const gender = genderOf(base)
+  const poseKeys = poseKeysFor(poses, gender)
   const a = draft.appearance ?? ({} as CharacterDraft['appearance'])
 
   // The app supplies the subject tags; the model is never asked for them.
@@ -488,9 +631,13 @@ export function draftToCharacter(
       ...(a.hairStyle ?? []),
       ...(a.hairBangs ?? []),
       ...(a.headAccessories ?? []),
-      ...(a.makeup ?? []),
       // One each: mutually exclusive descriptions.
-      ...(a.breastSize ?? []).slice(0, 1).map((size) => suffixTag(size, 'breasts')),
+      ...(gender === 'male'
+        ? [...(a.facialHair ?? []).slice(0, 1), ...(a.build ?? []).slice(0, 1)]
+        : [
+            ...(a.makeup ?? []),
+            ...(a.breastSize ?? []).slice(0, 1).map((size) => suffixTag(size, 'breasts'))
+          ]),
       ...(a.skin ?? []).slice(0, 1)
     ])
   ]
@@ -516,6 +663,11 @@ export function draftToCharacter(
   }
   const voicePitch = voicePitchOfTier(tier)
 
+  // Nobody at all is no answer: she falls back to the other gender alone.
+  const drafted = asAttraction({ female: draft.attractedToFemale, male: draft.attractedToMale })
+  if (!drafted) console.warn('[character] attracted to nobody; falling back to the other gender.')
+  const attraction = drafted ?? attractionOf({ gender: base.gender })
+
   const next: Character = {
     ...base,
     firstName: (draft.firstName || base.firstName).trim(),
@@ -536,10 +688,10 @@ export function draftToCharacter(
     preferredStat: isStatKey(draft.preferredStat) ? draft.preferredStat : 'heart',
     baseAppearance,
     // Derived from her build tags, which exist only now; the player retunes it in the Edit modal.
-    height: defaultSpriteScale(baseAppearance),
+    height: defaultSpriteScale(baseAppearance, gender),
     outfit: cleanTags(draft.outfit),
     peOutfit: cleanTags(draft.peOutfit),
-    swimOutfit: cleanTags(draft.swimOutfit),
+    swimOutfit: gender === 'male' ? [...MALE_SWIM_OUTFIT_TAGS] : cleanTags(draft.swimOutfit),
     pose,
     expressionTags,
     roomPrompt: (draft.roomPrompt ?? '').trim()
@@ -549,6 +701,9 @@ export function draftToCharacter(
   delete next.voicePitch
   // Centre is what an absent field means everywhere, so a centred voice is written as nothing.
   if (voicePitch !== 0) next.voicePitch = voicePitch
+  // Likewise the other gender alone, which is what an absent sexuality reads as.
+  delete next.attractedTo
+  if (!isDefaultAttraction(base, attraction)) next.attractedTo = attraction
   return next
 }
 
@@ -564,7 +719,7 @@ function uniqueCategories(values: string[] | undefined): GiftCategory[] {
 
 /**
  * Fields the Generate modal treats as required before a character can render; an appearance
- * holding nothing but subject tags, the build's or `subject`, is missing.
+ * holding nothing but her gender's subject tags, the build's or `subject`, is missing.
  */
 export function missingRequiredFields(character: Character, subject: readonly string[]): string[] {
   const missing: string[] = []
@@ -584,7 +739,7 @@ export function missingRequiredFields(character: Character, subject: readonly st
   // Only the liked half: an empty `disliked` is an ordinary answer.
   if (character.giftPreferences.liked.length === 0) missing.push('gift preferences')
   if (!character.pose) missing.push('pose')
-  if (withoutSubjectTags(character.baseAppearance, subject).length === 0) {
+  if (withoutSubjectTags(character.baseAppearance, genderOf(character), subject).length === 0) {
     missing.push('appearance')
   }
   if (character.outfit.length === 0) missing.push('outfit')

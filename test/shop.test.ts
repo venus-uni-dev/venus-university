@@ -79,6 +79,43 @@ describe('giftReactionOf', () => {
     })
   })
 
+  describe('a guy', () => {
+    const guy = (liked: GiftCategory[], disliked: GiftCategory[] = [], materialist = false) => ({
+      ...girl(liked, disliked, materialist),
+      gender: 'male' as const
+    })
+
+    const forHer = <T extends object>(present: T) => ({ ...present, madeFor: 'female' as const })
+
+    it('takes a present made for a woman no better than neutral, a Materialist too', () => {
+      expect(giftReactionOf(forHer(nightlight), guy(['cozy', 'cute']), false)).toBe('neutral')
+      expect(giftReactionOf(forHer(orchid), guy(['cozy']), false)).toBe('neutral')
+      expect(giftReactionOf(forHer(coat), guy(['luxury', 'cozy'], [], true), false)).toBe('neutral')
+      expect(giftReactionOf(forHer(flask), guy(['cozy'], ['edgy']), false)).toBe('unimpressed')
+    })
+
+    it('takes a present made for anybody, or for a man, as anybody would', () => {
+      expect(giftReactionOf(nightlight, guy(['cozy', 'cute']), false)).toBe('loved')
+      expect(giftReactionOf(coat, guy(['cute'], [], true), false)).toBe('liked')
+      expect(giftReactionOf(nightlight, guy(['cozy', 'cute']), true)).toBe('unimpressed')
+      expect(giftReactionOf({ ...nightlight, madeFor: 'male' }, guy(['cozy', 'cute']), false)).toBe(
+        'loved'
+      )
+    })
+  })
+
+  describe('a present made for a man', () => {
+    const forHim = <T extends object>(present: T) => ({ ...present, madeFor: 'male' as const })
+
+    it('lands no better than neutral on a girl, a Materialist too', () => {
+      expect(giftReactionOf(forHim(nightlight), girl(['cozy', 'cute']), false)).toBe('neutral')
+      expect(giftReactionOf(forHim(orchid), girl(['cozy']), false)).toBe('neutral')
+      expect(giftReactionOf(forHim(coat), girl(['luxury', 'cozy'], [], true), false)).toBe('neutral')
+      expect(giftReactionOf(forHim(flask), girl(['cozy'], ['edgy']), false)).toBe('unimpressed')
+      expect(giftReactionOf(forHim(nightlight), girl(['cozy', 'cute']), true)).toBe('unimpressed')
+    })
+  })
+
   /**
    * The repeat answer is unconditional and comes first: a present she already
    * owns is one nothing about her taste can redeem.

@@ -69,7 +69,7 @@ export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
     title: 'Thanks for playing!',
     message: [
       `Your university life is over... until next semester. Congratulations on making it to the end of the game! ${CREDITS_OFFER}`,
-      "You can also continue your game into the fall semester. Graduated girls won't return, but you'll keep all of your money, stats, and relationships."
+      "You can also continue your game into the fall semester. Graduates won't return, but you'll keep all of your money, stats, and relationships."
     ]
   },
   endingDebt: {

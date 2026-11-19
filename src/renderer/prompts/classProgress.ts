@@ -1,4 +1,5 @@
 import type {
+  AddedClass,
   Character,
   CharInfo,
   ClassEntry,
@@ -7,6 +8,7 @@ import type {
   ProjectSession
 } from '@shared/types'
 import { studentsOf } from '@shared/classes'
+import { globalSlotOf, slotFromId } from '@shared/jobs'
 import type { SemesterCalendar } from '@shared/semesters'
 import {
   aceShortfall,
@@ -140,11 +142,45 @@ export function projectPeriodOf(
 }
 
 /**
- * Whether `period`'s project has been handed out yet: the assignment meeting has a
- * record, attended or ditched.
+ * Whether `period`'s project has been handed out yet: a meeting from the assignment on has a
+ * record, attended or ditched. Every meeting on the timetable gets one, so that is the assignment
+ * meeting itself, or the first one after it for a class added once it had met.
  */
 export function projectAssigned(record: ClassRecord | undefined, period: ProjectPeriod): boolean {
-  return (record ?? EMPTY_RECORD).meetings.some((meeting) => meeting.date === period.assignmentDate)
+  return (record ?? EMPTY_RECORD).meetings.some((meeting) => meeting.date >= period.assignmentDate)
+}
+
+/**
+ * Whether a class added at add/drop is still owed its entrance: added after the course had
+ * already met, and the room has not met him yet.
+ */
+export function addOwesEntrance(
+  entry: ClassEntry,
+  added: AddedClass | undefined,
+  calendar: SemesterCalendar
+): boolean {
+  if (!added || added.announced) return false
+  // Meetings held, not dates on the timetable: a first Monday cancelled by orientation is a
+  // class that has not met.
+  return meetingsBefore(entry.slot, added.date, calendar) > 0
+}
+
+/**
+ * Whether `date` is a transfer student's first meeting of this class since she arrived in the
+ * global slot `transferredAt`, the class having already met before it.
+ */
+export function transferOwesEntrance(
+  entry: ClassEntry,
+  transferredAt: number,
+  date: number,
+  calendar: SemesterCalendar
+): boolean {
+  const { time } = slotFromId(entry.slot)
+  // A meeting in her arrival slot is her first; one earlier that day is before she arrived.
+  const first = meetingDatesOf(entry.slot, calendar).find(
+    (meeting) => globalSlotOf(meeting, time) >= transferredAt
+  )
+  return first === date && meetingsBefore(entry.slot, date, calendar) > 0
 }
 
 /** The sessions banked against one of the two projects, oldest first. */

@@ -49,3 +49,10 @@
 .vu-pop-option--on {
   background: var(--vu-tint);
 }
+
+/* The row already in force in a menu that always holds a pick, said in the ink rather than the
+   tint, which stays the pointer's. */
+.vu-pop-option--picked {
+  color: var(--vu-accent);
+  font-weight: 700;
+}

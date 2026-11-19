@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { affectionOf } from '@shared/relationship'
-import { calendarOf, semesterOf, type SemesterView } from '@shared/semesters'
+import { calendarOf, semesterOf, withTransfers, type SemesterView } from '@shared/semesters'
 import { emptyTallies } from '@shared/tallies'
 import { DEFAULT_PLAYER_STATS } from '@shared/playerStats'
 import type { CharInfo, CharProfile, JobState } from '@shared/types'
 import { emptyBunnyboard } from '@shared/types'
-import { carryOf, type CarryInput } from '../src/renderer/stores/semesterCarry'
-import { charInfo, playthroughRecord } from './fixtures'
+import { carryOf, continuationOf, type CarryInput } from '../src/renderer/stores/semesterCarry'
+import { charInfo, charJob, classEntry, playthroughRecord } from './fixtures'
 
 /**
  * The carry from one semester's ending into the next: a date left on the old clock, a profile
@@ -62,6 +62,8 @@ function input(over: Partial<CarryInput> = {}): CarryInput {
     bunnybotThrough: 245,
     npcRelationships: {},
     npcFriendships: [],
+    npcCouples: [],
+    transfers: [],
     ...over
   }
 }
@@ -201,6 +203,37 @@ describe('the clock across the break', () => {
     expect(affectionOf(carried.memories, 0)).toBe(affectionOf([{ date: 123, type: 'loved', desc: '' }], 123))
   })
 
+  it('moves the roster’s couples onto the next clock, and ends every crush on or of a graduate', () => {
+    const view = springView({ a: profile(2), b: profile(2), c: profile(3), senior: profile(4) })
+    const handoff = carryOf(
+      input({
+        npcRelationships: {
+          'a|b': { affinity: 5, dating: 100, ended: 30, crush: ['a'], cheated: { b: 90 } },
+          'a|c': { affinity: 2, crush: ['a', 'c'], crushAsked: ['c'] },
+          'a|senior': { affinity: 4, crush: ['a', 'senior'], crushAsked: ['a'] },
+          'c|senior': { affinity: 5, dating: 80 }
+        },
+        npcCouples: [{ a: 'a', b: 'b', date: 100, time: 1 }]
+      }),
+      view
+    )
+    const pairs = handoff.carry.npcRelationships
+
+    expect(pairs['a|b']).toEqual({
+      affinity: 5,
+      dating: 100 - 210,
+      ended: 30 - 210,
+      crush: ['a'],
+      cheated: { b: 90 - 210 }
+    })
+    // A crush already asked about stays asked about, as long as the crush lasts.
+    expect(pairs['a|c']).toEqual({ affinity: 2, crush: ['a', 'c'], crushAsked: ['c'] })
+    expect(pairs['a|senior']).toEqual({ affinity: 4 })
+    // Her graduating leaves the two of them long-distance, not apart.
+    expect(pairs['c|senior']).toEqual({ affinity: 5, dating: 80 - 210 })
+    expect(handoff.carry.npcCouples).toEqual([{ a: 'a', b: 'b', date: 100 - 210, time: 1 }])
+  })
+
   it('moves a fall’s dates on by the shorter winter break', () => {
     const girl = profile(2, 'fall')
     const view: SemesterView = { ...springView({ a: girl }), index: 1, season: 'fall' }
@@ -225,7 +258,8 @@ describe('the clock across the break', () => {
           summary: 'they talked',
           pendingHangout: { description: 'coffee' },
           declined: 2,
-          turnedDown: true as const
+          turnedDown: true as const,
+          advice: { kind: 'vent' as const, about: 'senior', answer: 'talk' as const }
         }
       },
       requestsSent: ['a', 'senior'],
@@ -240,6 +274,7 @@ describe('the clock across the break', () => {
     expect(thread).not.toHaveProperty('pendingHangout')
     expect(thread).not.toHaveProperty('declined')
     expect(thread).not.toHaveProperty('turnedDown')
+    expect(thread).not.toHaveProperty('advice')
     expect(handoff.carry.bunnyboard.requestsSent).toEqual(['a'])
     expect(handoff.carry.bunnyboard.requestsReceived).toEqual([])
     expect(handoff.carry.bunnyboard).not.toHaveProperty('suggestions')
@@ -373,5 +408,43 @@ describe('the reader’s bookkeeping', () => {
       playerSchedule: { 0: 'HIS 101' },
       events: []
     })
+  })
+})
+
+describe('a transfer student', () => {
+  it('carries a girl who transferred in as continuing, her arrival left on the log alone', () => {
+    const arrived = { ...profile(2, 'spring'), transferredAt: 41 }
+    const transfers = [{ charId: 'm', profile: arrived }]
+    const view = withTransfers(springView({ a: profile(1) }), { transfers })
+    const handoff = carryOf(
+      input({ charInfo: { m: entry(arrived, { job: charJob() }) }, transfers }),
+      view
+    )
+
+    expect(handoff.continuing).toEqual(['a', 'm'])
+    // Her intake is the season she arrived in, so her year waits for the next ending.
+    expect(handoff.priorProfiles.m).toMatchObject({ year: 2, intake: 'spring' })
+    expect(handoff.priorProfiles.m).not.toHaveProperty('transferredAt')
+    expect(handoff.carry.charInfo.m).not.toHaveProperty('transferredAt')
+    expect(handoff.jobs.m).toEqual({ jobId: 'cutetea', count: 1 })
+    expect(handoff.haunts.m).toBeDefined()
+    expect(handoff.carry.before.transfers).toEqual(transfers)
+  })
+
+  it('counts the classes a transfer brought among the ones the next semester avoids', () => {
+    const arrived = { ...profile(2, 'spring'), schedule: { 3: 'KNT 101' }, transferredAt: 41 }
+    const knit = classEntry({ code: 'KNT 101', category: 'interest', slot: 3 })
+    const transfers = [{ charId: 'm', profile: arrived, classes: { 'KNT 101': knit } }]
+    const record = playthroughRecord({
+      chars: ['a'],
+      profiles: { a: profile(1) },
+      classes: { 'HIS 101': classEntry({ code: 'HIS 101', major: 'History' }) }
+    })
+    const view = withTransfers(semesterOf(record), { transfers })
+    const handoff = carryOf(input({ charInfo: { m: entry(arrived) }, transfers }), view)
+
+    const taken = continuationOf(record, undefined, null, handoff).taken
+    expect(taken.map((entry) => entry.code).sort()).toEqual(['HIS 101', 'KNT 101'])
+    expect(taken.find((entry) => entry.code === 'KNT 101')?.category).toBe('interest')
   })
 })

@@ -1,12 +1,19 @@
-import { useMemo, type JSX } from 'react'
+import { useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { EMOTIONS } from '@shared/emotions'
 import { fullNameOf, type Character } from '@shared/types'
 import { CardCaption } from '../components/CardCaption'
+import { CharacterSortPill } from '../components/CharacterSortPill'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
-import { manageOrderOf, spriteUrl, useCharacterStore } from '../stores/characterStore'
+import {
+  sortCharacterIds,
+  spriteUrl,
+  useCharacterStore,
+  visibleOrderOf,
+  type CharacterSort
+} from '../stores/characterStore'
 import {
   cardLift,
   dealt,
@@ -46,11 +53,17 @@ export function LoadCharacterModal({
   const allOrder = useCharacterStore((s) => s.order)
   const removedDefaults = useCharacterStore((s) => s.removedDefaults)
   const pregenIds = useCharacterStore((s) => s.pregenIds)
-  const progress = useCharacterStore((s) => s.progress)
-  // Ordered as the Manage grid orders them.
+  // Every opening starts on the newest write, as Manage Characters does.
+  const [sort, setSort] = useState<CharacterSort>('recent')
   const order = useMemo(
-    () => manageOrderOf({ characters, order: allOrder, removedDefaults, pregenIds, progress }),
-    [characters, allOrder, removedDefaults, pregenIds, progress]
+    () =>
+      sortCharacterIds(
+        visibleOrderOf({ order: allOrder, removedDefaults }),
+        characters,
+        pregenIds,
+        sort
+      ),
+    [characters, allOrder, removedDefaults, pregenIds, sort]
   )
   const expressions = useCharacterStore((s) => s.expressions)
   const loading = useCharacterStore((s) => s.loading)
@@ -60,6 +73,9 @@ export function LoadCharacterModal({
   const finished = order.filter((charId) =>
     EMOTIONS.every((emotion) => expressions[charId]?.[emotion])
   )
+
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
 
   const { host, overlayProps } = useModalShell(onClose)
   if (!host) return null
@@ -89,13 +105,14 @@ export function LoadCharacterModal({
         <TitleTab>Add a character</TitleTab>
 
         <div className="vu-pick-scroll">
-          <div className="vu-pick-body">
+          <div ref={scroller} className="vu-pick-body">
             {waiting ? null : finished.length === 0 ? (
               <p className="vu-empty">
                 No finished characters yet. Make some in Manage characters first.
               </p>
             ) : (
-              <motion.ul className="vu-pick-grid" variants={PICK_DEAL}>
+              // Keyed on the order, so a new one deals again; the panel keeps its size.
+              <motion.ul key={sort} className="vu-pick-grid" variants={PICK_DEAL}>
                 {finished.map((charId) => (
                   <PickCard
                     key={charId}
@@ -111,6 +128,19 @@ export function LoadCharacterModal({
         </div>
 
         <div className="vu-foot">
+          {!waiting && finished.length > 0 && (
+            <span className="vu-pick-sort">
+              <CharacterSortPill
+                id="load-character-sort"
+                value={sort}
+                popupHost={popupHost}
+                onChange={(next) => {
+                  setSort(next)
+                  scroller.current?.scrollTo({ top: 0 })
+                }}
+              />
+            </span>
+          )}
           <motion.button
             id="load-character-close"
             className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
@@ -121,6 +151,10 @@ export function LoadCharacterModal({
             Close
           </motion.button>
         </div>
+
+        {/* The frame the sort's list is placed against, over the grid and taking no pointer of
+            its own. */}
+        <div className="vu-popups" ref={setPopupHost} />
       </motion.div>
     </motion.div>,
     host

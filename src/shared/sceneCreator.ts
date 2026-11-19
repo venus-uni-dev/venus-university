@@ -1,10 +1,26 @@
 import { appError } from './errors'
+import type { ReaderPronouns } from './gender'
 import { assertSafeId, validateRecord } from './jsonValidate'
-import { pairKeyOf, type NpcRelationshipMap } from './npcRelationships'
+import { genderOf } from './gender'
+import {
+  isFreeToDate,
+  npcPartnersOf,
+  pairKeyOf,
+  type NpcRelationshipMap
+} from './npcRelationships'
+import { HONEYMOON_DAYS } from './odds'
 import { STAT_KEYS, type StatKey, type StatTier, pointsForTier, type PlayerStats } from './playerStats'
 import { affectionOfDisposition, emptyFlags, type Disposition } from './relationship'
 import { hasTrait } from './traits'
-import type { CharFlags, Character, OutfitLock, SceneGift, SceneLine, TimeSlot } from './types'
+import type {
+  Attraction,
+  CharFlags,
+  Character,
+  OutfitLock,
+  SceneGift,
+  SceneLine,
+  TimeSlot
+} from './types'
 import { WEATHER_SLOTS, type Weather } from './weather'
 
 /**
@@ -28,8 +44,11 @@ export const SCENE_MILESTONES = [
 export type SceneMilestone = (typeof SCENE_MILESTONES)[number]
 export type SceneMilestones = Record<SceneMilestone, boolean>
 
-/** How two girls in the scene stand with each other; strangers have never met. */
-export const SCENE_RELATIONS = ['friends', 'acquaintances', 'strangers', 'enemies'] as const
+/**
+ * How two girls in the scene stand with each other; strangers have never met, and two dating
+ * are friends past their honeymoon.
+ */
+export const SCENE_RELATIONS = ['dating', 'friends', 'acquaintances', 'strangers', 'enemies'] as const
 export type SceneRelation = (typeof SCENE_RELATIONS)[number]
 
 /** The relation a pair nobody has set stands at. */
@@ -49,6 +68,8 @@ export const SCENE_DISPOSITIONS: readonly Disposition[] = [
 export interface SceneReader {
   firstName: string
   lastName: string
+  /** Absent on a scene saved before pronouns were asked, read as he/him. */
+  pronouns?: ReaderPronouns
   tiers: Record<StatKey, StatTier>
   bio: string
 }
@@ -250,9 +271,48 @@ export function flagsOfEntry(
 
 /** The affinity each relation is held at, inside the band `zoneOf` reads it as. */
 const RELATION_AFFINITY: Record<Exclude<SceneRelation, 'strangers'>, number> = {
+  dating: 5,
   friends: 5,
   acquaintances: 0,
   enemies: -5
+}
+
+/** What a setup knows of each character for deciding whether she may be set to dating, by charId. */
+export type SetupPeople = Readonly<
+  Record<
+    string,
+    | { character?: Pick<Character, 'traits'>; flags?: Pick<CharFlags, 'isLover' | 'harem'> }
+    | undefined
+  >
+>
+
+/**
+ * `map` with every pair the player set laid over it: each relation but dating first, then each
+ * pair set to dating, in key order, as a couple where both may still start dating on what has
+ * been laid so far, and as friends where either may not. A couple starts past its honeymoon.
+ */
+function layPairs(
+  map: NpcRelationshipMap,
+  pairs: Readonly<Record<string, SceneRelation>>,
+  date: number,
+  people: SetupPeople
+): NpcRelationshipMap {
+  const dating: string[] = []
+  for (const [key, relation] of Object.entries(pairs)) {
+    delete map[key]
+    if (relation === 'dating') dating.push(key)
+    else if (relation !== 'strangers') map[key] = { affinity: RELATION_AFFINITY[relation] }
+  }
+  const free = (charId: string): boolean =>
+    isFreeToDate(map, charId, people[charId]?.character, people[charId]?.flags)
+  for (const key of dating.sort()) {
+    const [a, b] = key.split('|')
+    map[key] =
+      free(a) && free(b)
+        ? { affinity: RELATION_AFFINITY.dating, dating: date - HONEYMOON_DAYS }
+        : { affinity: RELATION_AFFINITY.friends }
+  }
+  return map
 }
 
 /** The relation one pair of the cast stands at. */
@@ -264,36 +324,94 @@ export function relationOf(
   return pairs[pairKeyOf(a, b)] ?? DEFAULT_RELATION
 }
 
-/** The cast's pair map: every pair at its relation, strangers having no entry. */
+/**
+ * The cast's pair map on `date`: every pair at its relation, strangers having no entry, and a
+ * pair set to dating a couple where {@link layPairs} lets it be one.
+ */
 export function npcRelationshipsOf(
   cast: readonly string[],
-  pairs: Readonly<Record<string, SceneRelation>>
+  pairs: Readonly<Record<string, SceneRelation>>,
+  date = 0,
+  people: SetupPeople = {}
 ): NpcRelationshipMap {
-  const map: NpcRelationshipMap = {}
+  const every: Record<string, SceneRelation> = {}
   for (let i = 0; i < cast.length; i++) {
     for (let j = i + 1; j < cast.length; j++) {
-      const relation = relationOf(pairs, cast[i], cast[j])
-      if (relation === 'strangers') continue
-      map[pairKeyOf(cast[i], cast[j])] = { affinity: RELATION_AFFINITY[relation] }
+      every[pairKeyOf(cast[i], cast[j])] = relationOf(pairs, cast[i], cast[j])
     }
   }
-  return map
+  return layPairs({}, every, date, people)
 }
 
 /**
- * A rolled pair map with every pair the player set laid over it: strangers have no entry, and
- * the rest stand at their relation's affinity.
+ * A rolled or carried pair map with every pair the player set laid over it on `date`:
+ * strangers have no entry, the rest stand at their relation's affinity, and a pair set to dating
+ * is a couple where {@link layPairs} lets it be one.
  */
 export function pairsOver(
   rolled: Readonly<NpcRelationshipMap>,
-  pairs: Readonly<Record<string, SceneRelation>>
+  pairs: Readonly<Record<string, SceneRelation>>,
+  date = 0,
+  people: SetupPeople = {}
 ): NpcRelationshipMap {
-  const map: NpcRelationshipMap = { ...rolled }
+  return layPairs({ ...rolled }, pairs, date, people)
+}
+
+/**
+ * The picks as they will be laid over `base`: a pair set to dating that cannot hold reads as
+ * friends. The same object where every one holds.
+ */
+export function pairsAsLaid(
+  base: Readonly<NpcRelationshipMap>,
+  pairs: Readonly<Record<string, SceneRelation>>,
+  people: SetupPeople
+): Record<string, SceneRelation> {
+  const laid = pairsOver(base, pairs, 0, people)
+  let shown: Record<string, SceneRelation> | null = null
   for (const [key, relation] of Object.entries(pairs)) {
-    if (relation === 'strangers') delete map[key]
-    else map[key] = { affinity: RELATION_AFFINITY[relation] }
+    if (relation !== 'dating' || laid[key]?.dating !== undefined) continue
+    shown ??= { ...pairs }
+    shown[key] = 'friends'
   }
-  return map
+  return shown ?? (pairs as Record<string, SceneRelation>)
+}
+
+/**
+ * Whether `a` and `b` may be set to dating over `base` and the other picks: both may still
+ * start dating once every other pair is laid.
+ */
+export function datingOffered(
+  base: Readonly<NpcRelationshipMap>,
+  pairs: Readonly<Record<string, SceneRelation>>,
+  a: string,
+  b: string,
+  people: SetupPeople
+): boolean {
+  const { [pairKeyOf(a, b)]: _own, ...others } = pairs
+  const laid = pairsOver(base, others, 0, people)
+  delete laid[pairKeyOf(a, b)]
+  return [a, b].every((charId) =>
+    isFreeToDate(laid, charId, people[charId]?.character, people[charId]?.flags)
+  )
+}
+
+/**
+ * Who `charId` is attracted to once everybody she is dating on `map` is counted: their genders
+ * added to `attraction`. The same object where she is dating nobody it leaves out.
+ */
+export function withDatingAttraction(
+  attraction: Attraction,
+  charId: string,
+  map: Readonly<NpcRelationshipMap>,
+  characters: Readonly<Record<string, Pick<Character, 'gender'> | undefined>>
+): Attraction {
+  let next: Attraction | null = null
+  for (const partner of npcPartnersOf(map, charId, Object.keys(characters))) {
+    const gender = genderOf(characters[partner])
+    if ((next ?? attraction)[gender]) continue
+    next = { ...(next ?? attraction), [gender]: true }
+  }
+  return next ?? attraction
 }
 
 /** The pairs kept for a cast: only those whose two girls are both still in it. */

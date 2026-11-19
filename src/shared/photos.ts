@@ -14,7 +14,7 @@ import type { Emotion, TimeSlot, WardrobeTarget } from './types'
 /** The one version of a photo's sidecar this build reads and writes. */
 export const PHOTO_SCHEMA_VERSION = 1
 
-/** No roster holds more than twelve girls, and no photo holds more than twelve people. */
+/** No photo holds more than twelve people: the image model draws more than that unreliably. */
 export const MAX_PHOTO_CHARACTERS = 12
 
 /** The longest prompt a photo may be sent with. */

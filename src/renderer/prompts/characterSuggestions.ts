@@ -1,5 +1,7 @@
+import { PRONOUNS } from '@shared/gender'
 import { shuffle } from '@shared/shuffle'
 import { HAIR_COLORS, SHADES } from '@shared/tags'
+import type { Gender } from '@shared/types'
 
 /**
  * The suggestion pools behind the New Character modal. A suggestion is shown as a
@@ -8,8 +10,8 @@ import { HAIR_COLORS, SHADES } from '@shared/tags'
 
 // ---------------------------------------------------------------- first names
 
-/** Youthful, modern given names that read on sight in English. */
-const FIRST_NAMES = [
+/** Youthful, modern given names for a girl that read on sight in English. */
+const FEMALE_FIRST_NAMES = [
   'Adeline', 'Adriana', 'Aisha', 'Alice', 'Alina', 'Allison', 'Amara', 'Amber',
   'Amelia', 'Anastasia', 'Angelina', 'Annika', 'Anya', 'August', 'Arden', 'Aria',
   'Ariel', 'Ashley', 'Athena', 'Aubrey', 'Aurora', 'Autumn', 'Ava', 'Avery',
@@ -36,6 +38,26 @@ const FIRST_NAMES = [
   'Tessa', 'Thea', 'Trinity', 'Valentina', 'Valerie', 'Vera', 'Veronica',
   'Violet', 'Vivienne', 'Willow', 'Lumi', 'Wren', 'Yara', 'Yuna', 'Rachel',
   'Zara', 'Zaria', 'Zelda', 'Zoe', 'Zuri'
+] as const
+
+/** Youthful, modern given names for a guy that read on sight in English. */
+const MALE_FIRST_NAMES = [
+  'Aaron', 'Abel', 'Aiden', 'Alec', 'Alejandro', 'Amir', 'Andre', 'Anton',
+  'Arjun', 'Asher', 'Axel', 'Beau', 'Benjamin', 'Blake', 'Bradley', 'Brandon',
+  'Caleb', 'Callum', 'Cameron', 'Carlos', 'Cassius', 'Chase', 'Christian',
+  'Cole', 'Connor', 'Damian', 'Daniel', 'Dante', 'Darius', 'Declan', 'Dev',
+  'Diego', 'Dominic', 'Eli', 'Elias', 'Emmett', 'Enzo', 'Ethan', 'Evan',
+  'Ezra', 'Felix', 'Finn', 'Gabriel', 'Gavin', 'Graham', 'Grant', 'Hamza',
+  'Haruto', 'Hayden', 'Hector', 'Henry', 'Hugo', 'Ian', 'Isaac', 'Ivan',
+  'Jack', 'Jace', 'Jalen', 'Jamal', 'James', 'Jasper', 'Javier', 'Jin',
+  'Jonah', 'Julian', 'Jun', 'Kai', 'Kaito', 'Kenji', 'Kian', 'Kofi', 'Leo',
+  'Leon', 'Liam', 'Logan', 'Lorenzo', 'Lucas', 'Luca', 'Malik', 'Marco',
+  'Marcus', 'Mason', 'Mateo', 'Max', 'Micah', 'Miles', 'Nathan', 'Nico',
+  'Noah', 'Nolan', 'Omar', 'Oliver', 'Oscar', 'Owen', 'Pablo', 'Rafael',
+  'Ravi', 'Reid', 'Remy', 'Rhys', 'Riku', 'Roman', 'Ronan', 'Ryan', 'Ryu',
+  'Samuel', 'Santiago', 'Sebastian', 'Seth', 'Silas', 'Soren', 'Tariq',
+  'Theo', 'Thomas', 'Tobias', 'Tristan', 'Tyler', 'Victor', 'Vincent',
+  'Wesley', 'Wyatt', 'Xavier', 'Yusuf', 'Zach', 'Zane'
 ] as const
 
 // ----------------------------------------------------------------- last names
@@ -110,8 +132,8 @@ export const LAST_NAMES = [
 
 // ------------------------------------------------------------------- prompts
 
-/** Complete character briefs, drawn whole. */
-const CHARACTER_PROMPTS = [
+/** Complete briefs for a girl, drawn whole. */
+const FEMALE_PROMPTS = [
   'A deadpan honor student who ranks first in everything and runs an anonymous advice column for the classmates she pretends not to notice.',
   'An icy-cold competitive swimmer who who can\'t say thank you but meticulously remembers everything about her friends.',
   'A bubbly pastry chef who talks nonstop while she works and cries at sad movies.',
@@ -144,32 +166,72 @@ const CHARACTER_PROMPTS = [
   'A happy-go-lucky delinquent who regularly cuts class to feed cats and wander around town.'
 ] as const
 
+/** Complete briefs for a guy, drawn whole. */
+const MALE_PROMPTS = [
+  'A soft-spoken pre-law student who secretly hates everyone.',
+  "A golden-retriever rugby player who can never remember anyone's name.",
+  'A sarcastic barista who writes poetry in his free time.',
+  'A brooding guitarist who is known to work on a single song for years.',
+  'An overachieving class president who has no idea what he wants to do with his life.',
+  'A laid-back skater who is secretly a math genius.',
+  'A gentle giant of a nursing student who faints at the sight of blood.',
+  'A smug chess prodigy who is a terrible sore loser.',
+  "A shy amateur chef with a big family back home.",
+  'A flirtatious theater kid who peppers in play quotes into his speech.',
+  'A deadpan computer science major who communicates mostly in memes.',
+  'An earnest farm boy on a scholarship who is overwhelmed by the big city.',
+  'A hot-headed boxer who reads romance novels in secret.',
+  'A charming con artist who\'s trying to turn over a new leaf.',
+  'A pretty-boy model who is far more insecure than he looks.',
+  'A gym-obsessed kinesiology major who hands out workout advice nobody asked for.',
+  'A quiet film buff who judges people by their favorite movie.',
+  'A cheerful international exchange student who\'s curious about everything.',
+  'A reclusive game developer who only leaves his room to buy energy drinks.',
+  'A cocky lifeguard who is secretly terrified of deep water.',
+  "A nerdy history major who can't stop correcting people.",
+  'A bad-boy biker who volunteers at the animal shelter every weekend.',
+  "A perfectionist architecture student who hasn't slept properly since freshman year.",
+  'A jaded former child actor who hates being recognized.',
+  'A wannabe influencer who films everything and experiences nothing.',
+  'A stoic martial artist who is completely helpless around kids and animals.',
+  'A smooth-talking business major with a five-year plan for everything but his love life.',
+  'A dreamy marine biology student who talks to fish more than to people.',
+  'An immortal being from a fantasy realm curious about observing human customs.'
+] as const
+
 export interface CharacterSuggestions {
   firstName: string
   lastName: string
   prompt: string
 }
 
-/** The briefs in this visit's order; dealt from the front, one per modal open. */
-let promptDeck: readonly string[] = shuffle(CHARACTER_PROMPTS)
+/** Each gender's given names and briefs. */
+const POOLS: Readonly<Record<Gender, { names: readonly string[]; prompts: readonly string[] }>> = {
+  female: { names: FEMALE_FIRST_NAMES, prompts: FEMALE_PROMPTS },
+  male: { names: MALE_FIRST_NAMES, prompts: MALE_PROMPTS }
+}
 
-/** How many have been dealt; wraps around the deck. */
-let promptCursor = 0
+/** Each gender's briefs in this visit's order, dealt from the front one per modal open, and how many have been dealt. */
+const promptDecks: Record<Gender, { deck: readonly string[]; cursor: number }> = {
+  female: { deck: shuffle(FEMALE_PROMPTS), cursor: 0 },
+  male: { deck: shuffle(MALE_PROMPTS), cursor: 0 }
+}
 
-/** Cuts a fresh deck; called when Manage Characters opens. */
+/** Cuts a fresh deck for each gender; called when Manage Characters opens. */
 export function reshuffleSuggestions(): void {
-  promptDeck = shuffle(CHARACTER_PROMPTS)
-  promptCursor = 0
+  for (const gender of ['female', 'male'] as const) {
+    promptDecks[gender] = { deck: shuffle(POOLS[gender].prompts), cursor: 0 }
+  }
 }
 
 /**
  * A hair colour sentence for the shown brief — prose the character-generation call turns into
  * tags itself.
  */
-function hairColorSentence(): string {
+function hairColorSentence(gender: Gender): string {
   const shade = shuffle([...SHADES, ''])[0]
   const color = shuffle(HAIR_COLORS)[0]
-  return ` She has ${shade === '' ? '' : `${shade} `}${color} hair.`
+  return ` ${PRONOUNS[gender].They} has ${shade === '' ? '' : `${shade} `}${color} hair.`
 }
 
 /** Draws a name from a pool, skipping the one already on show. */
@@ -178,9 +240,9 @@ function drawName(pool: readonly string[], except?: string): string {
   return drawn.find((name) => name !== except) ?? drawn[0]
 }
 
-/** Draws a first name, optionally one other than the name given. */
-export function pickFirstName(except?: string): string {
-  return drawName(FIRST_NAMES, except)
+/** Draws a first name for the gender, optionally one other than the name given. */
+export function pickFirstName(gender: Gender, except?: string): string {
+  return drawName(POOLS[gender].names, except)
 }
 
 /** Draws a last name, optionally one other than the name given. */
@@ -188,13 +250,14 @@ export function pickLastName(except?: string): string {
   return drawName(LAST_NAMES, except)
 }
 
-/** Draws one suggestion per field for a freshly opened modal. */
-export function pickSuggestions(): CharacterSuggestions {
-  const brief = promptDeck[promptCursor % promptDeck.length]
-  promptCursor += 1
+/** Draws one suggestion per field for a freshly opened modal, or for a gender switched to. */
+export function pickSuggestions(gender: Gender): CharacterSuggestions {
+  const deck = promptDecks[gender]
+  const brief = deck.deck[deck.cursor % deck.deck.length]
+  deck.cursor += 1
   return {
-    firstName: pickFirstName(),
+    firstName: pickFirstName(gender),
     lastName: pickLastName(),
-    prompt: `${brief}${hairColorSentence()}`
+    prompt: `${brief}${hairColorSentence(gender)}`
   }
 }

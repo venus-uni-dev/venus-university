@@ -6,6 +6,7 @@ import {
   type SchedulePromptInput
 } from '../src/renderer/prompts/schedulePrompt'
 import { buildLedgerPrompt } from '../src/renderer/prompts/scenePrompt'
+import { DEFAULT_ROMANCE } from '@shared/relationship'
 import { calendarOf } from '@shared/semesters'
 import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
 import { charKeyOf, type CalendarEvent, type TimeSlot } from '@shared/types'
@@ -114,7 +115,9 @@ describe('the PLANS half of the ledger request', () => {
       lessNsfwText: false,
       memoryBudgets: DEFAULT_MEMORY_BUDGETS,
       history: {},
-      roomReady: {}
+      roomReady: {},
+      romance: DEFAULT_ROMANCE,
+      readerPronouns: 'he' as const
     }
   }
 

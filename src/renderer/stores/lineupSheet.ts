@@ -58,8 +58,8 @@ function trimOf(bitmap: ImageBitmap): LineupSprite | null {
 
 /**
  * Every frame trimmed and laid left to right on black, or null when none of them loaded. Two
- * passes with one bitmap alive at a time — the first measures, the second draws — since twelve
- * full frames decoded at once would be ~95MB.
+ * passes with one bitmap alive at a time — the first measures, the second draws — since every
+ * full frame decoded at once costs ~8MB.
  */
 export async function stitchLineup(frames: readonly LineupFrame[]): Promise<LineupSheet | null> {
   const measured: number[] = []

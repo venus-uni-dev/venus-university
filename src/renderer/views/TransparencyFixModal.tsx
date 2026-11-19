@@ -51,6 +51,8 @@ export function TransparencyFixModal({
     if (!canvas || saving) return
 
     setSaving(true)
+    // A save that closes the panel keeps it locked and reading Saving… through its exit.
+    let closed = false
     try {
       const work = document.createElement('canvas')
       const images: WardrobeFixImage[] = []
@@ -79,7 +81,10 @@ export function TransparencyFixModal({
 
       if (images.length === 0) return
       const ok = await applyFix(charId, set, images, await toPngBase64(canvas), 'fix')
-      if (ok) onClose()
+      if (ok) {
+        closed = true
+        onClose()
+      }
     } catch (err) {
       // Compositing has no service behind it, so its failure is wrapped here (a tier-2 recoverable
       // modal).
@@ -87,13 +92,15 @@ export function TransparencyFixModal({
         .getState()
         .showError(appError('SPRITE_UNWRITABLE', 'Could not repair the sprites.', messageOf(err)))
     } finally {
-      setSaving(false)
+      if (!closed) setSaving(false)
     }
   }
 
   /* Paint that has never been saved is work, and work is not thrown away on a stray click
-     outside — the Edit modal's own rule for its form. */
+     outside — the Edit modal's own rule for its form. A save under way answers no way out: it
+     closes the panel itself once the sprites are written. */
   const requestClose = (): void => {
+    if (saving) return
     if (dirty) setDiscarding(true)
     else onClose()
   }
@@ -135,6 +142,8 @@ export function TransparencyFixModal({
             order="under"
             hint={HINT}
             canvasRef={paintRef}
+            // The layer is read sprite by sprite through the save, so it holds still until then.
+            disabled={saving}
             onStage={setStage}
             onChange={(state) => setDirty(state.dirty)}
           >
@@ -143,7 +152,8 @@ export function TransparencyFixModal({
                 id="fix-cancel"
                 className="vu-btn vu-btn--quiet"
                 type="button"
-                {...gestures(false, quietLift, quietPress)}
+                disabled={saving}
+                {...gestures(saving, quietLift, quietPress)}
                 onClick={requestClose}
               >
                 Cancel

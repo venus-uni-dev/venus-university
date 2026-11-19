@@ -17,19 +17,19 @@ describe('withRegenTags', () => {
   it('opens on the kept edit whole', () => {
     const draft = spriteDraft(c, poseTags, 'pe', tags)
     const kept = { ...draft, appearance: ['red_hair'], negative: [] }
-    expect(withRegenTags(draft, kept, tags)).toEqual(kept)
+    expect(withRegenTags(draft, kept, tags, 'female')).toEqual(kept)
   })
 
   it('falls back to the draft for another wardrobe, another kind, or a non-object', () => {
     const draft = spriteDraft(c, poseTags, 'pe', tags)
     const otherSet = { ...spriteDraft(c, poseTags, 'swim', tags), appearance: ['red_hair'] }
-    expect(withRegenTags(draft, otherSet, tags)).toEqual(draft)
+    expect(withRegenTags(draft, otherSet, tags, 'female')).toEqual(draft)
 
     const otherKind: PromptEdit = { kind: 'expression', expression: ['x'] }
-    expect(withRegenTags(draft, otherKind, tags)).toEqual(draft)
+    expect(withRegenTags(draft, otherKind, tags, 'female')).toEqual(draft)
 
-    expect(withRegenTags(draft, 'broken', tags)).toEqual(draft)
-    expect(withRegenTags(draft, null, tags)).toEqual(draft)
+    expect(withRegenTags(draft, 'broken', tags, 'female')).toEqual(draft)
+    expect(withRegenTags(draft, null, tags, 'female')).toEqual(draft)
   })
 
   it('falls back one group at a time, and carries no group the kind lacks', () => {
@@ -41,7 +41,7 @@ describe('withRegenTags', () => {
       position: ['kept'],
       outfit: ['stray']
     }
-    const result = withRegenTags(draft, stored, tags)
+    const result = withRegenTags(draft, stored, tags, 'female')
     expect(result).toEqual({ ...draft, position: ['kept'] })
     expect('outfit' in result).toBe(false)
   })
@@ -92,7 +92,7 @@ describe('withRegenTags — the default tags', () => {
       base: sent.base.filter((tag) => tag !== 'masterpiece').concat('absurdres'),
       negative: [...sent.negative, 'bag']
     }
-    const opened = withRegenTags(draft, kept, changed)
+    const opened = withRegenTags(draft, kept, changed, 'female')
     expect(opened.kind === 'sprite' && opened.base).toEqual([
       'score_9',
       ...tags.sprite,
@@ -109,9 +109,34 @@ describe('withRegenTags — the default tags', () => {
     const draft = cgDraft(c, 'sex', changed)
     const kept = withRegenEdit(c, 'cg:sex', { ...draft, base: [...draft.base, 'x'] }, changed)
       .regenTags?.['cg:sex']
-    expect(withRegenTags(draft, kept, changed)).toEqual({ ...draft, base: [...draft.base, 'x'] })
+    expect(withRegenTags(draft, kept, changed, 'female')).toEqual({
+      ...draft,
+      base: [...draft.base, 'x']
+    })
 
-    const back = withRegenTags(cgDraft(c, 'sex', tags), kept, tags)
+    const back = withRegenTags(cgDraft(c, 'sex', tags), kept, tags, 'female')
     expect(back.kind === 'cg' && back.base).toEqual([...tags.quality, ...tags.cg, 'x'])
+  })
+
+  it('keeps a guy’s edit with the male negative it was sent with, and swaps it when that moves', () => {
+    const guy = character({ gender: 'male' })
+    const draft = spriteDraft(guy, poseTags, 'pe', tags)
+    const kept = withRegenEdit(guy, 'pe', { ...draft, negative: [...draft.negative, 'bag'] }, tags)
+      .regenTags?.pe
+    expect(kept?.sentDefaults?.negative).toEqual([
+      ...tags.negative,
+      ...tags.spriteNegative,
+      ...tags.maleNegative
+    ])
+
+    const moved: DefaultTags = { ...tags, maleNegative: ['1girl', 'cleavage'] }
+    const opened = withRegenTags(spriteDraft(guy, poseTags, 'pe', moved), kept, moved, 'male')
+    expect(opened.kind === 'sprite' && opened.negative).toEqual([
+      ...tags.negative,
+      ...tags.spriteNegative,
+      '1girl',
+      'cleavage',
+      'bag'
+    ])
   })
 })

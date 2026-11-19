@@ -8,7 +8,13 @@ import {
   replaysToDelete,
   type SlotReplay
 } from '@shared/replays'
-import { hasSemester, recordReplayIds, SEMESTER_NOT_FOUND, semesterOf } from '@shared/semesters'
+import {
+  hasSemester,
+  recordReplayIds,
+  SEMESTER_NOT_FOUND,
+  semesterOf,
+  withTransfers
+} from '@shared/semesters'
 import {
   APPLICATION_INVALID,
   APPLICATION_NOT_FOUND,
@@ -403,8 +409,9 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
     for (const saveId of await newestWrittenFirst(playthroughId, saveIds)) {
       try {
         const save = await loadSave(playthroughId, saveId)
-        // The roster and the semester the save is in; one the record does not hold is unreadable.
-        const semester = record ? semesterOf(record, save.semester) : null
+        // The roster and the semester the save is in, whoever transferred in joined on; one the
+        // record does not hold is unreadable.
+        const semester = record ? withTransfers(semesterOf(record, save.semester), save) : null
         summary = {
           ...named,
           chars: semester?.chars ?? [],

@@ -234,6 +234,34 @@ describe('expireHangoutInvitations', () => {
     expect(state.events[0]?.noShow).toEqual(['a', 'b'])
   })
 
+  // Each snub is filed in the pronouns of the one who holds it.
+  it('files the snubs a guy holds in his own pronouns', () => {
+    seedPlan()
+    useGameStore.setState({
+      characters: charactersById(
+        character({ charId: 'a' }),
+        character({ charId: 'b', firstName: 'Mina', lastName: 'Okafor', gender: 'male' })
+      ),
+      bunnyboard: {
+        ...useGameStore.getState().bunnyboard,
+        conversations: {
+          ...useGameStore.getState().bunnyboard.conversations,
+          b: { charId: 'b', messages: [], unread: 0, summary: null, turnedDown: true }
+        }
+      }
+    })
+    expireHangoutInvitations([])
+
+    const state = useGameStore.getState()
+    expect(state.charInfo.a?.memories?.map((memory) => memory.desc)).toEqual([
+      "the reader ghosted her and didn't show up for Dinner"
+    ])
+    expect(state.charInfo.b?.memories?.map((memory) => memory.desc)).toEqual([
+      "the reader ghosted him and didn't show up for Dinner",
+      'the reader turned down his request to hang out'
+    ])
+  })
+
   it('spares the attendee in the scene and still ghosts the rest', () => {
     seedPlan()
     expireHangoutInvitations(['a'])

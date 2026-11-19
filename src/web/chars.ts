@@ -22,7 +22,7 @@ import {
   newCharacter,
   withRemovedDefault
 } from '@shared/characterRules'
-import { defaultTagsOf } from '@shared/defaultTags'
+import { defaultTagsOf, subjectTagsOf } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, messageOf } from '@shared/errors'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
@@ -41,6 +41,7 @@ import type {
   CustomOutfitSlot,
   DefaultsStatus,
   Emotion,
+  Gender,
   OutfitSet,
   Position,
   ProfileCrop,
@@ -174,19 +175,22 @@ export async function restoreDefaults(): Promise<void> {
 }
 
 /**
- * Creates the pre-LLM record a new character starts as, with the reference picture stored
- * before it, so `brief.reference` is only ever true with the picture already there.
+ * Creates the pre-LLM record a new character of `gender` starts as, opening on its subject tags,
+ * with the reference picture stored before it, so `brief.reference` is only ever true with the
+ * picture already there.
  */
 export async function createCharacter(
   firstName: string,
   lastName: string,
+  gender: Gender,
   brief?: CharacterBrief,
   reference?: ReferenceImage
 ): Promise<Character> {
   const character = newCharacter(
     firstName,
     lastName,
-    defaultTagsOf(await currentSettings()).subject,
+    gender,
+    subjectTagsOf(defaultTagsOf(await currentSettings()), gender),
     brief
   )
   if (reference) {

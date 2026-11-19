@@ -30,7 +30,7 @@ describe('a hand edit writes only the boxes the player changed', () => {
       { brokenUp: 1, harem: true, gaveContactInfo: true },
       { datingSince: 5, brokeUpOn: 20 }
     )
-    const edited = withMilestonesEdited(info, opened, { ...opened, kissed: true }, TODAY)
+    const edited = withMilestonesEdited(info, opened, { ...opened, kissed: true }, TODAY, 'female')
     expect(edited.flags).toMatchObject({ hasKissed: true, harem: true, brokenUp: 1 })
     expect(edited).toMatchObject({ datingSince: 5, brokeUpOn: 20 })
     expect(edited.memories).toEqual([
@@ -46,7 +46,7 @@ describe('a hand-set relationship starts and ends as the game would', () => {
       { brokeUpOn: 10, leftFor: 'other' }
     )
     const picked = withEditMilestone(opened, 'lovers', true, standing)
-    const edited = withMilestonesEdited(info, opened, picked, TODAY)
+    const edited = withMilestonesEdited(info, opened, picked, TODAY, 'female')
     expect(edited.flags).toMatchObject({
       isLover: true,
       hasCrush: false,
@@ -64,7 +64,8 @@ describe('a hand-set relationship starts and ends as the game would', () => {
       graduate.info,
       graduate.opened,
       { ...graduate.opened, lovers: true },
-      TODAY
+      TODAY,
+      'female'
     )
     expect(gone.flags.isLover).toBe(true)
     expect(gone.romanceScenes).toBeUndefined()
@@ -77,7 +78,8 @@ describe('a hand-set relationship starts and ends as the game would', () => {
       info,
       opened,
       { ...opened, lovers: false, broke_up: true },
-      TODAY
+      TODAY,
+      'female'
     )
     expect(ended.flags).toMatchObject({ isLover: false, brokenUp: 1 })
     expect(ended).toMatchObject({ datingSince: 5, brokeUpOn: TODAY })
@@ -86,7 +88,7 @@ describe('a hand-set relationship starts and ends as the game would', () => {
       { date: TODAY, type: 'hated', desc: 'things ended between the reader and her' }
     ])
 
-    const never = withMilestonesEdited(info, opened, { ...opened, lovers: false }, TODAY)
+    const never = withMilestonesEdited(info, opened, { ...opened, lovers: false }, TODAY, 'female')
     expect(never.flags).toMatchObject({ isLover: false, brokenUp: 0 })
     expect(never.datingSince).toBeUndefined()
     expect(never.brokeUpOn).toBeUndefined()

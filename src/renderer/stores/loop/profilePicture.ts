@@ -27,6 +27,21 @@ import { currentRun, runStale } from './state'
  * read of the crop that fails costs nothing but the picture.
  */
 
+/**
+ * Where the reader's picture is kept and shown while a screen edits it: the crop on show, and how
+ * the kept picture is read, saved and removed. A game's is its playthrough's; a New Game's is the
+ * folder its application is kept in.
+ */
+export interface PictureHome {
+  /** The crop on show, as a URL, or null where none is kept. */
+  crop: string | null
+  /** The kept full picture for the crop modal, or null where none reads. */
+  openStored: () => Promise<ReaderPicture | null>
+  /** Keeps the crop cut through `frame` and the picture where it is new; false where it was not. */
+  save: (picture: ReaderPicture, frame: ProfileFrame) => Promise<boolean>
+  remove: () => Promise<void>
+}
+
 /** A full picture on its way through the crop modal, and the frame the modal opens on. */
 export interface ReaderPicture {
   blob: Blob
@@ -57,13 +72,8 @@ export async function loadProfilePicture(
   if (!playthroughId) return
 
   const run = currentRun()
-  const found = await window.api.saves.readProfilePicture(playthroughId)
-  if (runStale(run)) return
-  if (!found.ok) {
-    console.warn('[profile] no profile picture:', found.error.message)
-    return
-  }
-  if (found.data) publish(found.data)
+  const crop = await readPictureCrop(playthroughId)
+  if (!runStale(run) && crop) publish(crop)
 }
 
 /** Drops the crop and releases the URL behind it, on the way out of a game. */
@@ -125,14 +135,21 @@ function pictureBlob(bytes: Uint8Array<ArrayBuffer>): Blob {
   return new Blob([bytes], { type: imageTypeOf(bytes) ?? '' })
 }
 
+/** A playthrough's crop, or null where it has none or it will not read, which costs nothing. */
+export async function readPictureCrop(playthroughId: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  const found = await window.api.saves.readProfilePicture(playthroughId)
+  if (found.ok) return found.data
+  console.warn('[profile] no profile picture:', found.error.message)
+  return null
+}
+
 /**
- * The playthrough's full picture for the crop modal, on the frame it was last cut through. Where
+ * A playthrough's full picture for the crop modal, on the frame it was last cut through. Where
  * an older build kept only the crop, the crop stands in as the full picture until the next save.
  * Null, with the reason on screen, where nothing could be read.
  */
-export async function openStoredPicture(): Promise<ReaderPicture | null> {
+export async function openStoredPicture(playthroughId: string | null): Promise<ReaderPicture | null> {
   const ui = useUiStore.getState()
-  const playthroughId = useGameStore.getState().playthroughId
   if (!playthroughId) return null
 
   const source = await window.api.saves.readProfileSource(playthroughId)
@@ -170,15 +187,17 @@ export async function openStoredPicture(): Promise<ReaderPicture | null> {
 }
 
 /**
- * Cuts the crop out of the picture through `frame` and keeps both, the full picture only where it
- * is not already kept. False, with the reason on screen, where it could not be kept.
+ * Cuts the crop out of the picture through `frame` and keeps both in `playthroughId`, the full
+ * picture only where it is not already kept, unless `stale` says the screen that asked has gone.
+ * The crop's bytes, or null, with the reason on screen, where it could not be kept.
  */
-export async function savePicture(picture: ReaderPicture, frame: ProfileFrame): Promise<boolean> {
+export async function writePicture(
+  playthroughId: string,
+  picture: ReaderPicture,
+  frame: ProfileFrame,
+  stale: () => boolean
+): Promise<Uint8Array<ArrayBuffer> | null> {
   const ui = useUiStore.getState()
-  const playthroughId = useGameStore.getState().playthroughId
-  if (!playthroughId) return false
-
-  const run = currentRun()
   let crop: Uint8Array<ArrayBuffer>
   let image: string | undefined
   try {
@@ -200,9 +219,9 @@ export async function savePicture(picture: ReaderPicture, frame: ProfileFrame): 
   } catch (err) {
     console.warn('[profile] picture refused:', messageOf(err))
     ui.showError(toAppError(err, 'PROFILE_PICTURE_INVALID'))
-    return false
+    return null
   }
-  if (runStale(run)) return false
+  if (stale()) return null
 
   const { x, y, width, height } = frame
   const written = await window.api.saves.writeProfilePicture(playthroughId, bytesToBase64(crop), {
@@ -211,11 +230,28 @@ export async function savePicture(picture: ReaderPicture, frame: ProfileFrame): 
   })
   if (!written.ok) {
     ui.showError(written.error)
-    return false
+    return null
   }
+  return crop
+}
+
+/** The game's picture: {@link writePicture} into its playthrough, on the screen once it lands. */
+export async function savePicture(picture: ReaderPicture, frame: ProfileFrame): Promise<boolean> {
+  const playthroughId = useGameStore.getState().playthroughId
+  if (!playthroughId) return false
+  const run = currentRun()
+  const crop = await writePicture(playthroughId, picture, frame, () => runStale(run))
+  if (!crop) return false
   // The same bytes the bridge took, so the screen and the folder cannot disagree.
   if (!runStale(run)) publish(crop)
   return true
+}
+
+/** Takes a playthrough's picture away; false, with the reason on screen, where it could not. */
+export async function deletePicture(playthroughId: string): Promise<boolean> {
+  const removed = await window.api.saves.deleteProfilePicture(playthroughId)
+  if (!removed.ok) useUiStore.getState().showError(removed.error)
+  return removed.ok
 }
 
 /** The picture a photo sends for the reader: the full one, else the crop; null where neither reads. */
@@ -230,11 +266,15 @@ export async function readerReference(playthroughId: string): Promise<Blob | nul
 export async function removeProfilePicture(): Promise<void> {
   const playthroughId = useGameStore.getState().playthroughId
   if (!playthroughId) return
+  if (await deletePicture(playthroughId)) dropProfilePicture()
+}
 
-  const removed = await window.api.saves.deleteProfilePicture(playthroughId)
-  if (!removed.ok) {
-    useUiStore.getState().showError(removed.error)
-    return
+/** The game's picture as the Profile tab edits it. */
+export function gamePictureHome(crop: string | null): PictureHome {
+  return {
+    crop,
+    openStored: () => openStoredPicture(useGameStore.getState().playthroughId),
+    save: savePicture,
+    remove: removeProfilePicture
   }
-  dropProfilePicture()
 }

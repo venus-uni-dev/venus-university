@@ -1,5 +1,6 @@
-import type { Character, RegenTarget } from './types'
+import type { Character, Gender, RegenTarget } from './types'
 import { isTagList, sameTags, SHIPPED_DEFAULT_TAGS, type DefaultTags } from './defaultTags'
+import { genderOf } from './gender'
 import { defaultsOfGroups, type PromptEdit } from './imagePrompt'
 
 /**
@@ -59,18 +60,23 @@ export function swapDefaults(
 /**
  * What a regenerate opens on: the edit its button last sent, where that is of the draft's kind
  * and wardrobe, group by group where each is a list of tags; the draft's group otherwise. A kept
- * Base or Negative group has its default tags swapped for `tags`, an edit that does not say which
- * it was sent with having been sent with the build's own.
+ * Base or Negative group has its default tags swapped for `tags`, as they read for `gender`, an
+ * edit that does not say which it was sent with having been sent with the build's own.
  */
-export function withRegenTags(draft: PromptEdit, stored: unknown, tags: DefaultTags): PromptEdit {
+export function withRegenTags(
+  draft: PromptEdit,
+  stored: unknown,
+  tags: DefaultTags,
+  gender: Gender
+): PromptEdit {
   if (typeof stored !== 'object' || stored === null) return draft
   const held = stored as Partial<Record<PromptGroup | 'kind' | 'set' | 'sentDefaults', unknown>>
   if (held.kind !== draft.kind) return draft
   if (draft.kind === 'sprite' && held.set !== draft.set) return draft
   const before = isSentDefaults(held.sentDefaults)
     ? held.sentDefaults
-    : defaultsOfGroups(draft.kind, SHIPPED_DEFAULT_TAGS)
-  const after = defaultsOfGroups(draft.kind, tags)
+    : defaultsOfGroups(draft.kind, SHIPPED_DEFAULT_TAGS, gender)
+  const after = defaultsOfGroups(draft.kind, tags, gender)
   const next: PromptEdit = { ...draft }
   const groups = next as unknown as Record<PromptGroup, string[]>
   for (const group of PROMPT_GROUPS[draft.kind]) {
@@ -86,7 +92,7 @@ export function withRegenTags(draft: PromptEdit, stored: unknown, tags: DefaultT
 
 /**
  * The record with what one regenerate button sent kept under it, over whatever it kept before,
- * beside the default part of its shared groups as `tags` made them.
+ * beside the default part of its shared groups as `tags` made them for her gender.
  */
 export function withRegenEdit(
   character: Character,
@@ -94,7 +100,7 @@ export function withRegenEdit(
   edit: PromptEdit,
   tags: DefaultTags
 ): Character {
-  const sentDefaults = defaultsOfGroups(edit.kind, tags)
+  const sentDefaults = defaultsOfGroups(edit.kind, tags, genderOf(character))
   const kept: KeptEdit = sentDefaults ? { ...edit, sentDefaults } : edit
   return { ...character, regenTags: { ...character.regenTags, [target]: kept } }
 }

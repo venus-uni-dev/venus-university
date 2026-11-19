@@ -13,7 +13,7 @@ import { spriteRef } from '@shared/outfits'
 import type { OutfitSet, WardrobeLayer } from '@shared/types'
 import { loadWardrobeImage, spriteUrl } from '../stores/characterStore'
 import { gestures, quietPress, toggleLift } from '../views/motion'
-import { BrushIcon, EraserIcon, PipetteIcon } from '../views/repairIcons'
+import { BrushIcon, EraserIcon, MarkIcon, PipetteIcon } from '../views/repairIcons'
 import { ColorWheel } from './ColorWheel'
 import {
   BRUSH_MAX,
@@ -27,15 +27,22 @@ import {
 } from './RepairTools'
 import '../vu_styles/WardrobeFix.css'
 
-/** What the brush is doing: laying paint down, taking it back, or sampling it. */
-type Tool = 'brush' | 'eraser' | 'dropper'
+/**
+ * What the brush is doing: laying paint down, marking an area without colouring it, taking
+ * either back, or sampling a colour.
+ */
+type Tool = 'brush' | 'mark' | 'eraser' | 'dropper'
 
-/** The tool palette, in the order a repair uses them. */
+/** The tool palette, in the order a repair uses them; Mark only where there is a mark layer. */
 const TOOLS: ReadonlyArray<{ key: Tool; label: string; Icon: () => JSX.Element }> = [
   { key: 'brush', label: 'Paint', Icon: BrushIcon },
+  { key: 'mark', label: 'Mark', Icon: MarkIcon },
   { key: 'eraser', label: 'Erase', Icon: EraserIcon },
   { key: 'dropper', label: 'Pick color', Icon: PipetteIcon }
 ]
+
+/** The custom property the mark layer is drawn in, read off the stage so it follows the theme. */
+const MARK_COLOUR = '--vu-accent'
 
 /** The sprite's natural size, learned from the image itself. */
 export interface PainterStage {
@@ -81,6 +88,15 @@ export interface LayerPainterProps {
   hint: string
   /** The canvas the shell reads its pixels off; the painter owns everything drawn on it. */
   canvasRef: RefObject<HTMLCanvasElement | null>
+  /**
+   * A second layer over the paint, for a repair that redraws: what is marked there is redrawn
+   * from the sprite's own pixels rather than from a colour. Given, the palette offers Mark.
+   */
+  markRef?: RefObject<HTMLCanvasElement | null>
+  /** The panel's theme, which the mark layer is tinted from; read again when it changes. */
+  theme?: 'day' | 'night'
+  /** The shell's own fields, under the brush size. */
+  fields?: ReactNode
   /** Nothing may be painted or undone — a job is running over these strokes. */
   disabled?: boolean
   /** The sprite's size, once the image has said what it is. */
@@ -131,6 +147,9 @@ export function LayerPainter({
   order,
   hint,
   canvasRef,
+  markRef,
+  theme,
+  fields,
   disabled = false,
   onStage,
   onChange,
@@ -156,9 +175,15 @@ export function LayerPainter({
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
+    const inked = (layer: HTMLCanvasElement | null | undefined): boolean => {
+      const layerCtx = layer?.getContext('2d')
+      return Boolean(
+        layer && layerCtx && hasInk(layerCtx.getImageData(0, 0, layer.width, layer.height).data)
+      )
+    }
     onChange({
       dirty: history.isDirty(),
-      painted: hasInk(ctx.getImageData(0, 0, canvas.width, canvas.height).data)
+      painted: inked(canvas) || inked(markRef?.current)
     })
   }
 
@@ -190,7 +215,9 @@ export function LayerPainter({
   }, [stage, charId, set, restoreFrom, version, canvasRef])
 
   // A stroke taken back or put back is reported as one laid down is.
-  const history = useCanvasHistory(canvasRef, () => report.current())
+  const history = useCanvasHistory(markRef ? [canvasRef, markRef] : canvasRef, () =>
+    report.current()
+  )
   const { snapshot, undo, redo } = history
 
   useRepairKeys({
@@ -250,19 +277,63 @@ export function LayerPainter({
     setTool('brush')
   }
 
-  /** Sets up the context for one stroke — the tool is the composite operation. */
-  const strokeContext = (canvas: HTMLCanvasElement): CanvasRenderingContext2D | null => {
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
+  /** The colour the mark layer is drawn in now: the theme's accent, off the stage. */
+  const markColour = (): string =>
+    (stageRef.current && getComputedStyle(stageRef.current).getPropertyValue(MARK_COLOUR).trim()) ||
+    '#000'
 
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = brushSize
-    ctx.strokeStyle = color
-    // Always fully opaque: a semi-transparent stroke would write the defect being repaired.
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over'
-    return ctx
+  /** What the mark layer was last drawn in, so a theme change can recolour what is on it. */
+  const markDrawnIn = useRef<string | null>(null)
+
+  /* Recolours every marked pixel in the theme's accent, keeping its alpha: what is marked is
+     the alpha alone, and the tint only shows it. */
+  const tintMarks = (): void => {
+    const ctx = markRef?.current?.getContext('2d')
+    if (!ctx) return
+    const colour = markColour()
+    if (markDrawnIn.current === colour) return
+    markDrawnIn.current = colour
+    ctx.save()
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.fillStyle = colour
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    ctx.restore()
+  }
+
+  /* A theme change after the panel has taken the new theme's tokens, which the commit has by
+     now. Keyed on the theme alone: the tint is read off the page, not off these props. */
+  useEffect(() => {
+    tintMarks()
+  }, [theme])
+
+  /**
+   * Sets up the contexts one stroke draws on — the tool picks the layer, and is the composite
+   * operation: paint lays colour on the paint layer, Mark lays the accent on the mark layer, and
+   * the eraser takes either back.
+   */
+  const strokeContexts = (): CanvasRenderingContext2D[] => {
+    const layers =
+      tool === 'mark'
+        ? [markRef?.current]
+        : tool === 'eraser'
+          ? [canvasRef.current, markRef?.current]
+          : [canvasRef.current]
+    if (tool === 'mark') tintMarks()
+
+    const contexts: CanvasRenderingContext2D[] = []
+    for (const layer of layers) {
+      const ctx = layer?.getContext('2d')
+      if (!ctx) continue
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = brushSize
+      ctx.strokeStyle = tool === 'mark' ? (markDrawnIn.current ?? markColour()) : color
+      // Always fully opaque: a semi-transparent stroke would write the defect being repaired.
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over'
+      contexts.push(ctx)
+    }
+    return contexts
   }
 
   const onPointerDown = (event: PointerEvent<HTMLCanvasElement>): void => {
@@ -273,35 +344,39 @@ export function LayerPainter({
       return
     }
 
-    const ctx = strokeContext(event.currentTarget)
-    if (!ctx) return
+    const contexts = strokeContexts()
+    if (contexts.length === 0) return
 
     snapshot()
     event.currentTarget.setPointerCapture(event.pointerId)
     lastPoint.current = point
 
     // A click is a dot: round caps make a near-zero segment a full-width disc.
-    ctx.beginPath()
-    ctx.moveTo(point.x, point.y)
-    ctx.lineTo(point.x + 0.01, point.y)
-    ctx.stroke()
+    for (const ctx of contexts) {
+      ctx.beginPath()
+      ctx.moveTo(point.x, point.y)
+      ctx.lineTo(point.x + 0.01, point.y)
+      ctx.stroke()
+    }
   }
 
   const onPointerMove = (event: PointerEvent<HTMLCanvasElement>): void => {
     traceCursor(event)
     if (!lastPoint.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return
 
-    const ctx = strokeContext(event.currentTarget)
-    if (!ctx) return
+    const contexts = strokeContexts()
+    if (contexts.length === 0) return
 
     // Every point the pointer passed through, so a fast stroke stays a curve.
     const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? []
     for (const move of coalesced.length > 0 ? coalesced : [event.nativeEvent]) {
       const point = pointIn(event.currentTarget, move.clientX, move.clientY)
-      ctx.beginPath()
-      ctx.moveTo(lastPoint.current.x, lastPoint.current.y)
-      ctx.lineTo(point.x, point.y)
-      ctx.stroke()
+      for (const ctx of contexts) {
+        ctx.beginPath()
+        ctx.moveTo(lastPoint.current.x, lastPoint.current.y)
+        ctx.lineTo(point.x, point.y)
+        ctx.stroke()
+      }
       lastPoint.current = point
     }
   }
@@ -337,22 +412,39 @@ export function LayerPainter({
    */
   const ringing = over && tool !== 'dropper' && !disabled
 
+  /** What the pointer does on the stage, handed to whichever layer is on top. */
+  const pointer = {
+    'data-cursor': ringing ? 'none' : 'crosshair',
+    onPointerDown,
+    onPointerMove,
+    onPointerEnter: (event: PointerEvent<HTMLCanvasElement>) => {
+      setOver(true)
+      traceCursor(event)
+    },
+    onPointerLeave: () => setOver(false),
+    onPointerUp: endStroke,
+    onPointerCancel: endStroke
+  }
+
   const paintLayer = (
     <canvas
       ref={canvasRef}
-      className="vu-fix-paint"
-      data-cursor={ringing ? 'none' : 'crosshair'}
+      className={`vu-fix-paint${markRef ? ' vu-fix-paint--under' : ''}`}
       width={stage?.width}
       height={stage?.height}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerEnter={(event) => {
-        setOver(true)
-        traceCursor(event)
-      }}
-      onPointerLeave={() => setOver(false)}
-      onPointerUp={endStroke}
-      onPointerCancel={endStroke}
+      {...(markRef ? {} : pointer)}
+    />
+  )
+
+  /* The mark layer sits over the paint and takes the pointer for both: its strokes are drawn
+     opaque and shown faint, so what is under a mark stays readable and two marks never darken. */
+  const markLayer = markRef && (
+    <canvas
+      ref={markRef}
+      className="vu-fix-paint vu-fix-mark"
+      width={stage?.width}
+      height={stage?.height}
+      {...pointer}
     />
   )
 
@@ -374,6 +466,7 @@ export function LayerPainter({
         >
           {order === 'under' ? paintLayer : spriteLayer}
           {order === 'under' ? spriteLayer : paintLayer}
+          {markLayer}
           {ringing && (
             <span className={`vu-fix-cursor${tool === 'eraser' ? ' vu-fix-cursor--erase' : ''}`} />
           )}
@@ -393,10 +486,10 @@ export function LayerPainter({
           onRedo={redo}
           onZoom={() => setZoomed((on) => !on)}
         />
-        {/* One control in three states rather than three switches, and the one in force
+        {/* One control in N states rather than N switches, and the one in force
             is filled — so its hover may not animate a fill. */}
         <div className="vu-palette" role="group" aria-label="Tool">
-          {TOOLS.map(({ key, label, Icon }) => (
+          {TOOLS.filter(({ key }) => key !== 'mark' || markRef).map(({ key, label, Icon }) => (
             <motion.button
               key={key}
               className={`vu-palette-btn${tool === key ? ' vu-palette-btn--on' : ''}`}
@@ -450,6 +543,8 @@ export function LayerPainter({
           />
           <span className="vu-fix-readout">{brushSize} PX</span>
         </div>
+
+        {fields}
 
         <span className="vu-fix-gap" />
 

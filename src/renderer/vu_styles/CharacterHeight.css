@@ -220,6 +220,46 @@
   grid-template-rows: repeat(2, auto);
 }
 
+/* A roster past twelve picks who stands off a list beside the clusters. At twelve or fewer the
+   wrapper draws no box of its own, so the clusters stand straight in the panel's column. */
+.vu-heights-under {
+  display: contents;
+}
+
+.vu-heights-under--picking {
+  display: flex;
+  gap: 24px;
+}
+
+.vu-heights-picks-box {
+  flex: none;
+  width: 260px;
+}
+
+/* As tall as the clusters beside it — three rows of 68 and two gaps of 14, and the cluster
+   list's 6px a side — scrolling inside that rather than growing the panel. */
+.vu-heights-picks {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 244px;
+  padding: 4px 6px;
+  overflow: hidden auto;
+}
+
+/* Beside the list the clusters have 1036px at the widest stage and 872 at the narrowest (the
+   panel's 1320 or 1156 less the list and the gap), where six across would crowd: twelve stand
+   three rows of four, every column over 200px. */
+.vu-heights-under--picking > .vu-heights-list {
+  flex: 1;
+  min-width: 0;
+}
+
+.vu-heights-list--roster.vu-heights-list--picked {
+  grid-template-rows: repeat(3, auto);
+}
+
 /* Her face, her label and her steps, close enough to read as one thing and centred in the
    column the grid gives them. The right column is a chip over the pair — 22 + 6 + 40 — which
    is the archway's own 68, so the two sit level with nothing measured. */
@@ -296,4 +336,25 @@
   margin: 0;
   color: var(--vu-text-muted);
   font: italic 500 14px/1.5 var(--font-body);
+}
+
+/* The romance question's two steppers, in fixed columns as the reader's stats are, so the two
+   level names stand in one column and stay put as the player steps through them. */
+.vu-romance-row {
+  display: grid;
+  grid-template-columns: minmax(0, 170px) 40px minmax(170px, 1fr) 40px;
+  align-items: center;
+  gap: 14px;
+  max-width: 520px;
+}
+
+.vu-romance-label {
+  font: 700 17px var(--font-body);
+}
+
+.vu-romance-level {
+  color: var(--vu-text);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-align: center;
 }

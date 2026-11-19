@@ -35,7 +35,7 @@ describe('a girl the reader knows before the semester', () => {
       ],
       { sex: true, crush: true, contact: true }
     )
-    const start = charStartOf(girl, plain)
+    const start = charStartOf(girl, plain, 'he')
 
     // Oldest first, in the reader's voice, the one with no words left out.
     expect(start?.memories).toEqual([
@@ -58,11 +58,12 @@ describe('a girl the reader knows before the semester', () => {
 
   it('holds no crush below nothing, and dates a lover, an ex and one back together', () => {
     const hated = girlOf([{ date: -1, type: 'hated', desc: 'he lied' }], { crush: true })
-    expect(charStartOf(hated, plain)?.flags.hasCrush).toBe(false)
+    expect(charStartOf(hated, plain, 'he')?.flags.hasCrush).toBe(false)
 
     const lover = charStartOf(
       girlOf([], { met: true, lovers: true, crush: true, datingSince: -100 }),
-      plain
+      plain,
+      'he'
     )
     expect(lover).toMatchObject({
       datingSince: -100,
@@ -72,7 +73,8 @@ describe('a girl the reader knows before the semester', () => {
 
     const ex = charStartOf(
       girlOf([], { met: true, broke_up: true, brokeUpOn: -20, datingSince: -90 }),
-      plain
+      plain,
+      'he'
     )
     expect(ex).toMatchObject({ brokeUpOn: -20, flags: { brokenUp: 1, isLover: false } })
     expect(ex?.datingSince).toBeUndefined()
@@ -80,15 +82,16 @@ describe('a girl the reader knows before the semester', () => {
     // Back together after a breakup: dated from the default day, no longer an ex.
     const again = charStartOf(
       girlOf([], { met: true, broke_up: true, lovers: true, brokeUpOn: -20 }),
-      plain
+      plain,
+      'he'
     )
     expect(again).toMatchObject({ datingSince: -1, flags: { brokenUp: 1, isLover: true } })
     expect(again?.brokeUpOn).toBeUndefined()
   })
 
   it('is a stranger with nothing set, or with her number and nothing else', () => {
-    expect(charStartOf(undefined, plain)).toBeNull()
-    expect(charStartOf(emptyGirl(), plain)).toBeNull()
-    expect(charStartOf(girlOf([], { contact: true, kissed: true }), plain)).toBeNull()
+    expect(charStartOf(undefined, plain, 'he')).toBeNull()
+    expect(charStartOf(emptyGirl(), plain, 'he')).toBeNull()
+    expect(charStartOf(girlOf([], { contact: true, kissed: true }), plain, 'he')).toBeNull()
   })
 })

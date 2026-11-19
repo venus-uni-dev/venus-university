@@ -53,12 +53,14 @@ export interface WardrobeColumnProps {
   fixDisabled?: boolean
   /** Opens the hand repair, on the same terms as the one above. */
   onFixFingers?: () => void
-  /** True while the fingers cannot be fixed, on the same terms plus the render's own. */
-  fingersDisabled?: boolean
-  /** What a hover raises over a dead Fix fingers: the render's own prerequisite, or `null`. */
-  fingersNote?: string | null
+  /** True while the repairs that render cannot run: the terms above plus the render's own. */
+  renderDisabled?: boolean
+  /** What a hover raises over a dead repair that renders: the render's prerequisite, or `null`. */
+  renderNote?: string | null
   /** Opens the artifact eraser, on the transparency repair's terms. */
   onEraseArtifacts?: () => void
+  /** Opens Repaint, on the hand repair's terms. */
+  onRepaint?: () => void
   /** Generates a set that has nothing in it yet; the plus stands where the word would. */
   onAdd?: () => void
   /** The plus is dead — a render going, or whatever the set control below already names. */
@@ -106,9 +108,10 @@ export function WardrobeColumn({
   onFixTransparency,
   fixDisabled = false,
   onFixFingers,
-  fingersDisabled = false,
-  fingersNote = null,
+  renderDisabled = false,
+  renderNote = null,
   onEraseArtifacts,
+  onRepaint,
   onAdd,
   addDisabled = false,
   rename,
@@ -383,12 +386,13 @@ export function WardrobeColumn({
 
       {control && <SetControl {...control} />}
 
-      {/* Inline actions, so they stay underlined at rest, two to a row. The transparency
-          repair and the eraser say nothing about their own gate — the count above, the control
-          below and `NOT GENERATED` in the archway have already said it — while the hand fix is
-          a render too, and a missing install is raised over it. A custom set's instructions
-          are words, live whatever runs. */}
-      {(onFixTransparency || onFixFingers || onEraseArtifacts || onInstructions) && (
+      {/* Inline actions, so they stay underlined at rest, two to a row: the repairs first, and a
+          custom set's Instructions on a row of its own. The transparency repair and the eraser
+          say nothing about their own gate — the count above, the control below and `NOT
+          GENERATED` in the archway have already said it — while the hand fix and Repaint are
+          renders too, and a missing install is raised over them. A custom set's instructions are
+          words, live whatever runs. */}
+      {(onFixTransparency || onFixFingers || onEraseArtifacts || onRepaint || onInstructions) && (
         <div className="vu-wardrobe-links">
           {(onFixTransparency || onFixFingers) && (
             <div className="vu-wardrobe-links-row">
@@ -404,12 +408,12 @@ export function WardrobeColumn({
                 </motion.button>
               )}
               {onFixFingers && (
-                <DeadNote note={fingersDisabled ? fingersNote : null} align="center">
+                <DeadNote note={renderDisabled ? renderNote : null} align="center">
                   <motion.button
                     className="vu-wardrobe-fix"
                     type="button"
-                    disabled={fingersDisabled}
-                    {...gestures(fingersDisabled, linkLift, rowPress)}
+                    disabled={renderDisabled}
+                    {...gestures(renderDisabled, linkLift, rowPress)}
                     onClick={onFixFingers}
                   >
                     Fix fingers
@@ -418,7 +422,7 @@ export function WardrobeColumn({
               )}
             </div>
           )}
-          {(onEraseArtifacts || onInstructions) && (
+          {(onEraseArtifacts || onRepaint) && (
             <div className="vu-wardrobe-links-row">
               {onEraseArtifacts && (
                 <motion.button
@@ -431,6 +435,23 @@ export function WardrobeColumn({
                   Erase artifacts
                 </motion.button>
               )}
+              {onRepaint && (
+                <DeadNote note={renderDisabled ? renderNote : null} align="center">
+                  <motion.button
+                    className="vu-wardrobe-fix"
+                    type="button"
+                    disabled={renderDisabled}
+                    {...gestures(renderDisabled, linkLift, rowPress)}
+                    onClick={onRepaint}
+                  >
+                    Repaint
+                  </motion.button>
+                </DeadNote>
+              )}
+            </div>
+          )}
+          {onInstructions && (
+            <div className="vu-wardrobe-links-row">
               {onInstructions && (
                 <motion.button
                   className="vu-wardrobe-fix"

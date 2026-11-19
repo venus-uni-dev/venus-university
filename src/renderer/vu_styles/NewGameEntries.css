@@ -207,6 +207,11 @@
   display: none;
 }
 
+/* A field in the grid that takes a whole row of it, for a phrase the short fields would cut off. */
+.vu-entries-wide {
+  grid-column: 1 / -1;
+}
+
 /* Prose fields, one under another at the pane's width. */
 .vu-entries-column {
   display: flex;

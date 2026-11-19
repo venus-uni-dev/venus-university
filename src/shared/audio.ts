@@ -1,6 +1,7 @@
 import { customCgSfxOf, customCgVoiceOf } from './customCgs'
+import { genderOf } from './gender'
 import { customCgSlotOf, isAfterPosition, isStockPosition } from './positions'
-import type { CgSfx, CgVoice, Character, Position, StockPosition } from './types'
+import type { CgSfx, CgVoice, Character, Gender, Position, StockPosition } from './types'
 import type { Weather } from './weather'
 
 /**
@@ -300,12 +301,27 @@ export function voiceTierOf(voicePitch: number): VoiceTier {
 }
 
 /**
- * How far a voice takes a loop, in signed semitones: a voice above centre climbs toward the
- * file's `up`, one below it falls toward its `down`, and centre leaves the loop as recorded.
+ * How far a voice takes a loop, in signed semitones: centre sits `shift` off the recording, a
+ * voice above it climbs toward the file's `up` and one below it falls toward its `down`, each end
+ * moved by the shift but never past the file's own range.
  */
-export function pitchSemitonesOf(voicePitch: number, range: { down: number; up: number }): number {
+export function pitchSemitonesOf(
+  voicePitch: number,
+  range: { down: number; up: number },
+  shift = 0
+): number {
   const pitch = clampVoicePitch(voicePitch)
-  return pitch >= 0 ? pitch * range.up : pitch * range.down
+  const top = Math.min(range.up, shift + range.up)
+  const bottom = Math.max(-range.down, shift - range.down)
+  return pitch >= 0 ? shift + pitch * (top - shift) : shift + pitch * (shift - bottom)
+}
+
+/** How many semitones a voice sits off the recording at centre: a girl's a little higher, a guy's a little lower. */
+const VOICE_SHIFT: Record<Gender, number> = { female: 1.5, male: -1.5 }
+
+/** How far a voice takes the typewriter's blip, in signed semitones. */
+export function voiceSemitonesOf(voicePitch: number, gender: Gender): number {
+  return pitchSemitonesOf(voicePitch, AUDIO_FILES.voice.pitch, VOICE_SHIFT[gender])
 }
 
 /** How much of her breath the voice slider plays, in seconds, before the blips come in. */
@@ -447,22 +463,30 @@ export interface CgLoops {
 /**
  * The loops a CG plays: a stock position's from the tables above, a custom main's from its
  * slot's voice and act, and a custom after's the stock afterglow: the slow breath unless silent.
+ * A male character's CG plays its act alone, with no breath.
  */
 export function cgLoopsOf(
   position: Position,
-  character: Pick<Character, 'customCgs'> | undefined
+  character: Pick<Character, 'customCgs' | 'gender'> | undefined
 ): CgLoops {
+  const breathes = genderOf(character) === 'female'
   if (isStockPosition(position)) {
-    return { act: ACT_LOOP_BY_POSITION[position], breath: breathFor(position) }
+    return {
+      act: ACT_LOOP_BY_POSITION[position],
+      breath: breathes ? breathFor(position) : null
+    }
   }
   const slot = customCgSlotOf(position)
   if (!slot) return { act: null, breath: null }
   const held = character ?? {}
   const voice = customCgVoiceOf(held, slot)
   if (isAfterPosition(position)) {
-    return { act: null, breath: voice === 'none' ? null : 'cg_breath' }
+    return { act: null, breath: breathes && voice !== 'none' ? 'cg_breath' : null }
   }
-  return { act: SFX_LOOPS[customCgSfxOf(held, slot)], breath: VOICE_LOOPS[voice] }
+  return {
+    act: SFX_LOOPS[customCgSfxOf(held, slot)],
+    breath: breathes ? VOICE_LOOPS[voice] : null
+  }
 }
 
 /**

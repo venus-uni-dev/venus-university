@@ -7,6 +7,7 @@ import {
   ENDING_PICTURE_SIZE,
   endingPicturePrompt
 } from '@shared/endingPicture'
+import { asGender } from '@shared/gender'
 import { imageTypeOf } from '@shared/imageBytes'
 import { cancelGroup, cancelKeys, runAbortable } from '@shared/jobQueue'
 import { LINEUP_MIME_TYPE } from '@shared/lineup'
@@ -197,10 +198,6 @@ export function buildApi(): VenusUniversityApi {
         result('generate the occasions', () =>
           runAbortable(group, (signal) => completeStructured<T>(request, signal))
         ),
-      generateSecrets: <T,>(request: StructuredRequest, group: string) =>
-        result('generate the secrets', () =>
-          runAbortable(group, (signal) => completeStructured<T>(request, signal))
-        ),
       generateQuiz: <T,>(request: StructuredRequest) =>
         result('generate the exam', () => completeStructured<T>(request)),
       // The model ids a custom endpoint lists, falling back to the stored key for that origin.
@@ -276,9 +273,9 @@ export function buildApi(): VenusUniversityApi {
     },
     chars: {
       list: () => result('read the characters', chars.listCharacters),
-      create: (firstName, lastName, brief, reference) =>
+      create: (firstName, lastName, gender, brief, reference) =>
         result('create the character', () =>
-          chars.createCharacter(firstName, lastName, brief, reference)
+          chars.createCharacter(firstName, lastName, asGender(gender), brief, reference)
         ),
       reference: (charId) => result('read the reference picture', () => chars.readReference(charId)),
       update: (character) => result('save the character', () => chars.writeCharacter(character)),
@@ -505,7 +502,8 @@ export function buildApi(): VenusUniversityApi {
       generateExpression: () => desktopOnly('comfy.generateExpression'),
       generateCg: () => desktopOnly('comfy.generateCg'),
       generateOutfit: () => desktopOnly('comfy.generateOutfit'),
-      fixHands: () => desktopOnly('comfy.fixHands')
+      fixHands: () => desktopOnly('comfy.fixHands'),
+      repaint: () => desktopOnly('comfy.repaint')
     },
     jobs: {
       cancelGroup: (group) => result('cancel the jobs', () => cancelGroup(group)),

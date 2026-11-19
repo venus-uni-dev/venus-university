@@ -137,6 +137,11 @@ export function noNsfwImagesOf(state: SettingsStoreState): boolean {
   return state.settings?.noNsfwImages === true
 }
 
+/** Whether the stock CGs are kept to a reader they match, as they are until the player says not. */
+export function matchCgBiologyOf(state: SettingsStoreState): boolean {
+  return state.settings?.matchCgBiology !== false
+}
+
 /**
  * The current non-secret settings as a patch, for a caller changing one field. Named rather
  * than spread so the presence flags cannot ride along into a write.
@@ -186,6 +191,8 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     newGameWelcome: settings.newGameWelcome,
     noNsfwImages: settings.noNsfwImages,
     lessNsfwText: settings.lessNsfwText,
+    // Carried, or a save made from anywhere else would match the stock CGs to the reader again.
+    matchCgBiology: settings.matchCgBiology,
     sfwAsked: settings.sfwAsked,
     // Carried, or a save made from anywhere else would drop a browser's key on the next visit.
     rememberKey: settings.rememberKey,
@@ -199,6 +206,7 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     // Carried, or a save made from anywhere else would drop the budgets and the persona.
     memoryBudgets: settings.memoryBudgets,
     secretBudget: settings.secretBudget,
+    endingPictureMax: settings.endingPictureMax,
     scenePersona: settings.scenePersona
   }
 }

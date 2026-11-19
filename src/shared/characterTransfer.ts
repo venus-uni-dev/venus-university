@@ -1,8 +1,8 @@
 import { CHARACTER_FILE_NAME, isCharFileRel, STAGING_DIR } from './characterFiles'
 import { CHARACTER_SCHEMA_VERSION } from './characterRules'
-import { appError } from './errors'
+import { appError, truncate } from './errors'
 import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
-import type { Character } from './types'
+import type { AppError, Character } from './types'
 
 /** Moving one character between installs: what the package carries, and what it must say. */
 
@@ -132,6 +132,68 @@ export function stripWrapper(names: readonly string[]): string | null {
   if (paths.some((path) => path.split('/')[0] !== first)) return null
   // A single top-level file is not a folder anything sits under.
   return paths.some((path) => path.includes('/')) ? first : null
+}
+
+/**
+ * The character zips a pack carries, as the archive lists them and in the order they are
+ * adopted, or `null` where the archive is not a pack: a pack holds nothing but zips, at its
+ * root or under the one wrapper folder an import flattens.
+ */
+export function packMembers(names: readonly string[]): string[] | null {
+  const wrapper = stripWrapper(names)
+  const prefix = wrapper === null ? '' : `${wrapper}/`
+  const members = names.filter((name) => {
+    const path = name.replace(/\\/g, '/').replace(/\/+$/, '')
+    return path !== '' && path !== wrapper && !isArchiveCruft(path)
+  })
+  if (members.length === 0) return null
+
+  const isMember = (name: string): boolean => {
+    const rest = name.replace(/\\/g, '/').slice(prefix.length)
+    return !rest.includes('/') && rest.toLowerCase().endsWith('.zip')
+  }
+  if (!members.every(isMember)) return null
+
+  return members.sort((a, b) => {
+    const left = memberName(a).toLowerCase()
+    const right = memberName(b).toLowerCase()
+    return left < right ? -1 : left > right ? 1 : 0
+  })
+}
+
+/** The file name one pack member goes by, wherever in the pack it sits. */
+export function memberName(path: string): string {
+  const normal = path.replace(/\\/g, '/')
+  return normal.slice(normal.lastIndexOf('/') + 1)
+}
+
+/** One pack member an import refused, under the name the pack carries it by. */
+export interface RefusedMember {
+  name: string
+  error: AppError
+}
+
+/** Longest a refused member's own detail may run in the pack's error. */
+const MEMBER_DETAIL_LIMIT = 300
+
+/**
+ * The one error a pack's refused members are reported in, or `null` where every member was
+ * adopted.
+ */
+export function packRefusal(total: number, refused: readonly RefusedMember[]): AppError | null {
+  if (refused.length === 0) return null
+
+  const message =
+    refused.length === total
+      ? `None of the ${total} characters in that pack could be imported.`
+      : `${refused.length} of the ${total} characters in that pack could not be imported.`
+  const detail = refused
+    .map(({ name, error }) => {
+      const why = error.detail ? ` (${truncate(error.detail, MEMBER_DETAIL_LIMIT)})` : ''
+      return `${name}: ${error.message} [${error.code}]${why}`
+    })
+    .join('\n')
+  return appError('IMPORT_PACK_PARTIAL', message, detail)
 }
 
 /**

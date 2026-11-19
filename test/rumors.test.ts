@@ -392,6 +392,55 @@ describe('rumorPass suspicion', () => {
   })
 })
 
+describe('rumorPass affairs', () => {
+  // Sara dates Hana; Gia has a crush on Sara; Fay is Hana's friend.
+  const affair = (open: string[]): ReturnType<typeof rumorPass> =>
+    rumorPass(
+      passInput({
+        acts: [act()],
+        cast: ['s', 'h', 'g'],
+        roster: ['s', 'h', 'g', 'f'],
+        npcRelationships: {
+          'h|s': { affinity: 5, dating: 1 },
+          'g|s': { affinity: 2, crush: ['g'] },
+          ...friends(['f', 'h'])
+        },
+        charInfo: { s: info(), h: info(), g: info(), f: info() },
+        open
+      }),
+      ALWAYS
+    )
+
+  it('makes her partner find out, her admirer resent it and his friend side with him', () => {
+    const outcome = affair([])
+
+    expect(outcome.memories).toEqual([
+      {
+        charId: 'h',
+        memory: { date: DATE, type: 'hated', desc: 'she saw Sara cheating on her with the reader' }
+      },
+      {
+        charId: 'g',
+        memory: {
+          date: DATE,
+          type: 'hated',
+          desc: 'she saw the reader with Sara, who she had a crush on'
+        }
+      }
+    ])
+    expect(outcome.affairs).toEqual([{ cheater: 's', partner: 'h', saw: true }])
+    expect(outcome.sided).toEqual([{ by: 'f', cheater: 's', partner: 'h' }])
+  })
+
+  it('lets nobody be cheated on by a girl who is open', () => {
+    const outcome = affair(['s'])
+
+    expect(outcome.affairs).toBeUndefined()
+    expect(outcome.sided).toBeUndefined()
+    expect(outcome.memories.map(({ charId }) => charId)).toEqual(['g'])
+  })
+})
+
 describe('rumorPass determinism', () => {
   function run(): ReturnType<typeof rumorPass> {
     return rumorPass(
@@ -430,18 +479,18 @@ describe('upsertJealousyMemory', () => {
   }
 
   it('moves an identical desc to the new date rather than duplicating it', () => {
-    const list = upsertJealousyMemory([entry], { ...entry, date: 20 })
+    const list = upsertJealousyMemory([entry], { ...entry, date: 20 }, 'female')
     expect(list).toEqual([{ ...entry, date: 20 }])
   })
 
   it('leaves a differently worded entry alone', () => {
     const other: CharMemory = { ...entry, desc: 'she heard the reader was dating Hana' }
-    expect(upsertJealousyMemory([entry], other)).toEqual([entry, other])
+    expect(upsertJealousyMemory([entry], other, 'female')).toEqual([entry, other])
   })
 
   it("rewords an older save's second-person entry in place rather than filing it twice", () => {
     const old: CharMemory = { date: 10, type: 'hated', desc: 'she saw you with Sara' }
     const fresh: CharMemory = { date: 20, type: 'hated', desc: 'she saw the reader with Sara' }
-    expect(upsertJealousyMemory([old, entry], fresh)).toEqual([fresh, entry])
+    expect(upsertJealousyMemory([old, entry], fresh, 'female')).toEqual([fresh, entry])
   })
 })

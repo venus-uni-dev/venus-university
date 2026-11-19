@@ -19,6 +19,7 @@ import { advance, claimTextLedger, fetchEndingOpening } from './hooks'
 import { endingGameOver, writeAutosave } from './saves'
 import { currentRun, loopState, runStale, type TurnSnapshot } from './state'
 import { queueLines, unpark } from './stream'
+import { endingAwaitingTransfers } from './transfers'
 import { failTurn } from './turn'
 
 /** The exam. */
@@ -200,7 +201,8 @@ export async function runQuietEnding(): Promise<void> {
   // file on an exam slot as on any other, and the rest reads nothing an exam lacks.
   loopState.pendingLedgerResult = ledger
 
-  const opening = await (prefetchedOpening ?? fetchEndingOpening(ledger))
+  // Every transfer still out is waited for under it, a failure raised here rather than mid-paper.
+  const opening = await endingAwaitingTransfers(prefetchedOpening ?? fetchEndingOpening(ledger))
   if (!opening) return
   if (runStale(run)) return
 

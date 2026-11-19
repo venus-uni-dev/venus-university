@@ -3,6 +3,8 @@ import {
   CATALOG_POOLS,
   maskedOf,
   NEW_GAME_CALLS,
+  ROSTER_MAX,
+  ROSTER_MIN,
   type Application,
   type ApplicationDraft
 } from './application'
@@ -69,6 +71,7 @@ const SAVE_REQUIRED: Record<
     | 'playthroughId'
     | 'saveId'
     | 'npcFriendships'
+    | 'npcCouples'
     | 'slotRumor'
     | 'bunnybotSeenTipSent'
     | 'occasionsDeclined'
@@ -82,8 +85,11 @@ const SAVE_REQUIRED: Record<
     | 'homecomingVisitor'
     | 'breakupsOwed'
     | 'sceneEventsFired'
+    | 'scenesSinceRedraft'
     | 'readerCold'
     | 'readerColdsHad'
+    | 'transfers'
+    | 'pendingTransfers'
   >,
   true
 > = {
@@ -135,7 +141,10 @@ const SAVE_REQUIRED: Record<
  * the player gives it is optional on the type and omitted here.
  */
 const RECORD_REQUIRED: Record<
-  keyof Omit<PlaythroughRecord, 'name' | 'semesters' | 'fixedEdits' | 'masked'>,
+  keyof Omit<
+    PlaythroughRecord,
+    'name' | 'semesters' | 'fixedEdits' | 'masked' | 'romance' | 'playerPronouns'
+  >,
   true
 > = {
   schemaVersion: true,
@@ -161,9 +170,12 @@ const ENROLLMENT_REQUIRED: Record<
     | 'continued'
     | 'secrets'
     | 'starts'
+    | 'notes'
     | 'pairs'
     | 'fixedEdits'
     | 'masked'
+    | 'romance'
+    | 'playerPronouns'
   >,
   true
 > = {
@@ -301,6 +313,7 @@ const APPLICATION_REQUIRED: Record<
   keyof Omit<
     Application,
     | 'reader'
+    | 'size'
     | 'skipped'
     | 'dealtMajors'
     | 'randomPicks'
@@ -312,6 +325,7 @@ const APPLICATION_REQUIRED: Record<
     | 'fixedEdits'
     | 'composed'
     | 'finalEdits'
+    | 'romance'
   >,
   true
 > = {
@@ -396,9 +410,9 @@ function composedFault(composed: unknown): string | null {
 
 /**
  * Refuses an application whose shape a resume could not stand on: a screen or a season this build
- * has no name for, a roster that is not ids, a section that is not what a write leaves, a later
- * semester's continuation missing what its registrar reads, or a Finalize screen without the
- * semester it reviews.
+ * has no name for, a roster that is not ids, a roster size outside the range, a section that is
+ * not what a write leaves, a later semester's continuation missing what its registrar reads, or a
+ * Finalize screen without the semester it reviews.
  */
 function assertApplication(code: string): (application: Application, where: string) => void {
   return (application, where) => {
@@ -409,6 +423,13 @@ function assertApplication(code: string): (application: Application, where: stri
     if (application.season !== 'spring' && application.season !== 'fall') refuse('season')
     if (!Array.isArray(application.chars) || application.chars.some((id) => typeof id !== 'string')) {
       refuse('chars')
+    }
+    const { size } = application
+    if (
+      size !== undefined &&
+      (typeof size !== 'number' || !Number.isInteger(size) || size < ROSTER_MIN || size > ROSTER_MAX)
+    ) {
+      refuse('size')
     }
     if (!Array.isArray(application.plan)) refuse('plan')
     for (const key of ['occasions', 'catalog', 'girls', 'pairs', 'replies'] as const) {
@@ -664,6 +685,10 @@ export function summaryOf(save: GameSave): SaveSummary {
   }
   if (save.thumbnail) summary.thumbnail = save.thumbnail
   if (save.semester) summary.semester = save.semester
+  // A listing reads who transferred in, never her classes.
+  if (save.transfers && save.transfers.length > 0) {
+    summary.transfers = save.transfers.map(({ classes: _classes, ...transfer }) => transfer)
+  }
   return summary
 }
 

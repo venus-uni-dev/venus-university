@@ -4,11 +4,12 @@ import type { NpcGroup } from '@shared/npcRelationships'
 import type { DormId } from '@shared/dorms'
 import { globalSlotOf, jobDefOf, shiftSlotOf } from '@shared/jobs'
 import { ROOM_LOCATION } from '@shared/locations'
-import { isRainedOut, weatherAt } from '@shared/weather'
+import type { SemesterCalendar } from '@shared/semesters'
+import { isRainedOut, weatherAt, type Weather } from '@shared/weather'
 import { classSlotOf, hauntClosedOn, jobClosedOn } from '../prompts/occasions'
 import { charJobAt, shiftWeekdayOf } from '../prompts/gameDate'
 import { isHomecomingVisit } from '../prompts/homecoming'
-import { isMoodHomebound } from '../prompts/moods'
+import { isMoodHomebound, type MoodHolder } from '../prompts/moods'
 import type { Commitment } from '../prompts/slotIntroPrompt'
 import { isAwayForSpringBreak } from '../prompts/springBreak'
 import { useGameStore } from './gameStore'
@@ -36,13 +37,19 @@ export function isSickAtHome(
   return worstInSlot(info?.cold, globalSlotOf(date, time))
 }
 
-/** Whether `info` keeps her in her room all slot: one of her stay-in days, or the worst of a cold. */
+/**
+ * Whether `holder`, as `info` has her, stays in her room all slot: one of the stay-in days her
+ * gender's mood brings, or the worst of a cold.
+ */
 export function isHomebound(
+  holder: MoodHolder | undefined,
   info: Pick<CharInfo, 'moodCycleOffset' | 'cold'> | undefined,
   date: number,
   time: TimeSlot
 ): boolean {
-  return isMoodHomebound(date, info?.moodCycleOffset ?? 0) || isSickAtHome(info, date, time)
+  return (
+    isMoodHomebound(holder, date, info?.moodCycleOffset ?? 0) || isSickAtHome(info, date, time)
+  )
 }
 
 /** {@link isSickAtHome} for `charId` as the store holds her, defaulting to now. */
@@ -52,14 +59,28 @@ export function charSickAtHomeNow(charId: string, date?: number, time?: TimeSlot
 }
 
 /**
+ * The class code a student whose entry is `info` sits in for a slot, or null: nothing meets then,
+ * or she is in bed with a cold.
+ */
+export function classCodeIn(
+  info: Pick<CharInfo, 'schedule' | 'cold'> | undefined,
+  date: number,
+  time: TimeSlot,
+  calendar: SemesterCalendar
+): string | null {
+  const slot = classSlotOf(date, time, calendar)
+  if (slot === null) return null
+  if (isSickAtHome(info, date, time)) return null
+  return info?.schedule?.[slot] ?? null
+}
+
+/**
  * The class code `charId` is sitting in for a slot, defaulting to now, or null — the roster's
  * sibling of {@link playerClassNow}. A girl in bed with a cold sits in none.
  */
 export function charClassNow(charId: string, date?: number, time?: TimeSlot): string | null {
-  const slot = currentSlot(date, time)
-  if (slot === null) return null
-  if (charSickAtHomeNow(charId, date, time)) return null
-  return useGameStore.getState().charInfo[charId]?.schedule?.[slot] ?? null
+  const game = useGameStore.getState()
+  return classCodeIn(game.charInfo[charId], date ?? game.date, time ?? game.time, game.calendar)
 }
 
 /** The class code the *player* is enrolled in for a slot, defaulting to now. */
@@ -86,16 +107,30 @@ export function shiftNow(date?: number, time?: TimeSlot): ShiftSlot | null {
 }
 
 /**
+ * The employer a student whose entry is `info` works for in a slot, or null; `away` is whether
+ * she is off campus then.
+ */
+export function jobIn(
+  info: Pick<CharInfo, 'job' | 'cold'> | undefined,
+  date: number,
+  time: TimeSlot,
+  calendar: SemesterCalendar,
+  away: boolean
+): string | null {
+  // Nobody works a shift from another country, or from her bed.
+  if (away || isSickAtHome(info, date, time)) return null
+  const jobId = charJobAt(info?.job, date, time)
+  return jobClosedOn(jobId, date, calendar) ? null : jobId
+}
+
+/**
  * The employer `charId` is working for in a slot, defaulting to now, or null — the
  * roster's half of {@link shiftNow} above.
  */
 export function charJobNow(charId: string, date?: number, time?: TimeSlot): string | null {
   const game = useGameStore.getState()
   const on = date ?? game.date
-  // Nobody works a shift from another country, or from her bed.
-  if (charAwayNow(charId, on) || charSickAtHomeNow(charId, on, time)) return null
-  const jobId = charJobAt(game.charInfo[charId]?.job, on, time ?? game.time)
-  return jobClosedOn(jobId, on, game.calendar) ? null : jobId
+  return jobIn(game.charInfo[charId], on, time ?? game.time, game.calendar, charAwayNow(charId, on))
 }
 
 /** The graduate back in town on `date`, defaulting to today: Homecoming's visitor, or null. */
@@ -153,19 +188,44 @@ export function charUnavailableNow(charId: string, date?: number, time?: TimeSlo
 }
 
 /**
+ * The **standing** haunt of a student whose entry is `info` in a slot, or null for a slot her
+ * week says nothing about; `busy` is whether a class or a shift has her then.
+ */
+export function standingHauntIn(
+  info: Pick<CharInfo, 'hiddenSchedule'> | undefined,
+  date: number,
+  time: TimeSlot,
+  calendar: SemesterCalendar,
+  weather: readonly Weather[],
+  busy: boolean
+): Haunt | null {
+  const haunt = info?.hiddenSchedule?.[shiftSlotOf(shiftWeekdayOf(date), time)]
+  if (!haunt) return null
+  // A class or a shift outranks a haunt: a save whose timetable moved under it (add/drop).
+  if (busy) return null
+  if (hauntClosedOn(haunt.location, haunt.kind, date, calendar)) return null
+  // Nobody keeps an open-air haunt under rain: she is free that slot instead.
+  if (isRainedOut(haunt.location, weatherAt(weather, date, time))) return null
+  return haunt
+}
+
+/**
  * Her **standing** haunt this slot, before anything the slot itself did to it, or null for a
  * slot her week says nothing about.
  */
 export function charStandingHauntAt(charId: string, date: number, time: TimeSlot): Haunt | null {
   const game = useGameStore.getState()
-  const haunt = game.charInfo[charId]?.hiddenSchedule?.[shiftSlotOf(shiftWeekdayOf(date), time)]
-  if (!haunt) return null
-  // A class or a shift outranks a haunt: a save whose timetable moved under it (add/drop).
-  if (charBusyNow(charId, date, time)) return null
-  if (hauntClosedOn(haunt.location, haunt.kind, date, game.calendar)) return null
-  // Nobody keeps an open-air haunt under rain: she is free that slot instead.
-  if (isRainedOut(haunt.location, weatherAt(game.weather, date, time))) return null
-  return haunt
+  const info = game.charInfo[charId]
+  // Only a slot her week names a haunt for asks what has her busy.
+  if (!info?.hiddenSchedule?.[shiftSlotOf(shiftWeekdayOf(date), time)]) return null
+  return standingHauntIn(
+    info,
+    date,
+    time,
+    game.calendar,
+    game.weather,
+    charBusyNow(charId, date, time)
+  )
 }
 
 /**
@@ -216,7 +276,7 @@ export function charHiddenLocationNow(
   if (charAwayNow(charId, on)) return null
   // A graduate back for the day keeps no room or haunt in Veridan.
   if (game.alumni.includes(charId)) return null
-  if (isHomebound(game.charInfo[charId], on, half)) return ROOM_LOCATION
+  if (isHomebound(game.characters[charId], game.charInfo[charId], on, half)) return ROOM_LOCATION
   return (
     charOverlayGroupNow(charId, on, half)?.location ??
     charStandingHauntAt(charId, on, half)?.location ??

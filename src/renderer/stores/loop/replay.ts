@@ -87,7 +87,7 @@ export function replaySettleCount(): number {
  * What the calendar's Replay offers right now: dead through a scene, and otherwise Save Game's
  * offer, waiting as well while a call is out that leaving the game would cancel and entering it
  * again would pay for again — the slot's texting ledger not yet banked, an exam's ledger and
- * opening, the graduation picture and posts.
+ * opening, the graduation picture and posts, a transfer student still being generated.
  */
 export function replayOffer(): ReplayOffer {
   const game = useGameStore.getState()
@@ -98,7 +98,8 @@ export function replayOffer(): ReplayOffer {
     loopState.examOpening,
     loopState.endingPostsCall
   ].map(settledOf)
-  const callsOut = calls.includes(false) || game.endingArtPending
+  const callsOut =
+    calls.includes(false) || game.endingArtPending || Object.keys(game.transferJobs).length > 0
   return replayOfferOf(manualSaveOffer(), sceneActiveOf(game), callsOut)
 }
 
@@ -154,7 +155,8 @@ export function holdGame(inputDraft: string): HeldGame | null {
   held = {
     save: { ...draft, playthroughId, saveId: AUTOSAVE_ID, saveDate: Date.now() },
     record,
-    characters: game.characters,
+    // The waiting transfers' too, which the return's load sets apart again.
+    characters: { ...game.characters, ...game.pendingCharacters },
     decisionSave: loopState.decisionSave,
     slotSaveId: loopState.slotSaveId,
     examTextLedger: loopState.examTextLedger,
@@ -164,6 +166,8 @@ export function holdGame(inputDraft: string): HeldGame | null {
       chars: game.chars,
       playerFirstName: game.playerFirstName,
       playerLastName: game.playerLastName,
+      playerPronouns: game.playerPronouns,
+      romance: game.romance,
       charInfo: game.charInfo,
       charKeyToId: game.charKeyToId,
       weather: game.weather,

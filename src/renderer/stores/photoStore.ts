@@ -290,7 +290,7 @@ function spriteWords(row: PhotoRow, character: Character | undefined): string {
       : character
         ? outfitLabelOf(character, row.set)
         : row.set
-  return `${who}'s ${row.emotion} sprite in her ${outfit}`
+  return `${who}'s ${row.emotion} sprite in the ${outfit}`
 }
 
 /** The background's own picture in its sky: the player's own, a character's room, or the bundle's. */
@@ -521,7 +521,7 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
           .showError(
             appError(
               'PHOTO_READER_MISSING',
-              'Your profile picture could not be read. Upload it again, or take yourself out of the photo.'
+              'Profile picture could not be read.'
             )
           )
         return false
@@ -531,7 +531,7 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
         .showError(
           appError(
             'PHOTO_SPRITE_MISSING',
-            `${spriteWords(row, game.characters[row.charId])} could not be read. Pick another outfit or expression for her.`
+            `${spriteWords(row, game.characters[row.charId])} could not be read.`
           )
         )
       return false
@@ -571,7 +571,7 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
         useUiStore
           .getState()
           .showError(
-            appError('PHOTO_BACKGROUND_MISSING', 'The background could not be read. Pick another one.')
+            appError('PHOTO_BACKGROUND_MISSING', 'Background could not be read.')
           )
         return false
       }

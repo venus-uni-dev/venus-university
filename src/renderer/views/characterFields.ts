@@ -1,29 +1,46 @@
 import { CG_SFXS, CG_VOICES } from '@shared/customCgs'
+import { PRONOUNS } from '@shared/gender'
 import { STAT_KEYS, STAT_LABELS } from '@shared/playerStats'
 import { GIFT_CATEGORIES } from '@shared/shop'
 import { CHARACTER_TRAITS } from '@shared/traits'
-import type { CgSfx, CgVoice, CharacterBehavior, OutfitSet, SetTarget } from '@shared/types'
+import type {
+  CgSfx,
+  CgVoice,
+  CharacterBehavior,
+  Gender,
+  OutfitSet,
+  SetTarget
+} from '@shared/types'
 
 /**
  * What a character panel shows, and in what order — shared by the editor and the read-only
  * panel.
  */
 
+/** What each generation type is called where a panel reads it out. */
+export const GENERATION_TYPE_LABELS: Readonly<Record<Gender, string>> = {
+  female: 'Female',
+  male: 'Male'
+}
+
 /**
- * The behaviour fields under "More settings", in relationship order. `around` is the noun each
- * field's placeholder addresses her by.
+ * The behaviour fields under "More settings", in relationship order, worded for a character of
+ * `gender`. `around` is the noun each field's placeholder addresses the character by.
  */
-export const BEHAVIOR_FIELDS: ReadonlyArray<{
+export function behaviorFields(gender: Gender): ReadonlyArray<{
   key: keyof CharacterBehavior
   label: string
   around: string
-}> = [
-  { key: 'withStrangers', label: 'With strangers', around: 'strangers' },
-  { key: 'withFriends', label: 'With friends', around: 'friends' },
-  { key: 'withCrush', label: 'With a crush', around: 'a crush' },
-  { key: 'withLover', label: 'With a lover', around: 'a lover' },
-  { key: 'withEnemy', label: 'With someone she dislikes', around: 'someone she dislikes' }
-]
+}> {
+  const enemy = `someone ${PRONOUNS[gender].they} dislikes`
+  return [
+    { key: 'withStrangers', label: 'With strangers', around: 'strangers' },
+    { key: 'withFriends', label: 'With friends', around: 'friends' },
+    { key: 'withCrush', label: 'With a crush', around: 'a crush' },
+    { key: 'withLover', label: 'With a lover', around: 'a lover' },
+    { key: 'withEnemy', label: `With ${enemy}`, around: enemy }
+  ]
+}
 
 /**
  * The character's tag lists, in the order the wardrobes above them are shown. Each is a
@@ -60,9 +77,14 @@ export function outfitInstructionsHint(outfit: string): string {
 /** The line under a custom CG's Name field. */
 export const CG_NAME_HINT = 'Custom CG names must be lowercase with no spaces.'
 
-/** What her appearance tags must carry for the colours the game reads off them. */
-export const APPEARANCE_COLOR_HINT =
-  'Gameplay expects a hair and eye color in the format of "_hair" and "_eyes". It also looks for a skin color tag like "_skin", "tan", "dark-skinned_female", or "freckles". LoRA trigger words should go here too.'
+/**
+ * What a character of `gender`'s appearance tags must carry for the colours the game reads off
+ * them, naming that gender's dark-skin tag.
+ */
+export function appearanceColorHint(gender: Gender): string {
+  const dark = gender === 'male' ? 'dark-skinned_male' : 'dark-skinned_female'
+  return `Gameplay expects a hair and eye color in the format of "_hair" and "_eyes". It also looks for a skin color tag like "_skin", "tan", "${dark}", or "freckles". LoRA trigger words should go here too.`
+}
 
 /** What Replace model output does with the LoRA's tags on New Character. */
 export const LORA_REPLACE_NOTE =
@@ -74,8 +96,8 @@ export function loraMissingCopy(
   file: string
 ): { title: string; message: string; confirmText: string } {
   return {
-    title: `Generate without ${name ? `${name}'s` : 'her'} LoRA?`,
-    message: `ComfyUI can't find ${file}. It stays picked for her, and will be used again once it's back in the LoRA folder.`,
+    title: `Generate without ${name ? `${name}'s` : "this character's"} LoRA?`,
+    message: `LoRA ${file} is missing. Generation will proceed without it.`,
     confirmText: 'Generate without it'
   }
 }
@@ -91,14 +113,20 @@ export function positionLoraMissingCopy(file: string): {
 } {
   return {
     title: 'Generate without the position LoRA?',
-    message: `ComfyUI can't find ${file}. It stays picked for this CG, and will be used again once it's back in the LoRA folder.`,
+    message: `Position LoRA ${file} is missing. Generation will proceed without it.`,
     confirmText: 'Generate without it'
   }
 }
 
-/** The line under a custom CG's Instructions field, wherever it is written. */
-export const CG_INSTRUCTIONS_HINT =
-  'Include an optional instruction to the LLM on when to use this CG, starting with "she", e.g. "she is riding him".'
+/**
+ * The line under a custom CG's Instructions field, wherever it is written, for a character of
+ * `gender`: the instruction opens on that character's pronoun and names the reader, whose
+ * pronouns are each playthrough's own.
+ */
+export function cgInstructionsHint(gender: Gender): string {
+  const they = PRONOUNS[gender].they
+  return `Include an optional instruction to the LLM on when to use this CG, starting with "${they}", e.g. "${they} is riding the reader".`
+}
 
 /** What each breath a custom CG can play is called in its picker. */
 const CG_VOICE_LABELS: Record<CgVoice, string> = {
@@ -158,8 +186,14 @@ export function textList(value: string): string[] {
     .filter((entry) => entry.length > 0)
 }
 
-/** What an empty field of the sheet shows: the shape its prose wants, told about her by name. */
-export function sheetPlaceholders(name: string): {
+/**
+ * What an empty field of the sheet shows: the shape its prose wants, told about the character by
+ * name and in the pronouns of `gender`.
+ */
+export function sheetPlaceholders(
+  name: string,
+  gender: Gender
+): {
   personality: string
   backstory: string
   datingHistory: string
@@ -169,10 +203,11 @@ export function sheetPlaceholders(name: string): {
   dislikes: string
   behavior: (around: string) => string
 } {
+  const { they, them, themself, They } = PRONOUNS[gender]
   return {
-    personality: `${name} presents herself as... but actually she's... She wants..., but... keeps her from getting it. She has a habit of...`,
-    backstory: `${name} grew up... As a result, she...`,
-    datingHistory: `${name} hasn't dated/has dated before... As a result, she...`,
+    personality: `${name} presents ${themself} as... but actually ${they}'s... ${They} wants..., but... keeps ${them} from getting it. ${They} has a habit of...`,
+    backstory: `${name} grew up... As a result, ${they}...`,
+    datingHistory: `${name} hasn't dated/has dated before... As a result, ${they}...`,
     datingPreference: `${name} prefers hookups/long term relationships...`,
     kinks: `${name} has a thing for...`,
     likes: 'favorite foods\nfavorite beverages\nactivities\nentertainment preferences',

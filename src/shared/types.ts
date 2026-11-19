@@ -6,11 +6,17 @@ import type { LedgerStats, PlayerStats, StatKey, StatTier } from './playerStats'
 import type { ClassDifficulty, ClassKind, ExamPeriod, Professor } from './academics'
 import type { CharacterTrait } from './traits'
 import type { GiftPreferences, GiftReaction } from './shop'
-import type { NpcFriendship, NpcRelationshipMap, NpcSlotOverlay } from './npcRelationships'
+import type {
+  NpcCouple,
+  NpcFriendship,
+  NpcRelationshipMap,
+  NpcSlotOverlay
+} from './npcRelationships'
 import type { PromptKind } from './promptKinds'
 import type { RumorPassOutcome } from './rumors'
 import type { DormId } from './dorms'
 import type { SceneRelation } from './sceneCreator'
+import type { ReaderPronouns } from './gender'
 import type { AudioGroup } from './audio'
 import type { GameReplays } from './replays'
 import type { ComfyGpu } from './setupManifest'
@@ -66,6 +72,8 @@ export interface StructuredRequest {
    * every call that takes the setting as it is.
    */
   minThinking?: ThinkingLevel
+  /** Runs this call one level above the one it would otherwise send; absent on every other call. */
+  raiseThinking?: boolean
   /** Images attached to the user turn, base64 without the `data:` prefix. */
   images?: ReferenceImage[]
   /**
@@ -207,11 +215,11 @@ export interface WardrobeFixImage {
 }
 
 /**
- * What one hand fix rendered: the re-detailed hand cut out of the frame, and the
+ * What one hand fix or repaint rendered: what was redrawn, cut out of the frame, and the
  * region it changed. The renderer clears the region on each sprite and lays the cutout in it,
  * so an old blob finger goes where the new hand has a gap.
  */
-export interface HandFixResult {
+export interface RegionFixResult {
   cutout: Uint8Array<ArrayBuffer>
   region: Uint8Array<ArrayBuffer>
 }
@@ -330,6 +338,22 @@ export interface CharacterBrief {
   lora?: CharacterLoraBrief
 }
 
+/** Which of the two kinds of character one is, read off her record by `genderOf`. */
+export type Gender = 'female' | 'male'
+
+/**
+ * How one gender of character takes to the reader in a playthrough: never attracted, attracted
+ * as her sexuality has it, attracted whatever it says, or attracted to everybody at all — the
+ * reader and every other character.
+ */
+export type RomanceLevel = 'none' | 'sexuality' | 'all' | 'everyone'
+
+/** Which genders the reader may romance in a playthrough, one level for each. */
+export type RomanceSetting = Record<Gender, RomanceLevel>
+
+/** Which genders a character is attracted to; at least one is true. */
+export type Attraction = Record<Gender, boolean>
+
 /** On-disk character definition — `/data/characters/{charId}/character.json`. */
 export interface Character {
   schemaVersion: 3
@@ -337,16 +361,26 @@ export interface Character {
   charId: string
   firstName: string
   lastName: string
+  /**
+   * Written only for a male character; absent reads as female. Set when the character is
+   * created and never changed.
+   */
+  gender?: 'male'
   /** One woven prose profile: presentation, true self, desire, flaw, quirks. */
   personality: string
   behavior: CharacterBehavior
   /** One formative thing in her past and how it still moves her. */
   backstory: string
-  /** Her love life, in four fields. */
+  /** Her love life, in five fields. */
   datingHistory: string
   datingPreference: string
   kinks: string
   isVirgin: boolean
+  /**
+   * Who she is attracted to, written only where it is not the other gender alone; absent reads
+   * as that. A playthrough settles its own copy at New Game.
+   */
+  attractedTo?: Attraction
   /**
    * What she is drawn to and what puts her off — her tastes in food, drink, media and how she
    * spends her time, and the things that get under her skin.
@@ -440,6 +474,14 @@ export interface Character {
   updatedAt?: number
 }
 
+/** What one Import character ZIP adopted: one character, or every member of a pack that passed. */
+export interface CharacterImport {
+  /** In the order they were adopted. */
+  characters: Character[]
+  /** The one error naming every pack member that was refused; `null` where none was. */
+  refused: AppError | null
+}
+
 /** A fresh generation seed. Inside 2^53 so it survives JSON without precision loss. */
 export function randomSeed(): number {
   return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
@@ -491,6 +533,11 @@ export interface CharMemory {
   date: number
   type: MemoryType
   desc: string
+  /**
+   * `desc` as the player reads it, the reader called "you", in the ledger's own words; absent
+   * on a memory the app turns into the second person itself.
+   */
+  youDesc?: string
   /**
    * The days of the breaks between semesters it was carried across, which its age does not
    * count; absent on a memory of the semester it was made in.
@@ -695,6 +742,7 @@ export type RelationshipEvent =
   | 'gave_contact_info'
   | 'unblocked'
   | 'agreed_to_harem'
+  | 'agreed_to_closed'
 
 /** A character's standing part-time job. */
 export interface CharJob {
@@ -773,6 +821,39 @@ export interface CharProfile extends CharSchedule {
   intake?: Season
   /** What she is doing since she graduated, one short phrase; present exactly on a graduate. */
   pursuing?: string
+  /**
+   * Who she is attracted to, as her record had it when she joined the playthrough; absent on a
+   * record written before it was kept, which reads her record instead.
+   */
+  attractedTo?: Attraction
+  /**
+   * The global slot (`globalSlotOf`) she transferred in at, mid-semester; present only through the
+   * semester she arrived in.
+   */
+  transferredAt?: number
+}
+
+/**
+ * A character who transferred in mid-semester: the settled half the record would hold for her,
+ * kept on the save since the record is never rewritten mid-semester.
+ */
+export interface Transfer {
+  charId: string
+  profile: CharProfile
+  /** The classes generated for her, slotted and decorated, by code; absent where none were. */
+  classes?: Record<string, ClassEntry>
+}
+
+/**
+ * A transfer picked from the landing and dealt in full, waiting for the next slot boundary to
+ * admit her onto the roster.
+ */
+export interface PendingTransfer {
+  charId: string
+  profile: CharProfile
+  state: CharState
+  /** The classes generated for her, slotted and decorated, by code; absent where none were. */
+  classes?: Record<string, ClassEntry>
 }
 
 /** The half a playthrough accumulates — what every save file carries about her. */
@@ -991,10 +1072,32 @@ export interface Conversation {
    * occasion she asked him to, when she asked him to one, so a decline is filed against it.
    */
   pendingHangout?: { description: string; dismissed?: boolean; occasionId?: string }
+  /**
+   * Her vent about her partner, or her question about her crush, standing its three answers
+   * under her thread until he picks one; `answer` is the pick the slot's ending acts on. Gone at
+   * the boundary, and at a scene start that found it unanswered.
+   */
+  advice?: ConversationAdvice
   /** Invitations of hers he has not accepted in a row; absent at none. */
   declined?: number
   /** A lover he turned down by text, whose memory of it is still owed. */
   turnedDown?: true
+}
+
+/** A love-life text standing its answers: `about` is her partner for a vent, her crush otherwise. */
+export interface ConversationAdvice {
+  kind: 'vent' | 'crush'
+  about: string
+  answer?: 'breakUp' | 'talk' | 'yes' | 'no'
+}
+
+/**
+ * What a love-life text is about: a vent about her partner, a question about her crush, or how
+ * the reader's advice on either went. `about` is the other one's charId.
+ */
+export interface LoveText {
+  kind: 'vent' | 'crush' | 'together' | 'turnedDown' | 'brokeUp'
+  about: string
 }
 
 /** The Bunnyboard app's persisted state. */
@@ -1308,6 +1411,11 @@ export interface SceneState {
    */
   turnedDownInvites?: string[]
   /**
+   * The charIds who vented to him by text and got no answer before this scene, whose texting
+   * memory of it the scene start filed, said once each at its ending; absent when there were none.
+   */
+  ignoredVents?: string[]
+  /**
    * The employer whose premises this scene is set on because a *character* is working there,
    * or absent when it is not one.
    */
@@ -1338,6 +1446,8 @@ export interface SceneState {
   event?: SceneEvent
   /** The present a girl brings him in this scene, or absent when nobody does. */
   receivedGift?: ReceivedGift
+  /** The scene's opening was asked for a totally different take, or absent when it was not. */
+  redraft?: true
   /** The exam being sat, or absent when the slot is an ordinary scene. */
   quiz?: QuizState
   /** The line last shown, so resuming doesn't land on an empty dialogue box. */
@@ -1420,6 +1530,12 @@ export interface SlotOpening {
   reachOuts?: SlotIntroResponse['reachOuts']
   /** The texts the graduate back for Homecoming wrote to say she is in town, delivered at step 1. */
   homecomingTexts?: SlotIntroResponse['homecomingTexts']
+  /**
+   * Which of the {@link reachOuts} are about somebody's love life, by charKey: one venting about
+   * her partner or asking about her crush, whose thread then stands the reader's answers, or one
+   * saying how his advice went. Absent for an opening with none.
+   */
+  loveTexts?: Record<string, LoveText>
   /**
    * Who leaves campus for spring break, picked by the ending whose next slot is the first on or
    * after the notice and assigned by the boundary. Absent on every other opening.
@@ -1515,8 +1631,18 @@ export interface GameSave {
   /** Days elapsed in the save's semester; day 0 is its first Monday, January 19 or August 17. */
   date: number
   time: TimeSlot
-  /** The moving half of every character's entry; the settled half is the record's. */
+  /**
+   * The moving half of every character's entry; the settled half is the record's, or a
+   * transfer's own.
+   */
   charInfo: Record<string, CharState>
+  /**
+   * Who transferred in this semester, in arrival order, each with her settled half; absent while
+   * nobody has.
+   */
+  transfers?: Transfer[]
+  /** The transfers picked and waiting for the next slot boundary; absent while none wait. */
+  pendingTransfers?: PendingTransfer[]
   /**
    * The player's own timetable: sparse `ClassSlot` → class code, chosen on the Class Select View
    * and revisable through VenusBot up to the add/drop deadline.
@@ -1554,6 +1680,8 @@ export interface GameSave {
   inventory: OwnedItem[]
   /** When each scene event last fired this semester; absent before any has. */
   sceneEventsFired?: SceneEventsFired
+  /** Cast scenes ended since the last redrafted opening; absent before any has. */
+  scenesSinceRedraft?: number
   /** The reader's last cold this semester, as a girl's `cold` is kept; absent before any. */
   readerCold?: ColdCase
   /** Every strain the reader has caught this semester, by its id, ascending; absent before any. */
@@ -1619,6 +1747,11 @@ export interface GameSave {
    * before the feed said so.
    */
   npcFriendships?: NpcFriendship[]
+  /**
+   * Every time two of them got together, oldest first — a permanent record, so the feed says it
+   * once. Absent in a save written before the roster dated.
+   */
+  npcCouples?: NpcCouple[]
   /**
    * The occasions he turned down an invitation to, or let one stand — nobody asks him to one
    * of these twice. Absent in a save written before occasions were asked about.
@@ -1761,8 +1894,15 @@ export interface JobState {
   workedSlots: number[]
 }
 
-/** The reader's name when the player types nothing — the New Game modal's placeholders. */
-export const DEFAULT_PLAYER_FIRST_NAME = 'Seth'
+/**
+ * The reader's name when the player types nothing — the New Game modal's placeholders — the
+ * first name by the pronouns picked beside it.
+ */
+export const DEFAULT_PLAYER_FIRST_NAMES: Readonly<Record<ReaderPronouns, string>> = {
+  he: 'Seth',
+  she: 'Sophie',
+  they: 'Sam'
+}
 export const DEFAULT_PLAYER_LAST_NAME = 'Hawke'
 
 /**
@@ -1864,6 +2004,8 @@ export interface SaveSummary {
   thumbnail?: string
   /** The save's {@link GameSave.semester}, where it is past the first. */
   semester?: string
+  /** The save's {@link GameSave.transfers}, where it carries any. */
+  transfers?: Transfer[]
 }
 
 /** One listed save: a summary of the file as read, or the error that refused it. */
@@ -1898,6 +2040,11 @@ export interface PlaythroughRecord {
   playerFirstName: string
   playerLastName: string
   /**
+   * The reader's pronouns, picked beside the name and fixed for the playthrough; absent on a
+   * record written before them, read by `readerPronounsOf` as he/him.
+   */
+  playerPronouns?: ReaderPronouns
+  /**
    * The class roster, keyed by class `code`. Generated once at New Game; only classes with at
    * least one student are kept.
    */
@@ -1927,6 +2074,11 @@ export interface PlaythroughRecord {
    * the same ending sit side by side. Absent until the first Continue.
    */
   semesters?: Record<string, SemesterRecord>
+  /**
+   * How each gender takes to the reader, as the first semester's New Game set it or Quickstart
+   * wrote it; absent on one written before the setting, read by `romanceOf`.
+   */
+  romance?: RomanceSetting
 }
 
 /**
@@ -1972,6 +2124,8 @@ export interface SemesterLog {
   replays?: GameReplays
   playerSchedule: Record<number, string>
   events: CalendarEvent[]
+  /** Who transferred in during it, in arrival order; absent where nobody did. */
+  transfers?: Transfer[]
 }
 
 /**
@@ -2001,6 +2155,7 @@ export type SemesterCarry = Pick<
   | 'bunnybotThrough'
   | 'npcRelationships'
   | 'npcFriendships'
+  | 'npcCouples'
 > & {
   tallies: ReaderTallies
   /** The continuing girls' and every graduate's entries, keyed by charId. */
@@ -2102,6 +2257,8 @@ export interface QuickstartBundle {
 export type EnrollmentDraft = QuickstartBundle & {
   playerFirstName: string
   playerLastName: string
+  /** The reader's pronouns as New Game took them down; absent on one written before them. */
+  playerPronouns?: ReaderPronouns
   stats: PlayerStats
   /** The reader's own words about himself, as New Game took them down. */
   bio?: string
@@ -2112,6 +2269,11 @@ export type EnrollmentDraft = QuickstartBundle & {
    * set her; a girl with no entry is a stranger.
    */
   starts?: Record<string, CharStart>
+  /**
+   * Keyed by charId: the player's notes on each girl new to the roster, as the Profiles screen
+   * took them down; a girl with no entry has none.
+   */
+  notes?: Record<string, string>
   /** Keyed by `pairKeyOf`: two roster girls as the Profiles screen set them; the rest are rolled. */
   pairs?: Record<string, SceneRelation>
   /** The semester's changes to its fixed occasions, as the Occasions screen kept them; absent where none. */
@@ -2120,6 +2282,11 @@ export type EnrollmentDraft = QuickstartBundle & {
   masked?: string[]
   /** The semester Continue is starting, where this is not the playthrough's first. */
   continued?: ContinuedSemester
+  /**
+   * How each gender takes to the reader, as a first semester's New Game set it or Quickstart
+   * wrote it; absent on a later semester's and on one written before the setting.
+   */
+  romance?: RomanceSetting
 }
 
 /**
@@ -2365,6 +2532,11 @@ export interface Settings {
    */
   lessNsfwText: boolean
   /**
+   * Withhold a girl's stock eight CGs, which draw the reader male, from a reader whose pronouns
+   * are not he/him. Optional on disk, absent meaning they are withheld.
+   */
+  matchCgBiology?: boolean
+  /**
    * Whether the player has been asked the content questions above. It is the first run's last
    * step, so it doubles as the mark that the run finished.
    */
@@ -2407,6 +2579,8 @@ export interface Settings {
   memoryBudgets?: MemoryBudgets
   /** How many of her told secrets every prompt carrying her memories carries; absent is the default. */
   secretBudget?: number
+  /** The most friends the graduation picture draws, the closest ones; absent is the most it can. */
+  endingPictureMax?: number
   /**
    * The persona cast scene calls are written under in place of the shipped one, sent verbatim
    * whatever `lessNsfwText` says. Absent is the shipped persona.
@@ -2539,7 +2713,7 @@ export interface SceneResponse {
  */
 export interface LedgerResponse {
   /** Both cast-scoped arrays are absent for a solo scene, whose schema omits them. */
-  memories?: Array<{ charKey: string; type: MemoryType; desc: string }>
+  memories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
   events?: Array<{ charKey: string; event: RelationshipEvent }>
   /**
    * Every kiss and every night the hour held, one row per kind per set of girls; absent for a
@@ -2550,7 +2724,7 @@ export interface LedgerResponse {
    * What this slot's texting left each girl with — one per character, at most. The texting
    * ledger's field, scoped to whoever actually texted this slot.
    */
-  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string }>
+  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
   /**
    * The plans the slot settled on — the scene's from the scene ledger, the texts'
    * from the texting ledger, deduped by the merge.
@@ -2637,6 +2811,8 @@ export interface PoseEntry {
   tags: string[]
   /** Plain-language gist of the pose, so the LLM's pick is informed. */
   description: string
+  /** Written only on a male character's pose; an entry without it is a female character's. */
+  gender?: 'male'
 }
 
 /** Pose manifest  — `/assets/pose.json`. */

@@ -11,7 +11,13 @@ import {
   validateReplay,
   type SlotReplay
 } from '@shared/replays'
-import { hasSemester, recordReplayIds, SEMESTER_NOT_FOUND, semesterOf } from '@shared/semesters'
+import {
+  hasSemester,
+  recordReplayIds,
+  SEMESTER_NOT_FOUND,
+  semesterOf,
+  withTransfers
+} from '@shared/semesters'
 import {
   APPLICATION_INVALID,
   APPLICATION_NOT_FOUND,
@@ -331,8 +337,11 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
 
     const newest = await newestSave(playthroughId, saveIds, record)
     if (!reason) reason = newest.reason
-    // The roster and the semester the newest save is in.
-    const semester = newest.save && record ? semesterOf(record, newest.save.semester) : null
+    // The roster and the semester the newest save is in, whoever transferred in joined on.
+    const semester =
+      newest.save && record
+        ? withTransfers(semesterOf(record, newest.save.semester), newest.save)
+        : null
     const registration = registrationIn(row, playthroughId)
     summaries.push(
       withApplication(

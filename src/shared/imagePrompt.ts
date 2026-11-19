@@ -1,6 +1,7 @@
-import type { Character, Emotion, OutfitSet, Position } from './types'
+import type { Character, Emotion, Gender, OutfitSet, Position } from './types'
 import { customCgTagsFor, withAfterTag } from './customCgs'
 import type { DefaultTags } from './defaultTags'
+import { genderOf } from './gender'
 import { negativeTagsFor, outfitTagsFor } from './outfits'
 import {
   customCgSlotOf,
@@ -67,20 +68,26 @@ function neutralTags(tags: readonly string[]): string[] {
 
 /**
  * The part of a sprite or CG edit's two shared groups the default tags make up, at the front of
- * each; null for an expression, which has neither group.
+ * each, a male character's negative closing on the male negative; null for an expression, which
+ * has neither group.
  */
 export function defaultsOfGroups(
   kind: PromptEdit['kind'],
-  tags: DefaultTags
+  tags: DefaultTags,
+  gender: Gender
 ): { base: string[]; negative: string[] } | null {
   if (kind === 'expression') return null
+  const male = gender === 'male' ? tags.maleNegative : []
   if (kind === 'sprite') {
     return {
       base: unique([...tags.quality, ...tags.sprite]),
-      negative: unique([...tags.negative, ...tags.spriteNegative])
+      negative: unique([...tags.negative, ...tags.spriteNegative, ...male])
     }
   }
-  return { base: unique([...tags.quality, ...tags.cg]), negative: unique([...tags.negative]) }
+  return {
+    base: unique([...tags.quality, ...tags.cg]),
+    negative: unique([...tags.negative, ...male])
+  }
 }
 
 /** The groups one sprite render is drawn from; `set` is null for the default wardrobe. */
@@ -90,7 +97,7 @@ export function spriteDraft(
   set: OutfitSet | null,
   tags: DefaultTags
 ): Extract<PromptEdit, { kind: 'sprite' }> {
-  const defaults = defaultsOfGroups('sprite', tags)
+  const defaults = defaultsOfGroups('sprite', tags, genderOf(character))
   return {
     kind: 'sprite',
     set,
@@ -126,7 +133,7 @@ export function cgSetDraft(
   character: Character,
   tags: DefaultTags
 ): Extract<PromptEdit, { kind: 'cgs' }> {
-  const defaults = defaultsOfGroups('cgs', tags)
+  const defaults = defaultsOfGroups('cgs', tags, genderOf(character))
   return {
     kind: 'cgs',
     base: [...(defaults?.base ?? [])],

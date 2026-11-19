@@ -45,15 +45,18 @@ export interface DisplayedCg {
 export interface CgReadiness {
   cgReady: Record<string, boolean>
   customCgReady: Record<string, readonly CustomCgSlot[]>
+  /** Whether the stock eight are in play for this reader at all (`stockCgsInPlay`). */
+  stockCgs: boolean
 }
 
 /**
  * Whether one of her CGs is known not to be on disk: a custom one whose pair her readiness, once
- * read, does not list. A stock CG, and any CG before her readiness is read, counts as there.
+ * read, does not list. A stock CG counts as there while the stock eight are in play, as does any
+ * CG before her readiness is read.
  */
 export function cgKnownMissing(charId: string, position: Position, ready: CgReadiness): boolean {
   const slot = customCgSlotOf(position)
-  if (!slot) return false
+  if (!slot) return !ready.stockCgs
   const held = ready.customCgReady[charId]
   return held !== undefined && !held.includes(slot)
 }
@@ -94,18 +97,22 @@ export function displayedCgOf(input: {
 /**
  * The sprite reference actually drawn for a character under a wardrobe lock. A custom wardrobe
  * no longer whole on disk — deleted under a save that has her in it — draws her default one,
- * and a custom CG known missing (`customCgs` read and lacking its pair) the sprite it retires to.
+ * a custom CG known missing (`customCgs` read and lacking its pair) the sprite it retires to, and
+ * so does a stock CG while the stock eight are out of play.
  */
 export function displaySpriteRef(
   ref: SpriteRef,
   lock: OutfitLock | undefined,
   ready: readonly OutfitSet[] | undefined,
-  customCgs?: readonly CustomCgSlot[]
+  customCgs: readonly CustomCgSlot[] | undefined,
+  stockCgs: boolean
 ): SpriteRef {
   if (isPosition(ref)) {
     const slot = customCgSlotOf(ref)
-    if (!slot || !customCgs || customCgs.includes(slot)) return ref
-    return displaySpriteRef(cgRetiredRef(ref, ready?.includes('nude') === true, false), lock, ready)
+    const missing = slot ? customCgs !== undefined && !customCgs.includes(slot) : !stockCgs
+    if (!missing) return ref
+    const retired = cgRetiredRef(ref, ready?.includes('nude') === true, false)
+    return displaySpriteRef(retired, lock, ready, customCgs, stockCgs)
   }
   const parsed = parseSpriteRef(ref)
   if (!parsed) return ref

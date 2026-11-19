@@ -4,7 +4,8 @@ import { motion } from 'motion/react'
 import { DeadNote } from '../components/DeadNote'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
-import type { ManualSaveOffer } from '../stores/gameLoop'
+import { offerNoteOf, type ManualSaveOffer } from '../stores/gameLoop'
+import type { ReplayOffer } from '../stores/loop/saves'
 import {
   dealt,
   dealtItem,
@@ -29,6 +30,13 @@ export interface GameMenuModalProps {
   saveOffer: ManualSaveOffer
   /** Absent where there is no playthrough to load another save of, which drops the entry. */
   onLoadGame?: () => void
+  /**
+   * Whether a transfer student can be added now; absent where the game has no roster to add to,
+   * which drops the entry with the offer's own 'none'.
+   */
+  transferOffer?: ReplayOffer
+  /** Opens the transfer students' sheet in the menu's place. */
+  onTransfer?: () => void
   onFeedback: () => void
   onSettings: () => void
   /** Opens the list of the keys the app answers, in the menu's place. */
@@ -50,6 +58,8 @@ export function GameMenuModal({
   onSaveGame,
   saveOffer,
   onLoadGame,
+  transferOffer,
+  onTransfer,
   onFeedback,
   onSettings,
   onControls,
@@ -61,6 +71,7 @@ export function GameMenuModal({
   if (!host) return null
 
   const saveDead = saveOffer === 'waiting'
+  const transferDead = transferOffer !== 'open'
 
   return createPortal(
     <motion.div
@@ -111,6 +122,23 @@ export function GameMenuModal({
             >
               Load Game
             </motion.button>
+          )}
+          {/* Offered on a playthrough's landings up to finals week; dead in a scene and while a
+              call is out, the wrapper around it naming which. */}
+          {onTransfer && transferOffer !== undefined && transferOffer !== 'none' && (
+            <DeadNote note={offerNoteOf(transferOffer)} align="center">
+              <motion.button
+                id="game-menu-transfer"
+                className="vu-btn vu-btn--outline vu-paper"
+                type="button"
+                variants={transferDead ? dealtItemDead : dealtItem}
+                {...gestures(transferDead, lift, press)}
+                disabled={transferDead}
+                onClick={onTransfer}
+              >
+                Transfer student
+              </motion.button>
+            </DeadNote>
           )}
           <motion.button
             id="game-menu-settings"

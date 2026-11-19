@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { GRADUATION_DATE } from '../src/renderer/prompts/occasions'
 import { useGameStore } from '../src/renderer/stores/gameStore'
-import { farewellOptions, friendCharIds } from '../src/renderer/stores/loop/farewells'
+import {
+  closestFriendCharIds,
+  farewellOptions,
+  friendCharIds
+} from '../src/renderer/stores/loop/farewells'
 import { character, charInfo } from './fixtures'
 
 /**
@@ -96,5 +100,28 @@ describe('who is in the photograph', () => {
     useGameStore.getState().recordFarewell('a')
     expect(farewellOptions().map((option) => option.charId)).toEqual(['b'])
     expect(friendCharIds()).toEqual(['a', 'b'])
+  })
+
+  it('keeps the friends he is closest to, in roster order', () => {
+    const state = useGameStore.getState()
+    useGameStore.setState({
+      charInfo: {
+        ...state.charInfo,
+        // Warmer than Ada, and last in the roster of the three friends.
+        c: charInfo({
+          nameKnown: true,
+          year: 4,
+          memories: Array.from({ length: 10 }, () => ({
+            date: GRADUATION_DATE,
+            type: 'loved' as const,
+            desc: 'you were there'
+          }))
+        })
+      }
+    })
+    expect(friendCharIds()).toEqual(['a', 'b', 'c'])
+    expect(closestFriendCharIds(3)).toEqual(['a', 'b', 'c'])
+    expect(closestFriendCharIds(2)).toEqual(['a', 'c'])
+    expect(closestFriendCharIds(1)).toEqual(['c'])
   })
 })

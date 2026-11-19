@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { asReaderPronouns, readerPronounsOf } from '@shared/gender'
 import { pairKeyOf } from '@shared/npcRelationships'
 import { STARTING_TIER, STAT_KEYS, tierOf, type StatKey, type StatTier } from '@shared/playerStats'
 import {
@@ -13,7 +14,7 @@ import {
   type SceneSetup
 } from '@shared/sceneCreator'
 import {
-  DEFAULT_PLAYER_FIRST_NAME,
+  DEFAULT_PLAYER_FIRST_NAMES,
   DEFAULT_PLAYER_LAST_NAME,
   roomBgIdOf,
   type Character,
@@ -59,7 +60,13 @@ function freshEntry(charId: string): SceneCastEntry {
 function defaultReader(): SceneReader {
   const tiers = {} as Record<StatKey, StatTier>
   for (const key of STAT_KEYS) tiers[key] = STARTING_TIER
-  return { firstName: DEFAULT_PLAYER_FIRST_NAME, lastName: DEFAULT_PLAYER_LAST_NAME, tiers, bio: '' }
+  return {
+    firstName: DEFAULT_PLAYER_FIRST_NAMES.he,
+    lastName: DEFAULT_PLAYER_LAST_NAME,
+    pronouns: 'he',
+    tiers,
+    bio: ''
+  }
 }
 
 /** A setup with nobody in it, on the default day, half, sky and reader. */
@@ -96,6 +103,7 @@ async function newestReader(): Promise<SceneReader | null> {
     return {
       firstName: reader.firstName,
       lastName: reader.lastName,
+      pronouns: asReaderPronouns(reader.pronouns),
       tiers: tiersOf(reader.stats),
       bio: reader.bio ?? ''
     }
@@ -107,6 +115,7 @@ async function newestReader(): Promise<SceneReader | null> {
     return {
       firstName: enrollment.playerFirstName,
       lastName: enrollment.playerLastName,
+      pronouns: readerPronounsOf(enrollment),
       tiers: tiersOf(enrollment.stats),
       bio: enrollment.bio ?? ''
     }
@@ -120,6 +129,7 @@ async function newestReader(): Promise<SceneReader | null> {
   return {
     firstName: loaded.record.playerFirstName,
     lastName: loaded.record.playerLastName,
+    pronouns: readerPronounsOf(loaded.record),
     tiers: tiersOf(loaded.save.stats),
     bio: loaded.save.bio ?? ''
   }

@@ -75,80 +75,53 @@ function occasionAnswer(request: StructuredRequest): Result<unknown> {
   }
 }
 
-/** An answer profiling every student the request listed. */
+/** What a student's part answers in each field it asks. */
+const STUDENT_FIELDS: Record<string, unknown> = {
+  year: 2,
+  classesTaken: 4,
+  majorClassesTaken: 1,
+  dorm: 'lowrise',
+  job: '',
+  jobShifts: 0,
+  homeSlots: 2,
+  study: '',
+  fun: [],
+  activity: '',
+  activityLocation: '',
+  meal: '',
+  handle: 'sarah.rose',
+  winterPosts: [],
+  springBreakPlans: 'Go home.',
+  breakPosts: ['home'],
+  pursuing: 'teaching',
+  friendly: 'She knits.',
+  trusted: 'She lied.',
+  devoted: 'She ran.'
+}
+
+/** An answer to any part of the profile call: every major Biology, every field filled. */
 function profileAnswer(request: StructuredRequest): Result<unknown> {
-  const keys: string[] = schemaOf(request).properties.characters.items.properties.key.enum
-  return {
-    ok: true,
-    data: {
-      characters: keys.map((key) => ({
-        key,
-        year: 2,
-        major: 'Biology',
-        classesTaken: 4,
-        majorClassesTaken: 1,
-        dorm: 'lowrise_1',
-        job: '',
-        jobShifts: 0,
-        homeSlots: 2,
-        study: '',
-        fun: [],
-        activity: '',
-        activityLocation: '',
-        meal: '',
-        handle: key,
-        winterPosts: [],
-        springBreakPlans: 'Go home.'
-      }))
-    }
-  }
-}
-
-/** An answer writing every tier of every group the request asked for. */
-function secretAnswer(request: StructuredRequest): Result<unknown> {
-  const groups = schemaOf(request).properties
-  return {
-    ok: true,
-    data: Object.fromEntries(
-      Object.entries(groups).map(([group, array]) => {
-        const { key, ...tiers } = array.items.properties
-        return [
-          group,
-          (key.enum as string[]).map((name) => ({
-            key: name,
-            ...Object.fromEntries(Object.keys(tiers).map((tier) => [tier, `${name} ${tier}.`]))
-          }))
-        ]
-      })
-    )
-  }
-}
-
-/** An answer with an interest class for every student asked and a class for every major. */
-function classAnswer(request: StructuredRequest): Result<unknown> {
   const { properties } = schemaOf(request)
-  const keys = Object.keys(properties.characters?.properties ?? {})
-  const majors: string[] = properties.classes.items.properties.major.enum
+  if (request.schema.name === 'student_majors') {
+    const keys: string[] = properties.characters.items.properties.key.enum
+    return { ok: true, data: { characters: keys.map((key) => ({ key, major: 'Biology' })) } }
+  }
   return {
     ok: true,
-    data: {
-      characters: Object.fromEntries(
-        keys.map((key, i) => [
-          key,
-          { interestClass: { code: `INT ${100 + i}`, name: 'Hers', description: 'Hers.', kind: 'lecture' } }
-        ])
-      ),
-      classes: majors.map((major, i) => ({
-        code: `MAJ ${100 + i}`,
-        name: major,
-        description: 'Study.',
-        category: 'major',
-        major,
-        kind: 'lecture'
-      }))
-    }
+    data: Object.fromEntries(Object.keys(properties).map((field) => [field, STUDENT_FIELDS[field]]))
   }
 }
+
+/** An answer to any part of the catalog: one class for a pool or a major, or an interest class. */
+function classAnswer(request: StructuredRequest): Result<unknown> {
+  const course = { code: `C ${keyOf(request).slice(0, 6)}`, name: 'Hers', description: 'Hers.', kind: 'lecture' }
+  if (request.schema.name === 'interest_class') return { ok: true, data: { interestClass: course } }
+  return { ok: true, data: { classes: [course] } }
+}
+
+/** The schema names of every request a mock was sent, in order. */
+const sentNames = (mock: ReturnType<typeof vi.fn>): string[] =>
+  mock.mock.calls.map(([request]) => (request as StructuredRequest).schema.name)
 
 const dropped = (): Result<never> => ({
   ok: false,
@@ -157,20 +130,18 @@ const dropped = (): Result<never> => ({
 
 let occasions = vi.fn()
 let profiles = vi.fn()
-let secrets = vi.fn()
 let classes = vi.fn()
 let cancelGroup = vi.fn()
 let apply = vi.fn()
 let saved = vi.fn()
 let write = vi.fn()
 
-/** Installs the bridge over whatever the four mocks currently answer. */
+/** Installs the bridge over whatever the three mocks currently answer. */
 function bridge(): void {
   stubApi({
     llm: {
       generateOccasions: occasions,
       generateProfiles: profiles,
-      generateSecrets: secrets,
       generateClasses: classes
     },
     jobs: { cancelGroup, onProgress: () => () => {} },
@@ -187,7 +158,6 @@ function bridge(): void {
 function answering(): void {
   occasions = vi.fn(async (request: StructuredRequest) => occasionAnswer(request))
   profiles = vi.fn(async (request: StructuredRequest) => profileAnswer(request))
-  secrets = vi.fn(async (request: StructuredRequest) => secretAnswer(request))
   classes = vi.fn(async (request: StructuredRequest) => classAnswer(request))
   bridge()
 }
@@ -212,7 +182,6 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   occasions = vi.fn(async () => dropped())
   profiles = vi.fn(async () => dropped())
-  secrets = vi.fn(async () => dropped())
   classes = vi.fn(async () => dropped())
   cancelGroup = vi.fn(async () => ({ ok: true, data: undefined }))
   apply = vi.fn(async (draft: unknown, playthroughId?: string) => ({
@@ -233,23 +202,22 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
+/** Every part a one-girl application with nothing written sends, by schema. */
+const PROFILE_PARTS = ['student_majors', 'student_profile']
+const POOL_PARTS = ['pool_classes', 'pool_classes', 'pool_classes', 'pool_classes']
+
 describe('sendCalls', () => {
-  it('re-sends a dropped call five times, then holds it for the wait to name', async () => {
+  it('re-sends a dropped part five times, then holds it for the wait to name', async () => {
     const outcome = await settle(startApplication(ROSTER))
 
     expect(occasions).toHaveBeenCalledTimes(6)
-    expect(profiles).toHaveBeenCalledTimes(6)
-    expect(secrets).toHaveBeenCalledTimes(6)
-    // The catalog waits on the majors the profiles never brought.
-    expect(classes).not.toHaveBeenCalled()
+    // Her part waits on the majors the majors part never brought; the pools never wait.
+    expect(sentNames(profiles)).toEqual(Array(6).fill('student_majors'))
+    expect(classes).toHaveBeenCalledTimes(4 * 6)
+    expect(new Set(sentNames(classes))).toEqual(new Set(['pool_classes']))
     expect(outcome.status).toBe('failed')
     if (outcome.status !== 'failed') return
-    expect(outcome.missing).toEqual([
-      CALL_LABELS.occasions,
-      CALL_LABELS.profiles,
-      CALL_LABELS.secrets,
-      CALL_LABELS.classes
-    ])
+    expect(outcome.missing).toEqual([CALL_LABELS.occasions, CALL_LABELS.profiles, CALL_LABELS.classes])
   })
 
   it('sends nothing for a request already answered, and supersedes one that changed', async () => {
@@ -265,11 +233,11 @@ describe('sendCalls', () => {
     expect(occasions).toHaveBeenCalledTimes(1)
     expect(profiles).toHaveBeenCalledTimes(1)
 
-    // A field decided while the first request is out makes it a request nobody needs.
+    // Notes written while the majors part is out make it a request nobody needs.
     const stale = profiles.mock.calls[0][1]
     updateApplication((draft) => ({
       ...draft,
-      girls: { sarah: { profile: { year: 4 }, secrets: {}, memories: [] } }
+      girls: { sarah: { profile: {}, secrets: {}, memories: [], notes: 'Sarah sings.' } }
     }))
     sendCalls()
     expect(cancelGroup).toHaveBeenCalledWith(stale)
@@ -280,49 +248,101 @@ describe('sendCalls', () => {
     // The first reply lands late, and is kept against nothing.
     first.release(profileAnswer(profiles.mock.calls[0][0]))
     await vi.advanceTimersByTimeAsync(0)
-    const kept = useApplicationStore.getState().application?.replies.profiles
+    const kept = useApplicationStore.getState().application?.replies['profiles:majors']
     expect(kept?.key).toBe(keyOf(profiles.mock.calls[1][0]))
 
     sendCalls()
     expect(occasions).toHaveBeenCalledTimes(1)
-    expect(profiles).toHaveBeenCalledTimes(2)
-    expect(classes).toHaveBeenCalledTimes(1)
+    expect(sentNames(profiles)).toEqual(['student_majors', ...PROFILE_PARTS])
+    expect(sentNames(classes).sort()).toEqual(
+      ['interest_class', 'major_classes', ...POOL_PARTS].sort()
+    )
   })
 
-  it('holds the catalog until the profiles bring the majors it is built around', async () => {
+  it('sends the pools at once and holds a major and an interest class for the majors', async () => {
     answering()
     const reply = held<Result<unknown>>()
-    profiles = vi.fn(async () => reply.promise)
+    profiles = vi.fn(async (request: StructuredRequest) =>
+      profiles.mock.calls.length === 1 ? reply.promise : profileAnswer(request)
+    )
     bridge()
     beginApplication(ROSTER, 'spring', 'loading')
     sendCalls()
     await vi.advanceTimersByTimeAsync(0)
-    expect(classes).not.toHaveBeenCalled()
+    expect(sentNames(profiles)).toEqual(['student_majors'])
+    expect(sentNames(classes)).toEqual(POOL_PARTS)
 
     reply.release(profileAnswer(profiles.mock.calls[0][0]))
     await vi.advanceTimersByTimeAsync(0)
-    expect(classes).toHaveBeenCalledTimes(1)
-    const request = classes.mock.calls[0][0] as StructuredRequest
-    expect(schemaOf(request).properties.classes.items.properties.major.enum).toEqual(['Biology'])
+    expect(sentNames(profiles)).toEqual(PROFILE_PARTS)
+    // Her part is told the major it waited for.
+    expect((profiles.mock.calls[1][0] as StructuredRequest).user).toContain('major: "Biology"')
+    const major = classes.mock.calls.find(([request]) => request.schema.name === 'major_classes')
+    expect((major?.[0] as StructuredRequest).user).toContain('the Biology major')
+    expect(sentNames(classes)).toContain('interest_class')
   })
 
-  it('leaves a call that failed for Retry when the profiles land', async () => {
+  it('holds a part that failed alone, leaves it for Retry when the majors land, and Retry sends only it', async () => {
     answering()
-    occasions = vi.fn(async () => dropped())
+    const pe = (request: StructuredRequest): boolean =>
+      request.user.startsWith('Create 10 physical education')
+    classes = vi.fn(async (request: StructuredRequest) =>
+      pe(request) ? dropped() : classAnswer(request)
+    )
     const reply = held<Result<unknown>>()
-    profiles = vi.fn(async () => reply.promise)
+    profiles = vi.fn(async (request: StructuredRequest) =>
+      profiles.mock.calls.length === 1 ? reply.promise : profileAnswer(request)
+    )
     bridge()
     beginApplication(ROSTER, 'spring', 'loading')
     sendCalls()
+    const pending = settledOutcome()
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(occasions).toHaveBeenCalledTimes(6)
+    const peSent = (): number => classes.mock.calls.filter(([request]) => pe(request)).length
+    expect(peSent()).toBe(6)
 
     reply.release(profileAnswer(profiles.mock.calls[0][0]))
+    const outcome = await settle(pending)
+    expect(peSent()).toBe(6)
+    expect(outcome.status).toBe('failed')
+    if (outcome.status !== 'failed') return
+    expect(outcome.missing).toEqual([CALL_LABELS.classes])
+    const others = classes.mock.calls.length - peSent()
+
+    sendCalls()
     await vi.advanceTimersByTimeAsync(0)
-    expect(classes).toHaveBeenCalledTimes(1)
-    expect(occasions).toHaveBeenCalledTimes(6)
+    expect(peSent()).toBe(7)
+    expect(classes.mock.calls.length - peSent()).toBe(others)
+  })
+
+  it('resumes an application banked before calls went in parts, keeping only what still answers', async () => {
+    answering()
+    await settle(startApplication(ROSTER))
+    const before = useApplicationStore.getState().application!
+    const old = { key: 'an older build', reply: {} }
+    leaveApplication()
+    for (const mock of [occasions, profiles, classes]) mock.mockClear()
+
+    void openApplication({
+      ...before,
+      replies: { occasions: before.replies.occasions, profiles: old, secrets: old, classes: old }
+    })
+    const outcome = await settle(startResumed())
+    expect(occasions).not.toHaveBeenCalled()
+    expect(sentNames(profiles)).toEqual(PROFILE_PARTS)
+    expect(classes).toHaveBeenCalledTimes(6)
+    expect(outcome.status).toBe('ready')
+    const kept = Object.keys(useApplicationStore.getState().application!.replies)
+    expect(kept).toContain('occasions')
+    for (const call of ['profiles', 'secrets', 'classes']) expect(kept).not.toContain(call)
   })
 })
+
+/** Sends whatever an application just opened is owed, and its wait. */
+function startResumed(): ReturnType<typeof settledOutcome> {
+  sendCalls()
+  return settledOutcome()
+}
 
 describe('Finalize', () => {
   it('sends nothing once the semester is composed, though a request no longer matches its reply', async () => {
@@ -330,14 +350,14 @@ describe('Finalize', () => {
     const outcome = await settle(startApplication(ROSTER))
     if (outcome.status !== 'ready') throw new Error(outcome.status)
     openFinalize(outcome.data)
+    const sent = [profiles.mock.calls.length, classes.mock.calls.length]
     // A resume re-sends what a renamed girl's request no longer answers; the semester stands.
     updateApplication((draft) => ({
       ...draft,
       girls: { sarah: { profile: { year: 4 }, secrets: {}, memories: [] } }
     }))
     sendCalls()
-    expect(profiles).toHaveBeenCalledTimes(1)
-    expect(classes).toHaveBeenCalledTimes(1)
+    expect([profiles.mock.calls.length, classes.mock.calls.length]).toEqual(sent)
     expect(useApplicationStore.getState().application?.composed).toEqual(outcome.data)
   })
 
@@ -360,7 +380,11 @@ describe('Finalize', () => {
     expect(app().screen).toBe('classes')
     expect(app().composed).toBeUndefined()
     expect(app().finalEdits).toBeUndefined()
-    expect(Object.keys(app().replies).sort()).toEqual(['occasions', 'profiles', 'secrets'])
+    expect(Object.keys(app().replies).sort()).toEqual([
+      'occasions',
+      'profiles:majors',
+      'profiles:student:sarah'
+    ])
   })
 })
 
@@ -408,7 +432,7 @@ describe('passScreen', () => {
     expect(app().screen).toBe('loading')
 
     const outcome = await settle(settledOutcome())
-    for (const mock of [occasions, profiles, secrets, classes]) expect(mock).not.toHaveBeenCalled()
+    for (const mock of [occasions, profiles, classes]) expect(mock).not.toHaveBeenCalled()
     expect(outcome.status).toBe('ready')
     if (outcome.status !== 'ready') return
     expect(outcome.data.schedules.perChar.sarah.major).toBe('Physics')
@@ -421,10 +445,13 @@ describe('leaveApplication', () => {
     const out = held<Result<unknown>>()
     occasions = vi.fn(async () => out.promise)
     profiles = vi.fn(async () => out.promise)
-    secrets = vi.fn(async () => out.promise)
+    classes = vi.fn(async () => out.promise)
     bridge()
     const pending = startApplication(ROSTER)
-    const groups = [occasions, profiles, secrets].map((mock) => mock.mock.calls[0][1])
+    const groups = [occasions, profiles, classes].flatMap((mock) =>
+      mock.mock.calls.map((call) => call[1])
+    )
+    expect(groups).toHaveLength(6)
 
     leaveApplication()
     expect((await settle(pending)).status).toBe('cancelled')
@@ -495,7 +522,11 @@ describe('backScreen', () => {
     passScreen()
     await vi.advanceTimersByTimeAsync(0)
     expect(app().screen).toBe('classes')
-    expect(Object.keys(app().replies).sort()).toEqual(['occasions', 'profiles', 'secrets'])
+    expect(Object.keys(app().replies).sort()).toEqual([
+      'occasions',
+      'profiles:majors',
+      'profiles:student:sarah'
+    ])
 
     const entered = app().girls
     updateApplication((draft) => ({
@@ -691,5 +722,15 @@ describe('beginNextApplication', () => {
     expect(await beginNextApplication({ ...NEXT, ending: null })).toBe('opened')
     expect(app().screen).toBe('setting')
     expect(app().continued?.ending).toBeUndefined()
+  })
+
+  it('opens on the size the last roster held, never below the least', async () => {
+    expect(await beginNextApplication(NEXT)).toBe('opened')
+    expect(app().size).toBe(12)
+
+    const roster = Array.from({ length: 20 }, (_, i) => `girl-${i}`)
+    const handoff = { ...HANDOFF, continuing: roster.slice(0, 17), graduated: roster.slice(17) }
+    expect(await beginNextApplication({ ...NEXT, handoff })).toBe('opened')
+    expect(app().size).toBe(20)
   })
 })

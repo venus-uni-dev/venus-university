@@ -92,8 +92,16 @@ const TAG_FIELDS: Record<DefaultTagGroup, { label: string; hint: string }> = {
   },
   cg: { label: 'CG', hint: 'Only added to CG prompts.' },
   subject: {
-    label: 'Subject',
-    hint: "Added to character appearance tags."
+    label: 'Female subject',
+    hint: 'Added to female character appearance tags.'
+  },
+  maleSubject: {
+    label: 'Male subject',
+    hint: 'Added to male character appearance tags.'
+  },
+  maleNegative: {
+    label: 'Male negative',
+    hint: 'Only added to male character sprite and CG prompts.'
   }
 }
 

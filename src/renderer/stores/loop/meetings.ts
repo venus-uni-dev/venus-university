@@ -1,5 +1,6 @@
 import { kindOf, type ExamPeriod } from '@shared/academics'
 import { studentsOf } from '@shared/classes'
+import { readerWords } from '@shared/gender'
 import {
   jobDefOf,
   rollShiftGain,
@@ -11,8 +12,10 @@ import {
 import type { ClassEntry, JobState } from '@shared/types'
 import { examOn } from '../../prompts/classProgress'
 import { ordinal } from '../../prompts/gameDate'
+import { readerAmongCast } from '../../prompts/setting'
 import { PORTRAIT_SLOTS, useGameStore, type SceneKind } from '../gameStore'
 import { charJobNow, readerSickNow, shiftNow } from '../timetable'
+import { shownAt } from '../whereabouts'
 import { studentsHere } from './cast'
 import {
   admitLocals,
@@ -24,6 +27,7 @@ import {
   resolveAttendance,
   resolveLocationId,
   runIntoNote,
+  shownFirst,
   slotPlanAttendees,
   workersAtLocation,
   workingHereNote
@@ -109,6 +113,7 @@ export function shiftOf(kind: Extract<SceneKindVerdict, { kind: 'shift' }>): {
   note: string | null
 } {
   const { job, def } = kind
+  const r = readerWords(useGameStore.getState().playerPronouns)
   // Rolled once here and written onto the scene, so a reload pays the same stats back.
   // An employer with a single gain leaves the field off: the derivation finds it anyway.
   const gain = def ? rollShiftGain(def) : null
@@ -121,23 +126,26 @@ export function shiftOf(kind: Extract<SceneKindVerdict, { kind: 'shift' }>): {
     // The shift he is about to work: `recordShiftWorked` runs at the boundary, after this
     // prompt is built.
     note: def
-      ? `(He is working his ${ordinal(job.shiftsWorked + 1)} shift as a ${def.title} at ${def.employer}, ${def.duty}.)`
+      ? `(${r.He} is working ${r.his} ${ordinal(job.shiftsWorked + 1)} shift as a ${def.title} at ${def.employer}, ${def.duty}.)`
       : null
   }
 }
 
 /** The line under the action naming the project a work session is for. */
 function workSessionNote(code: string): string {
-  const name = useGameStore.getState().classes[code]?.name ?? 'course'
-  return `(He is putting a work session into his ${name} project.)`
+  const { classes, playerPronouns } = useGameStore.getState()
+  const name = classes[code]?.name ?? 'course'
+  const r = readerWords(playerPronouns)
+  return `(${r.He} is putting a work session into ${r.his} ${name} project.)`
 }
 
 /** The line for the girls in a class scene who do not take the class. */
 function sittingInNote(charIds: readonly string[]): string {
   const names = listOf(charIds.map(firstNameOf))
+  const him = readerAmongCast(useGameStore.getState().playerPronouns).him
   return charIds.length > 1
-    ? `${names} are not in this class and are sitting in on it with him.`
-    : `${names} is not in this class and is sitting in on it with him.`
+    ? `${names} are not in this class and are sitting in on it with ${him}.`
+    : `${names} is not in this class and is sitting in on it with ${him}.`
 }
 
 /** The kind a cast scene is, for the `[cast]` log lines. */
@@ -192,28 +200,37 @@ export function composeMeeting(call: MeetingCall, kind: SceneKindVerdict): Compo
   ]
 
   const named = called.length > 0 || required !== undefined
-  let cast: string[]
-  let passerby: string | null = null
-  if (named) {
-    cast = attendance.cast
-    // Only a named cast rolls for a passerby: the draw below accounts for its own bodies.
-    passerby = injectPasserby(cast, inPublic, resolveLocationId(sceneLocation))
-    if (passerby) {
-      cast = [...cast, passerby]
-      notes.push(runIntoNote([passerby]))
+  let uninvited: readonly string[] = []
+  // Only a named cast rolls for a passerby, and only a nobody-named one draws; either is seated
+  // after whoever the map shows at the place and before everybody else there.
+  const pickUp = (seated: readonly string[]): readonly string[] => {
+    if (named) {
+      const passerby = injectPasserby(seated, inPublic, resolveLocationId(sceneLocation))
+      uninvited = passerby ? [passerby] : []
+    } else {
+      uninvited = drawFreeCast(inPublic, sceneLocation, seated)
     }
-  } else {
-    cast = drawFreeCast(inPublic, sceneLocation)
-    // Every uninvited body is named under the action, whichever branch added it.
-    if (cast.length > 0) notes.push(runIntoNote(cast))
+    return uninvited
   }
 
-  // Last, so the people the reader came for have their slots first; the one branch
+  // After the people the reader came for, so they have their slots first; the one branch
   // that can add to a full scene's notes without adding to its cast.
-  const atWork = admitLocals(cast, sceneLocation, { named, inPublic })
+  const atWork = admitLocals(attendance.cast, sceneLocation, {
+    named,
+    inPublic,
+    shown: shownAt(sceneLocation),
+    pickUp
+  })
+  const passerby = named ? (uninvited[0] ?? null) : null
+  // Every uninvited body, whichever step added it, is named in one line under the action.
+  const ranInto = [...uninvited, ...atWork.joined]
   return {
     cast: atWork.cast,
-    notes: [...notes, ...atWork.notes],
+    notes: [
+      ...notes,
+      ...atWork.notes,
+      ...(ranInto.length > 0 ? [runIntoNote(ranInto, sceneLocation)] : [])
+    ],
     scene: {
       ...(kind.kind === 'project' ? { projectClass: kind.project.code } : {}),
       ...(atWork.jobId ? { visitJobId: atWork.jobId } : {})
@@ -279,7 +296,9 @@ function composeShift(
   const attendance = resolveAttendance(called, required, [...planned, ...coworkers])
   const locals = def ? localsAtLocation(def.locationId) : []
   const others: string[] = []
-  for (const charId of [...coworkers, ...locals]) {
+  // Whoever the map shows at the workplace is seated first.
+  const here = shownFirst([...coworkers, ...locals], def ? shownAt(def.locationId) : [])
+  for (const charId of here) {
     if (!attendance.cast.includes(charId) && !others.includes(charId)) others.push(charId)
   }
   // The attendance holds at most a stage's worth, so the cut never reaches the people called.

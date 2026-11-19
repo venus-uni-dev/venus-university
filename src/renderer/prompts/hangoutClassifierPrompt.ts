@@ -76,7 +76,7 @@ export function buildHangoutClassifierPrompt(
     "'''",
     '',
     `Set "playerAsked" to true when THE MESSAGE asks ${firstName} to meet up in person right now — today, this ${slotHalf(state.time)}, immediately — AND THE REPLY does not turn it down.`,
-    'It is false when she refuses, deflects, or is unsure in THE REPLY.',
+    `It is false when ${firstName} refuses, deflects, or is unsure in THE REPLY.`,
     'It is false for a plan at any other time: "tonight" while it is still day, "tomorrow", "this weekend", "sometime", "we should do this again".',
     '',
     `Set "characterOffered" to true when THE REPLY itself asks the reader to meet up in person right now, today, immediately — ${firstName} doing the proposing.`,

@@ -6,7 +6,14 @@
  */
 
 import { globalSlotOf } from '@shared/jobs'
-import { ASK_CHANCE, INVITE_CHANCE, REACH_OUT_CHANCE, SLOT_CHANCE } from '@shared/odds'
+import {
+  ADVICE_CHANCE,
+  ASK_CHANCE,
+  INVITE_CHANCE,
+  REACH_OUT_CHANCE,
+  SLOT_CHANCE,
+  VENT_CHANCE
+} from '@shared/odds'
 import type { Disposition } from '@shared/relationship'
 import {
   EVERYDAY_ASKS,
@@ -213,6 +220,33 @@ export function rollSlotReachOut(
   rand: () => number = Math.random
 ): string | null {
   return rollSlotAskers(candidates, rand, MAX_REACH_OUTS)[0] ?? null
+}
+
+/** One character who could text him about her love life, and the other one it is about. */
+export interface LoveTextCandidate {
+  charId: string
+  about: string
+}
+
+/**
+ * Who texts him about her love life this slot, if anybody: every one of a couple who just
+ * argued rolls to vent and one winner is drawn evenly; only where none wins does every one with a
+ * crush to ask about roll, drawn the same way.
+ */
+export function rollLoveText(
+  vents: readonly LoveTextCandidate[],
+  advisers: readonly LoveTextCandidate[],
+  rand: () => number = Math.random
+): (LoveTextCandidate & { kind: 'vent' | 'crush' }) | null {
+  const draw = (pool: readonly LoveTextCandidate[], chance: number): LoveTextCandidate | null => {
+    const winners = pool.filter(() => rand() < chance)
+    if (winners.length === 0) return null
+    return winners[Math.min(winners.length - 1, Math.floor(rand() * winners.length))]
+  }
+  const vent = draw(vents, VENT_CHANCE)
+  if (vent) return { ...vent, kind: 'vent' }
+  const adviser = draw(advisers, ADVICE_CHANCE)
+  return adviser ? { ...adviser, kind: 'crush' } : null
 }
 
 /** One contact who could ask him to the slot's occasion, and whether the slot places her anywhere. */

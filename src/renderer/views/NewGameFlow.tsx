@@ -4,6 +4,9 @@ import {
   APPLICATION_SCREENS,
   incompleteOf,
   maskedOf,
+  ROSTER_MAX,
+  ROSTER_MIN,
+  rosterSizeOf,
   screenIndex,
   type ApplicationContinuation,
   type ApplicationDraft,
@@ -13,11 +16,13 @@ import {
   type StartResult
 } from '@shared/application'
 import { toAppError } from '@shared/errors'
+import { romanceOf } from '@shared/relationship'
 import { andList } from '@shared/sentences'
-import type { AppError, Character } from '@shared/types'
+import type { AppError, Character, RomanceSetting } from '@shared/types'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { LlmFailureModal } from '../components/LlmFailureModal'
+import { StepSquare } from '../components/StepSquare'
 import { shellOpen } from '../components/useModalShell'
 import { useWindowKeydown } from '../components/useWindowKeydown'
 import { formatDatePart } from '../prompts/gameDate'
@@ -60,9 +65,11 @@ import { NewGameFinalize, useFinalizeModals } from './NewGameFinalize'
 import { NewGameFrame, type FrameNext } from './NewGameFrame'
 import { NewGameOccasions, OCCASION_KIND_WORDS, plannedKindOf, useOccasionModals } from './NewGameOccasions'
 import { NewGameProfiles, useProfileModals } from './NewGameProfiles'
-import { ROSTER_SIZE, RosterGrid, RosterModals, useRoster } from './NewGameRoster'
+import { RosterGrid, RosterModals, useRoster } from './NewGameRoster'
 import { NewGameSetting } from './NewGameSetting'
-import { PlayerNameModal } from './PlayerNameModal'
+import { PlayerNameModal, type NamedReader } from './PlayerNameModal'
+import { useNewGamePicture } from './newGamePicture'
+import { RomanceModal } from './RomanceModal'
 import { DiceIcon } from './screenIcons'
 
 /** The screens a player steps through, as the step reading names them. */
@@ -253,7 +260,15 @@ function WelcomeModal({
 }
 
 /** Where the Loading screen's questions and its wait stand. */
-type LoadingStep = 'idle' | 'heights' | 'voices' | 'covering' | 'naming' | 'waiting' | 'failed'
+type LoadingStep =
+  | 'idle'
+  | 'heights'
+  | 'voices'
+  | 'romance'
+  | 'covering'
+  | 'naming'
+  | 'waiting'
+  | 'failed'
 
 /** Gives up the caret, so a field that keeps its value as it is left keeps it now. */
 function blurActive(): void {
@@ -269,24 +284,25 @@ export interface NewGameFlowProps {
   continuation: Continuation | null
   /**
    * The semester as Finalize leaves it, under a curtain still down, the reader as he was named,
-   * the roster, what a later semester's application continues, and the random picks still masked:
-   * the registrar is the caller's.
+   * the roster, what a later semester's application continues, the random picks still masked,
+   * and a first semester's romance as Loading asked it: the registrar is the caller's.
    */
   onComposed: (
     semester: StartResult,
     reader: ApplicationReader,
     roster: Character[],
     continued: ApplicationContinuation | undefined,
-    masked: string[]
+    masked: string[],
+    romance: RomanceSetting | undefined
   ) => void
 }
 
 /**
  * The New Game flow: Setting, Occasions, Characters, Profiles and Classes, each left by Next or
  * Skip generation, Back and Cancel, the application written as it changes; then the Loading
- * screen's questions — heights, voices, and on a first semester the reader's name — over the wait
- * for the calls, and Finalize on the semester they compose. A later semester's runs the same
- * screens as New Game+.
+ * screen's questions — heights, voices, and on a first semester the romance and the reader's
+ * name — over the wait for the calls, and Finalize on the semester they compose. A later
+ * semester's runs the same screens as New Game+.
  */
 export function NewGameFlow({
   theme,
@@ -311,6 +327,8 @@ export function NewGameFlow({
   )
   const masked = useMasked()
   const [step, setStep] = useState<LoadingStep>('idle')
+  // The reader's picture, kept beside the application while the name question asks for it.
+  const picture = useNewGamePicture(step === 'naming')
   // Held in state so the wait below is armed by one stable promise for its lifetime.
   const [starting, setStarting] = useState<Promise<StartOutcome> | null>(null)
   const [failure, setFailure] = useState<{ error: AppError; missing: string[] } | null>(null)
@@ -346,8 +364,10 @@ export function NewGameFlow({
   const roster = useMemo(() => (chars ? rosterOf({ chars }) : []), [chars, characters])
   // The girls returning from the last semester, who stay on a New Game+'s roster.
   const locked = useMemo(() => (continued ? new Set(continued.continuing) : NONE), [continued])
+  const size = rosterSizeOf({ size: draft?.size, chars: chars ?? [] })
   const rosterState = useRoster(
     roster,
+    size,
     (next) => updateApplication((d) => ({ ...d, chars: next.map((c) => c.charId) })),
     continued?.alumni ?? NO_ALUMNI,
     locked
@@ -417,7 +437,7 @@ export function NewGameFlow({
         setAsking({ duplicates })
         return
       }
-      if (roster.length < ROSTER_SIZE) {
+      if (roster.length < size) {
         const picks = rosterState.drawEmpty()
         if (picks) leave('next', picks)
         else setAsking('short')
@@ -455,7 +475,10 @@ export function NewGameFlow({
             endCrossing()
             return
           }
-          onComposed(semester, now.reader, rosterOf(now), now.continued, [...maskedOf(now)])
+          // A first semester's romance as it was answered; none where it never was.
+          const romance =
+            now.continued || now.romance === undefined ? undefined : romanceOf(now)
+          onComposed(semester, now.reader, rosterOf(now), now.continued, [...maskedOf(now)], romance)
         })()
       },
       { wait: true }
@@ -543,12 +566,34 @@ export function NewGameFlow({
     setStarting(settledOutcome())
   }
 
+  /**
+   * The questions are answered and the curtain comes down: what is under it from here is the
+   * wait itself; once it is down a first semester's reader is named, and a later one's, named
+   * already, waits.
+   */
+  function cover(): void {
+    setStep('covering')
+    beginCrossing(
+      () => {
+        const now = useApplicationStore.getState().application
+        if (now?.continued && now.reader) wait()
+        else setStep('naming')
+      },
+      { wait: true }
+    )
+  }
+
+  /** The romance is kept on the application, and the curtain comes down. */
+  function onRomance(romance: RomanceSetting): void {
+    updateApplication((d) =>
+      d.romance?.female === romance.female && d.romance.male === romance.male ? d : { ...d, romance }
+    )
+    cover()
+  }
+
   /** The reader is named, and the wait arms. */
-  function onNamed(firstName: string, lastName: string, stats: ApplicationReader['stats'], bio: string): void {
-    updateApplication((d) => ({
-      ...d,
-      reader: { firstName, lastName, stats, ...(bio ? { bio } : {}) }
-    }))
+  function onNamed({ bio, ...named }: NamedReader): void {
+    updateApplication((d) => ({ ...d, reader: { ...named, ...(bio ? { bio } : {}) } }))
     wait()
   }
 
@@ -600,13 +645,48 @@ export function NewGameFlow({
     </ol>
   )
 
-  const fillDead = roster.length >= ROSTER_SIZE || rosterState.eligible.length === 0 || dead
+  const fillDead = roster.length >= size || rosterState.eligible.length === 0 || dead
+  // The least the roster may be stepped down to: no girl on it is ever stepped off.
+  const sizeFloor = Math.max(ROSTER_MIN, roster.length)
+
+  /**
+   * Steps the roster's size by one, inside its range and never below who is on it. A first
+   * semester's back at the least drops the field, which is how one never stepped reads.
+   */
+  function stepSize(delta: -1 | 1): void {
+    updateApplication((d) => {
+      const at = rosterSizeOf(d) + delta
+      if (at < Math.max(ROSTER_MIN, d.chars.length) || at > ROSTER_MAX) return d
+      const { size: _old, ...rest } = d
+      return at === ROSTER_MIN && !d.continued ? rest : { ...rest, size: at }
+    })
+  }
+
   const controls =
     screen === 'characters' ? (
       <>
         <span className="vu-newgame-count">
-          {roster.length}/{ROSTER_SIZE} characters
+          {roster.length}/{size} characters
         </span>
+        <div className="vu-newgame-size">
+          <span className="vu-newgame-size-label">Roster size</span>
+          <StepSquare
+            id="new-game-size-prev"
+            label="Lower roster size"
+            dead={size <= sizeFloor || dead}
+            back
+            onStep={() => stepSize(-1)}
+          />
+          <span className="vu-newgame-size-value" id="new-game-size">
+            {size}
+          </span>
+          <StepSquare
+            id="new-game-size-next"
+            label="Raise roster size"
+            dead={size >= ROSTER_MAX || dead}
+            onStep={() => stepSize(1)}
+          />
+        </div>
         <motion.button
           id="new-game-fill"
           className="vu-btn vu-btn--outline vu-btn--panel vu-paper vu-newgame-fill"
@@ -761,7 +841,7 @@ export function NewGameFlow({
             id="new-game-short"
             theme={theme}
             title="Not enough characters"
-            message="There aren't enough characters with different first names to fill the empty slots. Create more in Manage Characters first."
+            message={`There aren't enough characters with different first names to fill the empty slots. Create more in Manage Characters first${size > sizeFloor ? ', or lower the roster size' : ''}.`}
             confirmText="Okay"
             onConfirm={() => setAsking(null)}
           />
@@ -805,25 +885,21 @@ export function NewGameFlow({
               characterWrites.current = heights
                 .catch(() => undefined)
                 .then(() => useCharacterStore.getState().saveVoices(roster, pitches))
-              setStep('covering')
-              // What is under the curtain from here is the wait itself; once it is down a first
-              // semester's reader is named, and a later one's, named already, waits.
-              beginCrossing(
-                () => {
-                  const now = useApplicationStore.getState().application
-                  if (now?.continued && now.reader) wait()
-                  else setStep('naming')
-                },
-                { wait: true }
-              )
+              // Only a first semester asks the romance: a later one keeps the playthrough's.
+              if (continued) cover()
+              else setStep('romance')
             }}
           />
+        )}
+        {step === 'romance' && (
+          <RomanceModal key="romance" theme={theme} initial={romanceOf(draft)} onConfirm={onRomance} />
         )}
         {step === 'naming' && (
           <PlayerNameModal
             key="naming"
             theme={theme}
             initial={draft?.reader}
+            picture={picture}
             onSubmit={onNamed}
           />
         )}

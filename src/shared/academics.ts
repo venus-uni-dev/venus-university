@@ -1,3 +1,4 @@
+import { readerWords, type ReaderPronouns } from './gender'
 import type { ClassEntry, ClassRecord, CourseEntry } from './types'
 import { MAX_TIER, pointsForTier, tierOf } from './playerStats'
 import type { StatTier } from './playerStats'
@@ -603,5 +604,6 @@ export function acedExamsLine(count: number): string {
   return `The reader is known for acing ${count} exam${count === 1 ? '' : 's'}.`
 }
 export const GRADES_GOOD_LINE = 'The reader has exceptionally good grades.'
-export const GRADES_BAD_LINE =
-  'The reader is a terrible student who is known for failing all of his exams.'
+export function gradesBadLine(reader: ReaderPronouns): string {
+  return `The reader is a terrible student who is known for failing all of ${readerWords(reader).his} exams.`
+}

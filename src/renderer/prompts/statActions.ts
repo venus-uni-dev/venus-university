@@ -51,7 +51,7 @@ export const STAT_ACTIONS: Record<StatKey, readonly string[]> = {
   ],
   heart: [
     'Improve Heart by braving the open mic at the Stalestein.',
-    'Improve Heart by trying to pick up girls at Club Apogee.',
+    'Improve Heart by trying to pick someone up at Club Apogee.',
     'Improve Heart by volunteering to cook in the Lowrise 4 kitchen.',
     'Improve Heart by joining co-op games at the Pino-Cola rec center.',
     'Improve Heart by hanging out in the Lowrise 4 lounge.',

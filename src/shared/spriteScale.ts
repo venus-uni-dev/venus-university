@@ -3,6 +3,8 @@
  * edge meets the stage's, so a taller one runs off it.
  */
 
+import type { Gender } from './types'
+
 /** Ten percent below full size, the floor the New Game modal enforces. */
 export const SPRITE_SCALE_MIN = 0.9
 export const SPRITE_SCALE_MAX = 1.05
@@ -10,10 +12,16 @@ export const SPRITE_SCALE_MAX = 1.05
 export const SPRITE_SCALE_STEP = 0.01
 
 /**
- * The scale a character is given before the player touches anything, by breast tag;
- * `small` wins when freehand tags carry both.
+ * The scale a character is given before the player touches anything: a male character's by build
+ * tag, a slim one shortest, and a female one's by breast tag, the shorter pick winning wherever
+ * freehand tags carry both.
  */
-export function defaultSpriteScale(baseAppearance: readonly string[]): number {
+export function defaultSpriteScale(baseAppearance: readonly string[], gender: Gender): number {
+  if (gender === 'male') {
+    if (baseAppearance.includes('bishounen')) return 1.03
+    if (baseAppearance.includes('muscular_male')) return 1.05
+    return 1
+  }
   if (baseAppearance.includes('small_breasts')) return 0.94
   if (baseAppearance.includes('big_breasts')) return 1
   return 0.97

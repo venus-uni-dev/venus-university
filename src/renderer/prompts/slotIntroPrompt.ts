@@ -2,8 +2,25 @@ import type { ExamPeriod } from '@shared/academics'
 import { yearLabel } from '@shared/classes'
 import { worstInSlot } from '@shared/colds'
 import { globalSlotOf } from '@shared/jobs'
+import {
+  genderOf,
+  PRONOUNS,
+  pronounTag,
+  readerWords,
+  type Pronouns,
+  type ReaderPronouns,
+  type ReaderWords
+} from '@shared/gender'
 import { locationDefOf, locationLabel } from '@shared/locations'
-import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
+import { readerCrushFactorOf, type NpcRelationshipMap } from '@shared/npcRelationships'
+import {
+  affectionFor,
+  attractionInPlay,
+  dedupedMemoriesFor,
+  emptyFlags,
+  isRomanceable,
+  isTrusted
+} from '@shared/relationship'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
 import { readerYearOf, seasonOf, semesterOrdinal } from '@shared/semesters'
 import {
@@ -12,8 +29,11 @@ import {
   type Character,
   type CharInfo,
   type EverydayAsk,
+  type Gender,
   type Haunt,
   type Occasion,
+  type LoveText,
+  type RomanceSetting,
   type Season,
   type StructuredRequest,
   type TimeSlot
@@ -21,9 +41,9 @@ import {
 import type { Weather } from '@shared/weather'
 import { herColdLine } from './colds'
 import { formatRelativeSlot } from './gameDate'
-import { loreText, type LoreEntry } from './lorebook'
+import { loreText, transferLines, type LoreEntry } from './lorebook'
 import { examLookaheadLine } from './occasions'
-import { whereaboutsLine, type NpcCompanions } from './npcRelationship'
+import { loveLines, whereaboutsLine, type NpcCompanions } from './npcRelationship'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
 import {
@@ -35,6 +55,7 @@ import {
   profileLines,
   spaced
 } from './scenePrompt'
+import { readerAmongCast } from './setting'
 import { springBreakLines } from './springBreak'
 import { weatherLines } from './weather'
 
@@ -53,30 +74,41 @@ export type HangoutInvite =
   | { kind: 'outing'; location: string }
   | { kind: 'everyday'; ask: EverydayAsk }
 
-/** Each everyday ask as the prompt names it beside her key. */
-const EVERYDAY_ASK_PHRASE: Record<EverydayAsk, string> = {
-  help: 'asking him to help her with something',
-  exercise: 'asking him to work out or exercise with her',
-  meal: 'inviting him over for a meal she is cooking herself',
-  shopping: 'asking him to help her shop for something'
+/** Each everyday ask as the prompt names it beside the asker's key, in the asker's pronouns. */
+const EVERYDAY_ASK_PHRASE: Record<EverydayAsk, (p: Pronouns, r: ReaderWords) => string> = {
+  help: (p, r) => `asking ${r.him} to help ${p.them} with something`,
+  exercise: (p, r) => `asking ${r.him} to work out or exercise with ${p.them}`,
+  meal: (p, r) => `inviting ${r.him} over for a meal ${p.they} is cooking ${p.themself}`,
+  shopping: (p, r) => `asking ${r.him} to help ${p.them} shop for something`
 }
 
-/** What a rolled invitation asks him to, as the line beside her key says it on `date`'s `time`. */
-function invitePhrase(invite: HangoutInvite, date: number, time: TimeSlot): string {
+/**
+ * What a rolled invitation asks him to, as the line beside the asker's key says it on `date`'s
+ * `time`, in the asker's pronouns.
+ */
+function invitePhrase(
+  invite: HangoutInvite,
+  g: Gender,
+  date: number,
+  time: TimeSlot,
+  reader: ReaderPronouns
+): string {
+  const p = PRONOUNS[g]
+  const r = readerWords(reader, g)
   switch (invite.kind) {
     case 'herRoom':
-      return 'asking him to come over to her room'
+      return `asking ${r.him} to come over to ${p.their} room`
     case 'hisRoom':
-      return 'asking him to have her over in his dorm room'
+      return `asking ${r.him} to have ${p.them} over in ${r.his} dorm room`
     case 'study':
-      return `asking him to study with her for the ${invite.className} ${invite.exam} ${formatRelativeSlot(invite.date, invite.time, date, time)}`
+      return `asking ${r.him} to study with ${p.them} for the ${invite.className} ${invite.exam} ${formatRelativeSlot(invite.date, invite.time, date, time)}`
     case 'outing': {
       // The blurb, since nothing else in this prompt says what the place is.
       const blurb = locationDefOf(invite.location)?.blurb
-      return `asking him to come to ${locationLabel(invite.location)} with her${blurb ? `: ${blurb}` : ''}`
+      return `asking ${r.him} to come to ${locationLabel(invite.location)} with ${p.them}${blurb ? `: ${blurb}` : ''}`
     }
     case 'everyday':
-      return EVERYDAY_ASK_PHRASE[invite.ask]
+      return EVERYDAY_ASK_PHRASE[invite.ask](p, r)
   }
 }
 
@@ -125,6 +157,8 @@ export interface IntroBreakup {
   texted: boolean
   /** The first name of the girl he started dating instead. */
   forFirstName: string
+  /** He chose another lover over her rather than starting with somebody new. */
+  closed?: boolean
 }
 
 /** A contact leaving campus for spring break, texting the reader that she is going. */
@@ -164,13 +198,34 @@ export const ROLLED_REACH_OUT_TOPICS: readonly ReachOutTopic[] = [
   'question'
 ]
 
-/** Each reach-out topic as the prompt names it beside her key. */
-const REACH_OUT_TOPIC_PHRASE: Record<ReachOutTopic, string> = {
-  wellbeing: 'checking in on how he is doing',
-  goodNews: 'telling him some good news of hers',
-  badNews: 'telling him some bad news of hers',
-  question: 'asking him a question',
-  sick: 'telling him she is stuck in bed with a cold'
+/** Each reach-out topic as the prompt names it beside the texter's key, in the texter's pronouns. */
+const REACH_OUT_TOPIC_PHRASE: Record<ReachOutTopic, (p: Pronouns, r: ReaderWords) => string> = {
+  wellbeing: (_p, r) => `checking in on how ${r.he} is doing`,
+  goodNews: (p, r) => `telling ${r.him} some good news of ${p.theirs}`,
+  badNews: (p, r) => `telling ${r.him} some bad news of ${p.theirs}`,
+  question: (_p, r) => `asking ${r.him} a question`,
+  sick: (p, r) => `telling ${r.him} ${p.they} is stuck in bed with a cold`
+}
+
+/**
+ * A reach-out about her love life: venting about her partner, asking whether to ask out her
+ * crush, or saying how his advice on either went. `about` is the other one's full name.
+ */
+export interface LoveTopic {
+  kind: LoveText['kind']
+  about: string
+}
+
+/** Each love-life topic as the prompt names it beside the texter's key, in the texter's pronouns. */
+const LOVE_TOPIC_PHRASE: Record<LoveText['kind'], (p: Pronouns, r: ReaderWords, about: string) => string> = {
+  vent: (p, r, about) => `venting to ${r.him} after an argument with ${about}, whom ${p.they} is dating`,
+  crush: (p, r, about) =>
+    `asking ${r.him} whether ${p.they} should ask out ${about}, whom ${p.they} has a crush on`,
+  together: (p, r, about) =>
+    `telling ${r.him} ${p.they} took ${r.his} advice and asked out ${about}, who said yes, so the two of them are dating now`,
+  turnedDown: (p, r, about) =>
+    `telling ${r.him} ${p.they} took ${r.his} advice and asked out ${about}, who turned ${p.them} down`,
+  brokeUp: (p, r, about) => `telling ${r.him} ${p.they} took ${r.his} advice and broke up with ${about}`
 }
 
 /** A contact this slot rolled in to text the reader just to talk, about one rolled topic. */
@@ -182,7 +237,7 @@ export interface IntroReachOut {
   /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
   texted: boolean
   /** What she is texting him about. */
-  topic: ReachOutTopic
+  topic: ReachOutTopic | LoveTopic
   /** Her TEXTING HISTORY lines: what the two of them last texted about, and when. */
   thread: readonly string[]
   /** Where she is, who with, and what she is there for, when the slot places her anywhere. */
@@ -255,6 +310,8 @@ export interface SlotIntroInput {
    * absent on every other slot.
    */
   backOnCampus?: number
+  /** How many transfer students arrive in this slot; absent or 0 on every other slot. */
+  newTransfers?: number
   /** The lorebook lines for what this slot leads up to, built by the loop beside `occasions`. */
   occasionLeadUps?: readonly string[]
   /**
@@ -277,6 +334,14 @@ export interface SlotIntroInput {
    * scene the reader spends the slot in; absent means the block is not written at all.
    */
   rumorPlace?: LoreEntry
+  /** Which genders the playthrough lets the reader romance. */
+  romance: RomanceSetting
+  /** The pronouns the reader goes by. */
+  readerPronouns: ReaderPronouns
+  /** Who on the roster is dating whom, and who has a crush on whom. */
+  npcRelationships: NpcRelationshipMap
+  /** Everyone on the roster and every graduate, whom her partners and crushes are named among. */
+  people: readonly Character[]
 }
 
 /** The narration-only schema: no speaker, emotion, action or bg to emit. */
@@ -378,11 +443,21 @@ function weatherBlock(input: SlotIntroInput): string[] {
 function campusBlock(input: SlotIntroInput): string[] {
   const leadUps = input.occasionLeadUps ?? []
   const lookahead = examLookaheadLine(input.date, input.season)
-  const back = input.backOnCampus !== undefined ? backOnCampusLine(input.backOnCampus) : null
-  if (input.occasions.length === 0 && leadUps.length === 0 && !lookahead && !back) return []
+  const back = input.backOnCampus !== undefined ? backOnCampusLine(input.backOnCampus, input.readerPronouns) : null
+  const transfers = newTransfersLine(input.newTransfers ?? 0)
+  if (
+    input.occasions.length === 0 &&
+    leadUps.length === 0 &&
+    !lookahead &&
+    !back &&
+    !transfers
+  ) {
+    return []
+  }
   return [
     'WHAT\'S GOING ON',
     ...(back ? [`- ${back}`] : []),
+    ...(transfers ? [`- ${transfers}`] : []),
     ...input.occasions.map((occasion) => `- ${occasion.title} — ${occasion.description}`),
     ...leadUps.map((line) => `- ${line}`),
     ...(lookahead ? [`- ${lookahead}`] : [])
@@ -390,10 +465,21 @@ function campusBlock(input: SlotIntroInput): string[] {
 }
 
 /** The first morning of a semester after his first: what he is back from, and as what. */
-function backOnCampusLine(semesterIndex: number): string {
+function backOnCampusLine(semesterIndex: number, reader: ReaderPronouns): string {
   const year = yearLabel(readerYearOf(semesterIndex)).toLowerCase()
   const away = seasonOf(semesterIndex) === 'fall' ? 'summer vacation' : 'winter break'
-  return `The reader is back on campus after ${away}, starting his ${semesterOrdinal(semesterIndex)} semester as a ${year}. Classes start tomorrow.`
+  return `The reader is back on campus after ${away}, starting ${readerWords(reader).his} ${semesterOrdinal(semesterIndex)} semester as a ${year}. Classes start tomorrow.`
+}
+
+/** Counts of transfer students as a sentence opens with them, from two up. */
+const TRANSFER_COUNT_WORDS = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten']
+
+/** That `count` unnamed transfer students start today, or null when none do. */
+function newTransfersLine(count: number): string | null {
+  if (count < 1) return null
+  if (count === 1) return 'A new transfer student starts at Venus University today.'
+  const many = TRANSFER_COUNT_WORDS[count - 2] ?? `${count}`
+  return `${many} new transfer students start at Venus University today.`
 }
 
 /** A place worth going, for a slot with nothing and nobody in it. */
@@ -426,16 +512,21 @@ function closedSentence(text: string): string {
 }
 
 /**
- * The sentence beside a plan for a girl with a class or a shift in the slot, leaving the model to
- * pick whether she meets him before it or after.
+ * The sentence beside a plan for a character with a class or a shift in the slot, leaving the
+ * model to pick whether they meet him before it or after.
  */
-function commitmentSentence(firstName: string, commitment: Commitment, time: TimeSlot): string {
+function commitmentSentence(
+  who: Pick<Character, 'firstName' | 'gender'>,
+  commitment: Commitment,
+  time: TimeSlot
+): string {
+  const p = PRONOUNS[genderOf(who)]
   const what =
     commitment.kind === 'class'
-      ? `her ${commitment.name} class`
+      ? `${p.their} ${commitment.name} class`
       : `a shift at ${commitment.employer}`
   const when = time === 1 ? 'tonight' : 'today'
-  return ` ${firstName} has ${what} ${when} but she will meet up with the reader either before or after it. Choose what makes the most sense.`
+  return ` ${who.firstName} has ${what} ${when} but ${p.they} will meet up with the reader either before or after it. Choose what makes the most sense.`
 }
 
 /** The characters texting the reader an invitation this slot. */
@@ -444,26 +535,27 @@ function askerBlock(input: SlotIntroInput): string[] {
 
   return [
     'ASKING TO HANG OUT',
-    'Each of these characters is texting the reader right now to ask him to spend this part of the day with her, doing what is listed beside her where anything is. Write one entry in "hangouts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    `Each of these characters is texting the reader right now to ask ${readerAmongCast(input.readerPronouns).him} to spend this part of the day with them, doing what is listed beside them where anything is. Write one entry in "hangouts" for each, and nothing for anyone else. They are described under LOREBOOK.`,
     ...(anyPlans(input)
       ? [
-          'Where a plan is listed beside a character, she is not inviting the reader out of nowhere: the two of them agreed to this already, and she is writing about that plan, for everyone going. Her message reads as a reminder or a "still on?", not as a new idea.'
+          'Where a plan is listed beside a character, they are not inviting the reader out of nowhere: the two of them agreed to this already, and they are writing about that plan, for everyone going. Their message reads as a reminder or a "still on?", not as a new idea.'
         ]
       : []),
-    ...input.askers.map(({ character, charKey, plan, commitment, occasion, invite }) =>
+    ...input.askers.map(({ character, charKey, plan, commitment, occasion, invite }) => {
+      const g = genderOf(character)
       // The plan, the occasion and the rolled ask ride the key, not the lorebook entry.
-      plan
+      return plan
         ? `- ${charKey} — already planned for this part of the day: ` +
-          (commitment
-            ? closedSentence(plan.description) +
-              commitmentSentence(character.firstName, commitment, input.time)
-            : plan.description)
+            (commitment
+              ? closedSentence(plan.description) +
+                commitmentSentence(character, commitment, input.time)
+              : plan.description)
         : occasion
-          ? `- ${charKey} — asking him to come to ${occasion.title} with her`
+          ? `- ${charKey} — asking ${readerWords(input.readerPronouns, g).him} to come to ${occasion.title} with ${PRONOUNS[g].them}`
           : invite
-            ? `- ${charKey} — ${invitePhrase(invite, input.date, input.time)}`
+            ? `- ${charKey} — ${invitePhrase(invite, g, input.date, input.time, input.readerPronouns)}`
             : `- ${charKey}`
-    )
+    })
   ]
 }
 
@@ -471,11 +563,14 @@ function askerBlock(input: SlotIntroInput): string[] {
 function breakupBlock(input: SlotIntroInput): string[] {
   if (input.breakups.length === 0) return []
 
+  // A lover who chose another over her reads as a choice, not a newcomer.
+  const chose = input.breakups.some(({ closed }) => closed)
   return [
     'BREAKING UP',
-    'Each of these characters has just found out the reader started dating somebody else and is ending things with him over text right now. Write one entry in "breakups" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    `Each of these characters has just found out the reader ${chose ? 'chose somebody else over them' : 'started dating somebody else'} and is ending things with ${readerAmongCast(input.readerPronouns).him} over text right now. Write one entry in "breakups" for each, and nothing for anyone else. They are described under LOREBOOK.`,
     ...input.breakups.map(
-      ({ charKey, forFirstName }) => `- ${charKey} — he started dating ${forFirstName}`
+      ({ character, charKey, forFirstName, closed }) =>
+        `- ${charKey} — ${readerWords(input.readerPronouns, genderOf(character)).he} ${closed ? 'chose to see only' : 'started dating'} ${forFirstName}`
     )
   ]
 }
@@ -497,7 +592,7 @@ function leaverBlock(input: SlotIntroInput): string[] {
 
   return [
     'LEAVING FOR SPRING BREAK',
-    'Each of these characters is texting the reader right now to let him know she is leaving campus on Saturday for spring break and will be gone for the week. Write one entry in "springBreakTexts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    `Each of these characters is texting the reader right now to let ${readerAmongCast(input.readerPronouns).him} know they are leaving campus on Saturday for spring break and will be gone for the week. Write one entry in "springBreakTexts" for each, and nothing for anyone else. They are described under LOREBOOK.`,
     ...input.leavers.map(({ charKey }) => `- ${charKey}`)
   ]
 }
@@ -508,7 +603,7 @@ function visitorBlock(input: SlotIntroInput): string[] {
 
   return [
     'BACK FOR HOMECOMING',
-    'Each of these characters graduated and moved away from Veridan, and is texting the reader right now to let him know she is back in town for the Homecoming game today and leaves again tomorrow morning. Write one entry in "homecomingTexts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    `Each of these characters graduated and moved away from Veridan, and is texting the reader right now to let ${readerAmongCast(input.readerPronouns).him} know they are back in town for the Homecoming game today and leave again tomorrow morning. Write one entry in "homecomingTexts" for each, and nothing for anyone else. They are described under LOREBOOK.`,
     ...input.visitors.map(({ charKey }) => `- ${charKey}`)
   ]
 }
@@ -519,9 +614,22 @@ function reachOutBlock(input: SlotIntroInput): string[] {
 
   return [
     'REACHING OUT',
-    'Each of these characters is texting the reader right now just to talk, about what is listed beside her. Write one entry in "reachOuts" for each, and nothing for anyone else. They are described under LOREBOOK.',
-    ...input.reachOuts.map(({ charKey, topic }) => `- ${charKey} — ${REACH_OUT_TOPIC_PHRASE[topic]}`)
+    'Each of these characters is texting the reader right now just to talk, about what is listed beside them. Write one entry in "reachOuts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    ...input.reachOuts.map(({ character, charKey, topic }) => {
+      const g = genderOf(character)
+      const r = readerWords(input.readerPronouns, g)
+      const phrase =
+        typeof topic === 'string'
+          ? REACH_OUT_TOPIC_PHRASE[topic](PRONOUNS[g], r)
+          : LOVE_TOPIC_PHRASE[topic.kind](PRONOUNS[g], r, topic.about)
+      return `- ${charKey} — ${phrase}`
+    })
   ]
+}
+
+/** Whether anybody reaching out this slot is texting about her love life. */
+function anyLoveTopics(input: SlotIntroInput): boolean {
+  return input.reachOuts.some(({ topic }) => typeof topic !== 'string')
 }
 
 /** Everybody the six blocks above name, described once each. */
@@ -548,21 +656,22 @@ function characterBlock(input: SlotIntroInput): string[] {
     named.add(charKey)
     // How her cold stands in the slot opening, where she has one that shows.
     const slot = globalSlotOf(input.date, input.time)
-    const coldLine = herColdLine(character.firstName, info.cold, slot, true)
+    const coldLine = herColdLine(character, info.cold, slot, true)
     entries.push([
-      `${fullNameOf(character)} — "char": "${charKey}"`,
-      ...profileLines(character, info.flags ?? emptyFlags()),
+      `${fullNameOf(character)} (${pronounTag(genderOf(character))}) — "char": "${charKey}"`,
+      ...profileLines(
+        character,
+        info.flags ?? emptyFlags(),
+        attractionInPlay(character, info, input.romance, input.readerPronouns)
+      ),
       ...(coldLine ? [coldLine] : []),
       // A graduate posting or ending it from out of town, or back for Homecoming.
-      ...graduateLines(
-        character.firstName,
-        info,
-        input.homecomingVisitor === character.charId
-      ),
+      ...graduateLines(character, info, input.homecomingVisitor === character.charId),
+      ...transferLines(character, info, input.season),
       ...(whereabouts
         ? [
             whereaboutsLine(
-              character.firstName,
+              character,
               whereabouts.location,
               whereabouts.companions,
               whereabouts.haunt,
@@ -572,11 +681,12 @@ function characterBlock(input: SlotIntroInput): string[] {
         : []),
       // What she is doing with the break: a girl off campus has no location to report.
       ...springBreakLines(
-        character.firstName,
+        character,
         info.springBreakPlans,
         input.springBreakAway,
         character.charId,
-        input.date
+        input.date,
+        input.readerPronouns
       ),
       ...relationshipLines(
         character,
@@ -584,14 +694,38 @@ function characterBlock(input: SlotIntroInput): string[] {
         info.nameKnown,
         affectionFor(info, input.date, character),
         info,
-        input.stats ?? DEFAULT_PLAYER_STATS,
-        // Everybody here reaches the reader by phone: a first contact is a conversation, not a meeting.
-        { texting: true, texted },
-        // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
-        { date: input.date, offset: info.moodCycleOffset ?? 0, sick: worstInSlot(info.cold, slot) }
+        {
+          stats: input.stats ?? DEFAULT_PLAYER_STATS,
+          // Everybody here reaches the reader by phone: a first contact is a conversation, not a meeting.
+          medium: { texting: true, texted },
+          // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+          mood: {
+            date: input.date,
+            offset: info.moodCycleOffset ?? 0,
+            sick: worstInSlot(info.cold, slot)
+          },
+          romanceable: isRomanceable(character, info, input.romance, input.readerPronouns),
+          loyal:
+            readerCrushFactorOf(input.npcRelationships, character.charId, character, input.date) ===
+            0,
+          readerPronouns: input.readerPronouns
+        }
       ),
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory, input.season),
-      ...secretLines(info.toldSecrets, input.secretBudget),
+      // Who she is dating, and who she likes once she trusts him.
+      ...loveLines(
+        character,
+        input.people,
+        input.npcRelationships,
+        isTrusted(affectionFor(info, input.date, character))
+      ),
+      ...memoryLines(
+        character,
+        dedupedMemoriesFor(info).slice(-2),
+        info.textMemory,
+        input.season,
+        input.readerPronouns
+      ),
+      ...secretLines(character.firstName, info.toldSecrets, input.secretBudget),
       // What she and the reader last texted about, for the girl starting a conversation.
       ...('thread' in entry ? entry.thread : []),
       ...notesLines(character.firstName, info.notes)
@@ -622,6 +756,8 @@ export function buildSlotIntroPrompt(
   const rumor = rumorBlock(input)
   const planned = anyPlans(input)
   const committed = anyCommitments(input)
+  const r = readerWords(input.readerPronouns)
+  const rf = readerAmongCast(input.readerPronouns)
 
   const user = [
     'OPENING LINE',
@@ -643,8 +779,8 @@ export function buildSlotIntroPrompt(
     'Continue where the OPENING LINE left off with three to five short lines of narration. Don\'t include the OPENING LINE in your response. Each line is one entry in "lines".',
     // The three beats, named: without them the call writes a to-do list.
     waking
-      ? 'Open on the reader waking up in his Lowrise dorm room, describing how he feels and the sounds and sights around him.'
-      : 'Open on the day winding down around the reader in his Lowrise dorm room, describing how he feels and the sounds and sights around him.',
+      ? `Open on the reader waking up in ${r.his} Lowrise dorm room, describing how ${r.he} feels and the sounds and sights around ${r.him}.`
+      : `Open on the day winding down around the reader in ${r.his} Lowrise dorm room, describing how ${r.he} feels and the sounds and sights around ${r.him}.`,
     "Then say how campus feels right now. Take into account how far we are in the semester and what's going on in the city and on campus.",
     input.recent.length > 0
       ? 'Also keep in mind what happened recently and how it is making the reader feel right now.'
@@ -656,18 +792,18 @@ export function buildSlotIntroPrompt(
     ...(input.askers.length > 0
       ? [
           '',
-          'Then fill "hangouts", one entry per character under ASKING TO HANG OUT. "char" is her key exactly as written there. "text" is the message she sends, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — and it is ONLY about meeting up: what she wants to do and where, asked as a question' +
+          'Then fill "hangouts", one entry per character under ASKING TO HANG OUT. "char" is their key exactly as written there. "text" is the message they send, in their own texting voice — lowercase, slang, typos and emoji are all fine if that is how they type — and it is ONLY about meeting up: what they want to do and where, asked as a question' +
             (planned
-              ? ' — or, where she has a plan listed, that plan, asked as a "we\'re still on, right?"'
+              ? ' — or, where they have a plan listed, that plan, asked as a "we\'re still on, right?"'
               : '') +
             (committed
-              ? ', and where she has class or work, she says whether she will meet him before or after it'
+              ? `, and where they have class or work, they say whether they will meet ${rf.him} before or after it`
               : '') +
             '. No narration, no stage directions, no other conversation. "description" is the plan in a few plain words, like "Getting dinner with Sarah at the Mockingbird" or "Studying with Chloe in the library".' +
             (planned
-              ? ' If she has a hangout scheduled with the reader listed under her name, use that one.'
+              ? ' If they have a hangout scheduled with the reader listed under their name, use that one.'
               : ''),
-          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+          `The narration in "lines" must not mention these messages or these characters at all — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // An optional property with no instruction against it is an invitation to invent one.
@@ -677,8 +813,8 @@ export function buildSlotIntroPrompt(
     ...(input.breakups.length > 0
       ? [
           '',
-          'Then fill "breakups", one entry per character under BREAKING UP. "char" is her key exactly as written there. "texts" is two to four short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — breaking up with the reader because he started dating the girl named beside her: how she found out, how she feels about it, and that it is over. No narration, no stage directions, no reply from the reader.',
-          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+          `Then fill "breakups", one entry per character under BREAKING UP. "char" is their key exactly as written there. "texts" is two to four short messages they send one after another, in their own texting voice — lowercase, slang, typos and emoji are all fine if that is how they type — breaking up with the reader because ${rf.he} started dating the person named beside them: how they found out, how they feel about it, and that it is over. No narration, no stage directions, no reply from the reader.`,
+          `The narration in "lines" must not mention these messages or these characters at all — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // Refused out loud for "hangouts"'s reason.
@@ -688,8 +824,8 @@ export function buildSlotIntroPrompt(
     ...(input.posters.length > 0
       ? [
           '',
-          'Then fill "posts", one entry per character under STATUS UPDATES. "char" is her key exactly as written there. "text" is the post itself: one or two short lines in her own voice, the way she would actually type it — lowercase, slang and emoji are fine if that is how she writes. It is a post to nobody in particular, about her hour: what she is doing, where she is, what kind of mood she is in, something small she noticed. She is NOT writing to the reader and must not address him, mention him, or refer to meeting anyone. No narration and no stage directions.',
-          'The narration in "lines" must not mention these posts — the reader has not opened his phone yet.'
+          `Then fill "posts", one entry per character under STATUS UPDATES. "char" is their key exactly as written there. "text" is the post itself: one or two short lines in their own voice, the way they would actually type it — lowercase, slang and emoji are fine if that is how they write. It is a post to nobody in particular, about their hour: what they are doing, where they are, what kind of mood they are in, something small they noticed. They are NOT writing to the reader and must not address ${rf.him}, mention ${rf.him}, or refer to meeting anyone. No narration and no stage directions.`,
+          `The narration in "lines" must not mention these posts — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // Refused out loud for "hangouts"'s reason.
@@ -699,8 +835,8 @@ export function buildSlotIntroPrompt(
     ...(input.leavers.length > 0
       ? [
           '',
-          'Then fill "springBreakTexts", one entry per character under LEAVING FOR SPRING BREAK. "char" is her key exactly as written there. "texts" is one to three short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — letting the reader know she is leaving campus on Saturday and will be gone for spring break: what she is doing over the break, and how she feels about being away from him, in keeping with where the two of them stand. She is not inviting him along. No narration, no stage directions, no reply from the reader.',
-          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+          `Then fill "springBreakTexts", one entry per character under LEAVING FOR SPRING BREAK. "char" is their key exactly as written there. "texts" is one to three short messages they send one after another, in their own texting voice — lowercase, slang, typos and emoji are all fine if that is how they type — letting the reader know they are leaving campus on Saturday and will be gone for spring break: what they are doing over the break, and how they feel about being away from ${rf.him}, in keeping with where the two of them stand. They are not inviting ${rf.him} along. No narration, no stage directions, no reply from the reader.`,
+          `The narration in "lines" must not mention these messages or these characters at all — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // Refused out loud for "hangouts"'s reason.
@@ -710,8 +846,8 @@ export function buildSlotIntroPrompt(
     ...(input.visitors.length > 0
       ? [
           '',
-          'Then fill "homecomingTexts", one entry per character under BACK FOR HOMECOMING. "char" is her key exactly as written there. "texts" is one to three short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — letting the reader know she is back in town for the Homecoming game today and leaves again tomorrow morning: what she has been up to since she left, and whether she would like to see him while she is here, in keeping with where the two of them stand. No narration, no stage directions, no reply from the reader.',
-          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+          `Then fill "homecomingTexts", one entry per character under BACK FOR HOMECOMING. "char" is their key exactly as written there. "texts" is one to three short messages they send one after another, in their own texting voice — lowercase, slang, typos and emoji are all fine if that is how they type — letting the reader know they are back in town for the Homecoming game today and leave again tomorrow morning: what they have been up to since they left, and whether they would like to see ${rf.him} while they are here, in keeping with where the two of them stand. No narration, no stage directions, no reply from the reader.`,
+          `The narration in "lines" must not mention these messages or these characters at all — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // Refused out loud for "hangouts"'s reason.
@@ -721,8 +857,8 @@ export function buildSlotIntroPrompt(
     ...(input.reachOuts.length > 0
       ? [
           '',
-          'Then fill "reachOuts", one entry per character under REACHING OUT. "char" is her key exactly as written there. "texts" is one or two short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — starting a conversation with the reader about what is listed beside her name. Good or bad news is something that just happened in her own life, in keeping with how LOREBOOK describes her and where she is. A question is something she actually wants to know from him. She can pick up on time they recently spent together or on what they last texted about, and she ends on something he can answer. She is not asking to meet up or making plans. No narration, no stage directions, no reply from the reader.',
-          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+          `Then fill "reachOuts", one entry per character under REACHING OUT. "char" is their key exactly as written there. "texts" is one or two short messages they send one after another, in their own texting voice — lowercase, slang, typos and emoji are all fine if that is how they type — starting a conversation with the reader about what is listed beside their name. Good or bad news is something that just happened in their own life, in keeping with how LOREBOOK describes them and where they are. A question is something they actually want to know from ${rf.him}.${anyLoveTopics(input) ? ` Where it is about their love life, it is about the person named beside them: what happened between the two of them and how they feel about it, and someone venting or asking about a crush wants ${rf.his} take on it.` : ''} They can pick up on time the two of them recently spent together or on what they last texted about, and they end on something ${rf.he} can answer. They are not asking to meet up or making plans. No narration, no stage directions, no reply from the reader.`,
+          `The narration in "lines" must not mention these messages or these characters at all — the reader has not opened ${r.his} phone yet.`
         ]
       : [
           // Refused out loud for "hangouts"'s reason.
@@ -733,7 +869,7 @@ export function buildSlotIntroPrompt(
 
   return {
     system: [
-      personaFor(input.lessNsfwText),
+      personaFor(input.lessNsfwText, input.readerPronouns),
       '',
       'SETTING',
       setting,

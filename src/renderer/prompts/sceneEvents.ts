@@ -1,11 +1,12 @@
+import { PRONOUNS, readerWords, type ReaderPronouns } from '@shared/gender'
 import type { SceneEventId } from '@shared/sceneEvents'
 import { itemDefOf } from '@shared/shop'
-import type { ReceivedGift, SceneEvent, Season, TimeSlot } from '@shared/types'
+import type { Gender, ReceivedGift, SceneEvent, Season, TimeSlot } from '@shared/types'
 import { monthOf } from './gameDate'
 
 /**
- * The words a scene's curveball and a girl's present are put to the writer in: one line each,
- * in the opening call's `YOUR TURN` alone.
+ * The words a scene's curveball and a character's present are put to the writer in: one line
+ * each, in the opening call's `YOUR TURN` alone.
  */
 
 /** November through March, when it is the heating rather than the AC that breaks. */
@@ -18,11 +19,21 @@ interface EventMoment {
   season: Season
 }
 
-/** One event as a sentence, `who` the charKey of the girl it happens to. */
-function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
+/**
+ * One event as a sentence, `who` the charKey of the character it happens to and `g` their
+ * gender; a line names the reader outright where the reader's pronoun would read as theirs.
+ */
+function eventSentence(
+  id: SceneEventId,
+  who: string,
+  g: Gender,
+  at: EventMoment,
+  reader: ReaderPronouns
+): string {
+  const p = PRONOUNS[g]
   switch (id) {
     case 'herAsleep':
-      return `${who} invited the reader over, but she's fast asleep when he gets there.`
+      return `${who} invited the reader over, but ${p.they}'s fast asleep when ${readerWords(reader, g).he} gets there.`
     case 'herShowering':
       return `${who} is in the shower when the reader gets there.`
     case 'herMasturbating':
@@ -32,10 +43,10 @@ function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
     case 'herRomance':
       return `${who} has set up a romantic ${at.time === 1 ? 'evening' : 'afternoon'} for the reader.`
     case 'herLockedOut':
-      return `${who} has locked herself out of her room and is stuck in the hall when the reader gets there.`
+      return `${who} has locked ${p.themself} out of ${p.their} room and is stuck in the hall when the reader gets there.`
     case 'hisDrinks':
       return at.time === 1
-        ? `${who} shows up with something to drink, or takeout if she doesn't drink.`
+        ? `${who} shows up with something to drink, or takeout if ${p.they} doesn't drink.`
         : `${who} shows up with takeout for the two of them.`
     case 'hisLate':
       return `${who} shows up really late.`
@@ -44,9 +55,9 @@ function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
     case 'mealFire':
       return `The reader arrives to find that ${who} has started a small kitchen fire while cooking.`
     case 'mealMissingIngredient':
-      return `Halfway through cooking, ${who} realizes she's missing an ingredient.`
+      return `Halfway through cooking, ${who} realizes ${p.they}'s missing an ingredient.`
     case 'mealInjury':
-      return `The reader arrives to find that ${who} has hurt herself while she's cooking.`
+      return `The reader arrives to find that ${who} has hurt ${p.themself} while ${p.they}'s cooking.`
     case 'mealDisaster':
       return `The meal ${who} cooks turns out terrible.`
     case 'strayCat':
@@ -62,13 +73,13 @@ function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
     case 'hitOn':
       return `A stranger hits on ${who}.`
     case 'noUmbrella':
-      return `${who} realizes she forgot her umbrella.`
+      return `${who} realizes ${p.they} forgot ${p.their} umbrella.`
     case 'drenched':
       return `${who} shows up soaked from the rain.`
     case 'noHomework':
-      return `${who} forgot her homework for today's class.`
+      return `${who} forgot ${p.their} homework for today's class.`
     case 'noMaterials':
-      return `${who} forgot something she needs for today's class.`
+      return `${who} forgot something ${p.they} needs for today's class.`
     case 'asleepInClass':
       return `${who} dozes off in the middle of class.`
     case 'badGrade':
@@ -78,15 +89,15 @@ function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
     case 'classCancelled':
       return 'The professor cancels class at the last second.'
     case 'peInjury':
-      return `${who} hurts herself during class.`
+      return `${who} hurts ${p.themself} during class.`
     case 'peWardrobe':
       return `${who} has a wardrobe malfunction during class.`
     case 'periodAccident':
       return `${who} has a period accident.`
     case 'hungover':
-      return `${who} is badly hungover, or if she doesn't drink, has a debilitating migraine.`
+      return `${who} is badly hungover, or if ${p.they} doesn't drink, has a debilitating migraine.`
     case 'injury':
-      return `${who} hurts herself somehow.`
+      return `${who} hurts ${p.themself} somehow.`
     case 'wardrobe':
       return `${who} has a wardrobe malfunction.`
     case 'powerOut':
@@ -98,27 +109,31 @@ function eventSentence(id: SceneEventId, who: string, at: EventMoment): string {
     case 'wifiOut':
       return 'The campus wifi goes down.'
     case 'lostPhone':
-      return `${who} can't find her phone.`
+      return `${who} can't find ${p.their} phone.`
     case 'hiccups':
       return `${who} gets the hiccups and can't stop.`
   }
 }
 
 /**
- * The opening's lines for the scene's curveball and her present, `keyOf` naming a girl the way
- * the cast block does; nothing for a girl no longer in the cast or an item no longer sold.
+ * The opening's lines for the scene's curveball and a character's present, `keyOf` naming a
+ * character the way the cast block does and `genderOfId` giving their gender; nothing for a
+ * character no longer in the cast or an item no longer sold.
  */
 export function openingEventLines(
   event: SceneEvent | undefined,
   gift: ReceivedGift | undefined,
   keyOf: (charId: string) => string | null,
-  at: EventMoment
+  genderOfId: (charId: string) => Gender,
+  at: EventMoment,
+  reader: ReaderPronouns
 ): string[] {
   const lines: string[] = []
   const who = event?.charId ? keyOf(event.charId) : ''
   if (event && who !== null) {
+    const g = event.charId ? genderOfId(event.charId) : 'female'
     lines.push(
-      `Extra scene info: ${eventSentence(event.id, who, at)}`
+      `Extra scene info: ${eventSentence(event.id, who, g, at, reader)}`
     )
   }
   const giver = gift ? keyOf(gift.charId) : null

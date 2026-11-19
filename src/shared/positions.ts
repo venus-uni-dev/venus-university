@@ -1,4 +1,5 @@
-import type { CustomCgSlot, Position, StockPosition } from './types'
+import { genderOf, type ReaderPronouns } from './gender'
+import type { Character, CustomCgSlot, Position, StockPosition } from './types'
 
 /**
  * The eight stock CG positions, in a stable order: the stock CG grid's, the job counts' and the
@@ -14,6 +15,19 @@ export const STOCK_POSITIONS: readonly StockPosition[] = [
   'fellatio',
   'fellatio_after'
 ] as const
+
+/** Whether a character has the stock eight CGs: only a female character does. */
+export function stockCgsFor(c: Pick<Character, 'gender'> | null | undefined): boolean {
+  return genderOf(c) === 'female'
+}
+
+/**
+ * Whether a play may offer and show the stock eight at all: they draw the reader male, so only a
+ * he/him reader's, unless the player has turned off matching them to the reader.
+ */
+export function stockCgsInPlay(reader: ReaderPronouns, matchBiology: boolean): boolean {
+  return reader === 'he' || !matchBiology
+}
 
 /**
  * A custom CG pair's main id, and its `_after`'s: `customcg` and a whole number from one, with no

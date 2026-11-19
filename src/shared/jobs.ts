@@ -1,3 +1,4 @@
+import type { ReaderPronouns } from './gender'
 import type { ClassSlot, JobState, ShiftSlot, TimeSlot } from './types'
 import { formatSlot, packSlot, WEEKDAY_NAMES } from './classes'
 import { isLocationOpen } from './locations'
@@ -172,6 +173,8 @@ export interface JobDef {
     summer?: string
     winter?: string
   }
+  /** The texts a she/her or they/them reader is sent instead, where his calls the reader "man". */
+  neutralMessages?: Partial<Record<CoreJobMessageKind, string>>
 }
 
 /** Every opening in the game, in board order, which is pay order. */
@@ -212,6 +215,18 @@ Need cash? Apply now and start as early as the next hour!`,
       shiftChange: `Okay your schedule change is good now.`,
       sick1: `Get well man, I'll find someone to cover no worries.`,
       sick2: `Yeah right bro. Show up or it's a strike.`
+    },
+    neutralMessages: {
+      intro: `Dale the Man here, shift manager. Welcome aboard rookie, take it easy on your first shift alright?`,
+      raise: `Pay raise from the Man to my rising burger star. Keep it up!`,
+      missed: `Where the hell were you? You had a shift. I'm sorry but that's a strike.`,
+      missed2: `Show the fuck up. You're on two strikes now, ok? Ditch your shift another time and you're out.`,
+      fired: `Come on, really? You're fired.`,
+      quit: `Aw man, I'll miss you. Take care.`,
+      welcomeBack: `Dale here! Look who's back, superstar. Same pay you left on and a clean slate, so take it easy on your first shift alright?`,
+      coldNotice: `Heads up, there's a flu going around and half the crew is coughing on the fries. If you feel like crap don't come in, I'll cover your shifts. No strikes.`,
+      sick1: `Get well soon, I'll find someone to cover no worries.`,
+      sick2: `Yeah right. Show up or it's a strike.`
     }
   },
   {
@@ -329,6 +344,12 @@ Flexible hours and start week. Employee discount. Apply in store or online.`,
       shiftChange: `New schedule's up on the board in the back. Don't go to your old shifts okay.`,
       sick1: `No worries, feel better. I'll get someone to cover.`,
       sick2: `Look man I can't find anyone to cover you. If you don't come in today it's a write up sorry.`
+    },
+    neutralMessages: {
+      raise: `Good news, got you a raise. Thanks for always showing up on time.`,
+      missed2: `Hey, why didn't you show up? That's two write ups now. I'm not trying to be a hardass but corporate says three and you're out. Don't make me do that.`,
+      fired: `That's a third write-up so I have to let you go. Sorry. Come grab your last check from the office whenever.`,
+      sick2: `Look I can't find anyone to cover you. If you don't come in today it's a write up sorry.`
     }
   },
   {
@@ -493,9 +514,32 @@ We're prioritizing people who can start immediately.`,
       shiftChange: `Hey bud your new schedule's up, don't come in to your old times I'll make fun of you`,
       sick1: `Like hell you are. Whatever dude, I'll give you a pass this once.`,
       sick2: `HAHAHA oh I bet. Get your ass in here.`
+    },
+    neutralMessages: {
+      raise: `I hear you're killing it, hot stuff. Here's a little raise for you.`,
+      missed: `Where the hell were you. Don't expect me to put up with this kinda crap again.`,
+      shiftChange: `Hey hot stuff your new schedule's up, don't come in to your old times I'll make fun of you`,
+      sick1: `Like hell you are. Whatever, I'll give you a pass this once.`
     }
   }
 ]
+
+/**
+ * The text a boss sends for `kind` to a reader of these pronouns, or null where this employer has
+ * no such text: the neutral one for a she/her or they/them reader where he has one.
+ */
+export function bossMessageOf(
+  def: JobDef | undefined,
+  kind: JobMessageKind,
+  reader: ReaderPronouns
+): string | null {
+  if (!def) return null
+  const neutral =
+    reader !== 'he' && kind in (def.neutralMessages ?? {})
+      ? def.neutralMessages?.[kind as CoreJobMessageKind]
+      : undefined
+  return neutral ?? def.messages[kind] ?? null
+}
 
 /** The catalog entry for an id, or `undefined` for a job that no longer exists. */
 export function jobDefOf(jobId: string): JobDef | undefined {
@@ -563,7 +607,8 @@ export function placeNpcShifts(
   count: number,
   schedule: Record<number, string>,
   closures: Record<string, ShiftSlot[]> | undefined,
-  taken: readonly ShiftSlot[] = []
+  taken: readonly ShiftSlot[] = [],
+  rand: () => number = Math.random
 ): ShiftSlot[] {
   const def = jobDefOf(jobId)
   if (!def || count <= 0) return []
@@ -572,7 +617,7 @@ export function placeNpcShifts(
     const classSlot = classSlotForShift(slot)
     return classSlot === null || !schedule[classSlot]
   })
-  return shuffle(pool)
+  return shuffle(pool, rand)
     .slice(0, count)
     .sort((a, b) => a - b)
 }

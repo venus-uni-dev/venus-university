@@ -1036,36 +1036,6 @@
   overflow: hidden;
 }
 
-/* An archway is a person, and this one is also the control that picks his picture — 120x144 is
-   the 5:6 every profile is cut at, at the size a card reads a face from. */
-.vu-bb-me-arch {
-  display: grid;
-  flex: none;
-  place-items: stretch;
-  width: 120px;
-  height: 144px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-}
-
-/* Nothing picked yet, drawn as the gap it is: dashed in the border tone, with the plus standing
-   where the picture would. */
-.vu-bb-me-arch.vu-bb-me-arch--empty {
-  place-items: center;
-  border: 3px dashed var(--vu-border);
-  background: none;
-  color: var(--vu-text-muted);
-}
-
-/* `.vu-x` carries no position of its own; this rides it on the archway's square bottom corner,
-   where everything that acts on a face in this app sits. */
-.vu-bb-me > .vu-x {
-  position: absolute;
-  top: 132px;
-  left: 138px;
-}
-
 .vu-bb-me-main {
   display: flex;
   flex: 1;

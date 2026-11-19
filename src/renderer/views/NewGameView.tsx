@@ -3,6 +3,7 @@ import { AnimatePresence } from 'motion/react'
 import type { ApplicationContinuation, ApplicationReader, StartResult } from '@shared/application'
 import { appError, toAppError } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
+import { asReaderPronouns, readerPronounsOf, type ReaderPronouns } from '@shared/gender'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
 import { STARTING_MONEY } from '@shared/money'
 import { emptyTallies } from '@shared/tallies'
@@ -10,13 +11,13 @@ import { placeNpcShifts, rollFreshmanJobStart, rollJobClosures } from '@shared/j
 import { rollSemesterWeather } from '@shared/weather'
 import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
 import { calendarOf, seasonOf } from '@shared/semesters'
-import { initialFlags } from '@shared/relationship'
+import { ALL_ROMANCE, attractionOf, initialFlags, romanceOf } from '@shared/relationship'
 import { npcFriendsOf, rollInitialNpcRelationships } from '@shared/npcRelationships'
-import { pairsOver, type SceneRelation } from '@shared/sceneCreator'
+import { pairsOver, withDatingAttraction, type SceneRelation } from '@shared/sceneCreator'
 import { shuffle } from '@shared/shuffle'
 import {
   fullNameOf,
-  DEFAULT_PLAYER_FIRST_NAME,
+  DEFAULT_PLAYER_FIRST_NAMES,
   DEFAULT_PLAYER_LAST_NAME,
   emptyBunnyboard,
   FIRST_SLOT,
@@ -31,6 +32,7 @@ import {
   type HiddenScheduleAssignment,
   type JobAssignment,
   type Occasion,
+  type RomanceSetting,
   type ScheduleResult,
   type ShiftSlot
 } from '@shared/types'
@@ -64,13 +66,14 @@ import { useUiStore } from '../stores/uiStore'
 import { heldScreenTheme } from './clockTheme'
 import { ClassSelectView } from './ClassSelectView'
 import { NewGameFlow } from './NewGameFlow'
-import { PlayerNameModal } from './PlayerNameModal'
+import { PlayerNameModal, type NamedReader } from './PlayerNameModal'
 import '../vu_styles/NewGame.css'
 
 /** What a reader named at New Game is written into the enrollment as. */
 interface Reader {
   first: string
   last: string
+  pronouns: ReaderPronouns
   stats: PlayerStats
   bio: string
 }
@@ -141,9 +144,16 @@ export function NewGameView(): JSX.Element {
   // Where each girl the reader already knows stands with him, and the pairs the player set;
   // written onto the first save at Enroll.
   const [starts, setStarts] = useState<Record<string, CharStart>>(resumed?.enrollment.starts ?? {})
+  // The player's notes on each girl, written onto her entry at Enroll.
+  const [notes, setNotes] = useState<Record<string, string>>(resumed?.enrollment.notes ?? {})
   const [pairs, setPairs] = useState<Record<string, SceneRelation>>(resumed?.enrollment.pairs ?? {})
   // The random picks New Game left masked; written onto the record at Enroll.
   const [masked, setMasked] = useState<string[]>(resumed?.enrollment.masked ?? [])
+  // How each gender takes to the reader, as a first semester's New Game asked it or everyone
+  // attracted on a Quickstart's; written onto the record at Enroll.
+  const [romance, setRomance] = useState<RomanceSetting | undefined>(() =>
+    resumed && resumed.enrollment.romance !== undefined ? romanceOf(resumed.enrollment) : undefined
+  )
   // The folder the semester above was written into, which Enroll writes the record and the
   // opening save into; null until the enrollment lands.
   const [playthroughId, setPlaythroughId] = useState<string | null>(
@@ -154,12 +164,20 @@ export function NewGameView(): JSX.Element {
   const [applicationFolder, setApplicationFolder] = useState<string | null>(null)
   // The canned start's one question, asked under the menu's curtain.
   const [naming, setNaming] = useState(false)
-  const [playerName, setPlayerName] = useState(
+  const [playerName, setPlayerName] = useState<Pick<Reader, 'first' | 'last' | 'pronouns'>>(
     resumed
-      ? { first: resumed.enrollment.playerFirstName, last: resumed.enrollment.playerLastName }
+      ? {
+          first: resumed.enrollment.playerFirstName,
+          last: resumed.enrollment.playerLastName,
+          pronouns: readerPronounsOf(resumed.enrollment)
+        }
       : next
-        ? { first: next.record.playerFirstName, last: next.record.playerLastName }
-        : { first: DEFAULT_PLAYER_FIRST_NAME, last: DEFAULT_PLAYER_LAST_NAME }
+        ? {
+            first: next.record.playerFirstName,
+            last: next.record.playerLastName,
+            pronouns: readerPronounsOf(next.record)
+          }
+        : { first: DEFAULT_PLAYER_FIRST_NAMES.he, last: DEFAULT_PLAYER_LAST_NAME, pronouns: 'he' }
   )
   const [playerStats, setPlayerStats] = useState<PlayerStats>(
     resumed?.enrollment.stats ?? DEFAULT_PLAYER_STATS
@@ -265,8 +283,9 @@ export function NewGameView(): JSX.Element {
   /**
    * Writes the settled semester into a playthrough folder — the one `into` names, replacing the
    * New Game kept there, or one of its own — so the registrar it is about to open can be left and
-   * come back to. A refused write is reported and the registrar opens anyway; Enroll then
-   * writes into `into` or mints the folder itself. Answers the playthrough written into, or null.
+   * come back to, with the romance New Game asked where it asked one. A refused write is reported
+   * and the registrar opens anyway; Enroll then writes into `into` or mints the folder itself.
+   * Answers the playthrough written into, or null.
    */
   async function enroll(
     semester: StartResult,
@@ -274,7 +293,8 @@ export function NewGameView(): JSX.Element {
     masked: string[],
     reader: Reader,
     tokensGenerated: number,
-    into?: string
+    into?: string,
+    romance?: RomanceSetting
   ): Promise<string | null> {
     setEnrolledTokens(tokensGenerated)
     const written = await useSaveStore.getState().enroll(
@@ -290,13 +310,16 @@ export function NewGameView(): JSX.Element {
         occasions: semester.occasions,
         secrets: semester.secrets,
         ...(Object.keys(semester.starts).length > 0 ? { starts: semester.starts } : {}),
+        ...(semester.notes && Object.keys(semester.notes).length > 0 ? { notes: semester.notes } : {}),
         ...(Object.keys(semester.pairs).length > 0 ? { pairs: semester.pairs } : {}),
         ...(Object.keys(semester.fixedEdits).length > 0 ? { fixedEdits: semester.fixedEdits } : {}),
         playerFirstName: reader.first,
         playerLastName: reader.last,
+        playerPronouns: reader.pronouns,
         stats: reader.stats,
         ...(reader.bio ? { bio: reader.bio } : {}),
-        ...(tokensGenerated > 0 ? { tokensGenerated } : {})
+        ...(tokensGenerated > 0 ? { tokensGenerated } : {}),
+        ...(romance ? { romance } : {})
       },
       into
     )
@@ -318,7 +341,8 @@ export function NewGameView(): JSX.Element {
     named: ApplicationReader,
     composed: Character[],
     continued: ApplicationContinuation | undefined,
-    unrevealed: string[]
+    unrevealed: string[],
+    asked: RomanceSetting | undefined
   ): void {
     if (continued) {
       void enrollNext(semester, named, composed, continued, unrevealed)
@@ -330,6 +354,7 @@ export function NewGameView(): JSX.Element {
       const reader: Reader = {
         first: named.firstName,
         last: named.lastName,
+        pronouns: asReaderPronouns(named.pronouns),
         stats: named.stats,
         bio: named.bio ?? ''
       }
@@ -339,7 +364,8 @@ export function NewGameView(): JSX.Element {
         unrevealed,
         reader,
         tokens,
-        folder ?? undefined
+        folder ?? undefined,
+        asked
       )
       // An application never written takes the playthrough the enrollment made, so the lorebook
       // edits held for want of one land beside it.
@@ -349,7 +375,7 @@ export function NewGameView(): JSX.Element {
       endCrossing(() => {
         setApplicationFolder(folder)
         setRoster(composed)
-        setPlayerName({ first: reader.first, last: reader.last })
+        setPlayerName({ first: reader.first, last: reader.last, pronouns: reader.pronouns })
         setPlayerStats(reader.stats)
         setPlayerBio(reader.bio)
         setSchedules(semester.schedules)
@@ -359,8 +385,10 @@ export function NewGameView(): JSX.Element {
         setSpringBreakPlans(semester.springBreakPlans)
         setSecrets(semester.secrets)
         setStarts(semester.starts)
+        setNotes(semester.notes ?? {})
         setPairs(semester.pairs)
         setMasked(unrevealed)
+        setRomance(asked)
         setOccasions(semester.occasions)
         setFixedEdits(semester.fixedEdits)
         setView('classSelect')
@@ -395,10 +423,12 @@ export function NewGameView(): JSX.Element {
       occasions: semester.occasions,
       secrets: semester.secrets,
       ...(Object.keys(semester.starts).length > 0 ? { starts: semester.starts } : {}),
+      ...(semester.notes && Object.keys(semester.notes).length > 0 ? { notes: semester.notes } : {}),
       ...(Object.keys(semester.pairs).length > 0 ? { pairs: semester.pairs } : {}),
       ...(Object.keys(semester.fixedEdits).length > 0 ? { fixedEdits: semester.fixedEdits } : {}),
       playerFirstName: named.firstName,
       playerLastName: named.lastName,
+      playerPronouns: asReaderPronouns(named.pronouns),
       stats: named.stats,
       ...(named.bio ? { bio: named.bio } : {}),
       ...(tokensGenerated > 0 ? { tokensGenerated } : {}),
@@ -425,7 +455,11 @@ export function NewGameView(): JSX.Element {
     leaveApplication()
     endCrossing(() => {
       setRoster(composed)
-      setPlayerName({ first: named.firstName, last: named.lastName })
+      setPlayerName({
+        first: named.firstName,
+        last: named.lastName,
+        pronouns: asReaderPronouns(named.pronouns)
+      })
       setPlayerStats(named.stats)
       setPlayerBio(named.bio ?? '')
       setSchedules(semester.schedules)
@@ -435,6 +469,7 @@ export function NewGameView(): JSX.Element {
       setSpringBreakPlans(semester.springBreakPlans)
       setSecrets(semester.secrets)
       setStarts(semester.starts)
+      setNotes(semester.notes ?? {})
       setPairs(semester.pairs)
       setOccasions(semester.occasions)
       setView('classSelect')
@@ -445,10 +480,12 @@ export function NewGameView(): JSX.Element {
    * The canned start's reader is named: the menu's crossing has only the enrollment left to wait
    * on, so the registrar is swapped in under the same cover the question was asked on.
    */
-  function onNamed(first: string, last: string, stats: PlayerStats, bio: string): void {
-    setPlayerName({ first, last })
+  function onNamed({ firstName: first, lastName: last, pronouns, stats, bio }: NamedReader): void {
+    setPlayerName({ first, last, pronouns })
     setPlayerStats(stats)
     setPlayerBio(bio)
+    // Never asked here: everybody is attracted to the reader, whatever their pronouns.
+    setRomance(ALL_ROMANCE)
     setNaming(false)
     // Whatever the phase, `endCrossing` runs the swap under cover or at once — no window to
     // miss. No bundle behind the question: back to the menu rather than a curtain over nothing.
@@ -473,8 +510,10 @@ export function NewGameView(): JSX.Element {
         semester,
         roster.map((c) => c.charId),
         [],
-        { first, last, stats, bio },
-        useGameStore.getState().tallies.tokensGenerated
+        { first, last, pronouns, stats, bio },
+        useGameStore.getState().tallies.tokensGenerated,
+        undefined,
+        ALL_ROMANCE
       )
       endCrossing(() => setView('classSelect'))
     })()
@@ -591,13 +630,19 @@ export function NewGameView(): JSX.Element {
     const moodOffsets = shuffle([...Array(MOOD_CYCLE_LENGTH).keys()])
 
     // Who already knows whom, the pairs the player set laid over the roll; after the schedules,
-    // since the roll reads the year off them.
+    // since the roll reads the year off them. A pair set to dating starts on day 0 as a couple
+    // where each may date, off how she starts with the reader.
     const npcRelationships = pairsOver(
       rollInitialNpcRelationships(
         roster.map((c) => ({ charId: c.charId, year: perChar[c.charId]?.year ?? 1 }))
       ),
-      pairs
+      pairs,
+      0,
+      Object.fromEntries(
+        roster.map((c) => [c.charId, { character: c, flags: starts[c.charId]?.flags }])
+      )
     )
+    const rosterById = Object.fromEntries(roster.map((c) => [c.charId, c]))
     // A girl who gave him her number before the semester earns him BunnyMap as one who gave it
     // on day 0 would: BunnyBot hands it over after its introduction.
     const contactAtStart = roster.some((c) => starts[c.charId]?.flags.gaveContactInfo)
@@ -627,6 +672,14 @@ export function NewGameView(): JSX.Element {
           c.charId,
           {
             moodCycleOffset: moodOffsets[i % MOOD_CYCLE_LENGTH],
+            // Her sexuality as her record has it now, which later edits to her leave alone, and
+            // whoever she starts out dating's gender with it.
+            attractedTo: withDatingAttraction(
+              attractionOf(c),
+              c.charId,
+              npcRelationships,
+              rosterById
+            ),
             ...perChar[c.charId],
             // Omitted when the deal found nowhere to put her.
             ...(hiddenSchedule && Object.keys(hiddenSchedule).length > 0
@@ -647,10 +700,12 @@ export function NewGameView(): JSX.Element {
         chars: roster.map((c) => c.charId),
         playerFirstName: playerName.first,
         playerLastName: playerName.last,
+        playerPronouns: playerName.pronouns,
         classes,
         occasions,
         ...(Object.keys(fixedEdits).length > 0 ? { fixedEdits } : {}),
         ...(masked.length > 0 ? { masked } : {}),
+        ...(romance ? { romance } : {}),
         // Each all-hours employer's two closed slots, rolled above off the fixed timetable.
         jobClosures,
         weather,
@@ -676,7 +731,8 @@ export function NewGameView(): JSX.Element {
                 ...(job ? { job } : {}),
                 // Omitted for a freshman, whose break was somewhere else.
                 ...(winterFeeds[c.charId]?.length > 0 ? { feed: winterFeeds[c.charId] } : {}),
-                ...(secrets[c.charId]?.length > 0 ? { secrets: secrets[c.charId] } : {})
+                ...(secrets[c.charId]?.length > 0 ? { secrets: secrets[c.charId] } : {}),
+                ...(notes[c.charId] ? { notes: notes[c.charId] } : {})
               }
             ]
           })
@@ -716,6 +772,7 @@ export function NewGameView(): JSX.Element {
         // slot rolls its own overlay, and nobody has been out yet.
         npcRelationships,
         npcFriendships: [],
+        npcCouples: [],
         // Nobody has asked him anywhere yet, so no occasion has been turned down.
         occasionsDeclined: [],
         npcOverlay: null,

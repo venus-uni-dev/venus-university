@@ -43,6 +43,12 @@
   overflow: hidden auto;
 }
 
+/* The generation type: two states, not a tool box, so the palette at a field's scale rather
+   than the painter's. */
+.vu-generate-gender .vu-palette-btn {
+  height: 76px;
+}
+
 .vu-generate-names {
   display: flex;
   gap: 14px;

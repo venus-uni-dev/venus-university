@@ -23,6 +23,7 @@ import type { ExportKind } from '@shared/sillyTavern'
 import type {
   Character,
   CharacterBrief,
+  CharacterImport,
   ComfyStatus,
   CreatedEnrollment,
   CustomCgSlot,
@@ -32,8 +33,9 @@ import type {
   EndingPostsResponse,
   Enrollment,
   EnrollmentDraft,
+  Gender,
   GrabBags,
-  HandFixResult,
+  RegionFixResult,
   GameSave,
   InstallProgress,
   InstallResult,
@@ -128,8 +130,6 @@ export interface VenusUniversityApi {
     generateProfiles: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
     /** Generates the save's own calendar occasions once, at New Game. */
     generateOccasions: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
-    /** Generates the roster's secrets once, at the start of every semester. */
-    generateSecrets: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
     /** Generates one exam's multiple-choice questions. Never streams. */
     generateQuiz: <T>(request: StructuredRequest) => Promise<Result<T>>
     /**
@@ -197,12 +197,14 @@ export interface VenusUniversityApi {
   chars: {
     list: () => Promise<Result<Character[]>>
     /**
-     * Creates the folder and the pre-LLM record. The brief rides on the record and the
-     * reference picture beside it, so a write cut short can be rerun from her folder alone.
+     * Creates the folder and the pre-LLM record, of the gender it is given. The brief rides on
+     * the record and the reference picture beside it, so a write cut short can be rerun from her
+     * folder alone.
      */
     create: (
       firstName: string,
       lastName: string,
+      gender: Gender,
       brief?: CharacterBrief,
       reference?: ReferenceImage
     ) => Promise<Result<Character>>
@@ -300,10 +302,11 @@ export interface VenusUniversityApi {
      */
     export: (charId: string) => Promise<Result<string | null>>
     /**
-     * Picks a character zip through a native open dialog and adopts it under a
-     * fresh charId. `null` means the dialog was dismissed.
+     * Picks a character zip, or a pack of them, through a native open dialog and adopts each
+     * character under a fresh charId; a pack's refused members come back as one error beside
+     * the ones adopted. `null` means the dialog was dismissed.
      */
-    import: () => Promise<Result<Character | null>>
+    import: () => Promise<Result<CharacterImport | null>>
     /** Copies one character's folder under a fresh charId, staging excluded and name kept. */
     duplicate: (charId: string) => Promise<Result<Character>>
     /**
@@ -575,7 +578,23 @@ export interface VenusUniversityApi {
       target: WardrobeTarget,
       paintLayer: string,
       seed: number
-    ) => Promise<Result<HandFixResult>>
+    ) => Promise<Result<RegionFixResult>>
+    /**
+     * Redraws what the player painted or marked over a wardrobe's neutral sprite. `source` is
+     * that sprite flattened on white, `paintLayer` the strokes and `mask` everything painted or
+     * marked, each a base64 PNG with no `data:` prefix; `strength` is the detailer's denoise,
+     * inside `REPAINT_STRENGTH`. Answers with pixels as `fixHands` does, queued under
+     * `repaint:{target}`.
+     */
+    repaint: (
+      character: Character,
+      target: WardrobeTarget,
+      source: string,
+      paintLayer: string,
+      mask: string,
+      strength: number,
+      seed: number
+    ) => Promise<Result<RegionFixResult>>
   }
   jobs: {
     cancelGroup: (group: string) => Promise<Result<void>>

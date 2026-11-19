@@ -8,10 +8,12 @@ import type {
   ClassEntry,
   FixedOccasionEdits,
   Occasion,
+  PendingTransfer,
   PlaythroughRecord,
   Season,
   SemesterLog,
-  ShiftSlot
+  ShiftSlot,
+  Transfer
 } from './types'
 import type { Weather } from './weather'
 
@@ -163,6 +165,47 @@ export function semesterOf(record: PlaythroughRecord, id?: string): SemesterView
   }
 }
 
+/**
+ * A semester of the record with the girls who transferred into it joined on: each appended to its
+ * roster, once, her settled half laid over its profiles and her own classes over its catalog; the
+ * view itself where nobody did, and its own catalog where none brought classes.
+ */
+export function withTransfers(
+  view: SemesterView,
+  from: { transfers?: readonly Transfer[] } | null | undefined
+): SemesterView {
+  const transfers = from?.transfers ?? []
+  if (transfers.length === 0) return view
+  const chars = [...view.chars]
+  const profiles = { ...view.profiles }
+  let classes = view.classes
+  for (const { charId, profile, classes: hers } of transfers) {
+    if (!chars.includes(charId)) chars.push(charId)
+    profiles[charId] = profile
+    if (hers && Object.keys(hers).length > 0) classes = { ...classes, ...hers }
+  }
+  return { ...view, chars, profiles, classes }
+}
+
+/**
+ * The waiting transfers `kept` once `dropped` stop waiting: each class a dropped one brought that
+ * a kept one is seated in moves onto the first such kept one, so no timetable names a class the
+ * catalog will not hold.
+ */
+export function rehomedTransfers(
+  kept: readonly PendingTransfer[],
+  dropped: readonly PendingTransfer[]
+): PendingTransfer[] {
+  const out = kept.map((entry) => ({ ...entry }))
+  for (const { classes } of dropped) {
+    for (const entry of Object.values(classes ?? {})) {
+      const holder = out.find((held) => held.profile.schedule[entry.slot] === entry.code)
+      if (holder) holder.classes = { ...holder.classes, [entry.code]: entry }
+    }
+  }
+  return out
+}
+
 /** The calendar a semester of the record plays on. */
 export function semesterCalendarOf(
   view: Pick<SemesterView, 'season' | 'occasions' | 'fixedEdits'>
@@ -177,7 +220,10 @@ export interface ChainedSemester {
   log: SemesterLog | null
 }
 
-/** The semesters from the first to the one `id` names, oldest first. */
+/**
+ * The semesters from the first to the one `id` names, oldest first, each finished one with its
+ * transfers joined on off its log; the last one's are on the save.
+ */
 export function semesterChain(record: PlaythroughRecord, id?: string): ChainedSemester[] {
   const ids: (string | undefined)[] = []
   let at = id
@@ -190,10 +236,8 @@ export function semesterChain(record: PlaythroughRecord, id?: string): ChainedSe
   ids.unshift(undefined)
   return ids.map((semesterId, i) => {
     const next = ids[i + 1]
-    return {
-      view: semesterOf(record, semesterId),
-      log: next === undefined ? null : (record.semesters?.[next]?.before ?? null)
-    }
+    const log = next === undefined ? null : (record.semesters?.[next]?.before ?? null)
+    return { view: withTransfers(semesterOf(record, semesterId), log), log }
   })
 }
 
@@ -252,7 +296,9 @@ const PROFILE_KEYS: Record<keyof CharProfile, true> = {
   handle: true,
   springBreakPlans: true,
   intake: true,
-  pursuing: true
+  pursuing: true,
+  attractedTo: true,
+  transferredAt: true
 }
 
 /** The half of one entry a save file carries: everything the record already holds, dropped. */

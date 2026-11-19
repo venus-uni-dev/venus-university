@@ -208,7 +208,7 @@ export function rejection(message: string): AppError {
   return { code: 'CLASSIFIER_REJECTED', message }
 }
 
-/** The player refuses to know a name until a scene has said it out loud. */
+/** Whether the reader has learned her name. */
 export function nameIsKnown(charId: string): boolean {
   return useGameStore.getState().charInfo[charId]?.nameKnown === true
 }
@@ -217,12 +217,6 @@ export function nameIsKnown(charId: string): boolean {
 export function isContact(charId: string): boolean {
   return useGameStore.getState().charInfo[charId]?.flags?.gaveContactInfo === true
 }
-
-/**
- * The refusal for naming someone the reader has never been introduced to — vague about
- * *who*, or it would hand over the very name it withholds.
- */
-export const UNKNOWN_NAME_REJECTION = "You don't know anyone by that name yet."
 
 /** Why a scene cannot open on a graduate. */
 export function graduateRejection(charId: string): string {

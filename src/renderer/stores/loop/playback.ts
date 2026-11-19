@@ -1,6 +1,7 @@
 import type { GameOverReason } from '@shared/gameOver'
 import {
   READER_SPEAKER,
+  type AddedClass,
   type ClassEntry,
   type QuizState,
   type ReceivedGift,
@@ -8,6 +9,8 @@ import {
   type SceneLine,
   type TimeSlot
 } from '@shared/types'
+import type { SemesterCalendar } from '@shared/semesters'
+import { addOwesEntrance } from '../../prompts/classProgress'
 import { isGraduationSlot } from '../../prompts/graduation'
 import { isOrientationSlot } from '../../prompts/introScript'
 import { lastReaderIndexOf, rewindTargetOf } from '../stageStep'
@@ -28,6 +31,8 @@ export interface PlaybackSlice {
   cast: readonly string[]
   sceneClass: string | null
   classes: Readonly<Record<string, ClassEntry>>
+  addedClasses: Readonly<Record<string, AddedClass>>
+  calendar: SemesterCalendar
   sceneEvent: SceneEvent | null
   sceneReceivedGift: ReceivedGift | null
   sceneSecret: string | null
@@ -112,20 +117,30 @@ export function forwardOpenOf(s: PlaybackSlice): boolean {
 export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
- * What holds the scene's opening reply shut, or null: a lecture in session, one the professor has
- * not called off, a girl with a present still to hand him, or a girl with a secret to tell him.
+ * What holds the scene's opening reply shut, or null: a lecture in session, or a project class
+ * meeting him for the first time after he added it late, either one the professor has not called
+ * off; a girl with a present still to hand him, or a girl with a secret to tell him.
  */
 export function openingLockOf(
   s: Pick<
     PlaybackSlice,
-    'sceneClass' | 'classes' | 'sceneEvent' | 'sceneReceivedGift' | 'sceneSecret'
+    | 'sceneClass'
+    | 'classes'
+    | 'addedClasses'
+    | 'calendar'
+    | 'sceneEvent'
+    | 'sceneReceivedGift'
+    | 'sceneSecret'
   >
 ): 'class' | 'gift' | 'secret' | null {
   const entry = s.sceneClass !== null ? s.classes[s.sceneClass] : undefined
   if (
     entry !== undefined &&
+    s.sceneClass !== null &&
     entry.category !== 'pe' &&
-    entry.kind === 'lecture' &&
+    (entry.kind === 'lecture' ||
+      (entry.kind === 'project' &&
+        addOwesEntrance(entry, s.addedClasses[s.sceneClass], s.calendar))) &&
     s.sceneEvent?.id !== 'classCancelled'
   ) {
     return 'class'
@@ -141,6 +156,42 @@ export function openingLockOf(
 function lockOf(s: PlaybackSlice): 'locked' | 'open' {
   const acted = readPrefixOf(s).filter(isReaderLine).length
   return openingLockOf(s) !== null && acted <= 1 ? 'locked' : 'open'
+}
+
+/**
+ * Whether `log[at]` belongs to the reply to the action that opened the scene: no more than one
+ * of the reader's lines comes before it. The same count {@link lockOf} reads off the line on
+ * screen.
+ */
+export function inOpeningReply(log: readonly SceneLine[], at: number): boolean {
+  let acted = 0
+  for (let i = 0; i < at && i < log.length; i++) {
+    if (isReaderLine(log[i])) acted += 1
+    if (acted > 1) return false
+  }
+  return true
+}
+
+/**
+ * Whether `sceneLog[at]` is held shut against a rewrite: the scene's opening reply is locked by
+ * {@link openingLockOf}, and the line is part of it — for the rest of the scene, not only while
+ * it is on screen.
+ */
+export function lineRewriteLocked(
+  s: Pick<
+    PlaybackSlice,
+    | 'sceneLog'
+    | 'sceneClass'
+    | 'classes'
+    | 'addedClasses'
+    | 'calendar'
+    | 'sceneEvent'
+    | 'sceneReceivedGift'
+    | 'sceneSecret'
+  >,
+  at: number
+): boolean {
+  return openingLockOf(s) !== null && inOpeningReply(s.sceneLog, at)
 }
 
 /**

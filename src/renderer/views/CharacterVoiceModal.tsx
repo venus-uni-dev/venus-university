@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { clampVoicePitch, VOICE_PITCH_MAX, VOICE_PITCH_MIN, volumesOf } from '@shared/audio'
+import { genderOf } from '@shared/gender'
 import { hairColorOf } from '@shared/tags'
 import { fullNameOf, type Character } from '@shared/types'
 import { MaskedFace, SpoilerName } from '../components/Spoiler'
@@ -39,11 +40,19 @@ function SpeakerIcon(): JSX.Element {
 /** No girl masked. */
 const NONE_MASKED: ReadonlySet<string> = new Set()
 
-/** Plays a voice, the breath first unless the NSFW slider is down. */
-function preview(pitch: number): void {
+/** The rows a stack holds until the roster outgrows it: twelve girls are two stacks of six. */
+const MIN_STACK_ROWS = 6
+
+/**
+ * Plays a character's voice, the breath first unless the NSFW slider is down or the character
+ * is male, whose CGs play no breath.
+ */
+function preview(character: Character, pitch: number): void {
   // A muted NSFW slider skips the breath rather than leaving a silent gap before the blips.
-  const breath = volumesOf(useSettingsStore.getState().settings?.volumes).nsfw > 0
-  useAudioStore.getState().previewVoice(pitch, breath)
+  const gender = genderOf(character)
+  const breath =
+    gender === 'female' && volumesOf(useSettingsStore.getState().settings?.volumes).nsfw > 0
+  useAudioStore.getState().previewVoice(pitch, gender, breath)
 }
 
 export interface CharacterVoiceModalProps {
@@ -85,11 +94,14 @@ export function CharacterVoiceModal({
     const pitch = clampVoicePitch(value)
     if (played.current[character.charId] === pitch) return
     played.current[character.charId] = pitch
-    preview(pitch)
+    preview(character, pitch)
   }
 
   const answer = (): Record<string, number> =>
     Object.fromEntries(roster.map((c) => [c.charId, pitchOf(c)]))
+
+  // Two columns, so each stack is half the roster, and never shorter than twelve girls' stacks.
+  const stackRows = Math.max(MIN_STACK_ROWS, Math.ceil(roster.length / 2))
 
   const { host, overlayProps } = useModalShell(() => onConfirm(answer()))
   if (!host) return null
@@ -117,78 +129,83 @@ export function CharacterVoiceModal({
         {/* One row apiece: her face and name, the slider between its two ends — there is no
             unit under a voice, so the ends are the whole of the reading — and the square that
             plays it. */}
-        <div className="vu-voices-list">
-          {roster.map((character) => {
-            const pitch = pitchOf(character)
-            const hidden = masked.has(character.charId)
-            const name = hidden ? UNKNOWN_NAME : fullNameOf(character)
-            return (
-              <div
-                className="vu-voices-row"
-                key={character.charId}
-                data-hair={hidden ? undefined : (hairColorOf(character.baseAppearance) ?? undefined)}
-              >
-                <span className="vu-arch vu-paper vu-heights-arch">
-                  {hidden ? (
-                    <MaskedFace />
+        <div className="vu-scroll-box vu-voices-scroll">
+          <div className="vu-voices-list" style={{ '--voice-rows': stackRows } as CSSProperties}>
+            {roster.map((character) => {
+              const pitch = pitchOf(character)
+              const hidden = masked.has(character.charId)
+              const name = hidden ? UNKNOWN_NAME : fullNameOf(character)
+              return (
+                <div
+                  className="vu-voices-row"
+                  key={character.charId}
+                  data-hair={
+                    hidden ? undefined : (hairColorOf(character.baseAppearance) ?? undefined)
+                  }
+                >
+                  <span className="vu-arch vu-paper vu-heights-arch">
+                    {hidden ? (
+                      <MaskedFace />
+                    ) : (
+                      <span className="vu-crop">
+                        <img
+                          className="vu-crop-img"
+                          src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
+                          alt=""
+                        />
+                      </span>
+                    )}
+                  </span>
+                  {hidden && onReveal ? (
+                    <span className="vu-voices-name">
+                      <SpoilerName onReveal={() => onReveal(character.charId)} />
+                    </span>
                   ) : (
-                    <span className="vu-crop">
-                      <img
-                        className="vu-crop-img"
-                        src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
-                        alt=""
-                      />
+                    <span className="vu-voices-name">
+                      {hidden ? UNKNOWN_NAME : character.firstName || 'Unnamed'}
                     </span>
                   )}
-                </span>
-                {hidden && onReveal ? (
-                  <span className="vu-voices-name">
-                    <SpoilerName onReveal={() => onReveal(character.charId)} />
-                  </span>
-                ) : (
-                  <span className="vu-voices-name">
-                    {hidden ? UNKNOWN_NAME : character.firstName || 'Unnamed'}
-                  </span>
-                )}
-                <span className="vu-range-end">Lower</span>
-                <input
-                  className="vu-range"
-                  type="range"
-                  min={VOICE_PITCH_MIN}
-                  max={VOICE_PITCH_MAX}
-                  step={0.01}
-                  value={pitch}
-                  aria-label={`${name}'s voice pitch`}
-                  style={
-                    {
-                      '--range-fill': `${((pitch - VOICE_PITCH_MIN) / (VOICE_PITCH_MAX - VOICE_PITCH_MIN)) * 100}%`
-                    } as CSSProperties
-                  }
-                  onChange={(event) =>
-                    setPitches((prev) => ({
-                      ...prev,
-                      [character.charId]: clampVoicePitch(Number(event.target.value))
-                    }))
-                  }
-                  onPointerUp={(event) => release(character, Number(event.currentTarget.value))}
-                  onKeyUp={(event) => release(character, Number(event.currentTarget.value))}
-                />
-                <span className="vu-range-end">Higher</span>
-                <motion.button
-                  className="vu-square"
-                  type="button"
-                  aria-label={`Play ${name}'s voice`}
-                  {...gestures(false, quietLift, quietPress)}
-                  onClick={() => {
-                    played.current[character.charId] = pitch
-                    preview(pitch)
-                  }}
-                >
-                  <SpeakerIcon />
-                </motion.button>
-              </div>
-            )
-          })}
+                  <span className="vu-range-end">Lower</span>
+                  <input
+                    className="vu-range"
+                    type="range"
+                    min={VOICE_PITCH_MIN}
+                    max={VOICE_PITCH_MAX}
+                    step={0.01}
+                    value={pitch}
+                    aria-label={`${name}'s voice pitch`}
+                    style={
+                      {
+                        '--range-fill': `${((pitch - VOICE_PITCH_MIN) / (VOICE_PITCH_MAX - VOICE_PITCH_MIN)) * 100}%`
+                      } as CSSProperties
+                    }
+                    onChange={(event) =>
+                      setPitches((prev) => ({
+                        ...prev,
+                        [character.charId]: clampVoicePitch(Number(event.target.value))
+                      }))
+                    }
+                    onPointerUp={(event) => release(character, Number(event.currentTarget.value))}
+                    onKeyUp={(event) => release(character, Number(event.currentTarget.value))}
+                  />
+                  <span className="vu-range-end">Higher</span>
+                  <motion.button
+                    className="vu-square"
+                    type="button"
+                    aria-label={`Play ${name}'s voice`}
+                    {...gestures(false, quietLift, quietPress)}
+                    onClick={() => {
+                      played.current[character.charId] = pitch
+                      preview(character, pitch)
+                    }}
+                  >
+                    <SpeakerIcon />
+                  </motion.button>
+                </div>
+              )
+            })}
+          </div>
+          <div className="vu-scroll-fade" />
         </div>
 
         {note && <p className="vu-heights-note">{note}</p>}

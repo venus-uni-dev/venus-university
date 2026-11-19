@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { emptyCatalog, type Application, type ApplicationContinuation } from '@shared/application'
+import {
+  emptyCatalog,
+  ROSTER_MAX,
+  ROSTER_MIN,
+  rosterSizeOf,
+  type Application,
+  type ApplicationContinuation
+} from '@shared/application'
 import {
   assertSafeSaveId,
   atLocation,
@@ -135,6 +142,14 @@ describe('summaryOf', () => {
       pendingLines: [{ speaker: '', text: 'The bell over the door rings.', bg: 'cafe' }]
     } as unknown as SceneState
     expect(summaryOf(save({ scene }))).toMatchObject({ midScene: true, bg: 'cafe' })
+  })
+
+  it('carries the save’s transfers for the listing’s roster, and only where there are any', () => {
+    expect(summaryOf(save({ transfers: [] }))).not.toHaveProperty('transfers')
+    const transfers = [
+      { charId: 'm', profile: { year: 2, dorm: 'lowrise_1' as const, major: 'Art', schedule: {} } }
+    ]
+    expect(summaryOf(save({ transfers })).transfers).toEqual(transfers)
   })
 })
 
@@ -281,17 +296,17 @@ describe('a later semester’s New Game', () => {
     ).toEqual(saves(1_000))
   })
 
-  it('is refused on read where its continuation is not what a Finalize stands on', () => {
-    /** The refusal reading `body` raises, or null where it reads. */
-    function refusal(body: Application): AppError | null {
-      try {
-        readApplicationRecord(body, 'here')
-        return null
-      } catch (err) {
-        return err as AppError
-      }
+  /** The refusal reading `body` raises, or null where it reads. */
+  function refusal(body: Application): AppError | null {
+    try {
+      readApplicationRecord(body, 'here')
+      return null
+    } catch (err) {
+      return err as AppError
     }
+  }
 
+  it('is refused on read where its continuation is not what a Finalize stands on', () => {
     expect(refusal(application({ pursuits: { a: 'Teaching in Kyoto.' } }))).toBeNull()
     const faults: [string, unknown][] = [
       ['continued', 'spring'],
@@ -314,5 +329,23 @@ describe('a later semester’s New Game', () => {
     expect(refusal(application({ catalog: {} as never }))).toMatchObject({
       detail: 'here: catalog.pe'
     })
+  })
+
+  it('reads without a roster size as the least, and is refused one it cannot hold', () => {
+    const unsized = application()
+    expect(refusal(unsized)).toBeNull()
+    expect(rosterSizeOf(unsized)).toBe(ROSTER_MIN)
+    const crowded = Array.from({ length: ROSTER_MIN + 2 }, (_, i) => `g${i}`)
+    expect(rosterSizeOf({ chars: crowded })).toBe(ROSTER_MIN + 2)
+    expect(rosterSizeOf({ chars: crowded, size: ROSTER_MIN })).toBe(ROSTER_MIN + 2)
+
+    expect(refusal(application({ size: ROSTER_MIN }))).toBeNull()
+    expect(refusal(application({ size: ROSTER_MAX }))).toBeNull()
+    for (const size of [ROSTER_MIN - 1, ROSTER_MAX + 1, 14.5, '16']) {
+      expect(refusal(application({ size: size as number }))).toMatchObject({
+        code: 'APPLICATION_MALFORMED',
+        detail: 'here: size'
+      })
+    }
   })
 })

@@ -1,8 +1,22 @@
-import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
+import {
+  affectionFor,
+  attractionInPlay,
+  dedupedMemoriesFor,
+  emptyFlags,
+  isRomanceable,
+  isTrusted
+} from '@shared/relationship'
 import { ROOM_LOCATION } from '@shared/locations'
 import { worstInSlot } from '@shared/colds'
+import {
+  genderOf,
+  pronounsOf,
+  pronounTag,
+  readerWords,
+  type ReaderPronouns
+} from '@shared/gender'
 import { globalSlotOf } from '@shared/jobs'
-import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import { readerCrushFactorOf, type NpcRelationshipMap } from '@shared/npcRelationships'
 import type { SemesterCalendar } from '@shared/semesters'
 import {
   type Character,
@@ -13,6 +27,7 @@ import {
   type GameHistory,
   type Haunt,
   type JobState,
+  type RomanceSetting,
   type Season,
   type StructuredRequest,
   type TimeSlot
@@ -33,7 +48,8 @@ import {
   type ClassRoster,
   keyPattern,
   type BookEntry,
-  lorebookBlock
+  lorebookBlock,
+  transferLines
 } from './lorebook'
 import { occasionLoreLines } from './occasions'
 import { recapLore } from './recaps'
@@ -53,6 +69,7 @@ import { isAwayForSpringBreak, springBreakLines } from './springBreak'
 import {
   bestFriendLines,
   hauntClause,
+  loveLines,
   whereaboutsLine,
   type NpcCompanions
 } from './npcRelationship'
@@ -72,10 +89,10 @@ const TEXTING_HISTORY_CAP = 20
 const TEXTING_PERSONA = [
   'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
   'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
-  'Right now you are writing one side of a text conversation on Bunnyboard, the campus messaging app: you answer AS the character, in her own texting voice.',
-  'Some people send one long message, some fire off several short ones — match how SHE would text, keeping her personality and memories in mind.',
-  'Texts are casual: typos, slang, emoji and lowercase are all fair game if they fit her. No narration, no stage directions, just what she types.',
-  'You make the women play hard to get; everything is a slow burn.',
+  'Right now you are writing one side of a text conversation on Bunnyboard, the campus messaging app: you answer AS the character, in their own texting voice.',
+  'Some people send one long message, some fire off several short ones — match how THEY would text, keeping their personality and memories in mind.',
+  'Texts are casual: typos, slang, emoji and lowercase are all fair game if they fit the character. No narration, no stage directions, just what they type.',
+  'You make the characters play hard to get; everything is a slow burn.',
   'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
   'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
   'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
@@ -146,6 +163,10 @@ export interface TextingPromptState {
   secretBudget?: number
   /** The playthrough log, read for the lorebook's dated recaps. */
   history: GameHistory
+  /** Which genders the playthrough lets the reader romance. */
+  romance: RomanceSetting
+  /** The pronouns the reader goes by. */
+  readerPronouns: ReaderPronouns
 }
 
 /** A text's line breaks folded to spaces, so a message stays one prompt line. */
@@ -238,17 +259,25 @@ function hangoutTail(
   return null
 }
 
-/** The scene prompts' TEXTING HISTORY lines for one character, or none at all. */
+/**
+ * The scene prompts' TEXTING HISTORY lines for one character, or none at all; the block line
+ * names the reader outright where the reader's pronoun would read as the character's.
+ */
 export function composeTextingSummary(
   conversation: Conversation | undefined,
   ignoredInvitation: boolean,
-  firstName: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   now: Pick<TextingPromptState, 'date' | 'time'>,
-  blocked = false
+  blocked = false,
+  reader: ReaderPronouns
 ): string[] {
+  const { firstName } = who
+  const g = genderOf(who)
   // Being blocked outlives the thread, so it is stated even with nothing else to say.
   const blockedLines = blocked
-    ? [`${firstName} has the reader blocked on Bunnyboard, so he cannot text her.`]
+    ? [
+        `${firstName} has the reader blocked on Bunnyboard, so ${readerWords(reader, g).he} cannot text ${pronounsOf(who).them}.`
+      ]
     : []
   if (!conversation) {
     return blockedLines.length > 0
@@ -295,7 +324,7 @@ export function composeTextingSummary(
  * schedule is silent about.
  */
 function whereSheIs(
-  name: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   location: string | null | undefined,
   companions?: NpcCompanions,
   haunt?: Haunt | null,
@@ -303,18 +332,24 @@ function whereSheIs(
 ): string[] {
   if (!location) return []
   return [
-    whereaboutsLine(name, location, companions ?? { knownNames: [], unknown: 0 }, haunt, time)
+    whereaboutsLine(who, location, companions ?? { knownNames: [], unknown: 0 }, haunt, time)
   ]
 }
 
-/** What her calendar says about meeting up this instant. */
+/**
+ * What her calendar says about meeting up this instant, naming the reader outright where the
+ * reader's pronoun would read as hers.
+ */
 function meetUpLines(
-  name: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   location: string | null | undefined,
   haunt: Haunt | null | undefined,
   time: TimeSlot,
-  away: boolean
+  away: boolean,
+  reader: ReaderPronouns
 ): string[] {
+  const name = who.firstName
+  const p = pronounsOf(who)
   // Dropped while she is off campus: the line claims she can meet, and her block says she can't.
   if (away) return []
   if (!location || location === ROOM_LOCATION) {
@@ -322,8 +357,10 @@ function meetUpLines(
       `${name}'s schedule is clear, so if the reader asks to meet up right now assume ${name} is free to... though not necessarily willing.`
     ]
   }
+  const g = genderOf(who)
+  const him = readerWords(reader, g).him
   return [
-    `${name}'s schedule is clear, so if the reader asks to meet up right now assume ${name} is free to — she is already ${hauntClause(location, haunt, time)} and would sooner have him come to her than go somewhere else — though not necessarily willing.`
+    `${name}'s schedule is clear, so if the reader asks to meet up right now assume ${name} is free to — ${p.they} is already ${hauntClause(location, haunt, time, g)} and would sooner have ${him} come to ${p.them} than go somewhere else — though not necessarily willing.`
   ]
 }
 
@@ -337,6 +374,10 @@ export function buildTextingPrompt(
   reader: string
 ): StructuredRequest {
   const name = character.firstName
+  const gender = genderOf(character)
+  const p = pronounsOf(character)
+  // The reader is named outright where the reader's pronoun would read as hers.
+  const readerHim = readerWords(state.readerPronouns, gender).him
   // Off campus: away for the break, or graduated and gone from Veridan but for Homecoming.
   const visiting = state.homecomingVisitor === character.charId
   const away =
@@ -380,6 +421,7 @@ export function buildTextingPrompt(
       state.roster,
       state.charInfo,
       state.date,
+      state.calendar.season,
       relations,
       state.upcomingPlans,
       state.homecomingVisitor
@@ -388,6 +430,7 @@ export function buildTextingPrompt(
       ambient,
       state.charInfo,
       state.date,
+      state.calendar.season,
       relations,
       state.upcomingPlans,
       state.homecomingVisitor
@@ -408,15 +451,20 @@ export function buildTextingPrompt(
 
   // How her cold stands this slot, where she has one that shows.
   const slot = globalSlotOf(state.date, state.time)
-  const coldLine = herColdLine(name, info?.cold, slot, true)
+  const coldLine = herColdLine(character, info?.cold, slot, true)
 
   const characterBlock = [
-    'CHARACTER',
+    `CHARACTER (${pronounTag(gender)})`,
     `${name} ${character.lastName}.`,
-    ...(info?.major ? [yearMajorLine(info)] : []),
-    ...graduateLines(name, info, visiting),
+    ...(info?.major ? [yearMajorLine(info, gender)] : []),
+    ...graduateLines(character, info, visiting),
+    ...transferLines(character, info, state.calendar.season),
     // The phone takes the one-character budget.
-    ...profileLines(character, info?.flags ?? emptyFlags()),
+    ...profileLines(
+      character,
+      info?.flags ?? emptyFlags(),
+      attractionInPlay(character, info, state.romance, state.readerPronouns)
+    ),
     ...(coldLine ? [coldLine] : []),
     ...relationshipLines(
       character,
@@ -425,14 +473,32 @@ export function buildTextingPrompt(
       info?.nameKnown ?? true,
       affectionFor(info, state.date, character),
       info,
-      state.stats ?? DEFAULT_PLAYER_STATS,
-      // The stored thread only: the pending text is not yet something they have said.
-      { texting: true, texted: hasTexted(conversation) },
-      // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
-      { date: state.date, offset: info?.moodCycleOffset ?? 0, sick: worstInSlot(info?.cold, slot) }
+      {
+        stats: state.stats ?? DEFAULT_PLAYER_STATS,
+        // The stored thread only: the pending text is not yet something they have said.
+        medium: { texting: true, texted: hasTexted(conversation) },
+        // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+        mood: {
+          date: state.date,
+          offset: info?.moodCycleOffset ?? 0,
+          sick: worstInSlot(info?.cold, slot)
+        },
+        romanceable: isRomanceable(character, info, state.romance, state.readerPronouns),
+        loyal:
+          readerCrushFactorOf(state.npcRelationships, character.charId, character, state.date) ===
+          0,
+        readerPronouns: state.readerPronouns
+      }
     ),
     // Her closest friend; the roster handed in is everybody but her.
     ...bestFriendLines(character, state.roster, state.npcRelationships),
+    // Who she is dating, and who she likes once she trusts him.
+    ...loveLines(
+      character,
+      state.roster,
+      state.npcRelationships,
+      isTrusted(affectionFor(info, state.date, character))
+    ),
     ...scheduleLines(
       `${name}'s Schedule:`,
       info?.schedule ?? {},
@@ -445,19 +511,21 @@ export function buildTextingPrompt(
     ...(state.upcomingPlans?.[character.charId] ?? []),
     // Where she is spending the break: on a thread, the only thing saying she has left campus.
     ...springBreakLines(
-      name,
+      character,
       info?.springBreakPlans,
       state.springBreakAway,
       character.charId,
-      state.date
+      state.date,
+      state.readerPronouns
     ),
     ...memoryLines(
       character,
       dedupedMemoriesFor(info).slice(-state.memoryBudget),
       info?.textMemory,
-      state.calendar.season
+      state.calendar.season,
+      state.readerPronouns
     ),
-    ...secretLines(info?.toldSecrets, state.secretBudget),
+    ...secretLines(name, info?.toldSecrets, state.secretBudget),
     ...notesLines(name, info?.notes)
   ]
 
@@ -481,7 +549,7 @@ export function buildTextingPrompt(
     // Texting happens before the slot's scene; without this she treats the day as over.
     state.time === 0 ? 'Morning classes are starting soon.' : 'Night classes are starting soon.',
     ...(state.weather ? weatherLines(state.weather, state.date, state.time) : []),
-    ...whereSheIs(name, state.charLocation, state.charCompanions, state.charHaunt, state.time),
+    ...whereSheIs(character, state.charLocation, state.charCompanions, state.charHaunt, state.time),
     '',
     ...lore,
     ...(summary ? ['TEXTING SO FAR', '"' + summary + '"', ''] : []),
@@ -492,14 +560,14 @@ export function buildTextingPrompt(
     '',
     'YOUR TURN',
     `${name} is texting the reader back in a private DM.`,
-    `Write ${name}'s reply to the reader's newest message, the last line of RECENT MESSAGES, as the "messages" array: each entry is one text bubble she sends.`,
-    'Stay in her voice and keep it text-length: this is a phone thread, not prose.',
-    ...meetUpLines(name, state.charLocation, state.charHaunt, state.time, away),
+    `Write ${name}'s reply to the reader's newest message, the last line of RECENT MESSAGES, as the "messages" array: each entry is one text bubble ${p.they} sends.`,
+    `Stay in ${p.their} voice and keep it text-length: this is a phone thread, not prose.`,
+    ...meetUpLines(character, state.charLocation, state.charHaunt, state.time, away, state.readerPronouns),
     '',
     'BLOCKING',
-    `Set "blocked" to true only if these texts have pushed ${name} to cut the reader off completely. She is done, and blocks him on Bunnyboard as her last text lands.`,
-    'Her final messages should read like somebody who is about to do that.',
-    'Being annoyed, hurt, bored or angry is not enough on its own: people stay in threads they are angry in. Reserve it for wanting him gone.',
+    `Set "blocked" to true only if these texts have pushed ${name} to cut the reader off completely. ${p.They} is done, and blocks ${readerHim} on Bunnyboard as ${p.their} last text lands.`,
+    `${p.Their} final messages should read like somebody who is about to do that.`,
+    `Being annoyed, hurt, bored or angry is not enough on its own: people stay in threads they are angry in. Reserve it for wanting ${readerHim} gone.`,
     'Otherwise set it to false.',
     '',
     'SUMMARY',

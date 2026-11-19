@@ -1,5 +1,6 @@
 import { volumesOf } from './audio'
 import { endpointProblem, normalizeImageEndpoint, sameEndpointHost } from './endpoint'
+import { MAX_ENDING_FRIENDS } from './endingPicture'
 import { appError } from './errors'
 import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import {
@@ -22,7 +23,7 @@ export const SETTINGS_SCHEMA_VERSION = 1
  * hand-edited stream switch, the hand-edited ComfyUI build, which ComfyUI draws with its URL
  * and both sources' model picks and LoRA weights, the default tags, Gemini's secondary model,
  * the group volumes, the browser build's key-remembering, the sampling fields, the memory and
- * secret budgets and the custom scene persona are all optional.
+ * secret budgets, the graduation picture's cap and the custom scene persona are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -54,6 +55,7 @@ const SETTINGS_REQUIRED: Record<
     | 'fullscreen'
     | 'warnEndingInterrupt'
     | 'warnEndingEdit'
+    | 'matchCgBiology'
     | 'showProfilePictureInScenes'
     | 'askProfilePictureInScenes'
     | 'newGameWelcome'
@@ -69,6 +71,7 @@ const SETTINGS_REQUIRED: Record<
     | 'topK'
     | 'memoryBudgets'
     | 'secretBudget'
+    | 'endingPictureMax'
     | 'scenePersona'
   >,
   true
@@ -439,6 +442,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     newGameWelcome: patch.newGameWelcome,
     noNsfwImages: patch.noNsfwImages,
     lessNsfwText: patch.lessNsfwText,
+    // Absent stays absent, and absent is matching.
+    matchCgBiology: patch.matchCgBiology,
     sfwAsked: patch.sfwAsked,
     // Absent stays absent, `JSON.stringify` dropping the key, which is full volume.
     volumes: patch.volumes,
@@ -452,6 +457,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     // Absent stays absent, and absent is the default budgets.
     memoryBudgets: patch.memoryBudgets,
     secretBudget: patch.secretBudget,
+    // Absent stays absent, and absent is as many friends as the picture can hold.
+    endingPictureMax: patch.endingPictureMax,
     // Absent stays absent, and absent is the shipped persona.
     scenePersona: patch.scenePersona,
     ...secretsAfter(current, patch)
@@ -663,6 +670,27 @@ export function secretBudgetOf(settings: Pick<Settings, 'secretBudget'>): number
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 999
     ? value
     : DEFAULT_SECRET_BUDGET
+}
+
+/** The one line naming why the graduation picture's typed cap is not a count it can draw; blank is never a problem. */
+export function endingPictureMaxProblem(label: string, text: string): string | null {
+  const trimmed = text.trim()
+  if (trimmed === '') return null
+  if (!/^\d+$/.test(trimmed) || Number(trimmed) < 1 || Number(trimmed) > MAX_ENDING_FRIENDS) {
+    return `${label} must be a whole number from 1 to ${MAX_ENDING_FRIENDS}`
+  }
+  return null
+}
+
+/** The graduation picture's cap as stored, falling back to the most it can draw where it is not a valid count. */
+export function endingPictureMaxOf(settings: Pick<Settings, 'endingPictureMax'>): number {
+  const value = settings.endingPictureMax
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_ENDING_FRIENDS
+    ? value
+    : MAX_ENDING_FRIENDS
 }
 
 /** Which of the three stored budgets a cast of `castSize` spends. */

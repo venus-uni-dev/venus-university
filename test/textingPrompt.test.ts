@@ -31,7 +31,7 @@ describe('composeTextingSummary', () => {
     const chat = conversation([message({ text: ask, invite: true })], {
       pendingHangout: { description: 'Club Apogee' }
     })
-    const lines = composeTextingSummary(chat, false, 'Mina', now)
+    const lines = composeTextingSummary(chat, false, { firstName: 'Mina' }, now, false, 'he')
     expect(lines).toContain(`The last text in the thread was sent earlier tonight: "${ask}"`)
   })
 
@@ -40,14 +40,21 @@ describe('composeTextingSummary', () => {
       message({ id: 'm1', text: ask, invite: true }),
       message({ id: 'm2', sender: 'player', text: 'Sure' })
     ])
-    const lines = composeTextingSummary(chat, false, 'Mina', now)
+    const lines = composeTextingSummary(chat, false, { firstName: 'Mina' }, now, false, 'he')
     expect(lines).toContain(
       `The last texts in the thread were sent earlier tonight. Mina: "${ask}" The reader: "Sure"`
     )
   })
 
   it('only dates an ordinary last text', () => {
-    const lines = composeTextingSummary(conversation([message()]), false, 'Mina', now)
+    const lines = composeTextingSummary(
+      conversation([message()]),
+      false,
+      { firstName: 'Mina' },
+      now,
+      false,
+      'he'
+    )
     expect(lines).toContain('The last text in the thread was sent earlier tonight.')
     expect(lines.join('\n')).not.toContain('"hey"')
   })

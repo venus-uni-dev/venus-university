@@ -172,9 +172,19 @@ describe('projectAssigned', () => {
     ).toBe(true)
   })
 
-  it('ignores records of other meetings', () => {
+  it('is handed out at the first meeting of a class added after the assignment', () => {
     const later = meetingDatesOf(0, SPRING)[1]
-    expect(projectAssigned({ meetings: [{ date: later, attended: true }] }, period)).toBe(false)
+    expect(projectAssigned({ meetings: [{ date: later, attended: false }] }, period)).toBe(true)
+  })
+
+  it('ignores meetings before the assignment', () => {
+    const midterm = examMeetingDateOf(0, 'midterm', SPRING) as number
+    const final = projectPeriodOf(project, midterm + 1, SPRING) as NonNullable<
+      ReturnType<typeof projectPeriodOf>
+    >
+    expect(final.exam).toBe('final')
+    const record: ClassRecord = { meetings: [{ date: midterm, attended: true }] }
+    expect(projectAssigned(record, final)).toBe(false)
   })
 })
 

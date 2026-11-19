@@ -3,6 +3,15 @@ import { slotFullLabel, yearLabel } from '@shared/classes'
 import { dormClause } from '@shared/dorms'
 import { EMOTIONS } from '@shared/emotions'
 import {
+  fillPronouns,
+  genderOf,
+  PRONOUNS,
+  pronounsOf,
+  pronounTag,
+  readerWords,
+  type ReaderPronouns
+} from '@shared/gender'
+import {
   isCustomOutfitSlot,
   offeredCustomOutfits,
   outfitTagsFor,
@@ -12,7 +21,7 @@ import {
   type OfferedOutfit
 } from '@shared/outfits'
 import { DEFAULT_PLAYER_STATS, STAT_KEYS, type PlayerStats } from '@shared/playerStats'
-import { fullDescriptionOf, kindSentenceOf, projectStandingLine } from '@shared/academics'
+import { fullDescriptionOf, kindOf, kindSentenceOf, projectStandingLine } from '@shared/academics'
 import type { ClassKind, ProjectProgress } from '@shared/academics'
 import { offeredCustomCgs, writtenCgOf, type OfferedCg } from '@shared/customCgs'
 import { isAfterPosition, isPosition, STOCK_POSITIONS } from '@shared/positions'
@@ -21,18 +30,20 @@ import { cgAction, showAction, spriteAction } from '@shared/sceneActions'
 import { andList } from '@shared/sentences'
 import {
   affectionFor,
+  attractionInPlay,
   behaviorLevelOf,
   dedupedMemoriesFor,
   emptyFlags,
+  isRomanceable,
+  isTrusted,
   loveLifeBlurb,
   overTextDesc
 } from '@shared/relationship'
 import { withSecretTold } from '@shared/secrets'
 import { DEFAULT_SECRET_BUDGET, memoryBudgetFor } from '@shared/settingsRules'
 import { OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
-import { hasTrait } from '@shared/traits'
 import type { Weather } from '@shared/weather'
-import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import { readerCrushFactorOf, type NpcRelationshipMap } from '@shared/npcRelationships'
 import type { SemesterCalendar } from '@shared/semesters'
 import {
   allBackgrounds,
@@ -41,6 +52,7 @@ import {
   READER_SPEAKER,
   roomBgIdOf,
   type ActKind,
+  type Attraction,
   type BackgroundSets,
   type Character,
   type CharFlags,
@@ -51,6 +63,7 @@ import {
   type ClassSlot,
   type CustomCgSlot,
   type GameHistory,
+  type Gender,
   type JobState,
   MEMORY_TYPES,
   type MemoryBudgets,
@@ -59,6 +72,7 @@ import {
   type Position,
   type ProjectSession,
   type ReceivedGift,
+  type RomanceSetting,
   type SceneEvent,
   type SceneLine,
   type Season,
@@ -72,12 +86,13 @@ import {
 import {
   formatChatDivider,
   formatDateBanner,
+  formatGameDate,
   formatSemesterProgress,
   formatShortGameDate,
   ordinal
 } from './gameDate'
 import { worstInSlot } from '@shared/colds'
-import { globalSlotOf, jobDefOf, shiftSlotFullLabel } from '@shared/jobs'
+import { globalSlotOf, jobDefOf, shiftSlotFullLabel, slotFromId } from '@shared/jobs'
 import {
   ambientLoreCharacters,
   characterLore,
@@ -89,14 +104,16 @@ import {
   lorebookBlock,
   loreParagraph,
   type LoreRumor,
-  placeEntryOf
+  placeEntryOf,
+  transferLines
 } from './lorebook'
 import { farewellNowLines, graduationCastLines } from './graduation'
 import { herColdLine } from './colds'
 import { moodLine } from './moods'
-import { HOMECOMING_VISIT_SENTENCE } from './homecoming'
+import { homecomingVisitSentence } from './homecoming'
+import { readerAmongCast } from './setting'
 import { springBreakLines } from './springBreak'
-import { bestFriendLines, npcBehaviorLines, npcPairLines } from './npcRelationship'
+import { bestFriendLines, loveLines, npcBehaviorLines, npcPairLines } from './npcRelationship'
 import { occasionLoreLines } from './occasions'
 import { recapLore } from './recaps'
 import { openingEventLines } from './sceneEvents'
@@ -209,6 +226,8 @@ export interface PromptState {
   sceneEvent?: SceneEvent
   /** The present a girl brings him in this scene, read on the opening turn alone as well. */
   receivedGift?: ReceivedGift
+  /** The opening is asked for a totally different take, one thinking level up; read on it alone. */
+  redraft?: boolean
   /**
    * What this slot's opening said was going on somewhere, where the slot drew one: the
    * sentence rides that place's own lorebook entry, and **only on the turn that opens a scene**
@@ -243,6 +262,11 @@ export interface PromptState {
    * `classCode` decides which applies.
    */
   addedNotices?: readonly AddedNotice[]
+  /**
+   * The transfer students in the cast sitting in this scene's class for the first time since
+   * they arrived, the class having met before; absent when there are none.
+   */
+  transferEntrances?: readonly TransferEntrance[]
   /** The part-time job the reader holds, or null — the other half of his week. */
   playerJob: JobState | null
   /** The reader's accumulated stats, used for relationship requirement guidance. */
@@ -362,8 +386,15 @@ export interface PromptState {
   lessNsfwText: boolean
   /** The player's own cast-scene persona; absent is the shipped one. */
   scenePersona?: string
-  /** The subject tags the settings name; absent is the shipped ones alone. */
-  subjectTags?: readonly string[]
+  /** The subject tags the settings name for each gender; absent is the shipped ones alone. */
+  subjectTags?: Readonly<Record<Gender, readonly string[]>>
+  /**
+   * Which genders the playthrough lets the reader romance; a created scene's is every gender.
+   * A character of a gender left off stays romanceable once their history with him says so.
+   */
+  romance: RomanceSetting
+  /** The pronouns the reader goes by. */
+  readerPronouns: ReaderPronouns
   /** How many memories per character the cast block carries, by cast size. */
   memoryBudgets: Required<MemoryBudgets>
   /** How many of her told secrets each entry carries; absent is the default. */
@@ -390,24 +421,26 @@ const SEX_DIRECTION =
 const LEDGER_SEX_DIRECTION =
   'When you finally get to write the sex, you get super turned on and don\'t mind getting lewd and using sexual profanity.'
 
-/** The persona paragraph: who RITA is, how she writes, and what she returns. */
-const PERSONA_LINES = [
-  'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
-  'You have a unique style where you use present-tense narration and second-person perspective to put the reader in the action.',
-  'You generally make the reader a silent protagonist, though you occasionally describe things he does and says.',
-  'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
-  'You include all cast members in the scene and have them bond, fight... maybe even flirt, keeping their personalities and memories in mind as you write.',
-  'You don\'t jump to having everyone fuck, you make the women play hard to get, making everything a slow burn.',
-  SEX_DIRECTION,
-  'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
-  'You dig messy, sparse prose that\'s rich with subtext. You never have characters blurt out what\'s on their mind, instead showing how they feel via actions and body language.',
-  'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
-  'For dialogue, you write lines that are meant to be said, not read. You use contractions, imperfect grammar, ellipses, filler words like "like", and "um", and avoid overly flowery metaphors and strict sentence structure.',
-  'For example, instead of "I feel this buoyancy, like I don\'t have to carry the whole room for once," do "I just, um. Feel this... buoyancy. Like, I don\'t have to be so energetic anymore? I dunno."',
-  'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
-]
+/** The persona paragraph: who RITA is, how she writes, and what she returns, for a reader's pronouns. */
+function personaLinesOf(reader: ReaderPronouns): string[] {
+  return [
+    'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
+    'You have a unique style where you use present-tense narration and second-person perspective to put the reader in the action.',
+    `You generally make the reader a silent protagonist, though you occasionally describe things ${readerWords(reader).he} does and says.`,
+    'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
+    'You include all cast members in the scene and have them bond, fight... maybe even flirt, keeping their personalities and memories in mind as you write.',
+    'You don\'t jump to having everyone fuck, you make the characters play hard to get, making everything a slow burn.',
+    SEX_DIRECTION,
+    'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
+    'You dig messy, sparse prose that\'s rich with subtext. You never have characters blurt out what\'s on their mind, instead showing how they feel via actions and body language.',
+    'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
+    'For dialogue, you write lines that are meant to be said, not read. You use contractions, imperfect grammar, ellipses, filler words like "like", and "um", and avoid overly flowery metaphors and strict sentence structure.',
+    'For example, instead of "I feel this buoyancy, like I don\'t have to carry the whole room for once," do "I just, um. Feel this... buoyancy. Like, I don\'t have to be so energetic anymore? I dunno."',
+    'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
+  ]
+}
 
-const PERSONA = PERSONA_LINES.join('\n')
+const PERSONA = personaLinesOf('he').join('\n')
 
 /**
  * RITA with nobody else in the room — the persona for the calls that stage no cast: the two
@@ -427,28 +460,32 @@ const LEDGER_PERSONA_LINES = [
 export const LEDGER_PERSONA = LEDGER_PERSONA_LINES.join('\n')
 
 /**
- * The same two paragraphs with the sex direction taken out and nothing else touched — what
+ * The ledger persona with the sex direction taken out and nothing else touched — what
  * `lessNsfwText` sends instead.
  */
-const SFW_PERSONA = PERSONA_LINES.filter((line) => line !== SEX_DIRECTION).join('\n')
 const SFW_LEDGER_PERSONA = LEDGER_PERSONA_LINES.filter(
   (line) => line !== LEDGER_SEX_DIRECTION
 ).join('\n')
 
-/** Whichever scene persona this playthrough's content setting sends. */
-export function personaFor(lessNsfwText: boolean): string {
-  return lessNsfwText ? SFW_PERSONA : PERSONA
+/** Whichever scene persona this playthrough's content setting and the reader's pronouns send. */
+export function personaFor(lessNsfwText: boolean, reader: ReaderPronouns): string {
+  const lines = personaLinesOf(reader)
+  return (lessNsfwText ? lines.filter((line) => line !== SEX_DIRECTION) : lines).join('\n')
 }
 
-/** The shipped cast-scene persona, verbatim — what a player who has set no custom one sends. */
+/** The shipped cast-scene persona for a he/him reader, as the persona editor shows it. */
 export const DEFAULT_SCENE_PERSONA = PERSONA
 
 /**
  * The persona a cast scene is written under: the player's own verbatim where one is stored,
  * else the shipped one this content setting sends.
  */
-export function scenePersonaFor(lessNsfwText: boolean, custom: string | undefined): string {
-  return custom ?? personaFor(lessNsfwText)
+export function scenePersonaFor(
+  lessNsfwText: boolean,
+  custom: string | undefined,
+  reader: ReaderPronouns
+): string {
+  return custom ?? personaFor(lessNsfwText, reader)
 }
 
 /** {@link personaFor} for the calls that stage no cast — the ledgers and the solo scene. */
@@ -456,22 +493,25 @@ function ledgerPersonaFor(lessNsfwText: boolean): string {
   return lessNsfwText ? SFW_LEDGER_PERSONA : LEDGER_PERSONA
 }
 
-/** What each outfit suffix means, in RITA's terms. */
+/** What each outfit suffix means, in RITA's terms, about whichever character wears it. */
 const OUTFIT_SUFFIX_GLOSS: Record<StockOutfitSet, string> = {
-  pe: 'if she\'s in her PE clothes',
+  pe: 'if they\'re in their PE clothes',
   swim: 'for swimwear',
-  nude: "if her breasts or genitals have been exposed"
+  nude: "if their breasts or genitals have been exposed"
 }
 
 /** A stock CG of the act itself, as opposed to its climax twin. */
 type ActPosition = Exclude<StockPosition, `${string}_after`>
 
-/** What each stock act's CG is for, in RITA's terms. */
-const ACT_POSITION_GLOSS: Record<ActPosition, string> = {
-  nude_foreplay: 'she is naked and he is fingering her, going down on her or playing with her breasts.',
-  sex: 'they are having sex.',
-  handjob: 'she is giving him a handjob.',
-  fellatio: 'she is giving him a blowjob.'
+/** What each stock act's CG is for, in RITA's terms, beside a girl. */
+function actPositionGloss(reader: ReaderPronouns): Record<ActPosition, string> {
+  const r = readerAmongCast(reader)
+  return {
+    nude_foreplay: `she is naked and ${r.he} is fingering her, going down on her or playing with her breasts.`,
+    sex: 'they are having sex.',
+    handjob: `she is giving ${r.him} a handjob.`,
+    fellatio: `she is giving ${r.him} a blowjob.`
+  }
 }
 
 /** True for a stock CG of the act itself rather than its climax. */
@@ -507,18 +547,20 @@ function jsonRules(
   backgrounds: BackgroundSets,
   /** Whether the stock CGs are on offer, listed here. */
   stockCgs: boolean,
-  /** The CGs of her own the girl alone on stage is offered, listed after the stock ones. */
+  /** The CGs of their own the character alone on stage is offered, listed after the stock ones. */
   customCgs: readonly OfferedCg[],
   outfitSets: readonly StockOutfitSet[],
-  /** Whether anybody in the cast has a custom wardrobe on offer, listed in her own entry. */
+  /** Whether anybody in the cast has a custom wardrobe on offer, listed in their own entry. */
   customOffered: boolean,
   /** The first names of the cast with the stock CGs, said out loud only when the cast is a crowd. */
-  cgNames: readonly string[]
+  cgNames: readonly string[],
+  reader: ReaderPronouns
 ): string[] {
+  const actGloss = actPositionGloss(reader)
   const suffixes = [
     ...outfitSets.map((set) => `"_${set}" ${OUTFIT_SUFFIX_GLOSS[set]}`),
     ...(customOffered
-      ? ['"_<outfit>" for one of her own outfits listed in her character info, when its instructions say so']
+      ? ['"_<outfit>" for one of their own outfits listed in their character info, when its instructions say so']
       : [])
   ]
   const afters = [
@@ -536,30 +578,30 @@ function jsonRules(
     // Described only when the schema carries the suffixes: a tag the model cannot emit is a rejected line.
     ...(suffixes.length > 0
       ? [
-          `Suffix the emotion with ${andList(suffixes)}. An unsuffixed emotion puts her back in her main outfit. Don't remove the suffix unless the character's changed back into her default clothes.`
+          `Suffix the emotion with ${andList(suffixes)}. An unsuffixed emotion puts them back in their main outfit. Don't remove the suffix unless the character's changed back into their default clothes.`
         ]
       : []),
     'Every "show:" must be paired with a "sprite:" in the same actions array. Afterwards, change a character\'s sprite whenever it makes sense.',
     ...(afters.length > 0
       ? [
-          'If sex is happening on screen, use the "cg:<name>" action to replace her sprite with an explicit full-screen picture of her in the middle of a sex act.',
+          'If sex is happening on screen, use the "cg:<name>" action to replace the character\'s sprite with an explicit full-screen picture of them in the middle of a sex act.',
           ...(stockCgs
             ? STOCK_POSITIONS.filter(isActPosition).map(
-                (position) => `"${cgAction(position)}": ${ACT_POSITION_GLOSS[position]}`
+                (position) => `"${cgAction(position)}": ${actGloss[position]}`
               )
             : []),
           ...customCgs.map((cg) => `"cg:${cg.name}": ${whenClause(cg.instructions)}`),
           `When one of them climaxes, switch to that act's "_after" cg: ${afters.join(', ')}.`,
           'If the position changes or sex starts again, set "cg:<name>" again.',
           'CG is overwritten by "sprite:". DO NOT use "sprite:" on a character who is in a CG until sex is done.',
-          'A cg shows one girl by herself, so only use "cg:" when she is the only character on screen.',
+          'A cg shows one character on their own, so only use "cg:" when they are the only character on screen.',
           'Showing anybody else ends the cg.',
           ...(stockCgs && cgNames.length > 0
             ? [`Only ${andList(cgNames)} ${cgNames.length === 1 ? 'has' : 'have'} the cgs above.`]
             : [])
         ]
       : []),
-    ...bgLines(backgrounds, 'Set "bg" whenever the location changes and leave it as "" otherwise. Pick only from the backgrounds below OR a character\'s own room (listed under her character info):')
+    ...bgLines(backgrounds, 'Set "bg" whenever the location changes and leave it as "" otherwise. Pick only from the backgrounds below OR a character\'s own room (listed under their character info):')
   ]
 }
 
@@ -617,7 +659,7 @@ function cgsOfferedTo(
   return offeredCustomCgs(character, state.customCgReady[character.charId])
 }
 
-/** The cast with the stock CGs, by first name — what the rules name when there is a choice of girl. */
+/** The cast with the stock CGs, by first name — what the rules name when there is a choice of character. */
 function cgReadyNames(cast: readonly Character[], state: PromptState): string[] {
   if (cast.length < 2) return []
   return cast
@@ -640,7 +682,8 @@ function wardrobeProse(tags: readonly string[]): string {
 /**
  * Renders a cast character's block: who she is and what she looks like, then personality
  * and relationship, then her week and what she remembers. `secret` is the one her scene
- * tells, passed by the call that opens it alone; every later call lists it as told.
+ * tells, passed by the call that opens it alone to keep it off her told list, its turn
+ * establishing it; every later call lists it as told.
  */
 function castBlock(
   cast: readonly Character[],
@@ -665,20 +708,27 @@ function castBlock(
   for (const character of cast) {
     const key = charKeyOf(character.firstName, character.lastName)
     const info = charInfo[character.charId]
+    const gender = genderOf(character)
 
-    lines.push('', `${key} — ${fullNameOf(character)}.`)
+    lines.push('', `${key} — ${fullNameOf(character)} (${pronounTag(gender)}).`)
 
     if (info?.major) {
-      lines.push(yearMajorLine(info))
+      lines.push(yearMajorLine(info, gender))
     }
     // A graduate is only ever cast while she is back for Homecoming.
     lines.push(
-      ...graduateLines(character.firstName, info, state.homecomingVisitor === character.charId)
+      ...graduateLines(character, info, state.homecomingVisitor === character.charId)
     )
+    // When a transfer student arrived, through the semester she arrived in.
+    lines.push(...transferLines(character, info, state.calendar.season))
 
     // Appearance and main outfit as their booru tags.
     // The subject tags are the renderer's, and say nothing to the writer.
-    const appearance = withoutSubjectTags(character.baseAppearance, state.subjectTags ?? [])
+    const appearance = withoutSubjectTags(
+      character.baseAppearance,
+      gender,
+      state.subjectTags?.[gender] ?? []
+    )
     if (appearance.length > 0) {
       lines.push(`Appearance: ${appearance.join(', ')}`)
     }
@@ -701,26 +751,22 @@ function castBlock(
 
     // Her room bg, offered only when both of its images exist; scene calls only.
     const room = offeredRoomBg(character, state)
-    if (room) lines.push(`The bg for her room is ${room}.`)
+    if (room) lines.push(`The bg for ${PRONOUNS[gender].their} room is ${room}.`)
 
     const flags = info?.flags ?? emptyFlags()
     const affection =
       state.affection?.[character.charId] ?? affectionFor(info, state.date, character)
-    lines.push(...profileLines(character, flags, cast.length))
+    const attraction = attractionInPlay(character, info, state.romance, state.readerPronouns)
+    lines.push(...profileLines(character, flags, attraction, cast.length))
 
     // What kind of day she is having; a created scene's notes say it instead.
     const mood = state.createdScene
       ? null
-      : moodLine(
-          character.firstName,
-          state.date,
-          info?.moodCycleOffset ?? 0,
-          hasTrait(character, 'Mood-swings')
-        )
+      : moodLine(character, state.date, info?.moodCycleOffset ?? 0)
     if (mood) lines.push(mood)
     // How her cold stands, where she has one that shows; a created scene holds none.
     const slot = globalSlotOf(state.date, state.time)
-    const cold = state.createdScene ? null : herColdLine(character.firstName, info?.cold, slot)
+    const cold = state.createdScene ? null : herColdLine(character, info?.cold, slot)
     if (cold) lines.push(cold)
 
     // Where the relationship stands: the behavior stage, how she feels, and their history.
@@ -731,18 +777,25 @@ function castBlock(
         info?.nameKnown ?? false,
         affection,
         info,
-        state.stats ?? DEFAULT_PLAYER_STATS,
-        // In the room, so this only says whether they have met on the phone first.
-        { texting: false, texted: state.textedWith?.includes(character.charId) ?? false },
-        // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
-        state.createdScene
-          ? undefined
-          : {
-              date: state.date,
-              offset: info?.moodCycleOffset ?? 0,
-              sick: worstInSlot(info?.cold, slot)
-            },
-        !state.createdScene
+        {
+          stats: state.stats ?? DEFAULT_PLAYER_STATS,
+          // In the room, so this only says whether they have met on the phone first.
+          medium: { texting: false, texted: state.textedWith?.includes(character.charId) ?? false },
+          // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+          mood: state.createdScene
+            ? undefined
+            : {
+                date: state.date,
+                offset: info?.moodCycleOffset ?? 0,
+                sick: worstInSlot(info?.cold, slot)
+              },
+          attractionGate: !state.createdScene,
+          romanceable: isRomanceable(character, info, state.romance, state.readerPronouns),
+          loyal:
+            readerCrushFactorOf(state.npcRelationships, character.charId, character, state.date) ===
+            0,
+          readerPronouns: state.readerPronouns
+        }
       )
     )
     // Outside the status chain, so it stands beside whatever they are.
@@ -765,6 +818,10 @@ function castBlock(
 
     // Who she is closest to among the girls who are *not* here.
     lines.push(...bestFriendLines(character, state.roster, state.npcRelationships))
+    // Who she is dating among them, and who she likes once she trusts him.
+    lines.push(
+      ...loveLines(character, state.roster, state.npcRelationships, isTrusted(affection))
+    )
 
     lines.push(
       ...scheduleLines(
@@ -781,11 +838,12 @@ function castBlock(
     // Where she is spending the break, from the notice through to the week after.
     lines.push(
       ...springBreakLines(
-        character.firstName,
+        character,
         info?.springBreakPlans,
         state.springBreakAway,
         character.charId,
-        state.date
+        state.date,
+        state.readerPronouns
       )
     )
     // Whether she graduates at the ceremony, and whether she has left for the break yet.
@@ -799,7 +857,7 @@ function castBlock(
     )
     lines.push(...newJobLine(character.firstName, info?.job, state.date))
     lines.push(
-      ...droppedClassLines(character.firstName, info?.schedule, state.droppedNotices ?? [])
+      ...droppedClassLines(character, info?.schedule, state.droppedNotices ?? [])
     )
 
     // Memory budget by cast size, never by who is on screen.
@@ -810,13 +868,13 @@ function castBlock(
         character,
         dedupedMemoriesFor(info).slice(-memoryBudget),
         info?.textMemory,
-        state.calendar.season
+        state.calendar.season,
+        state.readerPronouns
       )
     )
-    // What she has told him, and, on the opening call, the secret she tells him in this scene
-    // when she is alone in it; later calls count that one among what she has told.
-    lines.push(...secretLines(info?.toldSecrets, state.secretBudget))
-    if (secret && cast.length === 1) lines.push(establishLine(secret))
+    // What she has told him; the secret she tells in this scene counts among them past its
+    // opening call, which establishes it in its turn instead.
+    lines.push(...secretLines(character.firstName, info?.toldSecrets, state.secretBudget))
 
     // What the two of them have been texting about on Bunnyboard.
     lines.push(...(state.textingSummaries?.[character.charId] ?? []))
@@ -868,7 +926,11 @@ export function milestoneCastLines(
   for (const character of cast) {
     const key = charKeyOf(character.firstName, character.lastName)
     const flags = charInfo[character.charId]?.flags ?? emptyFlags()
-    lines.push('', `${key} — ${fullNameOf(character)}.`, milestoneLine(character.firstName, flags))
+    lines.push(
+      '',
+      `${key} — ${fullNameOf(character)} (${pronounTag(genderOf(character))}).`,
+      milestoneLine(character.firstName, flags)
+    )
   }
   return lines
 }
@@ -878,42 +940,49 @@ export function spaced(lines: readonly string[]): string[] {
   return lines.length > 0 ? [...lines, ''] : []
 }
 
-/** Her year and major, with the dorm clause where she has one; a graduate's year is that she graduated. */
-export function yearMajorLine(info: CharInfo): string {
+/**
+ * Their year and major, with the dorm clause in gender `g`'s pronoun; a graduate's year is that
+ * they graduated.
+ */
+export function yearMajorLine(info: CharInfo, g: Gender): string {
   if (info.pursuing !== undefined) return `Year: Graduated | Major: ${info.major}.`
-  return `Year: ${yearLabel(info.year)} | Major: ${info.major}.${dormClause(info.dorm)}`
+  return `Year: ${yearLabel(info.year)} | Major: ${info.major}.${dormClause(info.dorm, g)}`
 }
 
 /**
- * What a graduate is doing with her life now, and that she is nowhere he can meet her — or, while
- * `visiting`, that she is back for Homecoming.
+ * What a graduate is doing with their life now, and that they are nowhere he can meet them — or,
+ * while `visiting`, that they are back for Homecoming.
  */
 export function graduateLines(
-  firstName: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   info: CharInfo | undefined,
   visiting = false
 ): string[] {
   if (info?.pursuing === undefined) return []
-  const where = visiting ? HOMECOMING_VISIT_SENTENCE : 'She is out of town.'
+  const g = genderOf(who)
+  const where = visiting ? homecomingVisitSentence(g) : `${PRONOUNS[g].They} is out of town.`
   return [
-    `${firstName} graduated from Venus University, moved away from Veridan, and is now ${info.pursuing}. ${where}`
+    `${who.firstName} graduated from Venus University, moved away from Veridan, and is now ${info.pursuing}. ${where}`
   ]
 }
 
 /** Everything written about who a character *is*, shared by the cast block and the phone. */
-export function profileLines(character: Character, flags: CharFlags, castSize = 1): string[] {
+export function profileLines(
+  character: Character,
+  flags: CharFlags,
+  attraction: Attraction,
+  castSize = 1
+): string[] {
   const lines: string[] = []
   if (character.personality) lines.push(character.personality)
   // A crowd of three or more gets the personality paragraph and nothing else.
   if (castSize < 3) {
     if (character.backstory) lines.push(`Backstory: ${character.backstory}`)
-    // Her love life only when he is involved with her and alone with her.
+    // The paragraph the contact profile shows him, her kinks only when he is involved with her
+    // and alone with her.
     const involved = flags.isLover || flags.hasCrush || flags.benefits
-    if (involved && castSize < 2) {
-      // The same paragraph the contact profile shows him.
-      const loveLife = loveLifeBlurb(character, flags)
-      if (loveLife) lines.push(`Love life: ${loveLife}`)
-    }
+    const loveLife = loveLifeBlurb(character, flags, attraction, involved && castSize < 2)
+    lines.push(`Love life: ${loveLife}`)
     if (character.likes.length > 0) lines.push(`Likes: ${character.likes.join(', ')}`)
     if (character.dislikes.length > 0) lines.push(`Dislikes: ${character.dislikes.join(', ')}`)
   }
@@ -1020,15 +1089,16 @@ export function dropsKnownTo(
   return notices.filter((notice) => enrolled.has(notice.code))
 }
 
-/** The one sentence each of those drops gets. */
+/** The one sentence each of those drops gets, in the character's own pronoun. */
 function droppedClassLines(
-  firstName: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   schedule: Record<number, string> | undefined,
   notices: readonly DroppedNotice[]
 ): string[] {
+  const they = pronounsOf(who).they
   return dropsKnownTo(schedule, notices).map(
     (notice) =>
-      `${firstName} found out you dropped ${notice.name} when she didn\'t see you on ${notice.day}.`
+      `${who.firstName} found out you dropped ${notice.name} when ${they} didn\'t see you on ${notice.day}.`
   )
 }
 
@@ -1050,15 +1120,40 @@ export function addsAnnouncedBy(
   return notices.filter((notice) => notice.code === classCode)
 }
 
-/** The one sentence that add gets. */
+/** A transfer student walking into a class that met before she arrived. */
+export interface TransferEntrance extends Pick<Character, 'firstName' | 'gender'> {
+  /** The global slot she arrived in. */
+  transferredAt: number
+}
+
+/** The one line each transfer student's entrance gets, in her own pronouns. */
+function transferEntranceLines(
+  entrances: readonly TransferEntrance[],
+  season: Season
+): string[] {
+  return entrances.map((who) => {
+    const p = pronounsOf(who)
+    const on = formatGameDate(slotFromId(who.transferredAt).date, season)
+    return (
+      `${who.firstName} transferred to Venus University on ${on} and this is ${p.their} first time in the room.` +
+      ` ${p.They} is a new face to everybody here, and nobody has seen ${p.them} in this class before.`
+    )
+  })
+}
+
+/** The one line that add gets, catching him up on a project the class is already building. */
 function addedClassLines(
   classCode: string | null | undefined,
-  notices: readonly AddedNotice[]
+  notices: readonly AddedNotice[],
+  explainProject: boolean,
+  reader: ReaderPronouns
 ): string[] {
+  const r = readerAmongCast(reader)
   return addsAnnouncedBy(classCode, notices).map(
     (notice) =>
-      `The reader added ${notice.name} at add/drop and this is his first time in the room.` +
-      ' He is a new face to everybody here, and nobody has seen him in this class before.'
+      `The reader added ${notice.name} at add/drop and this is ${r.his} first time in the room.` +
+      ` ${r.He} is a new face to everybody here, and nobody has seen ${r.him} in this class before.` +
+      (explainProject ? ` Someone should explain the class project to ${r.him}.` : '')
   )
 }
 
@@ -1070,30 +1165,39 @@ export function memoryLines(
   character: Character,
   memories: readonly CharMemory[],
   textMemory: CharMemory | undefined,
-  season: Season
+  season: Season,
+  reader: ReaderPronouns
 ): string[] {
   if (memories.length === 0) return []
   return [
     `${character.firstName}'s Memories:`,
     ...memories.map((entry) => {
       const desc = entry === textMemory ? overTextDesc(entry.desc) : entry.desc
-      return `- ${formatShortGameDate(entry.date, season)}: ${character.firstName} ${entry.type} that ${readerize(desc)}`
+      return `- ${formatShortGameDate(entry.date, season)}: ${character.firstName} ${entry.type} that ${readerize(desc, genderOf(character), reader)}`
     })
   ]
 }
 
-/** Her newest `budget` told secrets as one line, oldest first; none, or a budget of 0, nothing. */
+/**
+ * Her newest `budget` told secrets as one line, oldest first, saying she told them herself;
+ * none, or a budget of 0, nothing.
+ */
 export function secretLines(
+  firstName: string,
   told: readonly string[] | undefined,
   budget = DEFAULT_SECRET_BUDGET
 ): string[] {
   const shown = budget > 0 ? (told ?? []).slice(-budget) : []
-  return shown.length > 0 ? [`Secrets the reader knows: ${shown.join(' ')}`] : []
+  return shown.length > 0
+    ? [`Secrets ${firstName} has told the reader in the past: ${shown.join(' ')}`]
+    : []
 }
 
-/** The line that has the scene establish the secret she tells in it. */
-function establishLine(secret: string): string {
-  return `Establish this fact about the character: ${secret}`
+/** The line that has the opening establish the secret the one girl cast tells in it. */
+function establishLines(cast: readonly Character[], secret: string | null | undefined): string[] {
+  if (!secret || cast.length !== 1) return []
+  const [character] = cast
+  return [`Establish this fact about ${charKeyOf(character.firstName, character.lastName)}: ${secret}`]
 }
 
 /** The player's own notes on her, verbatim as one element, closing her entry; none, nothing. */
@@ -1225,7 +1329,7 @@ function systemPrompt(
   setting: string
 ): string {
   return [
-    scenePersonaFor(state.lessNsfwText, state.scenePersona),
+    scenePersonaFor(state.lessNsfwText, state.scenePersona, state.readerPronouns),
     '',
     ...jsonRules(
       state.backgrounds,
@@ -1233,7 +1337,8 @@ function systemPrompt(
       cast.flatMap((character) => cgsOfferedTo(character, cast, state)),
       castOutfitSets(cast, state),
       cast.some((character) => offeredOf(character, state).length > 0),
-      cgReadyNames(cast, state)
+      cgReadyNames(cast, state),
+      state.readerPronouns
     ),
     '',
     'SETTING',
@@ -1330,16 +1435,17 @@ function nowBlock(cast: readonly Character[], state: PromptState): string[] {
   ]
 }
 
-/** How each stock wardrobe a girl opens a created scene in is named. */
+/** How each stock wardrobe a character opens a created scene in is named, pronouns as tokens. */
 const OPENING_OUTFIT_WORDS: Record<StockOutfitSet, string> = {
-  pe: 'in her PE clothes',
-  swim: 'in her swimwear',
+  pe: 'in {their} PE clothes',
+  swim: 'in {their} swimwear',
   nude: 'naked'
 }
 
 /**
- * The wardrobe each girl opens a created scene in, one line apiece and only on its opening call:
- * the suffix her sprites carry until she changes, or her main outfit where the set is not offered.
+ * The wardrobe each character opens a created scene in, one line apiece and only on its opening
+ * call: the suffix their sprites carry until they change, or their main outfit where the set is
+ * not offered.
  */
 function openingOutfitLines(cast: readonly Character[], state: PromptState): string[] {
   const outfits = state.openingOutfits
@@ -1348,17 +1454,19 @@ function openingOutfitLines(cast: readonly Character[], state: PromptState): str
     const outfit = outfits[character.charId]
     if (!outfit) return []
     const name = character.firstName
-    const main = `${name} starts the scene in her main outfit, so use her unsuffixed sprites.`
+    const g = genderOf(character)
+    const p = PRONOUNS[g]
+    const main = `${name} starts the scene in ${p.their} main outfit, so use ${p.their} unsuffixed sprites.`
     if (outfit === 'default' || !state.outfitReady[character.charId]?.includes(outfit)) return [main]
     if (isCustomOutfitSlot(outfit)) {
       const offered = offeredOf(character, state).find((entry) => entry.slot === outfit)
       if (!offered) return [main]
       return [
-        `${name} starts the scene in her ${offered.suffix} outfit, so use her "_${offered.suffix}" sprites until she changes.`
+        `${name} starts the scene in ${p.their} ${offered.suffix} outfit, so use ${p.their} "_${offered.suffix}" sprites until ${p.they} changes.`
       ]
     }
     return [
-      `${name} starts the scene ${OPENING_OUTFIT_WORDS[outfit]}, so use her "_${outfit}" sprites until she changes.`
+      `${name} starts the scene ${fillPronouns(OPENING_OUTFIT_WORDS[outfit], g)}, so use ${p.their} "_${outfit}" sprites until ${p.they} changes.`
     ]
   })
 }
@@ -1387,7 +1495,15 @@ function classBlock(state: PromptState): string[] {
   if (kind) lines.push(kind)
 
   // A new face in the room, ahead of everything about the term, and the faces missing from it.
-  lines.push(...addedClassLines(state.classCode, state.addedNotices ?? []))
+  // A showcase is the project being presented, so it is not explained to him there.
+  const added = addedClassLines(
+    state.classCode,
+    state.addedNotices ?? [],
+    kindOf(entry) === 'project' && !context?.isMidterm && !context?.isFinals,
+    state.readerPronouns
+  )
+  lines.push(...added)
+  lines.push(...transferEntranceLines(state.transferEntrances ?? [], state.calendar.season))
   lines.push(...outSickLines(state.outSick))
 
   if (!context) return [...lines, '']
@@ -1413,8 +1529,9 @@ function classBlock(state: PromptState): string[] {
 
   if (context.project) {
     const { progress, workedThisWeek } = context.project
-    // Not on a handback: the project is only being assigned today, so it has no standing yet.
-    if (context.index > 1 && !context.isHandback) {
+    // Not on a handback, nor on his first time in the room: the project is only being handed to
+    // him today, so it has no standing yet.
+    if (context.index > 1 && !context.isHandback && added.length === 0) {
       lines.push(
         workedThisWeek
           ? 'The reader has put time into the project since the last class.'
@@ -1485,9 +1602,10 @@ function lectureTurnLines(state: PromptState): string[] {
   // Syllabus week teaches nothing, a handback meeting has its own business, and a cancelled one
   // never starts.
   if (context.index <= 1 || context.isHandback || context.cancelled) return []
+  const r = readerAmongCast(state.readerPronouns)
   return [
-    'Since this is a lecture class, your scene should put the reader in the middle of the teaching: have the professor call on him, have a classmate put a question to him, or run a pop quiz.',
-    'Whichever you pick, he must come away knowing one concrete thing about the subject that no previous week of this class has covered.'
+    `Since this is a lecture class, your scene should put the reader in the middle of the teaching: have the professor call on ${r.him}, have a classmate put a question to ${r.him}, or run a pop quiz.`,
+    `Whichever you pick, ${r.he} must come away knowing one concrete thing about the subject that no previous week of this class has covered.`
   ]
 }
 
@@ -1509,7 +1627,7 @@ function projectLore(state: PromptState): string[] {
     [
       `${entry.name} (${entry.code}): ${fullDescriptionOf(entry)}${kind ? ` ${kind}` : ''}`,
       ...recapLines(entry.code, state.projectRecap ?? []),
-      ...workLines(entry.code, state.projectScene, state.calendar.season)
+      ...workLines(entry.code, state.projectScene, state.calendar.season, state.readerPronouns)
     ].join('\n')
   ]
 }
@@ -1521,7 +1639,8 @@ function projectLore(state: PromptState): string[] {
 function workLines(
   code: string,
   context: ProjectSceneContext | undefined,
-  season: Season
+  season: Season,
+  reader: ReaderPronouns
 ): string[] {
   if (!context) return []
   const last = context.lastSession
@@ -1529,7 +1648,7 @@ function workLines(
     `${code} PROJECT:`,
     ...(last?.summary
       ? [
-          `The reader last worked on his project on ${formatChatDivider(last.date, last.time, season)}: ${last.summary}`
+          `The reader last worked on ${readerWords(reader).his} project on ${formatChatDivider(last.date, last.time, season)}: ${last.summary}`
         ]
       : []),
     projectStandingLine(context.progress)
@@ -1616,6 +1735,7 @@ function characterLoreFor(
       state.roster,
       state.charInfo,
       state.date,
+      state.calendar.season,
       relations,
       state.upcomingPlans,
       state.homecomingVisitor
@@ -1624,6 +1744,7 @@ function characterLoreFor(
       [...mentions, ...ambient],
       state.charInfo,
       state.date,
+      state.calendar.season,
       relations,
       state.upcomingPlans,
       state.homecomingVisitor
@@ -1794,8 +1915,18 @@ export function buildScenePrompt(
         const character = cast.find((member) => member.charId === charId)
         return character ? charKeyOf(character.firstName, character.lastName) : null
       },
-      { date: state.date, time: state.time, season: state.calendar.season }
+      (charId) => genderOf(cast.find((member) => member.charId === charId)),
+      { date: state.date, time: state.time, season: state.calendar.season },
+      state.readerPronouns
     ),
+    // The secret the one girl cast tells in this scene, on this call alone.
+    ...establishLines(cast, state.sceneSecret),
+    // A redraft, on this call alone as well.
+    ...(state.redraft
+      ? [
+          'Plan out the scene you\'d normally write for this, then scrap it and write a totally different one: a new angle, new twists, a new hook. Only the new scene goes in your reply, and everything above still applies.'
+        ]
+      : []),
     '',
     `Reader's action: ${action}`
   ]
@@ -1803,7 +1934,7 @@ export function buildScenePrompt(
   // Nothing has been written yet, so the action is the whole scan. The slot's rumor rides this
   // call alone, and the secret she tells is established on it alone — the continuation and the
   // closing pass neither, the secret reaching them as one she has told.
-  return castScenePrompt(
+  const request = castScenePrompt(
     cast,
     state,
     setting,
@@ -1815,6 +1946,7 @@ export function buildScenePrompt(
     state.slotRumor,
     state.sceneSecret
   )
+  return state.redraft ? { ...request, raiseThinking: true } : request
 }
 
 /** The rules a solo scene needs and no more. */
@@ -1845,6 +1977,7 @@ export function buildSoloPrompt(
         state.mentions ?? [],
         state.charInfo,
         state.date,
+        state.calendar.season,
         undefined,
         state.upcomingPlans,
         state.homecomingVisitor
@@ -1978,6 +2111,23 @@ export function buildClosingPrompt(
   return castScenePrompt(cast, state, setting, reader, scan, tail, true, false)
 }
 
+/** The example sentence the memory rule contrasts, in each set's own pronouns beside a character. */
+const MEMORY_VOICE_EXAMPLE: Record<ReaderPronouns, { whom: string; wrong: string }> = {
+  he: { whom: 'her', wrong: 'he lent her his notes' },
+  she: { whom: 'him', wrong: 'she lent him her notes' },
+  they: { whom: 'her', wrong: 'they lent her their notes' }
+}
+
+/** The two ledger rules on how a memory names the reader and the character it belongs to. */
+export function memoryVoiceLines(reader: ReaderPronouns): string[] {
+  const example = MEMORY_VOICE_EXAMPLE[reader]
+  return [
+    `In "desc", call the reader "the reader" every time, never "you", ${readerWords(reader).list}: "the reader lent ${example.whom} the reader's notes", not "${example.wrong}".`,
+    'Only use "he", "she", "him", "her" or "his" for the character the memory belongs to, and call anybody else by name: "the reader left the party with Mina", not "the reader left the party with her".',
+    `Then write the same memory again in "youDesc", this time talking to the reader as "you": "you lent ${example.whom} your notes".`
+  ]
+}
+
 /** The two kinds of intimate act the ledger may report, each with the gloss RITA is given. */
 export const ACT_KINDS: ReadonlyArray<readonly [ActKind, string]> = [
   ['kiss', 'they kissed'],
@@ -1985,24 +2135,34 @@ export const ACT_KINDS: ReadonlyArray<readonly [ActKind, string]> = [
 ]
 
 /** The milestones the ledger may report, each with the gloss RITA is given. */
-const EVENT_GLOSS: ReadonlyArray<readonly [string, string]> = [
-  ['became_lovers', 'they agreed to be a couple in this scene'],
-  ['broke_up', 'their relationship ended in this scene'],
-  ['friendzoned_by_reader', 'the reader turned her confession down or made it clear they\'re just friends'],
-  ['friendzoned_reader', 'she turned the reader\'s confession down or made it clear they\'re just friends'],
-  [
-    'gave_contact_info',
-    'she gave the reader a way to reach her later or the reader gave his contact info: a phone number, email, Bunnyboard, or social media handle. Telling him where she lives or inviting him somewhere later also counts. Mentioning Bunnyboard in passing, or a campus or professor email does not count.'
-  ],
-  [
-    'unblocked',
-    'she had the reader blocked on Bunnyboard and agreed in this scene to unblock him — only report it if the CAST block says she has him blocked'
-  ],
-  [
-    'agreed_to_harem',
-    'she agreed in this scene to an open relationship and/or to share the reader with other girls, and not to be jealous about them'
+function eventGlossOf(reader: ReaderPronouns): ReadonlyArray<readonly [string, string]> {
+  const r = readerAmongCast(reader)
+  return [
+    ['became_lovers', 'they agreed to be a couple in this scene'],
+    ['broke_up', 'their relationship ended in this scene'],
+    ['friendzoned_by_reader', 'the reader turned the character\'s confession down or made it clear they\'re just friends'],
+    ['friendzoned_reader', 'the character turned the reader\'s confession down or made it clear they\'re just friends'],
+    [
+      'gave_contact_info',
+      `the character gave the reader a way to reach them later or the reader gave ${r.his} contact info: a phone number, email, Bunnyboard, or social media handle. Telling ${r.him} where they live or inviting ${r.him} somewhere later also counts. Mentioning Bunnyboard in passing, or a campus or professor email does not count.`
+    ],
+    [
+      'unblocked',
+      `the character had the reader blocked on Bunnyboard and agreed in this scene to unblock ${r.him} — only report it if the CAST block says they have ${r.him} blocked`
+    ],
+    [
+      'agreed_to_harem',
+      'the character agreed in this scene to an open relationship and/or to share the reader with others, and not to be jealous about them'
+    ],
+    [
+      'agreed_to_closed',
+      'the character, a lover who had agreed to share the reader, agreed in this scene that the two of them see only each other from now on'
+    ]
   ]
-]
+}
+
+/** The ledger's milestone keys, which do not vary with the reader. */
+const EVENT_KEYS = eventGlossOf('he').map(([key]) => key)
 
 
 /**
@@ -2089,11 +2249,12 @@ function ledgerSchema(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['charKey', 'type', 'desc'],
+          required: ['charKey', 'type', 'desc', 'youDesc'],
           properties: {
             charKey,
             type: memoryType,
-            desc: { type: 'string' }
+            desc: { type: 'string' },
+            youDesc: { type: 'string' }
           }
         }
       },
@@ -2105,7 +2266,7 @@ function ledgerSchema(
           required: ['charKey', 'event'],
           properties: {
             charKey,
-            event: { type: 'string', enum: EVENT_GLOSS.map(([key]) => key) }
+            event: { type: 'string', enum: EVENT_KEYS }
           }
         }
       },
@@ -2128,13 +2289,14 @@ function ledgerSchema(
 }
 
 /** The `STATS` section, in its two forms. */
-function statsSection(single: boolean): string[] {
+function statsSection(single: boolean, reader: ReaderPronouns): string[] {
+  const r = readerWords(reader)
   return [
     'STATS',
     single
       ? 'Say which ONE of the reader\'s stats this scene exercised the most.'
       : 'Say which of the reader\'s stats this scene actually exercised.',
-    'Set Brain to true if he worked on his smarts, Body to true if he worked on his fitness, and Heart to true if he worked on his charisma or social skills.',
+    `Set Brain to true if ${r.he} worked on ${r.his} smarts, Body to true if ${r.he} worked on ${r.his} fitness, and Heart to true if ${r.he} worked on ${r.his} charisma or social skills.`,
     single
       ? 'Set at most ONE of the three to true and the other two to false. Never more than one. All three false is a perfectly good answer — an hour that exercised nothing exercised nothing.'
       : 'Set a stat to false if the scene did not exercise it. All three false is a perfectly good answer — an hour spent lazing around exercised nothing.',
@@ -2186,6 +2348,8 @@ export function buildLedgerPrompt(
   const castStats = cast.length > 0 && (!classScene || cancelled) && state.jobId === null
   // No cast, no plans; a plan settled by phone is the texting ledger's.
   const wantPlans = cast.length > 0
+  const r = readerWords(state.readerPronouns)
+  const rf = readerAmongCast(state.readerPronouns)
 
   const preamble = [
     'YOUR TASK',
@@ -2194,16 +2358,16 @@ export function buildLedgerPrompt(
     // The reader's balance is never in this request.
     'MONEY',
     'Report the total dollars the reader personally spent in this scene as a whole number.',
-    'Charge him even when no price was named. Infer a reasonable price for modern day USA.',
+    `Charge ${r.him} even when no price was named. Infer a reasonable price for modern day USA.`,
     'A gift the reader bought before this scene was already paid for and is not an expense of this scene.',
-    'Report 0 when the scene cost him nothing.',
+    `Report 0 when the scene cost ${r.him} nothing.`,
     '',
     // Always present, so it sits above the block the cast swaps.
     'EXPULSION',
-    'Say whether the reader was CAUGHT doing something in this scene that a university would expel him for.',
+    `Say whether the reader was CAUGHT doing something in this scene that a university would expel ${r.him} for.`,
     'Expellable offenses include: any crime (theft, assault, sexual offenses, dealing drugs, arson, breaking into somewhere, carrying a weapon), cheating on an exam or plagiarizing work, forging university documents or grades, hazing, and serious harassment or stalking.',
-    'Set expelled to true ONLY if he was caught. Caught means somebody who would report him found out during this scene — campus staff or security, the police, a professor, or a victim or witness who saw plainly what he did.',
-    'If he did something expellable and got away with it — nobody saw, nobody found out, he covered it up, or the only people who know would never turn him in — then he was NOT caught, and expelled is false.',
+    `Set expelled to true ONLY if ${r.he} was caught. Caught means somebody who would report ${r.him} found out during this scene — campus staff or security, the police, a professor, or a victim or witness who saw plainly what ${r.he} did.`,
+    `If ${r.he} did something expellable and got away with it — nobody saw, nobody found out, ${r.he} covered it up, or the only people who know would never turn ${r.him} in — then ${r.he} was NOT caught, and expelled is false.`,
     'False is the right answer for almost every scene.',
     '',
     // Above the other conditional sections: it is on every scene with a cast.
@@ -2215,38 +2379,38 @@ export function buildLedgerPrompt(
           'MEMORIES',
           'Write a single memory of what the character should still remember weeks from now.',
           'Each desc completes the sentence "<Name> <type> that ...", in the past tense, e.g. "the reader helped her carry books".',
-          'Call the reader "the reader" every time, never "you", "he" or "him": "the reader lent her the reader\'s notes", not "he lent her his notes".',
-          'If a scene was uneventful for someone, give her nothing.',
+          ...memoryVoiceLines(state.readerPronouns),
+          'If a scene was uneventful for someone, give them nothing.',
           '',
           'EVENTS',
           'List any of these milestones that actually happened IN THIS SCENE:',
-          ...EVENT_GLOSS.map(([key, gloss]) => `- ${key}: ${gloss}`),
+          ...eventGlossOf(state.readerPronouns).map(([key, gloss]) => `- ${key}: ${gloss}`),
           'A milestone that did not happen this scene is simply left out. If one happened again — they agreed to be a couple again after a breakup — report it again.',
           'An empty "events" list is the ordinary answer and it is always allowed. Meeting for the first time, getting along, opening up or helping each other out is not a milestone.',
           '',
           'ACTS',
           'Report every kiss and every time the reader slept with somebody in this scene.',
           ...ACT_KINDS.map(([kind, gloss]) => `- kind "${kind}": ${gloss}`),
-          'One row per act, and "chars" is every girl who was in that act with him:',
-          '- With one girl on her own: one row naming her.',
-          '- With two or more girls at the same time — a threesome, a shared kiss, a girl joining in while he is with another: ONE row naming all of them. Never split it into a row per girl.',
-          '- With two girls separately — different moments, or different places: one row for each, naming one girl.',
-          'Repeats do not add rows: however many times the same girls kissed, that is one "kiss" row, and sleeping together is its own "sex" row beside it.',
-          '"inPublic" is true if anybody not taking part could have seen it — a passerby, somebody else in the room, a crowd — and false only when they were alone and out of sight. If the same girls were seen once and unseen once, say true.',
+          `One row per act, and "chars" is every character who was in that act with ${rf.him}:`,
+          '- With one character on their own: one row naming them.',
+          `- With two or more characters at the same time — a threesome, a shared kiss, somebody joining in while ${rf.he} is with another: ONE row naming all of them. Never split it into a row per character.`,
+          '- With two characters separately — different moments, or different places: one row for each, naming one character.',
+          'Repeats do not add rows: however many times the same characters kissed, that is one "kiss" row, and sleeping together is its own "sex" row beside it.',
+          '"inPublic" is true if anybody not taking part could have seen it — a passerby, somebody else in the room, a crowd — and false only when they were alone and out of sight. If the same characters were seen once and unseen once, say true.',
           'An empty "acts" list is the ordinary answer.',
           'Examples, for a cast of "mina_okafor — Mina Okafor" and "hazel_kim — Hazel Kim":',
-          'SCENE he kisses Mina in the library, and later that hour kisses her again in the stacks',
+          `SCENE ${rf.he} kisses Mina in the library, and later that hour kisses her again in the stacks`,
           '{"acts":[{"kind":"kiss","inPublic":true,"chars":["mina_okafor"]}]}',
-          'SCENE Mina and Hazel both go to bed with him in his room, the three of them together',
+          `SCENE Mina and Hazel both go to bed with ${rf.him} in ${rf.his} room, the three of them together`,
           '{"acts":[{"kind":"sex","inPublic":false,"chars":["mina_okafor","hazel_kim"]}]}',
-          'SCENE he kisses Hazel goodbye at the door, then sleeps with Mina after Hazel has left',
+          `SCENE ${rf.he} kisses Hazel goodbye at the door, then sleeps with Mina after Hazel has left`,
           '{"acts":[{"kind":"kiss","inPublic":true,"chars":["hazel_kim"]},{"kind":"sex","inPublic":false,"chars":["mina_okafor"]}]}',
           'SCENE they study together and nothing happens',
           '{"acts":[]}',
           '',
-          ...(castStats ? statsSection(true) : [])
+          ...(castStats ? statsSection(true, state.readerPronouns) : [])
         ]
-      : statsSection(false)),
+      : statsSection(false, state.readerPronouns)),
     // The rarer branch sits lower, so the common case shares the longest prefix.
     ...(classScene
       ? [

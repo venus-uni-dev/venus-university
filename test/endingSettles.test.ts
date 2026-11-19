@@ -5,7 +5,7 @@ import type { LedgerResponse } from '@shared/types'
 import { buildCharKeyToId, useGameStore } from '../src/renderer/stores/gameStore'
 import { projectLedger } from '../src/renderer/stores/sceneSanitizer'
 import { applyRumorPass, rollRumorPass } from '../src/renderer/stores/loop/rumors'
-import { rollNpcRelationshipSettle } from '../src/renderer/stores/loop/npc'
+import { applyNewCouples, rollNpcRelationshipSettle } from '../src/renderer/stores/loop/npc'
 import { applyCrushSettle, rollCrushSettle } from '../src/renderer/stores/loop/crushes'
 import { withRumorPass } from '../src/renderer/stores/loop/ledgerView'
 import { pointsForTier } from '@shared/playerStats'
@@ -133,7 +133,7 @@ describe('rollNpcRelationshipSettle', () => {
     const settled = rollNpcRelationshipSettle([], [
       { kind: 'class', ref: 'BIO101', members: ['a', 'c'] }
     ])
-    expect(settled[pairKeyOf('a', 'c')].encounter?.ref).toBe('BIO101')
+    expect(settled[pairKeyOf('a', 'c')].encounter).toMatchObject({ ref: 'BIO101' })
   })
 
   it('returns the settled map without writing it', () => {
@@ -157,6 +157,29 @@ describe('rollNpcRelationshipSettle', () => {
     const once = useGameStore.getState().npcRelationships
     useGameStore.getState().setNpcRelationships(settled)
     expect(useGameStore.getState().npcRelationships).toEqual(once)
+  })
+})
+
+describe('applyNewCouples', () => {
+  it("logs a new couple once and takes her crush on the reader, however often the boundary runs", () => {
+    const flags = { ...charInfo().flags!, hasCrush: true, benefits: true }
+    useGameStore.setState({
+      time: 1,
+      charInfo: { a: charInfo({ flags }), b: charInfo(), c: charInfo() },
+      npcRelationships: { [pairKeyOf('a', 'b')]: { affinity: 3, crush: ['a', 'b'] } }
+    })
+    const before = useGameStore.getState().npcRelationships
+    const after = { [pairKeyOf('a', 'b')]: { affinity: 4, dating: 7 } }
+
+    applyNewCouples(before, after)
+    const logged = useGameStore.getState().npcCouples
+    const info = useGameStore.getState().charInfo
+    applyNewCouples(before, after)
+
+    expect(logged).toEqual([{ a: 'a', b: 'b', date: 7, time: 1 }])
+    expect(useGameStore.getState().npcCouples).toEqual(logged)
+    expect(info.a.flags).toMatchObject({ hasCrush: false, benefits: false })
+    expect(useGameStore.getState().charInfo).toBe(info)
   })
 })
 
@@ -240,6 +263,30 @@ describe('rollCrushSettle', () => {
     })
     expect(rollCrushSettle(likedSarah, hurt, godly)).toEqual([])
     expect(rollCrushSettle(likedSarah, useGameStore.getState().charInfo, godly)).toEqual(['a'])
+  })
+
+  it('rolls for nobody of a gender the playthrough leaves out, until a kiss in the scene itself', () => {
+    const theo = character({ charId: 'd', firstName: 'Theo', lastName: 'Park', gender: 'male' })
+    const characters = { ...roster, d: theo }
+    useGameStore.setState({
+      chars: ['a', 'b', 'c', 'd'],
+      characters,
+      charKeyToId: buildCharKeyToId(characters),
+      charInfo: { ...useGameStore.getState().charInfo, d: charInfo() }
+    })
+    const likedTheo: LedgerResponse = {
+      memories: [{ charKey: 'theo_park', type: 'liked', desc: 'you walked him home' }],
+      events: []
+    }
+    // Guys are off by default, and the dice never get a say.
+    expect(rollCrushSettle(likedTheo, useGameStore.getState().charInfo, godly)).toEqual([])
+    // The kiss is the scene's own, so only the projection the ending rolls off has it.
+    const kissed: LedgerResponse = {
+      ...likedTheo,
+      acts: [{ kind: 'kiss', inPublic: false, chars: ['theo_park'] }]
+    }
+    const projected = projectLedger(useGameStore.getState().charInfo, kissed, 7)
+    expect(rollCrushSettle(kissed, projected.charInfo, godly)).toEqual(['d'])
   })
 })
 

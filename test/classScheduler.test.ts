@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { CLASS_SLOTS, MAX_CLASS_SIZE, scheduleComplaint } from '@shared/classes'
+import { CLASS_SLOTS, MAX_CLASS_SIZE, scheduleComplaint, studentsOf } from '@shared/classes'
 import { shuffle } from '@shared/shuffle'
-import { charKeyOf, type Character } from '@shared/types'
+import { charKeyOf, type Character, type ClassEntry, type CourseEntry } from '@shared/types'
 import {
   decorateClasses,
   type ClassDraft,
   type ClassGenDraft
 } from '../src/renderer/prompts/classPrompt'
-import { buildSchedules, SWIM_CLASS } from '../src/renderer/stores/classScheduler'
-import { character, legalPick } from './fixtures'
+import {
+  buildSchedules,
+  seatTransfer,
+  slotTransferClasses,
+  SWIM_CLASS,
+  type UnslottedCourse
+} from '../src/renderer/stores/classScheduler'
+import { character, classEntry, lcg, legalPick, peClassEntry } from './fixtures'
 
 /**
  * The scheduler runs once per playthrough and freezes into the save forever, so a double-booked
@@ -375,6 +381,158 @@ describe('the swim class', () => {
       expect(counts.get(swims[0].code) ?? 0).toBeGreaterThan(0)
       for (const code of Object.keys(classes)) expect(counts.get(code) ?? 0).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('seatTransfer', () => {
+  // A catalog with its slots fixed: two PE classes, two Biology, one History, four fillers.
+  const catalog: Record<string, ClassEntry> = Object.fromEntries(
+    [
+      peClassEntry({ code: 'PED 101', slot: 0 }),
+      peClassEntry({ code: 'PED 102', slot: 1 }),
+      classEntry({ code: 'BIO 201', slot: 2, major: 'Biology' }),
+      classEntry({ code: 'BIO 202', slot: 3, major: 'Biology' }),
+      classEntry({ code: 'HIS 201', slot: 4, major: 'History' }),
+      classEntry({ code: 'HUM 201', slot: 5, category: 'humanities' }),
+      classEntry({ code: 'ART 201', slot: 6, category: 'arts' }),
+      classEntry({ code: 'MSC 201', slot: 7, category: 'misc' }),
+      classEntry({ code: 'INT 201', slot: 8, category: 'interest' })
+    ].map((entry) => [entry.code, entry])
+  )
+  const entries = Object.values(catalog)
+
+  /** Ten girls in random classes, never more than a class holds. */
+  function standing(rand: () => number): Record<string, { schedule: Record<number, string> }> {
+    const out: Record<string, { schedule: Record<number, string> }> = {}
+    const seated = new Map<string, number>()
+    for (let i = 0; i < 10; i++) {
+      const schedule: Record<number, string> = {}
+      for (const entry of entries) {
+        if (rand() < 0.5 || (seated.get(entry.code) ?? 0) >= MAX_CLASS_SIZE) continue
+        schedule[entry.slot] = entry.code
+        seated.set(entry.code, (seated.get(entry.code) ?? 0) + 1)
+      }
+      out[`g${i}`] = { schedule }
+    }
+    return out
+  }
+
+  it('keeps every class to its size, every class in its slot, and her load and major', () => {
+    const rand = lcg(7)
+    for (let run = 0; run < RUNS; run++) {
+      const schedules = standing(rand)
+      const classesTaken = 3 + Math.floor(rand() * 4)
+      const majorClassesTaken = 1 + Math.floor(rand() * 3)
+      const { schedule } = seatTransfer(
+        { major: 'Biology', classesTaken, majorClassesTaken },
+        catalog,
+        schedules,
+        { 0: 'PED 101', 4: 'HIS 201', 6: 'ART 201' },
+        rand
+      )
+      expect(Object.keys(schedule).length).toBeLessThanOrEqual(classesTaken)
+      expect(Object.values(schedule)).not.toContain('HIS 201')
+      const all = { ...schedules, her: { schedule } }
+      for (const [slot, code] of Object.entries(schedule)) {
+        expect(catalog[code].slot).toBe(Number(slot))
+      }
+      for (const entry of entries) {
+        expect(studentsOf(entry, Object.keys(all), all).length).toBeLessThanOrEqual(MAX_CLASS_SIZE)
+      }
+    }
+  })
+
+  it('takes one of the reader’s classes with a seat free before an emptier one', () => {
+    // The reader's arts class holds two already; every other filler stands empty, and his History
+    // class is another major's.
+    const schedules = { a: { schedule: { 6: 'ART 201' } }, b: { schedule: { 6: 'ART 201' } } }
+    for (let run = 0; run < RUNS; run++) {
+      const { schedule } = seatTransfer(
+        { major: 'Biology', classesTaken: 3, majorClassesTaken: 1 },
+        catalog,
+        schedules,
+        { 4: 'HIS 201', 6: 'ART 201' }
+      )
+      expect(schedule[6]).toBe('ART 201')
+      expect(Object.values(schedule)).not.toContain('HIS 201')
+      expect(Object.keys(schedule)).toHaveLength(3)
+    }
+  })
+
+  /** A course made for her, no slot yet. */
+  function fresh(code: string, over: Partial<CourseEntry> = {}): UnslottedCourse {
+    const { slot: _slot, ...course } = classEntry({ code, ...over })
+    return course
+  }
+
+  it('deals her own courses into distinct slots free in her week, the emptiest first', () => {
+    const rand = lcg(11)
+    for (let run = 0; run < RUNS; run++) {
+      const busy = new Set(CLASS_SLOTS.filter(() => rand() < 0.4))
+      const courses = [fresh('KNT 101'), fresh('NUR 101'), fresh('NUR 102'), fresh('NUR 103')]
+      const slotted = slotTransferClasses(courses, busy, catalog, rand)
+      const slots = slotted.map((entry) => entry.slot)
+      expect(new Set(slots).size).toBe(slots.length)
+      for (const slot of slots) expect(busy.has(slot)).toBe(false)
+      expect(slotted).toHaveLength(Math.min(courses.length, CLASS_SLOTS.length - busy.size))
+    }
+    // The catalog fills slots 0 to 8, so slot 9 is the emptiest.
+    expect(slotTransferClasses([fresh('KNT 101')], new Set(), catalog)[0].slot).toBe(9)
+  })
+
+  it('seats her own interest class and her new major classes, never filling a class past its size', () => {
+    const rand = lcg(13)
+    for (let run = 0; run < RUNS; run++) {
+      const schedules = standing(rand)
+      const classesTaken = 4 + Math.floor(rand() * 3)
+      const majorClassesTaken = 1 + Math.floor(rand() * 3)
+      const interest = fresh('KNT 101', { category: 'interest' })
+      const major = [1, 2, 3].map((n) => fresh(`NUR 10${n}`, { major: 'Nursing' }))
+      const { schedule, classes } = seatTransfer(
+        { major: 'Nursing', classesTaken, majorClassesTaken, fresh: { interest, major } },
+        catalog,
+        schedules,
+        { 0: 'PED 101', 6: 'ART 201' },
+        rand
+      )
+      expect(Object.keys(schedule).length).toBeLessThanOrEqual(classesTaken)
+      expect(Object.values(schedule)).toContain('KNT 101')
+      // The reader's, PE and her interest class leave room for one of her major at least.
+      const nursing = Object.values(schedule).filter((code) => code.startsWith('NUR'))
+      expect(nursing.length).toBeGreaterThanOrEqual(1)
+      expect(nursing.length).toBeLessThanOrEqual(majorClassesTaken)
+      // Her own courses come back as seated, each in its own slot.
+      expect(classes.map((entry) => entry.code).sort()).toEqual(
+        Object.values(schedule)
+          .filter((code) => !(code in catalog))
+          .sort()
+      )
+      for (const entry of classes) expect(schedule[entry.slot]).toBe(entry.code)
+      const all = { ...schedules, her: { schedule } }
+      for (const entry of entries) {
+        expect(studentsOf(entry, Object.keys(all), all).length).toBeLessThanOrEqual(MAX_CLASS_SIZE)
+      }
+    }
+
+    // With nothing shared, PE and her interest class leave the rest of her load to her major.
+    const { schedule } = seatTransfer(
+      {
+        major: 'Nursing',
+        classesTaken: 5,
+        majorClassesTaken: 3,
+        fresh: {
+          interest: fresh('KNT 101', { category: 'interest' }),
+          major: [1, 2, 3].map((n) => fresh(`NUR 10${n}`, { major: 'Nursing' }))
+        }
+      },
+      catalog,
+      {},
+      {}
+    )
+    const codes = Object.values(schedule)
+    expect(codes.filter((code) => code.startsWith('PED'))).toHaveLength(1)
+    expect(codes).toContain('KNT 101')
+    expect(codes.filter((code) => code.startsWith('NUR'))).toHaveLength(3)
   })
 })
 

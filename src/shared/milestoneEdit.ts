@@ -1,7 +1,6 @@
 import { dispositionOf, emptyFlags, foldRelationshipEvents } from './relationship'
 import { lockedMilestones, type SceneMilestone } from './sceneCreator'
-import { hasTrait } from './traits'
-import type { CharFlags, CharInfo, Character, RelationshipEvent } from './types'
+import type { CharFlags, CharInfo, Character, Gender, RelationshipEvent } from './types'
 
 /**
  * A girl's milestones set by hand from her contact page: the boxes read off her flags, the rule
@@ -63,7 +62,7 @@ export function editLocksOf(milestones: EditMilestones, standing: EditStanding):
     dispositionOf(standing.affection),
     standing.character
   )
-  if (milestones.met && !hasTrait(standing.character, 'Promiscuous')) delete locked.agreed_to_harem
+  if (milestones.met) delete locked.agreed_to_harem
   if (standing.affection < 0 && !('crush' in locked)) locked.crush = false
   if (standing.planAhead) locked.contact = true
   if (!(locked.contact ?? milestones.contact)) locked.blocked = false
@@ -97,14 +96,16 @@ export function withEditMilestone(
 /**
  * Her entry with every box that differs between `opened` and `picked` applied, the rest left as
  * they stand. A box ticked is the event a scene would report, folded as the ledger folds it, its
- * memories and dates included; Lovers cleared with Broke up ticked is a breakup, and alone is
- * never having dated; any other box cleared clears its milestone and no memory.
+ * memories, worded for the holder's gender, and dates included; Lovers cleared with Broke up
+ * ticked is a breakup, and alone is never having dated; any other box cleared clears its
+ * milestone and no memory.
  */
 export function withMilestonesEdited(
   info: CharInfo,
   opened: EditMilestones,
   picked: EditMilestones,
-  date: number
+  date: number,
+  holder: Gender
 ): CharInfo {
   const on = (key: EditMilestone): boolean => !opened[key] && picked[key]
   const off = (key: EditMilestone): boolean => opened[key] && !picked[key]
@@ -152,7 +153,7 @@ export function withMilestonesEdited(
   if (on('friendzoned_reader')) events.push('friendzoned_reader')
   if (on('contact')) events.push('gave_contact_info')
   if (on('agreed_to_harem')) events.push('agreed_to_harem')
-  if (events.length > 0) next = foldRelationshipEvents(next, events, date)
+  if (events.length > 0) next = foldRelationshipEvents(next, events, date, holder)
   if (exNow) next = { ...next, brokeUpOn: date }
 
   // Her number is a contact of his, and a contact is somebody whose name he knows.

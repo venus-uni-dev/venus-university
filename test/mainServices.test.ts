@@ -202,7 +202,7 @@ describe('the brief a character is created with', () => {
   }
 
   it('lands the picture beside the record and retires it once the sheet is written', async () => {
-    const created = await createCharacter('Sarah', 'Rose', BRIEF, REFERENCE)
+    const created = await createCharacter('Sarah', 'Rose', 'female', BRIEF, REFERENCE)
     const at = getCharacterImagePath(created.charId, REFERENCE_NAME)
 
     // The record claims a picture only because the write above already put one there.

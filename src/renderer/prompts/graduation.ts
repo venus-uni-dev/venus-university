@@ -1,6 +1,7 @@
+import { pronounsOf } from '@shared/gender'
 import type { Disposition } from '@shared/relationship'
 import { markedLine } from '@shared/statusMark'
-import type { SceneLine, Season, TimeSlot } from '@shared/types'
+import type { Character, SceneLine, Season, TimeSlot } from '@shared/types'
 import { formatDatePart, formatGameDate } from './gameDate'
 import { FINALS_WEEK, GRADUATION_DATE } from './occasions'
 
@@ -145,15 +146,20 @@ export function farewellNowLines(firstName: string, forAWhile: boolean, season: 
 
 /**
  * What the player is left with when a goodbye ends — the one status line an epilogue
- * scene gets in place of the ledger's. How she took it is the coloured run, and the line rings
- * positive whichever tier she is on.
+ * scene gets in place of the ledger's. How they took it is the coloured run, and the line rings
+ * positive whichever tier they are on.
  */
-export function farewellStatusLine(firstName: string, disposition: Disposition): SceneLine {
+export function farewellStatusLine(
+  who: Pick<Character, 'firstName' | 'gender'>,
+  disposition: Disposition
+): SceneLine {
+  const { firstName } = who
+  const p = pronounsOf(who)
   if (disposition === 'devoted') {
     return markedLine(
       `${firstName} will `,
       'remember the memories you made together forever.',
-      ' She can\'t wait to see you again.',
+      ` ${p.They} can't wait to see you again.`,
       'gain'
     )
   }
@@ -167,7 +173,7 @@ export function farewellStatusLine(firstName: string, disposition: Disposition):
   }
   return markedLine(
     `${firstName} seems `,
-    'glad she got to know you',
+    `glad ${p.they} got to know you`,
     ', and will miss you.',
     'gain'
   )

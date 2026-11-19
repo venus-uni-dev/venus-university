@@ -2,10 +2,17 @@ import { useEffect, useMemo, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { characterLoraOf } from '@shared/comfyModels'
 import { customCgLabelOf, customCgLoraOf } from '@shared/customCgs'
+import { pronounsOf } from '@shared/gender'
 import { isCustomCgSlot } from '@shared/positions'
 import { pictureKeySet } from '@shared/settingsRules'
-import { fullNameOf, type Character, type CustomCgSlot, type SetTarget } from '@shared/types'
+import {
+  fullNameOf,
+  type Character,
+  type CustomCgSlot,
+  type SetTarget
+} from '@shared/types'
 import { CharacterJobCard } from '../components/CharacterJobCard'
+import { CharacterSortPill } from '../components/CharacterSortPill'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DeadNote } from '../components/DeadNote'
 import { DESKTOP_ONLY_NOTE, isWebBuild } from '../platform'
@@ -16,7 +23,8 @@ import {
   isUnfinished,
   manageOrderOf,
   missingContentPlan,
-  useCharacterStore
+  useCharacterStore,
+  type CharacterSort
 } from '../stores/characterStore'
 import { reshuffleSuggestions } from '../prompts/characterSuggestions'
 import { useComfyStore } from '../stores/comfyStore'
@@ -73,18 +81,20 @@ function namesPhrase(names: readonly string[]): string {
     : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
-/** What the fill confirm adds where some of its characters' LoRAs are missing. */
+/**
+ * What the fill confirm adds where some of its characters' LoRAs are missing, each named.
+ */
 function missingLorasLine(names: readonly string[]): string {
   return names.length === 1
-    ? `${names[0]}'s LoRA is missing, so her sets will be generated without it.`
-    : `The LoRAs of ${namesPhrase(names)} are missing, so their sets will be generated without them.`
+    ? `${names[0]}'s LoRA is missing. Generation will proceed without it.`
+    : `LoRAs for ${namesPhrase(names)} are missing. Generation will proceed without them.`
 }
 
 /** And where some of its custom CGs' position LoRAs are, each named as her CG: "Ana's bunny". */
 function missingPositionLorasLine(cgs: readonly string[]): string {
   return cgs.length === 1
-    ? `The position LoRA of ${cgs[0]} is missing, so that CG will be generated without it.`
-    : `The position LoRAs of ${namesPhrase(cgs)} are missing, so those CGs will be generated without them.`
+    ? `Position LoRA for ${cgs[0]} is missing. Generation will proceed without it.`
+    : `Position LoRAs for ${namesPhrase(cgs)} are missing. Generation will proceed without them.`
 }
 
 /**
@@ -154,13 +164,18 @@ export function ManageCharactersView(): JSX.Element {
   // Drawn once per visit, from the dev switch or the machine clock.
   const [theme] = useState(heldScreenTheme)
 
-  // Generating first, then the newest write, then the shipped cast — a run in
-  // progress is what the player came back to look at, and what he last worked on is
-  // what he is likely to want next. A character who has just finished generating is
-  // therefore first in the grid, having been written a moment ago.
+  // Every visit opens on the newest write: what he last worked on is what he is likely to want
+  // next, and a character who has just finished generating is first, having been written a
+  // moment ago. `sorted` is whether he has changed it since, which deals the grid at once.
+  const [sort, setSort] = useState<CharacterSort>('recent')
+  const [sorted, setSorted] = useState(false)
+  const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
+
+  // Generating first whatever the sort: a run in progress is what the player came back to look at.
   const order = useMemo(
-    () => manageOrderOf({ characters, order: allOrder, removedDefaults, pregenIds, progress }),
-    [characters, allOrder, removedDefaults, pregenIds, progress]
+    () =>
+      manageOrderOf({ characters, order: allOrder, removedDefaults, pregenIds, progress }, sort),
+    [characters, allOrder, removedDefaults, pregenIds, progress, sort]
   )
 
   useEffect(() => {
@@ -405,12 +420,30 @@ export function ManageCharactersView(): JSX.Element {
             {importing ? 'Importing…' : 'Import character ZIP'}
           </motion.button>
         </div>
+
+        {/* The grid's order, on a row of its own at the header's end: the actions fill theirs.
+            The row stands while the roster is read, so the grid does not drop when it lands. */}
+        <div className="vu-manage-sort">
+          {order.length > 0 && (
+            <CharacterSortPill
+              id="manage-sort"
+              value={sort}
+              popupHost={popupHost}
+              onChange={(next) => {
+                setSort(next)
+                setSorted(true)
+              }}
+            />
+          )}
+        </div>
       </motion.header>
 
       <div className="vu-manage-body">
+        {/* Keyed on the order, so a new one deals again from the top. */}
         <motion.ul
+          key={sort}
           className="vu-manage-grid"
-          variants={dealt(0.25, 0.04)}
+          variants={sorted ? dealt(0, 0.03) : dealt(0.25, 0.04)}
           initial="hidden"
           animate="shown"
         >
@@ -464,6 +497,9 @@ export function ManageCharactersView(): JSX.Element {
         <div className="vu-manage-fade" />
       </div>
 
+      {/* The frame the sort's list is placed against: the whole screen, taking no pointer. */}
+      <div className="vu-popups" ref={setPopupHost} />
+
       <AnimatePresence>
         {generating && (
           <GenerateCharacterModal
@@ -474,6 +510,7 @@ export function ManageCharactersView(): JSX.Element {
               firstName,
               lastName,
               prompt,
+              gender,
               namesAreSuggestions,
               options,
               reference,
@@ -485,15 +522,16 @@ export function ManageCharactersView(): JSX.Element {
                 firstName,
                 lastName,
                 prompt,
+                gender,
                 namesAreSuggestions,
                 options,
                 reference,
                 lora
               )
             }}
-            onCreateBlank={(firstName, lastName, personality, lora) => {
+            onCreateBlank={(firstName, lastName, personality, gender, lora) => {
               setGenerating(false)
-              void createBlank(firstName, lastName, personality, lora)
+              void createBlank(firstName, lastName, personality, gender, lora)
             }}
           />
         )}
@@ -533,7 +571,7 @@ export function ManageCharactersView(): JSX.Element {
             message={
               deletingIsShipped
                 ? `You can restore ${nameOf(deletingCharacter)} later with the Restore Default Characters button.`
-                : `${nameOf(deletingCharacter)} and all generated sprites will be permanently deleted. All playthroughs including her will become unloadable.`
+                : `${nameOf(deletingCharacter)} and all generated sprites will be permanently deleted. All playthroughs including ${pronounsOf(deletingCharacter).them} will become unloadable.`
             }
             onCancel={() => setDeleting(null)}
             onConfirm={() => {

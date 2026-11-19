@@ -4,13 +4,13 @@ import type { CalendarEvent, CharInfo } from '@shared/types'
 import { WEATHER_SLOTS, type Weather } from '@shared/weather'
 import {
   admitLocals,
-  admitWorkers,
   injectPasserby,
   localsAtLocation,
   pickCast,
   pickFirstNightCast,
   resolveAttendance,
   resolveLocationId,
+  runIntoNote,
   workersAtLocation,
   workingHereNote
 } from '../src/renderer/stores/loop/casting'
@@ -205,27 +205,6 @@ describe('workersAtLocation', () => {
     seed({ a: { job: { jobId: 'cutetea', shifts: [0] } } })
     useGameStore.setState({ time: 1 })
     expect(workersAtLocation('Cutetea')).toEqual([])
-  })
-})
-
-describe('admitWorkers', () => {
-  it('puts her in the scene whether or not the classifier named her', () => {
-    seed({ a: { job: { jobId: 'cutetea', shifts: [0] } } })
-    const result = admitWorkers(['b'], 'Cutetea')
-    expect(result.cast).toEqual(['b', 'a'])
-    expect(result.jobId).toBe('cutetea')
-    expect(result.notes).toEqual([workingHereNote('a', 'cutetea')])
-  })
-
-  it('drops her silently off a full stage but still reports the workplace', () => {
-    // Three people he arranged to meet outrank the girl on shift where they are
-    // meeting, and she is standing right there — narrating her absent would be
-    // the one thing that reads as a bug.
-    seed({ a: { job: { jobId: 'cutetea', shifts: [0] } } })
-    const result = admitWorkers(['b', 'c', 'd'], 'Cutetea')
-    expect(result.cast).toEqual(['b', 'c', 'd'])
-    expect(result.notes).toEqual([])
-    expect(result.jobId).toBe('cutetea')
   })
 })
 
@@ -450,11 +429,12 @@ describe('admitLocals', () => {
     seed({ a: { nameKnown: true, hiddenSchedule: { 0: { location: 'btb_arcade', kind: 'fun' } } } })
     const out = admitLocals([], 'btb_arcade', { named: false, inPublic: true })
     expect(out.cast).toEqual(['a'])
-    expect(out.notes).toEqual(['They happen to run into Sarah.'])
+    expect(out.joined).toEqual(['a'])
+    expect(out.notes).toEqual([])
     expect(out.jobId).toBeNull()
   })
 
-  it('names what the local admitted is doing, at her own haunt', () => {
+  it('names what a girl run into is doing, at her own haunt', () => {
     seed({
       a: {
         nameKnown: true,
@@ -463,11 +443,9 @@ describe('admitLocals', () => {
         }
       }
     })
-    const out = admitLocals([], 'btb_arcade', { named: false, inPublic: true })
-    expect(out.cast).toEqual(['a'])
-    expect(out.notes).toEqual([
+    expect(runIntoNote(['a'], 'btb_arcade')).toBe(
       'They happen to run into Sarah. Sarah is playing the claw machines at BTB Arcade.'
-    ])
+    )
   })
 
   it('rolls for her when he named somebody, and usually loses', () => {
@@ -477,7 +455,49 @@ describe('admitLocals', () => {
     expect(missed.cast).toEqual(['b'])
     // A roll that fails is nothing at all — she was never part of the plan, so
     // there is no absence to narrate.
-    expect(missed.notes).toEqual([])
+    expect(missed.joined).toEqual([])
+  })
+
+  it('puts the worker in the scene whether or not the classifier named her', () => {
+    seed({ a: { job: { jobId: 'cutetea', shifts: [0] } } })
+    const result = admitLocals(['b'], 'Cutetea', { named: false, inPublic: true })
+    expect(result.cast).toEqual(['b', 'a'])
+    expect(result.jobId).toBe('cutetea')
+    expect(result.notes).toEqual([workingHereNote('a', 'cutetea')])
+  })
+
+  it('drops the worker silently off a full stage but still reports the workplace', () => {
+    // Three people he arranged to meet outrank the girl on shift where they are
+    // meeting, and she is standing right there — narrating her absent would be
+    // the one thing that reads as a bug.
+    seed({ a: { job: { jobId: 'cutetea', shifts: [0] } } })
+    const result = admitLocals(['b', 'c', 'd'], 'Cutetea', { named: true, inPublic: true })
+    expect(result.cast).toEqual(['b', 'c', 'd'])
+    expect(result.notes).toEqual([])
+    expect(result.jobId).toBe('cutetea')
+  })
+
+  it('seats whoever the map shows here ahead of the draw and everybody else here', () => {
+    // Three girls stand at the arcade and the draw would fill the stage; the one he
+    // came for is last in the roster, and the map is why he came.
+    const arcade = {
+      nameKnown: true,
+      hiddenSchedule: { 0: { location: 'btb_arcade', kind: 'fun' as const } }
+    }
+    seed({ b: arcade, c: arcade, d: arcade })
+    const seen: (readonly string[])[] = []
+    const out = admitLocals([], 'btb_arcade', {
+      named: false,
+      inPublic: true,
+      shown: ['d'],
+      pickUp: (seated) => {
+        seen.push([...seated])
+        return ['a', 'c']
+      }
+    })
+    expect(seen).toEqual([['d']])
+    expect(out.cast).toEqual(['d', 'a', 'c'])
+    expect(out.joined).toEqual(['d'])
   })
 
   it('leaves the worker rule exactly as it was', () => {
@@ -488,6 +508,7 @@ describe('admitLocals', () => {
     const out = admitLocals(['b'], 'cutetea', { named: true, inPublic: true })
     expect(out.cast).toEqual(['b', 'a'])
     expect(out.notes).toEqual(['Sarah is here, working a shift at CuteTea.'])
+    expect(out.joined).toEqual([])
     expect(out.jobId).toBe('cutetea')
   })
 
@@ -495,7 +516,7 @@ describe('admitLocals', () => {
     seed({ d: { nameKnown: true, hiddenSchedule: { 0: { location: 'btb_arcade', kind: 'fun' } } } })
     const out = admitLocals(['a', 'b', 'c'], 'btb_arcade', { named: false, inPublic: true })
     expect(out.cast).toEqual(['a', 'b', 'c'])
-    expect(out.notes).toEqual([])
+    expect(out.joined).toEqual([])
   })
 
   it('pulls the group-mate of a cast member in past the roll', () => {
@@ -507,7 +528,7 @@ describe('admitLocals', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99)
     const out = admitLocals(['b'], 'btb_arcade', { named: true, inPublic: true })
     expect(out.cast).toEqual(['b', 'a'])
-    expect(out.notes).toEqual(['They happen to run into Sarah.'])
+    expect(out.joined).toEqual(['a'])
   })
 
   it('still rolls for a local whose group holds nobody in the cast', () => {
@@ -518,7 +539,7 @@ describe('admitLocals', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99)
     const out = admitLocals(['b'], 'btb_arcade', { named: true, inPublic: true })
     expect(out.cast).toEqual(['b'])
-    expect(out.notes).toEqual([])
+    expect(out.joined).toEqual([])
   })
 
   it('does not let a crasher pull her own group in behind her', () => {
@@ -544,7 +565,7 @@ describe('admitLocals', () => {
     grouped(['d', 'a'], 'btb_arcade')
     const out = admitLocals(['a', 'b', 'c'], 'btb_arcade', { named: true, inPublic: true })
     expect(out.cast).toEqual(['a', 'b', 'c'])
-    expect(out.notes).toEqual([])
+    expect(out.joined).toEqual([])
   })
 
   it('seats the companion ahead of the crasher on the last free slot', () => {
@@ -558,7 +579,7 @@ describe('admitLocals', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0)
     const out = admitLocals(['a', 'b'], 'btb_arcade', { named: true, inPublic: true })
     expect(out.cast).toEqual(['a', 'b', 'd'])
-    expect(out.notes).toEqual(['They happen to run into Chloe.'])
+    expect(out.joined).toEqual(['d'])
   })
 
   it('admits nobody at all into a private scene', () => {
@@ -576,6 +597,7 @@ describe('admitLocals', () => {
     expect(admitLocals(['b'], 'lowrise_dorms', { named: true, inPublic: false })).toEqual({
       cast: ['b'],
       notes: [],
+      joined: [],
       jobId: null
     })
     // The same building in public is the draw it always was.
@@ -592,6 +614,7 @@ describe('admitLocals', () => {
     expect(admitLocals(['b'], 'cutetea', { named: true, inPublic: false })).toEqual({
       cast: ['b'],
       notes: [],
+      joined: [],
       jobId: null
     })
   })

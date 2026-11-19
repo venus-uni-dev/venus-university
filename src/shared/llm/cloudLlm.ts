@@ -183,6 +183,16 @@ function modelToRun(settings: Settings, kind: PromptKind | undefined): ModelConf
   return modelFor(settings.apiProvider, routed ? secondary : writerModelOf(settings))
 }
 
+/** A whole reply's token usage as the provider reports it, Gemini's or the OpenAI wire's. */
+function usageIn(raw: string): unknown {
+  try {
+    const parsed = JSON.parse(raw) as { usageMetadata?: unknown; usage?: unknown } | null
+    return parsed?.usageMetadata ?? parsed?.usage ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Sends one provider-enforced structured-output request and returns parsed JSON;
  * `onDelta` is preview-only and the full response stays authoritative, and `override` sends
@@ -200,7 +210,12 @@ export async function completeStructured<T>(
   const model = modelToRun(settings, request.kind)
   // Against the model that will actually run, so a secondary that takes fewer levels than the
   // primary falls to its own default rather than 400ing.
-  const thinkingLevel = reasoningToSend(settings, model.id, request.minThinking)
+  const thinkingLevel = reasoningToSend(
+    settings,
+    model.id,
+    request.minThinking,
+    request.raiseThinking
+  )
   // Absent is `priority` under Gemini, and none at all for a custom endpoint.
   const serviceTier = serviceTierToSend(settings)
   // The player's own cap where a custom endpoint names one, else the pinned ceiling.
@@ -344,6 +359,8 @@ export async function completeStructured<T>(
         raw = await response.text()
         generated = adapter.generatedTokensOf(raw)
         content = adapter.contentOf(raw, provider.label)
+        const usage = usageIn(raw)
+        if (usage) outcome = ` usage=${JSON.stringify(usage)}`
       }
 
       const responseMs = elapsed()

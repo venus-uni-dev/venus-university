@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 
 /**
- * The marks the repair modals' rails wear: the four tools at palette size, and the
+ * The marks the repair modals' rails wear: the five tools at palette size, and the
  * four row actions at pill size. Lucide-shaped and drawn in `currentColor`, so the button
  * they sit in tints them with one rule.
  */
@@ -68,6 +68,16 @@ export function PipetteIcon(): JSX.Element {
       <path d="m2 22 1-1h3l9-9" />
       <path d="M3 21v-3l9-9" />
       <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+    </>
+  )
+}
+
+export function MarkIcon(): JSX.Element {
+  return mark(
+    32,
+    <>
+      <path d="m9 11-6 6v3h9l3-3" />
+      <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
     </>
   )
 }

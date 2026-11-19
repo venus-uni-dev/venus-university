@@ -16,7 +16,8 @@ import {
   type SceneMilestone,
   type SceneMilestones
 } from '@shared/sceneCreator'
-import type { Character } from '@shared/types'
+import { PRONOUNS } from '@shared/gender'
+import type { Character, Gender } from '@shared/types'
 import { CheckField } from '../components/CheckField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
@@ -25,7 +26,11 @@ import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
 import '../vu_styles/SceneCreator.css'
 
 /** What each box says, her name standing in where the milestone is hers or his. */
-export function milestoneLabel(key: SceneMilestone | 'contact' | 'blocked', name: string): string {
+export function milestoneLabel(
+  key: SceneMilestone | 'contact' | 'blocked',
+  name: string,
+  gender: Gender
+): string {
   switch (key) {
     case 'met':
       return `Met before`
@@ -46,7 +51,7 @@ export function milestoneLabel(key: SceneMilestone | 'contact' | 'blocked', name
     case 'agreed_to_harem':
       return `Agreed to an open relationship`
     case 'contact':
-      return 'Gave you her contact info'
+      return `Gave you ${PRONOUNS[gender].their} contact info`
     case 'blocked':
       return `${name} blocked you`
   }
@@ -55,6 +60,8 @@ export function milestoneLabel(key: SceneMilestone | 'contact' | 'blocked', name
 export interface SceneMilestonesModalProps {
   theme: ScreenTheme
   character: Character
+  /** The gender of the one whose milestones these are. */
+  gender: Gender
   entry: SceneCastEntry
   onChange: (milestones: SceneMilestones) => void
   onClose: () => void
@@ -64,6 +71,7 @@ export interface SceneMilestonesModalProps {
 export function SceneMilestonesModal({
   theme,
   character,
+  gender,
   entry,
   onChange,
   onClose
@@ -101,7 +109,7 @@ export function SceneMilestonesModal({
             <CheckField
               key={key}
               id={`scene-milestone-${key}`}
-              label={milestoneLabel(key, name)}
+              label={milestoneLabel(key, name, gender)}
               checked={shown[key]}
               disabled={key in locked}
               onChange={(checked) =>

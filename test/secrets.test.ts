@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { affectionOfDisposition } from '@shared/relationship'
 import { observedSecretTiers, pendingSecretOf, withSecretTold } from '@shared/secrets'
-import { charKeyOf, type CharSecret } from '@shared/types'
-import { validateSecretDraft } from '../src/renderer/prompts/secretsPrompt'
+import type { CharSecret } from '@shared/types'
+import { validateSecretsOf } from '../src/renderer/prompts/secretsPrompt'
 import { character, charInfo } from './fixtures'
 
 /**
@@ -72,56 +72,32 @@ describe('withSecretTold', () => {
   })
 })
 
-describe('validateSecretDraft', () => {
+describe('validateSecretsOf', () => {
   const sara = character({ firstName: 'Sara', lastName: 'Lee' })
-  const mia = character({ charId: 'mia', firstName: 'Mia', lastName: 'Park' })
   const ivy = character({ charId: 'ivy', firstName: 'Ivy', lastName: 'Cole' })
-  const entries = [
-    { character: sara, tiers: ['friendly', 'trusted', 'devoted'] as const, held: [] },
-    { character: mia, tiers: ['devoted'] as const, held: ['Mia is afraid of birds.'] },
-    // The player wrote her friendly secret, so only the two above it are asked.
-    { character: ivy, tiers: ['devoted', 'trusted'] as const, held: ['Ivy juggles.'] }
-  ]
 
-  it('keeps each tier written, closed with a stop, and drops a blank one', () => {
+  it('keeps each tier asked, closed with a stop, and drops a blank one or one not asked', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const secrets = validateSecretDraft(
-      {
-        characters: [
-          {
-            key: charKeyOf('Sara', 'Lee'),
-            friendly: ' Sara knits ',
-            trusted: '',
-            devoted: 'Sara lied.'
-          }
-        ],
-        devoted: [
-          { key: charKeyOf('Mia', 'Park'), devoted: 'Mia has a twin' },
-          { key: 'nobody', devoted: 'x' }
-        ],
-        trusted_devoted: [{ key: charKeyOf('Ivy', 'Cole'), trusted: 'Ivy lied.', devoted: 'Ivy left.' }]
-      },
-      entries
-    )
-    expect(secrets[charKeyOf('Sara', 'Lee')]).toEqual([
+    const entry = { character: sara, tiers: ['devoted', 'friendly', 'trusted'] as const, held: [] }
+    expect(validateSecretsOf(entry, { friendly: ' Sara knits ', trusted: '', devoted: 'Sara lied.' })).toEqual([
       { text: 'Sara knits.', tier: 'friendly' },
       { text: 'Sara lied.', tier: 'devoted' }
     ])
-    expect(secrets[charKeyOf('Mia', 'Park')]).toEqual([
-      { text: 'Mia has a twin.', tier: 'devoted' }
-    ])
-    expect(secrets[charKeyOf('Ivy', 'Cole')]).toEqual([
+    // The player wrote her friendly secret, so only the two above it are read.
+    const ivys = { character: ivy, tiers: ['devoted', 'trusted'] as const, held: ['Ivy juggles.'] }
+    expect(validateSecretsOf(ivys, { friendly: 'Ivy sings.', trusted: 'Ivy lied.', devoted: 'Ivy left.' })).toEqual([
       { text: 'Ivy lied.', tier: 'trusted' },
       { text: 'Ivy left.', tier: 'devoted' }
     ])
   })
 
-  it('refuses a reply that leaves a girl without a secret', () => {
+  it('refuses a reply that leaves her without a secret', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    // Mia, asked for one, is left out of the reply altogether.
-    const reply = { characters: [{ key: charKeyOf('Sara', 'Lee'), friendly: 'Sara knits.' }] }
-    expect(() => validateSecretDraft(reply, entries)).toThrow(
-      expect.objectContaining({ code: 'SECRET_GEN_INVALID' })
-    )
+    const entry = { character: sara, tiers: ['devoted'] as const, held: [] }
+    for (const reply of [{ friendly: 'Sara knits.' }, null, 'Sara knits.']) {
+      expect(() => validateSecretsOf(entry, reply)).toThrow(
+        expect.objectContaining({ code: 'SECRET_GEN_INVALID' })
+      )
+    }
   })
 })

@@ -62,5 +62,57 @@
       "arms_behind_back"
     ],
     "description": "Hip cocked and hands hidden behind her back. Playful, coy, or maybe a little mysterious."
+  },
+  "male_arms_at_sides": {
+    "tags": [
+      "arms_at_sides"
+    ],
+    "description": "Arms hanging loose at his sides. Relaxed, open, or maybe just spaced out.",
+    "gender": "male"
+  },
+  "male_hand_on_hip": {
+    "tags": [
+      "hand_on_own_hip",
+      "arm_at_side"
+    ],
+    "description": "One hand cocked on his hip, the other arm loose. Self-assured, cocky, or maybe just aloof.",
+    "gender": "male"
+  },
+  "male_hands_on_hips": {
+    "tags": [
+      "hands_on_own_hips"
+    ],
+    "description": "Both hands planted on his hips, elbows out. Bold, commanding, or maybe just silly.",
+    "gender": "male"
+  },
+  "male_crossed_arms": {
+    "tags": [
+      "crossed_arms"
+    ],
+    "description": "Arms folded across his chest. Closed off, defensive, or maybe just confident.",
+    "gender": "male"
+  },
+  "male_clutching_arm": {
+    "tags": [
+      "hand_on_own_arm",
+      "arm_at_side"
+    ],
+    "description": "One hand gripping his own opposite arm. Nervous, self-soothing, or maybe just creepy.",
+    "gender": "male"
+  },
+  "male_bold": {
+    "tags": [
+      "legs_apart",
+      "arms_at_sides"
+    ],
+    "description": "Standing with legs apart and arms at his sides. Assertive, poised, or maybe just rude.",
+    "gender": "male"
+  },
+  "male_arms_behind_back": {
+    "tags": [
+      "arms_behind_back"
+    ],
+    "description": "Hands hidden behind his back. Playful, coy, or maybe a little mysterious.",
+    "gender": "male"
   }
 }

@@ -6,10 +6,39 @@ import { pick, shuffle } from '@shared/shuffle'
 import { MAX_GROUP } from './npcOverlay'
 
 /**
- * Who ran into whom off the overlay's books: residents out in their own building's shared
- * rooms, and pairs who bumped into each other out on campus. Pure and randomised — no store
- * access, the caller reads the store and hands both rolls what they need.
+ * Who ran into whom off the overlay's books: girls keeping their haunts at the same place,
+ * residents out in their own building's shared rooms, and pairs who bumped into each other out
+ * on campus. Pure, with no store access: the caller reads the store and hands each what it
+ * needs. The two run-in rolls are randomised; the shared haunts roll nothing.
  */
+
+/** What one character brings into {@link sharedHauntGroups}. */
+export interface SharedHauntCharInput {
+  /** Her standing haunt while she is actually at it — a location id, `'room'`, or null. */
+  haunt: string | null
+  /** In the scene, busy, off campus or in bed with a cold: she met nobody at it. */
+  excluded: boolean
+}
+
+/**
+ * Everybody keeping a haunt at one place this slot, met there, a group per place; no dice. A
+ * room is nobody else's, and a girl alone at hers met nobody.
+ */
+export function sharedHauntGroups(
+  chars: Record<string, SharedHauntCharInput>
+): NpcEncounterGroup[] {
+  const byPlace = new Map<string, string[]>()
+  for (const charId of Object.keys(chars)) {
+    const { haunt, excluded } = chars[charId]
+    if (excluded || haunt === null || haunt === ROOM_LOCATION) continue
+    byPlace.set(haunt, [...(byPlace.get(haunt) ?? []), charId])
+  }
+  const groups: NpcEncounterGroup[] = []
+  for (const [location, members] of byPlace) {
+    if (members.length >= 2) groups.push({ kind: 'hangout', ref: location, members })
+  }
+  return groups
+}
 
 /** What one character brings into the two rolls. */
 export interface RunInCharInput {

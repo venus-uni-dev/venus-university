@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   NO_FILLED_CATALOG,
   validateClassDraft,
-  type ClassGenReply,
-  type ClassPromptInput
+  type ClassPromptInput,
+  type ClassReply
 } from '../src/renderer/prompts/classPrompt'
 import type { Character } from '../src/shared/types'
 import { freeClassCode } from '../src/shared/classes'
@@ -14,6 +14,8 @@ import { character } from './fixtures'
  * code would overwrite each other in the save's `classes` record, since a
  * course code is that record's key.
  */
+
+type ReplyInterest = NonNullable<ClassReply['characters']>[number]['interestClass']
 
 /** A call whose students all major in Biology, with no interest class written yet. */
 function asking(roster: Character[]): Pick<ClassPromptInput, 'students' | 'filled'> {
@@ -27,13 +29,13 @@ describe('validateClassDraft', () => {
   it('renumbers a duplicate catalog code instead of failing the reply', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const roster = [character({ charId: 'char-1', firstName: 'Sarah', lastName: 'Rose' })]
-    const draft: ClassGenReply = {
-      characters: {
-        sarah_rose: {
-          major: 'Biology',
+    const draft: ClassReply = {
+      characters: [
+        {
+          key: 'sarah_rose',
           interestClass: { code: 'MUS 150', name: 'Choir', description: 'Singing.' }
         }
-      },
+      ],
       classes: [
         {
           code: 'BIO 210',
@@ -65,13 +67,13 @@ describe('validateClassDraft', () => {
   it('renumbers past an interest class that collides with the catalog', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const roster = [character({ charId: 'char-1', firstName: 'Sarah', lastName: 'Rose' })]
-    const draft: ClassGenReply = {
-      characters: {
-        sarah_rose: {
-          major: 'Biology',
+    const draft: ClassReply = {
+      characters: [
+        {
+          key: 'sarah_rose',
           interestClass: { code: 'ART 101', name: 'Pots', description: 'Pots.' }
         }
-      },
+      ],
       classes: [
         {
           code: 'ART 101',
@@ -113,11 +115,12 @@ describe('validateClassDraft', () => {
     const sarah = character({ charId: 'char-1', firstName: 'Sarah', lastName: 'Rose' })
     const out = validateClassDraft(
       {
-        characters: {
-          sarah_rose: {
+        characters: [
+          {
+            key: 'sarah_rose',
             interestClass: { code: 'BIO 210', name: 'Birds', description: 'Birds.', kind: 'lecture' }
           }
-        },
+        ],
         classes: []
       },
       {
@@ -133,6 +136,33 @@ describe('validateClassDraft', () => {
     expect(out.classes.find((c) => c.name === 'Cells')?.code).toBe('BIO 210')
     expect(out.classes.find((c) => c.name === 'Birds')?.code).toBe('BIO 211')
     expect(out.characters.sarah_rose.major).toBe('Biology')
+    warn.mockRestore()
+  })
+
+  // The first entry for a key stands; an entry for a girl who was not asked is skipped.
+  it('keeps the first of a repeated key and ignores an unknown one', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const sarah = character({ charId: 'char-1', firstName: 'Sarah', lastName: 'Rose' })
+    const interest = (code: string, name: string): ReplyInterest => ({
+      code,
+      name,
+      description: `${name}.`,
+      kind: 'lecture'
+    })
+    const out = validateClassDraft(
+      {
+        characters: [
+          { key: 'nobody_here', interestClass: interest('ART 101', 'Pots') },
+          { key: 'sarah_rose', interestClass: interest('MUS 150', 'Choir') },
+          { key: 'sarah_rose', interestClass: interest('ART 102', 'Painting') }
+        ],
+        classes: []
+      },
+      { ...asking([sarah]), openMajors: true }
+    )
+    expect(out.classes.map((c) => c.name)).toEqual(['Choir'])
+    expect(out.characters.sarah_rose.interestClass.name).toBe('Choir')
+    expect(warn).toHaveBeenCalledTimes(2)
     warn.mockRestore()
   })
 })

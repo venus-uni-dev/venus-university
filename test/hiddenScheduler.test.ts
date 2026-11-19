@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { classSlotForShift, jobDefOf } from '@shared/jobs'
-import { GROCERY_LOCATION, locationDefOf, ROOM_LOCATION } from '@shared/locations'
+import { classSlotForShift, jobDefOf, SHIFT_SLOTS } from '@shared/jobs'
+import { GROCERY_LOCATION, isLocationOpen, locationDefOf, ROOM_LOCATION } from '@shared/locations'
 import type { CharJob, Haunt, ShiftSlot } from '@shared/types'
 import {
   buildHiddenSchedules,
+  MAX_HAUNTS_PER_PLACE,
   type HiddenScheduleInput
 } from '../src/renderer/stores/hiddenScheduler'
 
 /**
  * The haunt deal runs once per playthrough and is frozen into the save, so
- * these are invariant checks over many random runs. Two girls dealt one place at
+ * these are invariant checks over many random runs. Three girls dealt one place at
  * one hour cannot be repaired later and nothing in play would throw over it.
  */
 
@@ -58,17 +59,75 @@ function placements(
   )
 }
 
+/** How many characters each (slot, location) a result holds keeps, rooms excluded. */
+function heldPerPlaceSlot(result: Record<string, Record<number, Haunt>>): Map<string, number> {
+  const held = new Map<string, number>()
+  for (const { slot, location } of placements(result)) {
+    if (location === ROOM_LOCATION) continue
+    const key = `${slot}:${location}`
+    held.set(key, (held.get(key) ?? 0) + 1)
+  }
+  return held
+}
+
+/** A class in every weekday slot Monday to Thursday, leaving Friday and the weekend free. */
+const EIGHT_CLASSES: Record<number, string> = Object.fromEntries(
+  [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => [slot, 'BIO 210'])
+)
+
 describe('buildHiddenSchedules', () => {
-  it('never puts two characters in one place at one hour', () => {
+  it('never puts more than two characters in one place at one hour, nor anybody beside a shift', () => {
     for (let run = 0; run < RUNS; run++) {
-      const result = buildHiddenSchedules(inputs())
-      const seen = new Set<string>()
-      for (const { slot, location } of placements(result)) {
-        if (location === ROOM_LOCATION) continue
-        const key = `${slot}:${location}`
-        expect(seen.has(key), key).toBe(false)
-        seen.add(key)
+      // Six girls with the same eight classes ask for six haunts each in the six slots left.
+      const crowd: Record<string, Partial<HiddenScheduleInput>> = {}
+      for (let i = 0; i < 6; i++) crowd[`c${i}`] = { schedule: EIGHT_CLASSES }
+      // c0 works the library, which every one of them studies at, in three of those six.
+      const job: CharJob = { jobId: 'kendall_library', shifts: [9, 11, 13] }
+      crowd.c0 = { ...crowd.c0, job }
+      const result = buildHiddenSchedules(inputs(crowd))
+      for (const [key, held] of heldPerPlaceSlot(result)) {
+        expect(held, key).toBeLessThanOrEqual(MAX_HAUNTS_PER_PLACE)
       }
+      const workplace = jobDefOf(job.jobId)!.locationId
+      for (const { slot, location } of placements(result)) {
+        if (location !== workplace) continue
+        expect(job.shifts.includes(slot as ShiftSlot), `${location} at ${slot}`).toBe(false)
+      }
+    }
+  })
+
+  it('shares no place at all while there is an empty slot for every haunt', () => {
+    for (let run = 0; run < RUNS; run++) {
+      for (const [key, held] of heldPerPlaceSlot(buildHiddenSchedules(inputs()))) {
+        expect(held, key).toBe(1)
+      }
+    }
+  })
+
+  it('places every haunt of a crowded deal two to a place rather than dropping any', () => {
+    // Nine girls, the same eight classes, one meal out at one diner: six free slots for nine
+    // meals, so three of them must be shared. Groceries then still have room for everybody.
+    const crowd: Record<string, HiddenScheduleInput> = {}
+    for (let i = 0; i < 9; i++) {
+      crowd[`c${i}`] = {
+        homeSlots: 1,
+        study: null,
+        fun: [],
+        activity: null,
+        meal: 'bobbys_diner',
+        schedule: EIGHT_CLASSES
+      }
+    }
+    for (let run = 0; run < RUNS; run++) {
+      const result = buildHiddenSchedules(crowd)
+      for (const [charId, week] of Object.entries(result)) {
+        const places = Object.values(week).map((haunt) => haunt.location)
+        expect(places, charId).toContain('bobbys_diner')
+        expect(places, charId).toContain(GROCERY_LOCATION)
+        expect(places, charId).toContain(ROOM_LOCATION)
+      }
+      const held = [...heldPerPlaceSlot(result).values()]
+      expect(Math.max(...held)).toBe(MAX_HAUNTS_PER_PLACE)
     }
   })
 
@@ -184,5 +243,47 @@ describe('buildHiddenSchedules', () => {
       )
       expect(rooms).toHaveLength(3)
     }
+  })
+
+  describe('around a standing roster', () => {
+    /** One girl out for the arcade alone, nothing else asked of her week. */
+    const her: Record<string, HiddenScheduleInput> = {
+      her: {
+        homeSlots: 1,
+        study: null,
+        fun: ['btb_arcade'],
+        activity: null,
+        meal: null,
+        schedule: {}
+      }
+    }
+    const arcadeHours = SHIFT_SLOTS.filter((slot) => isLocationOpen('btb_arcade', slot))
+    const cuteteaHours = SHIFT_SLOTS.filter((slot) => isLocationOpen('cutetea', slot))
+
+    it('keeps her off a place two standing haunts already hold in a slot', () => {
+      const free = arcadeHours[arcadeHours.length - 1]
+      const week: Record<number, Haunt> = Object.fromEntries(
+        arcadeHours
+          .filter((slot) => slot !== free)
+          .map((slot) => [slot, { location: 'btb_arcade', kind: 'fun' } as Haunt])
+      )
+      for (let run = 0; run < RUNS; run++) {
+        const result = buildHiddenSchedules(her, { weeks: [week, week], jobs: [] })
+        expect(result.her[free]?.location).toBe('btb_arcade')
+      }
+    })
+
+    it('keeps her off a place where a standing shift runs', () => {
+      const free = cuteteaHours[0]
+      const job: CharJob = {
+        jobId: 'cutetea',
+        shifts: cuteteaHours.filter((slot) => slot !== free) as ShiftSlot[]
+      }
+      const input = { her: { ...her.her, fun: ['cutetea'] } }
+      for (let run = 0; run < RUNS; run++) {
+        const result = buildHiddenSchedules(input, { weeks: [], jobs: [job] })
+        expect(result.her[free]?.location).toBe('cutetea')
+      }
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { coursePointsOf, gradedCourses } from '@shared/academics'
 import type { ApplicationContinuation } from '@shared/application'
-import { overTextDesc } from '@shared/relationship'
+import { overTextMemory } from '@shared/relationship'
 import { mintId } from '@shared/saveRules'
 import {
   advancesAfter,
@@ -11,10 +11,16 @@ import {
   intakeOf,
   semesterChain,
   semesterShiftOf,
+  withTransfers,
   type SemesterCalendar,
   type SemesterView
 } from '@shared/semesters'
-import type { NpcFriendship, NpcRelationshipMap } from '@shared/npcRelationships'
+import type {
+  NpcCouple,
+  NpcFriendship,
+  NpcRelationship,
+  NpcRelationshipMap
+} from '@shared/npcRelationships'
 import type { GameReplays } from '@shared/replays'
 import type { ReaderTallies } from '@shared/tallies'
 import type {
@@ -38,7 +44,8 @@ import type {
   SemesterCarry,
   SemesterHandoff,
   SocialPost,
-  Transcript
+  Transcript,
+  Transfer
 } from '@shared/types'
 import type { PlayerStats } from '@shared/playerStats'
 import { handedBackAcedCount } from '../prompts/classProgress'
@@ -85,6 +92,9 @@ export interface CarryInput {
   bunnybotThrough: number
   npcRelationships: NpcRelationshipMap
   npcFriendships: readonly NpcFriendship[]
+  npcCouples: readonly NpcCouple[]
+  /** Who transferred in this semester, in arrival order, for the calendar to seat later. */
+  transfers: readonly Transfer[]
 }
 
 /** A memory moved onto the next semester's clock, its age frozen across the break. */
@@ -116,7 +126,7 @@ function carriedState(
     const text = memory(state.textMemory)
     // A graduate keeps what texting left her as one of her memories, said as texted.
     if (graduate) {
-      state.memories = withMemoryInOrder(state.memories, { ...text, desc: overTextDesc(text.desc) })
+      state.memories = withMemoryInOrder(state.memories, overTextMemory(text))
       delete state.textMemory
     } else {
       state.textMemory = text
@@ -156,8 +166,13 @@ function carriedFeed(feed: readonly SocialPost[], shift: number): SocialPost[] {
 
 /** A thread moved onto the next semester's clock, with nothing of this semester still pending. */
 function carriedConversation(conversation: Conversation, shift: number): Conversation {
-  const { pendingHangout: _pending, declined: _declined, turnedDown: _turnedDown, ...rest } =
-    conversation
+  const {
+    pendingHangout: _pending,
+    declined: _declined,
+    turnedDown: _turnedDown,
+    advice: _advice,
+    ...rest
+  } = conversation
   return {
     ...rest,
     messages: conversation.messages.map((message) => ({ ...message, date: message.date - shift }))
@@ -184,10 +199,31 @@ function carriedBunnyboard(
   }
 }
 
-/** Every pair's standing kept, its last meeting dropped: that meeting belongs to the old clock. */
-function carriedRelationships(map: NpcRelationshipMap): NpcRelationshipMap {
+/**
+ * Every pair's standing kept and its dates moved onto the next clock, its last event dropped:
+ * that belongs to the old one. A crush held by or on a graduate ends with her time here.
+ */
+function carriedRelationships(
+  map: NpcRelationshipMap,
+  shift: number,
+  isGraduate: (charId: string) => boolean
+): NpcRelationshipMap {
   return Object.fromEntries(
-    Object.entries(map).map(([key, pair]) => [key, { affinity: pair.affinity }])
+    Object.entries(map).map(([key, pair]) => {
+      const carried: NpcRelationship = { affinity: pair.affinity }
+      if (pair.dating !== undefined) carried.dating = pair.dating - shift
+      if (pair.ended !== undefined) carried.ended = pair.ended - shift
+      if (pair.crush && !key.split('|').some(isGraduate)) {
+        carried.crush = [...pair.crush]
+        if (pair.crushAsked) carried.crushAsked = [...pair.crushAsked]
+      }
+      if (pair.cheated) {
+        carried.cheated = Object.fromEntries(
+          Object.entries(pair.cheated).map(([charId, day]) => [charId, day - shift])
+        )
+      }
+      return [key, carried]
+    })
   )
 }
 
@@ -240,11 +276,16 @@ function carriedTranscript(input: CarryInput): Transcript {
 
 /**
  * A settled half carried into the next semester: her intake written down, her year moved on where
- * her intake moves now, and a graduate's week emptied.
+ * her intake moves now, a transfer's arrival left behind, and a graduate's week emptied.
  */
 function carriedProfile(profile: CharProfile, graduate: boolean, view: SemesterView): CharProfile {
   const intake = intakeOf(profile)
-  const { hiddenSchedule: _week, springBreakPlans: _plans, ...rest } = profile
+  const {
+    hiddenSchedule: _week,
+    springBreakPlans: _plans,
+    transferredAt: _arrived,
+    ...rest
+  } = profile
   if (graduate) return { ...rest, intake, schedule: {} }
   return {
     ...rest,
@@ -320,14 +361,16 @@ export function carryOf(input: CarryInput, view: SemesterView): SemesterHandoff 
     bunnybotSeenTipSent: input.bunnybotSeenTipSent,
     bunnybotDeferred: [...input.bunnybotDeferred],
     bunnybotThrough: input.bunnybotThrough,
-    npcRelationships: carriedRelationships(input.npcRelationships),
+    npcRelationships: carriedRelationships(input.npcRelationships, shift, isGraduate),
     npcFriendships: input.npcFriendships.map((pair) => ({ ...pair, date: pair.date - shift })),
+    npcCouples: input.npcCouples.map((couple) => ({ ...couple, date: couple.date - shift })),
     charInfo,
     before: {
       history: input.history,
       ...(Object.keys(input.replays).length > 0 ? { replays: input.replays } : {}),
       playerSchedule: { ...input.playerSchedule },
-      events: [...input.events]
+      events: [...input.events],
+      ...(input.transfers.length > 0 ? { transfers: [...input.transfers] } : {})
     }
   }
 
@@ -344,18 +387,31 @@ export function carryOf(input: CarryInput, view: SemesterView): SemesterHandoff 
   }
 }
 
-/** Every class this timeline has run, by code, oldest semester first: what the catalog avoids. */
-function takenClassesOf(
+/**
+ * Every class this timeline has run through the semester `from`, by code, oldest semester first,
+ * with the pool or major it ran in: what the catalog avoids. `last` holds the transfers of the
+ * semester `from` itself, whose classes the record does not hold while it runs or as it ends.
+ */
+export function takenClassesOf(
   record: PlaythroughRecord,
-  from: string | undefined
-): { code: string; name: string }[] {
-  const taken = new Map<string, string>()
-  for (const { view } of semesterChain(record, from)) {
-    for (const entry of Object.values(view.classes)) {
-      if (!taken.has(entry.code)) taken.set(entry.code, entry.name)
+  from: string | undefined,
+  last?: { transfers?: readonly Transfer[] } | null
+): ApplicationContinuation['taken'] {
+  const taken = new Map<string, ApplicationContinuation['taken'][number]>()
+  const chain = semesterChain(record, from)
+  for (const [index, { view }] of chain.entries()) {
+    const ran = index === chain.length - 1 ? withTransfers(view, last) : view
+    for (const entry of Object.values(ran.classes)) {
+      if (taken.has(entry.code)) continue
+      taken.set(entry.code, {
+        code: entry.code,
+        name: entry.name,
+        category: entry.category,
+        ...(entry.major ? { major: entry.major } : {})
+      })
     }
   }
-  return [...taken].map(([code, name]) => ({ code, name }))
+  return [...taken.values()]
 }
 
 /**
@@ -373,6 +429,7 @@ export function continuationOf(
     id: mintId(new Set(Object.keys(record.semesters ?? {}))),
     ...(from !== undefined ? { parent: from } : {}),
     ...(ending !== null ? { ending } : {}),
-    taken: takenClassesOf(record, from)
+    // The ended semester's transfers ride the handoff until the next semester writes the record.
+    taken: takenClassesOf(record, from, handoff.carry.before)
   }
 }

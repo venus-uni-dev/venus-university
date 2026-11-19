@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type JSX, type MutableRefObject } from 'react'
 import { motion } from 'motion/react'
+import { MAX_ENDING_FRIENDS } from '@shared/endingPicture'
 import { MAX_OUTPUT_TOKENS } from '@shared/llm/adapter'
 import {
   DEFAULT_MEMORY_BUDGETS,
   DEFAULT_SECRET_BUDGET,
   SAMPLING_FIELDS,
+  endingPictureMaxProblem,
   maxOutputTokensProblem,
   memoryBudgetProblem,
   parseMaxOutputTokens,
@@ -42,6 +44,9 @@ const MEMORY_FIELDS: readonly { key: MemoryBudgetKey; label: string }[] = [
 /** The secret budget's label, which also names it in the line saying what is wrong with it. */
 const SECRET_LABEL = 'Secrets per character'
 
+/** The graduation picture cap's label, which also names it in the line saying what is wrong with it. */
+const ENDING_PICTURE_LABEL = 'Graduation picture max characters'
+
 /** A stored number as the text a field would show for it, or blank where it is absent. */
 function textOf(value: number | undefined): string {
   return value !== undefined ? String(value) : ''
@@ -49,9 +54,9 @@ function textOf(value: number | undefined): string {
 
 /**
  * Settings' Advanced tab: the reply cap and sampling values a custom endpoint is sent, the
- * per-cast-size memory budgets and the secret budget, each written the moment its field is left,
- * a value it cannot take held in its box and written nowhere. The cap and the sampling fields are dead under
- * Gemini, which is sent none of them.
+ * per-cast-size memory budgets, the secret budget and the graduation picture's cap, each written
+ * the moment its field is left, a value it cannot take held in its box and written nowhere. The
+ * reply cap and the sampling fields are dead under Gemini, which is sent none of them.
  */
 export function SettingsAdvancedTab({
   onProblemChange,
@@ -78,6 +83,7 @@ export function SettingsAdvancedTab({
     three: textOf(settings?.memoryBudgets?.three)
   }))
   const [secretText, setSecretText] = useState(() => textOf(settings?.secretBudget))
+  const [endingText, setEndingText] = useState(() => textOf(settings?.endingPictureMax))
 
   // What this tab has last sent for each field, ahead of the store while a write is in the
   // lane: each blur is compared and merged against it, so a second field left before the first
@@ -87,11 +93,13 @@ export function SettingsAdvancedTab({
     sampling: Partial<Record<SamplingKey, number>>
     budgets: MemoryBudgets
     secrets: number | undefined
+    ending: number | undefined
   }>({
     cap: settings ? storedMaxOutputTokens(settings) : undefined,
     sampling: Object.fromEntries(SAMPLING_FIELDS.map((field) => [field.key, settings?.[field.key]])),
     budgets: { ...settings?.memoryBudgets },
-    secrets: settings?.secretBudget
+    secrets: settings?.secretBudget,
+    ending: settings?.endingPictureMax
   })
 
   // Gemini is sent none of the five, so under it they are dead and checked for nothing.
@@ -162,6 +170,20 @@ export function SettingsAdvancedTab({
     setSecretText(textOf(stored))
   }
 
+  /** Writes the graduation picture's cap once its text checks out and differs from what was last sent. */
+  async function commitEnding(): Promise<void> {
+    if (endingPictureMaxProblem(ENDING_PICTURE_LABEL, endingText) !== null) return
+    const parsed = parseMemoryBudget(endingText)
+    if (parsed === sent.current.ending) return
+    sent.current.ending = parsed
+    const ok = await update({ endingPictureMax: parsed })
+    if (ok) return
+    // Put the field back to whatever the store still holds.
+    const stored = useSettingsStore.getState().settings?.endingPictureMax
+    sent.current.ending = stored
+    setEndingText(textOf(stored))
+  }
+
   // The first thing wrong with a field as it is currently typed, the cap and the sampling fields
   // counted only while they are live.
   const problem =
@@ -175,6 +197,7 @@ export function SettingsAdvancedTab({
       (p) => p !== null
     ) ??
     memoryBudgetProblem(SECRET_LABEL, secretText) ??
+    endingPictureMaxProblem(ENDING_PICTURE_LABEL, endingText) ??
     null
 
   useEffect(() => onProblemChange(problem), [problem])
@@ -188,6 +211,7 @@ export function SettingsAdvancedTab({
     }
     for (const field of MEMORY_FIELDS) await commitMemory(field.key, field.label)
     await commitSecrets()
+    await commitEnding()
   }
 
   if (!settings) return null
@@ -271,6 +295,16 @@ export function SettingsAdvancedTab({
               placeholder={String(DEFAULT_SECRET_BUDGET)}
               maxLength={3}
               onBlur={() => void commitSecrets()}
+            />
+            <span className="vu-settings-heading">Other</span>
+            <TextField
+              id="advanced-ending-picture"
+              label={ENDING_PICTURE_LABEL}
+              value={endingText}
+              onChange={setEndingText}
+              placeholder={String(MAX_ENDING_FRIENDS)}
+              maxLength={2}
+              onBlur={() => void commitEnding()}
             />
           </div>
           <div className="vu-scroll-fade" />

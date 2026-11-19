@@ -145,12 +145,24 @@ export function eyeColorOf(baseAppearance: readonly string[]): string | null {
 /** Breast size — pick 0–1; `draftToCharacter` suffixes the pick into `{size}_breasts`. */
 export const BREAST_SIZES = ['small', 'big'] as const
 
+/** Build for a male character — pick 0–1; none is slim. */
+export const MALE_BUILDS = ['muscular_male', 'bishounen'] as const
+
 /** Skin — pick 0–1. */
 export const SKIN_TAGS = ['tan', 'dark-skinned_female', 'freckles'] as const
 
+/** Skin for a male character — pick 0–1. */
+export const MALE_SKIN_TAGS = ['tan', 'dark-skinned_male', 'freckles'] as const
+
+/** Every skin tag of either vocabulary, each once. */
+const ALL_SKIN_TAGS = [...new Set([...SKIN_TAGS, ...MALE_SKIN_TAGS])]
+
 /** The words each skin tag of the vocabulary is read back as; fair skin is never written out. */
-const SKIN_WORDS: Readonly<Record<(typeof SKIN_TAGS)[number], string>> = {
+const SKIN_WORDS: Readonly<
+  Record<(typeof SKIN_TAGS)[number] | (typeof MALE_SKIN_TAGS)[number], string>
+> = {
   'dark-skinned_female': 'dark',
+  'dark-skinned_male': 'dark',
   tan: 'tan',
   freckles: 'freckled'
 }
@@ -159,12 +171,12 @@ const SKIN_WORDS: Readonly<Record<(typeof SKIN_TAGS)[number], string>> = {
 const NOT_SKIN_COLORS: readonly string[] = ['shiny_skin', 'colored_skin']
 
 /**
- * Her skin off her `baseAppearance`, as words: every skin tag of the vocabulary she carries, or
- * else the first other `_skin` tag's colour (`blue_skin` is `blue`); empty for fair skin.
+ * Her skin off her `baseAppearance`, as words: every skin tag of either vocabulary she carries,
+ * or else the first other `_skin` tag's colour (`blue_skin` is `blue`); empty for fair skin.
  */
 export function skinTonesOf(baseAppearance: readonly string[]): string[] {
   const tags = baseAppearance.map(bareTag)
-  const known = SKIN_TAGS.filter((tag) => tags.includes(tag)).map((tag) => SKIN_WORDS[tag])
+  const known = ALL_SKIN_TAGS.filter((tag) => tags.includes(tag)).map((tag) => SKIN_WORDS[tag])
   if (known.length > 0) return known
   const other = tags.find(
     (tag) => tag.endsWith('_skin') && tag.length > '_skin'.length && !NOT_SKIN_COLORS.includes(tag)
@@ -191,12 +203,26 @@ export const HEAD_ACCESSORIES = [
   'ear_piercing'
 ] as const
 
+/** Head accessories for a male character — optional, any number. */
+export const MALE_HEAD_ACCESSORIES = [
+  'headband',
+  'hairclip',
+  'hair_ornament',
+  'glasses',
+  'earrings',
+  'ear_piercing'
+] as const
+
+/** Facial hair for a male character — pick 0–1. */
+export const FACIAL_HAIR = ['stubble', 'beard', 'goatee', 'mustache'] as const
+
 /** Hair length — pick 1; `draftToCharacter` suffixes the pick into `{length}_hair`. */
 export const HAIR_LENGTHS = ['very_short', 'short', 'medium', 'long'] as const
 
 /** Hair style — pick 1 or more. */
 export const HAIR_STYLES = [
   'bob_cut',
+  'bowl_cut',
   'hime_cut',
   'pixie_cut',
   'wolf_cut',
@@ -215,7 +241,21 @@ export const HAIR_STYLES = [
   'drill_hair'
 ] as const
 
-/** Bangs — pick 1 or more. */
+/** Hair style for a male character — pick 1 or more. */
+export const MALE_HAIR_STYLES = [
+  'undercut',
+  'parted_hair',
+  'bowl_cut',
+  'pixie_cut',
+  'buzz_cut',
+  'crew_cut',
+  'hair_slicked_back',
+  'ponytail',
+  'wolf_cut',
+  'mullet'
+] as const
+
+/** Bangs — pick 0 or more. */
 export const HAIR_BANGS = [
   'blunt_bangs',
   'swept_bangs',
@@ -230,11 +270,15 @@ export const HAIR_BANGS = [
 /** Hair texture — pick 1; `draftToCharacter` suffixes the pick into `{texture}_hair`. */
 export const HAIR_TEXTURES = ['straight', 'wavy', 'curly', 'messy'] as const
 
+/** Hair texture for a male character — pick 1, suffixed as {@link HAIR_TEXTURES} is. */
+export const MALE_HAIR_TEXTURES = [...HAIR_TEXTURES, 'spiked'] as const
+
 /** Hair tags that say something other than its colour. */
 const NOT_HAIR_COLORS: readonly string[] = [
   ...HAIR_LENGTHS.map((length) => `${length}_hair`),
-  ...HAIR_TEXTURES.map((texture) => `${texture}_hair`),
+  ...MALE_HAIR_TEXTURES.map((texture) => `${texture}_hair`),
   'drill_hair',
+  'parted_hair',
   'very_long_hair',
   'absurdly_long_hair',
   'multicolored_hair',
@@ -242,7 +286,6 @@ const NOT_HAIR_COLORS: readonly string[] = [
   'streaked_hair',
   'gradient_hair',
   'colored_inner_hair',
-  'spiked_hair',
   'floating_hair',
   'wet_hair',
   'big_hair'

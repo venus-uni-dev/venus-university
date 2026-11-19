@@ -10,7 +10,7 @@ import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { useCharacterStore, useSpriteVersion } from '../stores/characterStore'
 import { useUiStore } from '../stores/uiStore'
-import { HandPreviewModal } from './HandPreviewModal'
+import { RegionPreviewModal } from './RegionPreviewModal'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 
 export interface FingerFixModalProps {
@@ -53,6 +53,8 @@ export function FingerFixModal({
   const outfits = useCharacterStore((s) => s.outfits[charId])
   const hasBaseImage = useCharacterStore((s) => s.hasBaseImage)
   const discardLayer = useCharacterStore((s) => s.discardWardrobeLayer)
+  const fixHands = useCharacterStore((s) => s.fixHands)
+  const cancelHandFix = useCharacterStore((s) => s.cancelHandFix)
   const present = set === null ? expressions : outfits?.[set]
   const repairing = EMOTIONS.filter((emotion: Emotion) => present?.[emotion])
 
@@ -172,13 +174,15 @@ export function FingerFixModal({
 
       <AnimatePresence propagate>
         {previewing !== null && (
-          <HandPreviewModal
+          <RegionPreviewModal
             key="preview"
+            repair="hands"
             charId={charId}
             set={set}
             title={title}
             theme={theme}
-            paintLayer={previewing}
+            render={() => fixHands(charId, set, previewing)}
+            cancel={() => void cancelHandFix(charId, set)}
             emotions={repairing}
             onCancel={() => setPreviewing(null)}
             // The preview comes down with the panel it applied to, for the discard confirm's reason.

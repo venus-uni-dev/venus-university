@@ -1,6 +1,6 @@
 /* The wardrobe repairs: a sprite, a layer of paint over or under it or a mask cut out of it,
-   and the tools that do it — Fix holes, Fix fingers and Erase artifacts are one chassis, so
-   this is one file rather than three kept in step by hand. Imported from `LayerPainter` and
+   and the tools that do it — Fix holes, Fix fingers, Erase artifacts and Repaint are one
+   chassis, so this is one file rather than four kept in step by hand. Imported from `LayerPainter` and
    the eraser, never from index.css — a screen's file must load after base.css or its
    overrides lose at equal specificity.
 
@@ -60,6 +60,16 @@
   /* The canvas is drawn to its own edges, so nothing may pan or scroll under a stroke
      that leaves it — the pointer is still painting. */
   touch-action: none;
+}
+
+/* Under a mark layer, which takes the pointer for both. */
+.vu-fix-paint--under {
+  pointer-events: none;
+}
+
+/* Repaint's Mark: drawn opaque in the accent, shown faint, so the sprite under it reads. */
+.vu-fix-mark {
+  opacity: 0.4;
 }
 
 .vu-fix-sprite {

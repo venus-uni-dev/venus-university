@@ -1,8 +1,9 @@
 import { zipSync } from 'fflate'
 import { expressionRel } from '@shared/characterFiles'
-import { defaultTagsOf } from '@shared/defaultTags'
+import { defaultTagsOf, subjectTagsOf } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { appError } from '@shared/errors'
+import { fillPronouns, genderOf } from '@shared/gender'
 import { imageTypeOf } from '@shared/imageBytes'
 import { utf8ToBase64, withTextChunks } from '@shared/pngText'
 import { CARD_BG, CARD_SIZE, cardFrame, SILLYTAVERN_EMOTIONS } from '@shared/sillyTavern'
@@ -32,7 +33,13 @@ export async function composeCard(charId: string, character: Character): Promise
   const spriteResult = await window.api.chars.readImage(charId, expressionRel('neutral'))
   if (!spriteResult.ok) throw spriteResult.error
   if (!spriteResult.data) {
-    throw appError('CARD_NO_SPRITE', 'She has no neutral sprite yet. Render her sprites first.')
+    throw appError(
+      'CARD_NO_SPRITE',
+      fillPronouns(
+        '{They} has no neutral sprite yet. Render {their} sprites first.',
+        genderOf(character)
+      )
+    )
   }
 
   const cropResult = await window.api.chars.profileCrop(charId)
@@ -72,7 +79,7 @@ export async function composeCard(charId: string, character: Character): Promise
   const card = buildCharacterCard(
     character,
     new Date(),
-    defaultTagsOf(useSettingsStore.getState().settings).subject
+    subjectTagsOf(defaultTagsOf(useSettingsStore.getState().settings), genderOf(character))
   )
   const cardBytes = withTextChunks(bytes, {
     chara: utf8ToBase64(JSON.stringify(card.v2)),
@@ -83,9 +90,12 @@ export async function composeCard(charId: string, character: Character): Promise
 
 /**
  * Composes a character's rendered expressions as a base64 zip under SillyTavern's names, each
- * sprite copied under every label it stands in for.
+ * sprite copied under every label it stands in for; `character` is whom a refusal speaks of.
  */
-export async function composeSpritePack(charId: string): Promise<string> {
+export async function composeSpritePack(
+  charId: string,
+  character: Pick<Character, 'gender'> | undefined
+): Promise<string> {
   const files: Record<string, Uint8Array> = {}
   for (const emotion of EMOTIONS) {
     const result = await window.api.chars.readImage(charId, expressionRel(emotion))
@@ -97,7 +107,10 @@ export async function composeSpritePack(charId: string): Promise<string> {
     for (const label of SILLYTAVERN_EMOTIONS[emotion]) files[`${label}.${ext}`] = result.data
   }
   if (Object.keys(files).length === 0) {
-    throw appError('SPRITES_NONE', 'She has no sprites yet. Render her sprites first.')
+    throw appError(
+      'SPRITES_NONE',
+      fillPronouns('{They} has no sprites yet. Render {their} sprites first.', genderOf(character))
+    )
   }
   // Level 0: the art is already compressed, and a stored zip is what the desktop importer
   // and the shipped packs both are.

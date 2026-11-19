@@ -16,8 +16,9 @@ import {
   withGirlChanged,
   type ApplicationGirl
 } from '@shared/application'
+import { genderOf } from '@shared/gender'
 import { DISPOSITION_LABELS } from '@shared/relationship'
-import type { Character, CharMemory, Season } from '@shared/types'
+import type { Character, CharMemory, Gender, Season } from '@shared/types'
 import { DeleteX } from '../components/DeleteX'
 import { MemoryRow } from '../components/MemoryRow'
 import { TitleTab } from '../components/TitleTab'
@@ -56,6 +57,7 @@ function changeMemories(charId: string, change: (memories: CharMemory[]) => Char
 function MemoryLine({
   charId,
   name,
+  gender,
   masked,
   index,
   memory,
@@ -64,6 +66,8 @@ function MemoryLine({
 }: {
   charId: string
   name: string
+  /** The gender of the one who remembers it. */
+  gender: Gender
   masked: boolean
   index: number
   memory: CharMemory
@@ -85,6 +89,7 @@ function MemoryLine({
       <MemoryRow
         id={`start-memory-${index}`}
         name={name}
+        gender={gender}
         faceOf={charId}
         masked={masked}
         type={memory.type}
@@ -199,6 +204,7 @@ export function StartMemoriesModal({
                     key={index}
                     charId={charId}
                     name={name}
+                    gender={genderOf(character)}
                     masked={hidden}
                     index={index}
                     memory={memory}

@@ -8,7 +8,9 @@ import {
   customCgSlotNumber,
   customCgSlotOf,
   customCgSlotsIn,
-  STOCK_CG_DISPLAY_ORDER
+  STOCK_CG_DISPLAY_ORDER,
+  stockCgsFor,
+  stockCgsInPlay
 } from '@shared/positions'
 import type { Position } from '@shared/types'
 import { PageArrows, wrapPage } from '../components/PageArrows'
@@ -17,6 +19,7 @@ import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
+import { matchCgBiologyOf, useSettingsStore } from '../stores/settingsStore'
 import { cgKnownMissing } from '../stores/stageDisplay'
 import type { ScreenTheme } from './clockTheme'
 import { CG_PAGE_SLOTS, pageSlotNumbers, slotPageCount } from './customPages'
@@ -46,15 +49,16 @@ interface CgPage {
 const STOCK_PAGE: CgPage = { title: 'NSFW CG', positions: STOCK_CG_DISPLAY_ORDER, custom: false }
 
 /**
- * The stock page, then her own pairs on as many pages as her highest slot in use needs, at least
- * one, each slot in the cell the Custom CG panel stands it in with its `_after` under its main.
+ * The stock page where the character has the stock CGs, then her own pairs on as many pages as
+ * her highest slot in use needs, at least one, each slot in the cell the Custom CG panel stands
+ * it in with its `_after` under its main.
  */
-function pagesFor(lastTaken: number): CgPage[] {
+function pagesFor(lastTaken: number, stock: boolean): CgPage[] {
   const custom = Array.from({ length: slotPageCount(lastTaken, CG_PAGE_SLOTS) }, (_, page) => {
     const slots = pageSlotNumbers(page, CG_PAGE_SLOTS).map(customCgSlotAt)
     return { title: 'Custom CG', positions: [...slots, ...slots.map(afterOf)], custom: true }
   })
-  return [STOCK_PAGE, ...custom]
+  return stock ? [STOCK_PAGE, ...custom] : custom
 }
 
 /** A page's cells dealing in with the page, quick and close together. */
@@ -68,27 +72,34 @@ export interface CgPickerModalProps {
 }
 
 /**
- * One character's CGs a page at a time, the stock eight and then her own pairs. A click puts one
- * over the whole stage and a second click on it takes it off; a set not whole on disk is drawn
- * as gaps.
+ * One character's CGs a page at a time, the stock eight and then her own pairs, a male
+ * character's own pairs alone. A click puts one over the whole stage and a second click on it
+ * takes it off; a set not whole on disk is drawn as gaps.
  */
 export function CgPickerModal({ theme, charId, onClose }: CgPickerModalProps): JSX.Element | null {
   const character = useGameStore((s) => s.characters[charId])
   const cgReady = useGameStore((s) => s.cgReady)
   const customCgReady = useGameStore((s) => s.customCgReady)
   const cgLock = useGameStore((s) => s.cgLock)
+  // The stock eight draw the reader male, so they stand only where they match the reader.
+  const stockCgs = stockCgsInPlay(
+    useGameStore((s) => s.playerPronouns),
+    useSettingsStore(matchCgBiologyOf)
+  )
   const setCgLock = useGameStore((s) => s.setCgLock)
   const version = useSpriteVersion(charId)
 
   /** Whether a CG's whole set is on disk, which is what makes it hers to pick. */
   const pickable = (position: Position): boolean => {
     const slot = customCgSlotOf(position)
-    return slot ? customCgReady[charId]?.includes(slot) === true : cgReady[charId] === true
+    return slot
+      ? customCgReady[charId]?.includes(slot) === true
+      : stockCgs && cgReady[charId] === true
   }
   // Her CG over the stage, as the stage draws it; pressed again, it comes off.
   const inForce =
     cgLock?.charId === charId &&
-    !cgKnownMissing(charId, cgLock.position, { cgReady, customCgReady })
+    !cgKnownMissing(charId, cgLock.position, { cgReady, customCgReady, stockCgs })
       ? cgLock.position
       : null
 
@@ -97,7 +108,7 @@ export function CgPickerModal({ theme, charId, onClose }: CgPickerModalProps): J
     ...Object.keys(character?.customCgs ?? {}),
     ...(customCgReady[charId] ?? [])
   ])
-  const pages = pagesFor(Math.max(0, ...taken.map(customCgSlotNumber)))
+  const pages = pagesFor(Math.max(0, ...taken.map(customCgSlotNumber)), stockCgsFor(character) && stockCgs)
 
   // Opens on the page holding her CG in force, else the first with anything to pick.
   const [page, setPage] = useState(() => {

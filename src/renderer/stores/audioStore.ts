@@ -8,10 +8,11 @@ import {
   VOICE_PREVIEW_BLIP_MS,
   VOICE_PREVIEW_BLIPS,
   VOICE_PREVIEW_BREATH_S,
+  voiceSemitonesOf,
   volumesOf
 } from '@shared/audio'
 import type { AudioKey, DayHalf, Volumes } from '@shared/audio'
-import type { Conversation, RendererSettings } from '@shared/types'
+import type { Conversation, Gender, RendererSettings } from '@shared/types'
 import { slotHalf, weekendSaturdayOf } from '../prompts/gameDate'
 import { isEpilogueNight } from '../prompts/graduation'
 import { slotWeather } from '../prompts/weather'
@@ -21,7 +22,8 @@ import * as engine from './audioEngine'
 import { AUDIO_CHANNELS } from './audioEngine'
 import { useCrossingStore } from './crossingStore'
 import { useGameStore } from './gameStore'
-import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
+import { matchCgBiologyOf, noNsfwImagesOf, useSettingsStore } from './settingsStore'
+import { stockCgsInPlay } from '@shared/positions'
 import { soundscapeOf, stingsOf, type SoundFacts } from './soundscape'
 import { displayedCgOf, displaySlotsOf } from './stageDisplay'
 import { useUiStore, type ViewName } from './uiStore'
@@ -45,7 +47,7 @@ interface AudioStoreState {
   /** Plays one sound through once — what a view fires when the interface itself makes a noise. */
   play: (key: AudioKey, opts?: { semitones?: number }) => void
   /** Reads a voice out where it is being tuned: a breath at that pitch, then a run of blips. */
-  previewVoice: (voicePitch: number, breath: boolean) => void
+  previewVoice: (voicePitch: number, gender: Gender, breath: boolean) => void
   /** Moves the buses while a slider is being dragged, ahead of any write to settings. */
   setLiveVolumes: (volumes: Volumes) => void
 }
@@ -78,7 +80,7 @@ export const useAudioStore = create<AudioStoreState>(() => ({
 
   play: (key, opts) => engine.playOneShot(key, opts?.semitones ?? 0),
 
-  previewVoice: (voicePitch, breath) => {
+  previewVoice: (voicePitch, gender, breath) => {
     clearPreview()
     engine.stopSnippet()
 
@@ -91,7 +93,7 @@ export const useAudioStore = create<AudioStoreState>(() => ({
     }
 
     // The blips follow the breath, or open the preview where there is none.
-    const semitones = pitchSemitonesOf(voicePitch, AUDIO_FILES.voice.pitch)
+    const semitones = voiceSemitonesOf(voicePitch, gender)
     const start = breath ? VOICE_PREVIEW_BREATH_S * 1000 : 0
     for (let blip = 0; blip < VOICE_PREVIEW_BLIPS; blip++) {
       previewTimers.push(
@@ -215,7 +217,11 @@ function gameFactsOf(): NonNullable<SoundFacts['game']> {
     emotions: game.emotions,
     lock: game.cgLock,
     hasCharacter: (charId) => Boolean(game.characters[charId]),
-    ready: { cgReady: game.cgReady, customCgReady: game.customCgReady },
+    ready: {
+      cgReady: game.cgReady,
+      customCgReady: game.customCgReady,
+      stockCgs: stockCgsInPlay(game.playerPronouns, matchCgBiologyOf(useSettingsStore.getState()))
+    },
     noNsfwImages: noNsfwImagesOf(useSettingsStore.getState())
   })
   const character = cg ? game.characters[cg.charId] : null

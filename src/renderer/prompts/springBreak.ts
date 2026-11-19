@@ -1,5 +1,6 @@
+import { genderOf, PRONOUNS, readerWords, type ReaderPronouns } from '@shared/gender'
 import { isPositive } from '@shared/relationship'
-import type { CharInfo } from '@shared/types'
+import type { CharInfo, Character } from '@shared/types'
 import { formatDatePart } from './gameDate'
 import { breakWeekOf } from './occasions'
 
@@ -55,15 +56,19 @@ export function sendsSpringBreakNotice(info: CharInfo | undefined, affection: nu
 
 /**
  * The one sentence a character's spring break earns, from the notice through to the Saturday
- * after she is back.
+ * after they are back, naming the reader outright where the reader's pronoun would read as theirs.
  */
 export function springBreakLines(
-  firstName: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   plans: string | undefined,
   away: readonly string[] | null | undefined,
   charId: string,
-  date: number
+  date: number,
+  reader: ReaderPronouns
 ): string[] {
+  const { firstName } = who
+  const g = genderOf(who)
+  const p = PRONOUNS[g]
   if (!away) return []
   if (date < SPRING_BREAK_NOTICE || date >= SPRING_BREAK_FORGET) return []
 
@@ -79,16 +84,18 @@ export function springBreakLines(
   if (date < SPRING_BREAK_LEAVE) {
     return [
       `${firstName} has spring break plans next week${tail}` +
-        " She's leaving campus on Saturday without the reader, who is staying in Veridan for" +
+        ` ${p.They}'s leaving campus on Saturday without the reader, who is staying in Veridan for` +
         ' the break, and is fully committed.'
     ]
   }
   if (date < SPRING_BREAK_RETURN) {
     return [
       `${firstName} left campus for spring break on ${formatDatePart(SPRING_BREAK_LEAVE, 'spring')}` +
-        ` and can't hang out. What she's currently doing${tail}` +
-        ' The reader is not with her: he stayed in Veridan.'
+        ` and can't hang out. What ${p.they}'s currently doing${tail}` +
+        (g === 'male'
+          ? ' The reader stayed in Veridan and is not with him.'
+          : ` The reader is not with her: ${readerWords(reader, g).he} stayed in Veridan.`)
     ]
   }
-  return [`${firstName} came back from her spring break vacation on Sunday morning${tail}`]
+  return [`${firstName} came back from ${p.their} spring break vacation on Sunday morning${tail}`]
 }

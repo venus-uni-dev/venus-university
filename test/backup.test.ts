@@ -198,7 +198,7 @@ async function seedPlaythrough(): Promise<{ playthroughId: string; saveIds: stri
 
 /** A character on disk with sprites, a CG and a staging tree to leave behind. */
 async function seedCharacter(): Promise<Character> {
-  const created = await createCharacter('Mina', 'Aoki')
+  const created = await createCharacter('Mina', 'Aoki', 'female')
   const charId = created.charId
 
   for (const emotion of EMOTIONS) {

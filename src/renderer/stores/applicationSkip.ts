@@ -14,6 +14,7 @@ import {
   type ProfileField
 } from '@shared/application'
 import { DORM_IDS, type DormId } from '@shared/dorms'
+import { fillPronouns, genderOf } from '@shared/gender'
 import { JOB_CATALOG } from '@shared/jobs'
 import { FUN_LOCATIONS, MEAL_LOCATIONS, STUDY_LOCATIONS } from '@shared/locations'
 import {
@@ -28,7 +29,7 @@ import {
 } from '@shared/odds'
 import { heldSecretsOf, SECRET_TIERS, secretText, secretTiersWanted } from '@shared/secrets'
 import { pick, shuffle } from '@shared/shuffle'
-import { charKeyOf, type Character } from '@shared/types'
+import { charKeyOf, type Character, type Gender, type SecretTier } from '@shared/types'
 import { shortfallOf, type DealtClasses } from '../prompts/classPrompt'
 import { CLASS_POOLS, classBagOf } from '../prompts/classPool'
 import { occasionBagOf, occasionPoolKindOf, occasionPoolOf } from '../prompts/occasionPool'
@@ -37,10 +38,13 @@ import {
   ACTIVITY_BAG,
   MAJOR_BAG,
   MAJORS,
+  poolLineFits,
+  poolLineText,
   PURSUIT_BAG,
   PURSUITS,
   SPRING_BREAK_BAG,
-  SPRING_BREAK_PLANS
+  SPRING_BREAK_PLANS,
+  type PoolLine
 } from '../prompts/profilePool'
 import { normalizeActivity } from '../prompts/profilePrompt'
 import { SECRET_POOLS, secretBagOf, secretFor } from '../prompts/secretPool'
@@ -76,6 +80,47 @@ function dealEach<T>(
   const dealt = deal(bag, items, count, keyOf, accept)
   if (dealt.length === 0) return []
   return Array.from({ length: count }, (_, index) => dealt[index % dealt.length])
+}
+
+/** Both genders, in the order their holders are dealt. */
+const GENDERS: readonly Gender[] = ['female', 'male']
+
+/**
+ * One pooled line for each holder, said of them by `say`, undefined where the pool has none for
+ * them. The holders of one gender are dealt together, off the whole pool so every key stays in
+ * the bag, with `accept` passing the lines that fit them; what the bag deals is kept to those
+ * lines even where it makes up a shortfall from the rest, so no line reaches a holder it does
+ * not fit.
+ */
+function dealFitting<H extends Pick<Character, 'gender'>>(
+  deal: Deal,
+  bag: string,
+  pool: readonly PoolLine[],
+  holders: readonly H[],
+  say: (template: string, holder: H) => string
+): (string | undefined)[] {
+  const said: (string | undefined)[] = holders.map(() => undefined)
+  for (const gender of GENDERS) {
+    const seats = holders.flatMap((holder, index) => (genderOf(holder) === gender ? [index] : []))
+    if (seats.length === 0) continue
+    const fits = (line: PoolLine): boolean => poolLineFits(line, gender)
+    const dealt = deal(bag, pool, seats.length, poolLineText, fits).filter(fits)
+    if (dealt.length === 0) continue
+    seats.forEach((seat, index) => {
+      said[seat] = say(poolLineText(dealt[index % dealt.length]), holders[seat])
+    })
+  }
+  return said
+}
+
+/** A pooled profile line said of its holder, its pronoun tokens theirs. */
+function sayOf(template: string, holder: Pick<Character, 'gender'>): string {
+  return fillPronouns(template, genderOf(holder))
+}
+
+/** A pooled secret said of its holder, with their first name and pronouns. */
+function secretOf(template: string, holder: Pick<Character, 'firstName' | 'gender'>): string {
+  return secretFor(template, holder.firstName, genderOf(holder))
 }
 
 /** One index picked by its weight. */
@@ -157,12 +202,106 @@ function rollHandle(character: Character, rand: () => number): string {
   return pick(HANDLE_STYLES, rand)(first, last, digits)
 }
 
+/** Where a rolled profile's next Lowrise and next employer come from, each asked when wanted. */
+export interface ProfilePicks {
+  lowrise: () => DormId
+  employer: () => string
+}
+
 /**
- * Every new girl's skipped profile blanks but her major, among the fields the application asks:
- * her year first, at least a junior's under an Elysium dorm she chose; then her dorm, a Lowrise
- * in turn unless a junior or senior draws Elysium; a load of four with one in her major; her
- * job, haunts and handle off the odds; no break posts; spring break plans in spring, dealt with
- * every returning girl's.
+ * One girl's rolled blanks among the fields `blank` passes, but her major, her activity's words
+ * and her plans: her year first, at least a junior's under an Elysium dorm she chose; then her
+ * dorm, the next Lowrise unless a junior or senior draws Elysium; a load of four with one in her
+ * major; her job, haunts and handle off the odds; no break posts. `wantsActivity` where she draws
+ * an activity to be dealt.
+ */
+export function rollProfileOf(
+  character: Character,
+  theirs: DecidedProfile,
+  blank: (field: ProfileField) => boolean,
+  picks: ProfilePicks,
+  rand: () => number
+): { profile: DecidedProfile; wantsActivity: boolean } {
+  const out: DecidedProfile = {}
+  let wantsActivity = false
+
+  let year = theirs.year
+  if (blank('year')) {
+    const floor = yearFloorOf(theirs)
+    year = floor + Math.floor(rand() * (5 - floor))
+    out.year = year
+  }
+  if (blank('dorm')) {
+    out.dorm = (year ?? 1) >= 3 && rand() < SKIP_ELYSIUM_CHANCE ? 'elysium' : picks.lowrise()
+  }
+  if (blank('classesTaken')) out.classesTaken = 4
+  if (blank('majorClassesTaken')) out.majorClassesTaken = 1
+  if (blank('job')) {
+    out.job =
+      rand() < SKIP_JOB_CHANCE
+        ? {
+            jobId: picks.employer(),
+            count: rand() < SKIP_TWO_SHIFTS_CHANCE ? 2 : 1
+          }
+        : null
+  }
+  if (blank('homeSlots')) out.homeSlots = 1 + weightedIndex(SKIP_HOME_SLOTS_WEIGHTS, rand)
+  if (blank('study')) {
+    out.study = rand() < SKIP_STUDY_CHANCE ? pick(Object.values(STUDY_LOCATIONS), rand) : null
+  }
+  if (blank('fun')) {
+    out.fun = shuffle(Object.values(FUN_LOCATIONS), rand).slice(
+      0,
+      weightedIndex(SKIP_FUN_WEIGHTS, rand)
+    )
+  }
+  if (blank('meal')) {
+    out.meal = rand() < SKIP_MEAL_CHANCE ? pick(Object.values(MEAL_LOCATIONS), rand) : null
+  }
+  if (blank('activity')) {
+    if (rand() < SKIP_ACTIVITY_CHANCE) wantsActivity = true
+    else out.activity = null
+  }
+  if (blank('handle')) out.handle = rollHandle(character, rand)
+  if (blank('breakPosts')) out.breakPosts = []
+  return { profile: out, wantsActivity }
+}
+
+/**
+ * One girl's whole profile among `fields` but her major, every one rolled or dealt: her activity
+ * and, where `fields` asks them, her spring break plans off their pools.
+ */
+export function rollStudentProfile(
+  character: Character,
+  fields: readonly ProfileField[],
+  picks: ProfilePicks,
+  deal: Deal,
+  rand: () => number = Math.random
+): DecidedProfile {
+  const { profile, wantsActivity } = rollProfileOf(
+    character,
+    {},
+    (field) => fields.includes(field),
+    picks,
+    rand
+  )
+  if (wantsActivity) {
+    const [activity] = dealEach(deal, ACTIVITY_BAG, ACTIVITIES, 1, (a) => a.doing)
+    profile.activity = activity
+      ? { location: activity.location, doing: sayOf(activity.doing, character) }
+      : null
+  }
+  if (fields.includes('springBreakPlans')) {
+    const [plan] = dealFitting(deal, SPRING_BREAK_BAG, SPRING_BREAK_PLANS, [character], sayOf)
+    if (plan) profile.springBreakPlans = plan
+  }
+  return profile
+}
+
+/**
+ * Every new girl's skipped profile blanks but her major, among the fields the application asks,
+ * rolled by {@link rollProfileOf} with the Lowrises and employers each taken in turn; spring
+ * break plans in spring, dealt with every returning girl's.
  */
 function rollProfiles(
   draft: ApplicationDraft,
@@ -181,8 +320,12 @@ function rollProfiles(
   )
   let lowrise = 0
   let employer = 0
-  const wantActivity: string[] = []
-  const wantPlans: string[] = []
+  const picks: ProfilePicks = {
+    lowrise: () => lowrises[lowrise++ % lowrises.length],
+    employer: () => employers[employer++ % employers.length]
+  }
+  const wantActivity: Character[] = []
+  const wantPlans: Character[] = []
   const profiles: Record<string, DecidedProfile> = {}
 
   for (const character of roster) {
@@ -190,69 +333,31 @@ function rollProfiles(
     const theirs = draft.girls[character.charId]?.profile ?? {}
     const blank = (field: ProfileField): boolean =>
       fields.includes(field) && !profileFieldDecided(theirs, field)
-    const out: DecidedProfile = {}
-
-    let year = theirs.year
-    if (blank('year')) {
-      const floor = yearFloorOf(theirs)
-      year = floor + Math.floor(rand() * (5 - floor))
-      out.year = year
-    }
-    if (blank('dorm')) {
-      out.dorm =
-        (year ?? 1) >= 3 && rand() < SKIP_ELYSIUM_CHANCE
-          ? 'elysium'
-          : lowrises[lowrise++ % lowrises.length]
-    }
-    if (blank('classesTaken')) out.classesTaken = 4
-    if (blank('majorClassesTaken')) out.majorClassesTaken = 1
-    if (blank('job')) {
-      out.job =
-        rand() < SKIP_JOB_CHANCE
-          ? {
-              jobId: employers[employer++ % employers.length],
-              count: rand() < SKIP_TWO_SHIFTS_CHANCE ? 2 : 1
-            }
-          : null
-    }
-    if (blank('homeSlots')) out.homeSlots = 1 + weightedIndex(SKIP_HOME_SLOTS_WEIGHTS, rand)
-    if (blank('study')) {
-      out.study = rand() < SKIP_STUDY_CHANCE ? pick(Object.values(STUDY_LOCATIONS), rand) : null
-    }
-    if (blank('fun')) {
-      out.fun = shuffle(Object.values(FUN_LOCATIONS), rand).slice(
-        0,
-        weightedIndex(SKIP_FUN_WEIGHTS, rand)
-      )
-    }
-    if (blank('meal')) {
-      out.meal = rand() < SKIP_MEAL_CHANCE ? pick(Object.values(MEAL_LOCATIONS), rand) : null
-    }
-    if (blank('activity')) {
-      if (rand() < SKIP_ACTIVITY_CHANCE) wantActivity.push(character.charId)
-      else out.activity = null
-    }
-    if (blank('handle')) out.handle = rollHandle(character, rand)
-    if (blank('breakPosts')) out.breakPosts = []
-    if (blank('springBreakPlans') && draft.season === 'spring') wantPlans.push(character.charId)
-    profiles[character.charId] = out
+    const { profile, wantsActivity } = rollProfileOf(character, theirs, blank, picks, rand)
+    if (wantsActivity) wantActivity.push(character)
+    if (blank('springBreakPlans') && draft.season === 'spring') wantPlans.push(character)
+    profiles[character.charId] = profile
   }
   const returning =
     draft.season === 'spring' ? roster.filter((c) => isReturning(draft, c.charId)) : []
 
   const activities = dealEach(deal, ACTIVITY_BAG, ACTIVITIES, wantActivity.length, (a) => a.doing)
-  wantActivity.forEach((charId, index) => {
+  wantActivity.forEach((character, index) => {
     const activity = activities[index]
-    profiles[charId].activity = activity ? { location: activity.location, doing: activity.doing } : null
+    profiles[character.charId].activity = activity
+      ? { location: activity.location, doing: sayOf(activity.doing, character) }
+      : null
   })
-  const plans = dealEach(
+  const plans = dealFitting(
     deal,
     SPRING_BREAK_BAG,
     SPRING_BREAK_PLANS,
-    wantPlans.length + returning.length
+    [...wantPlans, ...returning],
+    sayOf
   )
-  wantPlans.forEach((charId, index) => {
-    if (plans[index]) profiles[charId].springBreakPlans = plans[index]
+  wantPlans.forEach((character, index) => {
+    const plan = plans[index]
+    if (plan) profiles[character.charId].springBreakPlans = plan
   })
   const springBreakPlans: Record<string, string> = {}
   returning.forEach((character, index) => {
@@ -278,7 +383,7 @@ function dealPursuits(
       continued.graduated.includes(c.charId) &&
       normalizeActivity(draft.pursuits?.[c.charId]) === ''
   )
-  const dealt = dealEach(deal, PURSUIT_BAG, PURSUITS, wanting.length)
+  const dealt = dealFitting(deal, PURSUIT_BAG, PURSUITS, wanting, sayOf)
   const out: SkipFill['pursuits'] = {}
   wanting.forEach((character, index) => {
     if (dealt[index]) out[character.charId] = dealt[index]
@@ -311,8 +416,41 @@ function dealOccasions(draft: ApplicationDraft, deal: Deal): SkipFill['occasions
 }
 
 /**
+ * One tier's secret for each of `holders` off its pool, said with her first name and pronouns,
+ * added to `out` by charId; nobody is dealt a line that does not fit them.
+ */
+function dealTierTo(
+  tier: SecretTier,
+  holders: readonly Character[],
+  deal: Deal,
+  out: SkipFill['secrets']
+): void {
+  const dealt = dealFitting(deal, secretBagOf(tier), SECRET_POOLS[tier], holders, secretOf)
+  holders.forEach((character, index) => {
+    const secret = dealt[index]
+    if (!secret) return
+    out[character.charId] = { ...out[character.charId], [tier]: secret }
+  })
+}
+
+/**
+ * Every one of `tiers` for each girl new to the playthrough named, dealt as {@link dealTierTo}
+ * deals them, by charId; a tier whose pool has nothing for her is left out.
+ */
+export function dealNewSecrets(
+  holders: readonly Character[],
+  deal: Deal,
+  tiers: readonly SecretTier[] = SECRET_TIERS
+): SkipFill['secrets'] {
+  const out: SkipFill['secrets'] = {}
+  for (const tier of tiers) dealTierTo(tier, holders, deal, out)
+  return out
+}
+
+/**
  * Every tier each new girl left blank, and every tier a returning girl is owed, dealt from its
- * tier's pool and said with her first name; a returning girl is never dealt one she holds.
+ * tier's pool and said with her first name and pronouns; nobody is dealt a line that does not
+ * fit them, and a returning girl never one she holds.
  */
 function dealSecrets(
   draft: ApplicationDraft,
@@ -326,31 +464,27 @@ function dealSecrets(
         !isReturning(draft, c.charId) &&
         secretTiersBlank(draft.girls[c.charId]?.secrets ?? {}).includes(tier)
     )
-    const dealt = dealEach(deal, secretBagOf(tier), SECRET_POOLS[tier], blank.length)
-    blank.forEach((character, index) => {
-      if (!dealt[index]) return
-      out[character.charId] = {
-        ...out[character.charId],
-        [tier]: secretFor(dealt[index], character.firstName)
-      }
-    })
+    dealTierTo(tier, blank, deal, out)
 
     for (const character of roster) {
       if (!isReturning(draft, character.charId)) continue
       const carried = draft.continued?.carry.charInfo[character.charId]
       if (!secretTiersWanted(carried).includes(tier)) continue
       const held = new Set(heldSecretsOf(carried).map(secretText))
-      const [template] = deal(
+      const gender = genderOf(character)
+      const fits = (line: PoolLine): boolean => poolLineFits(line, gender)
+      // A shortfall the bag makes up from the rest may be one she holds, never one unfit for her.
+      const [line] = deal(
         secretBagOf(tier),
         SECRET_POOLS[tier],
         1,
-        undefined,
-        (entry) => !held.has(secretText(secretFor(entry, character.firstName)))
-      )
-      if (!template) continue
+        poolLineText,
+        (entry) => fits(entry) && !held.has(secretText(secretOf(poolLineText(entry), character)))
+      ).filter(fits)
+      if (!line) continue
       out[character.charId] = {
         ...out[character.charId],
-        [tier]: secretFor(template, character.firstName)
+        [tier]: secretOf(poolLineText(line), character)
       }
     }
   }

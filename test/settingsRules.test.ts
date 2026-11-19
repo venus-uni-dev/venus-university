@@ -10,6 +10,7 @@ import { endpointProblem, normalizeEndpoint } from '@shared/endpoint'
 import {
   defaultSettings,
   DEFAULT_MEMORY_BUDGETS,
+  endingPictureMaxOf,
   maxOutputTokensOf,
   memoryBudgetsOf,
   mergePatch,
@@ -243,20 +244,27 @@ describe('writerModelOf and secondaryModelOf', () => {
 })
 
 describe('mergePatch — the optional switches', () => {
-  it('carries the ending warnings and fullscreen turned off, and leaves an absent one absent', () => {
+  it('carries the ending warnings, fullscreen and CG matching turned off, and leaves an absent one absent', () => {
     // Absent is on, so a save that dropped the field would turn it back on.
     const off = mergePatch(
       settings(),
-      settingsPatch({ warnEndingInterrupt: false, warnEndingEdit: false, fullscreen: false })
+      settingsPatch({
+        warnEndingInterrupt: false,
+        warnEndingEdit: false,
+        fullscreen: false,
+        matchCgBiology: false
+      })
     )
     expect(off.warnEndingInterrupt).toBe(false)
     expect(off.warnEndingEdit).toBe(false)
     expect(off.fullscreen).toBe(false)
+    expect(off.matchCgBiology).toBe(false)
 
     const untouched = mergePatch(settings(), settingsPatch())
     expect(untouched.warnEndingInterrupt).toBeUndefined()
     expect(untouched.warnEndingEdit).toBeUndefined()
     expect(untouched.fullscreen).toBeUndefined()
+    expect(untouched.matchCgBiology).toBeUndefined()
   })
 })
 
@@ -420,6 +428,18 @@ describe('memoryBudgetsOf', () => {
     expect(memoryBudgetsOf(settings({ memoryBudgets: { two: 1000 } }))).toEqual(
       DEFAULT_MEMORY_BUDGETS
     )
+  })
+})
+
+describe('endingPictureMaxOf', () => {
+  it('keeps a whole number from 1 to 12 and falls back to 12 otherwise', () => {
+    const of = (cap: unknown): number =>
+      endingPictureMaxOf(settings({ endingPictureMax: cap as number }))
+    expect(endingPictureMaxOf(settings())).toBe(12)
+    expect(of(1)).toBe(1)
+    expect(of(7)).toBe(7)
+    expect(of(12)).toBe(12)
+    for (const junk of [0, 13, -3, 2.5, NaN, '5']) expect(of(junk)).toBe(12)
   })
 })
 

@@ -2,18 +2,27 @@ import { describe, expect, it } from 'vitest'
 import {
   affinityUpChance,
   areNpcFriends,
+  inHoneymoon,
   MAX_AFFINITY,
   MIN_AFFINITY,
   listenersOf,
+  newCouples,
   newFriendships,
   npcFriendsOf,
   pairKeyOf,
+  readerCrushFactorOf,
   rollInitialNpcRelationships,
   rollMeetingAffinity,
   settleNpcPairs,
+  settleNpcPairsFull,
+  withAffairsFound,
+  withCouplesLeft,
   zoneOf,
+  type NpcAdvice,
   type NpcRelationshipMap
 } from '@shared/npcRelationships'
+import { seededRand } from '@shared/hash'
+import { HONEYMOON_DAYS } from '@shared/odds'
 import { character, charactersById } from './fixtures'
 
 /**
@@ -210,11 +219,11 @@ describe('settleNpcPairs', () => {
 
     const up = settle({ relationships: before, groups }, () => 0)
     expect(up[pairKeyOf('a', 'b')].affinity).toBe(3)
-    expect(up[pairKeyOf('a', 'b')].encounter?.positive).toBe(true)
+    expect(up[pairKeyOf('a', 'b')].encounter).toMatchObject({ positive: true })
 
     const down = settle({ relationships: before, groups }, () => 0.999999)
     expect(down[pairKeyOf('a', 'b')].affinity).toBe(1)
-    expect(down[pairKeyOf('a', 'b')].encounter?.positive).toBe(false)
+    expect(down[pairKeyOf('a', 'b')].encounter).toMatchObject({ positive: false })
   })
 
   it('records the encounter even where the affinity is already pinned at the end', () => {
@@ -227,14 +236,14 @@ describe('settleNpcPairs', () => {
       () => 0
     )
     expect(map[pairKeyOf('a', 'b')].affinity).toBe(MAX_AFFINITY)
-    expect(map[pairKeyOf('a', 'b')].encounter?.ref).toBe('selkie_beach')
+    expect(map[pairKeyOf('a', 'b')].encounter).toMatchObject({ ref: 'selkie_beach' })
   })
 
   it('records whose room a room hangout was in, so the line can name her', () => {
     const map = settle({
       groups: [{ kind: 'hangout', ref: 'room', members: ['a', 'b'], host: 'a' }]
     })
-    expect(map[pairKeyOf('a', 'b')].encounter?.roomOf).toBe('a')
+    expect(map[pairKeyOf('a', 'b')].encounter).toMatchObject({ roomOf: 'a' })
   })
 
   it('moves every pair inside a group of three', () => {
@@ -323,5 +332,359 @@ describe('newFriendships', () => {
 
   it('says nothing about a pair that is merely getting on', () => {
     expect(newFriendships({ [AB]: { affinity: 1 } }, { [AB]: { affinity: 3 } }, [])).toEqual([])
+  })
+})
+
+/** The couples log, which the feed and her page read: one row per time a pair got together. */
+describe('newCouples', () => {
+  const AB = pairKeyOf('a', 'b')
+
+  it('reports a pair the settle has just put together, under the date it did', () => {
+    expect(newCouples({ [AB]: { affinity: 2 } }, { [AB]: { affinity: 3, dating: 8 } }, [])).toEqual([
+      { a: 'a', b: 'b', date: 8 }
+    ])
+  })
+
+  it('says nothing of a couple that was already together, or one already logged', () => {
+    const together = { [AB]: { affinity: 3, dating: 8 } }
+    expect(newCouples(together, together, [])).toEqual([])
+    expect(newCouples({}, together, [{ a: 'a', b: 'b', date: 8 }])).toEqual([])
+  })
+
+  it('reports a pair that broke up and got back together again', () => {
+    const fresh = newCouples(
+      { [AB]: { affinity: 3, ended: 20 } },
+      { [AB]: { affinity: 4, ended: 20, dating: 30 } },
+      [{ a: 'a', b: 'b', date: 8 }]
+    )
+    expect(fresh).toEqual([{ a: 'a', b: 'b', date: 30 }])
+  })
+})
+
+/**
+ * Who falls for whom, gets together and breaks up, checked as invariants over many seeded slots,
+ * since every slot's settle is frozen into the save it lands on.
+ */
+describe('the settle with love lives', () => {
+  const bi = { female: true, male: true }
+  const roster = [
+    character({ charId: 'a', firstName: 'Ana', attractedTo: bi }),
+    character({ charId: 'b', firstName: 'Bea' }),
+    character({ charId: 'c', firstName: 'Cleo', traits: ['Promiscuous'], attractedTo: bi }),
+    character({ charId: 'd', firstName: 'Dee', traits: ['Good-natured'] }),
+    character({ charId: 'm', firstName: 'Max', gender: 'male' }),
+    character({ charId: 'n', firstName: 'Ned', gender: 'male', traits: ['High Standards'] }),
+    character({ charId: 'o', firstName: 'Oli', gender: 'male', attractedTo: bi }),
+    character({ charId: 'p', firstName: 'Pip', gender: 'male', traits: ['Disagreeable'] })
+  ]
+  const graduate = character({ charId: 'g', firstName: 'Gus', gender: 'male' })
+  const characters = charactersById(...roster, graduate)
+  const ids = roster.map((c) => c.charId)
+  const attraction = Object.fromEntries(
+    [...roster, graduate].map((c) => [
+      c.charId,
+      c.attractedTo ?? { female: c.gender === 'male', male: c.gender !== 'male' }
+    ])
+  )
+  const open = new Set(['c'])
+  const lovers = ['b']
+
+  /** Everyone dating `charId` on `map`. */
+  const partners = (map: NpcRelationshipMap, charId: string): string[] =>
+    [...ids, 'g'].filter((other) => other !== charId && map[pairKeyOf(charId, other)]?.dating !== undefined)
+
+  /** One slot's groups: the roster shuffled and cut into twos and threes. */
+  const groupsOf = (rand: () => number) => {
+    const order = [...ids].sort(() => rand() - 0.5)
+    const groups = []
+    for (let i = 0; i + 1 < order.length; i += 2 + Math.floor(rand() * 2)) {
+      groups.push({ kind: 'hangout' as const, ref: 'pier_44', members: order.slice(i, i + 3) })
+    }
+    return groups
+  }
+
+  it('holds every rule of who may love whom over many slots', () => {
+    // What the runs saw, so the rules below are known to have been put to the test.
+    const seen = { crush: 0, together: 0, brokeUp: 0, jealous: 0 }
+    for (let run = 0; run < 12; run++) {
+      const rand = seededRand(`love:${run}`)
+      // Everybody knows everybody and gets on, and Gus has graduated with a girlfriend on campus.
+      let map: NpcRelationshipMap = {}
+      for (const x of ids) for (const y of ids) if (x < y) map[pairKeyOf(x, y)] = { affinity: 2 }
+      map[pairKeyOf('d', 'g')] = { affinity: 5, dating: -40 }
+
+      for (let slot = 0; slot < 240; slot++) {
+        const date = Math.floor(slot / 2)
+        const before = map
+        map = settleNpcPairs(
+          {
+            date,
+            relationships: before,
+            cast: [],
+            groups: groupsOf(rand),
+            characters,
+            roster: ids,
+            alumni: ['g'],
+            attraction,
+            readerCrush: ['d'],
+            readerLovers: lovers,
+            night: slot % 2 === 1
+          },
+          rand
+        )
+
+        for (const charId of [...ids, 'g']) {
+          if (!open.has(charId)) expect(partners(map, charId).length).toBeLessThanOrEqual(1)
+        }
+        for (const [key, pair] of Object.entries(map)) {
+          const [x, y] = key.split('|')
+          const was = before[key]
+          if (pair.crush && !was?.crush) seen.crush++
+          if (pair.encounter !== was?.encounter && pair.encounter?.kind === 'together') seen.together++
+          if (pair.encounter !== was?.encounter && pair.encounter?.kind === 'brokeUp') seen.brokeUp++
+          if (pair.encounter !== was?.encounter && pair.encounter?.kind === 'jealous') seen.jealous++
+          // Absent rather than empty, sorted, and only between two on the roster attracted to
+          // each other, standing at 0 or above.
+          if (pair.crush) {
+            expect(pair.crush.length).toBeGreaterThan(0)
+            expect(pair.crush).toEqual([...pair.crush].sort())
+            expect(ids).toContain(x)
+            expect(ids).toContain(y)
+            expect(pair.affinity).toBeGreaterThanOrEqual(0)
+            const gx = characters[x].gender === 'male' ? 'male' : 'female'
+            const gy = characters[y].gender === 'male' ? 'male' : 'female'
+            expect(attraction[x][gy] && attraction[y][gx]).toBe(true)
+            // The reader's lover, not being open, has nobody else in mind.
+            for (const lover of lovers) expect(pair.crush).not.toContain(lover)
+          }
+          // A couple only ever parts by breaking up, and a honeymoon neither parts nor lowers one.
+          if (was?.dating !== undefined && pair.dating === undefined) {
+            expect(pair.ended).toBe(date)
+            expect(pair.encounter?.kind).toBe('brokeUp')
+            expect(date - was.dating).toBeGreaterThanOrEqual(HONEYMOON_DAYS)
+          }
+          const longDistance = x === 'g' || y === 'g'
+          if (was?.dating !== undefined && inHoneymoon(was, date) && !longDistance) {
+            expect(pair.dating).toBe(was.dating)
+            expect(pair.affinity).toBeGreaterThanOrEqual(was.affinity)
+          }
+          if (was?.ended !== undefined) expect(pair.ended).toBeGreaterThanOrEqual(was.ended)
+          if (pair.dating !== undefined && was?.dating === undefined) {
+            expect(pair.dating).toBe(date)
+            expect(pair.encounter?.kind).toBe('together')
+          }
+        }
+      }
+    }
+    expect(seen.crush).toBeGreaterThan(0)
+    expect(seen.together).toBeGreaterThan(0)
+    expect(seen.brokeUp).toBeGreaterThan(0)
+    expect(seen.jealous).toBeGreaterThan(0)
+  })
+
+  it('rolls nothing new where no roster is given, so a save with no love life settles as before', () => {
+    const before = {
+      [pairKeyOf('a', 'b')]: { affinity: 2, crush: ['a', 'b'] },
+      [pairKeyOf('a', 'c')]: { affinity: 3 }
+    }
+    const groups = [{ kind: 'hangout' as const, ref: 'pier_44', members: ['a', 'b', 'c'] }]
+    const map = settleNpcPairs({ date: 10, relationships: before, cast: [], groups, characters }, () => 0)
+    // Every pair stepped up, the crush kept and nobody got together.
+    expect(map[pairKeyOf('a', 'b')]).toMatchObject({ affinity: 3, crush: ['a', 'b'] })
+    expect(map[pairKeyOf('a', 'b')].dating).toBeUndefined()
+  })
+
+  it("lands each of the reader's answers before anybody meets", () => {
+    const AM = pairKeyOf('a', 'm')
+    const AO = pairKeyOf('a', 'o')
+    const settle = (relationships: NpcRelationshipMap, advice: NpcAdvice[], rand: () => number) =>
+      settleNpcPairsFull(
+        { date: 40, relationships, cast: [], groups: [], characters, roster: ids, attraction, advice },
+        rand
+      )
+
+    // A mutual crush he says yes to is a couple, whatever the dice.
+    const mutual = settle({ [AM]: { affinity: 2, crush: ['a', 'm'], crushAsked: ['a'] } }, [{ charId: 'a', about: 'm', answer: 'yes' }], () => 0.99)
+    expect(mutual.relationships[AM]).toEqual({ affinity: 2, dating: 40, encounter: { date: 40, kind: 'together' } })
+    expect(mutual.outcomes).toEqual([{ charId: 'a', about: 'm', result: 'together' }])
+
+    // One he does not return turns her down: her crush ends and the pair drops a step.
+    const refused = settle({ [AM]: { affinity: 2, crush: ['a'], crushAsked: ['a'] } }, [{ charId: 'a', about: 'm', answer: 'yes' }], () => 0.99)
+    expect(refused.relationships[AM]).toEqual({ affinity: 1, encounter: { date: 40, kind: 'turnedDown', by: 'm' } })
+    expect(refused.outcomes).toEqual([{ charId: 'a', about: 'm', result: 'turnedDown' }])
+
+    // A yes to somebody no longer free to date comes to nothing, and "Definitely not." ends her crush.
+    const taken = settle(
+      { [AM]: { affinity: 2, crush: ['a', 'm'] }, [pairKeyOf('b', 'm')]: { affinity: 5, dating: 0 } },
+      [{ charId: 'a', about: 'm', answer: 'yes' }],
+      () => 0
+    )
+    expect(taken.relationships[AM]).toEqual({ affinity: 2, crush: ['a', 'm'] })
+    expect(taken.outcomes).toEqual([])
+    expect(settle({ [AM]: { affinity: 2, crush: ['a', 'm'] } }, [{ charId: 'a', about: 'm', answer: 'no' }], () => 0).relationships[AM]).toEqual({ affinity: 2, crush: ['m'] })
+
+    // Talking it out is a step up; breaking up a step down that may part a couple below friends.
+    const couple = { [AO]: { affinity: 4, dating: 0 } }
+    expect(settle(couple, [{ charId: 'a', about: 'o', answer: 'talk' }], () => 0).relationships[AO].affinity).toBe(5)
+    const parted = settle(couple, [{ charId: 'a', about: 'o', answer: 'breakUp' }], () => 0)
+    expect(parted.relationships[AO]).toEqual({ affinity: 3, ended: 40, encounter: { date: 40, kind: 'brokeUp' } })
+    expect(parted.outcomes).toEqual([{ charId: 'a', about: 'o', result: 'brokeUp' }])
+    const stayed = settle(couple, [{ charId: 'a', about: 'o', answer: 'breakUp' }], () => 0.99)
+    expect(stayed.relationships[AO]).toEqual({ affinity: 3, dating: 0 })
+    expect(stayed.outcomes).toEqual([])
+    // Inside a honeymoon it costs them nothing.
+    expect(settle({ [AO]: { affinity: 1, dating: 35 } }, [{ charId: 'a', about: 'o', answer: 'breakUp' }], () => 0).relationships[AO]).toEqual({ affinity: 1, dating: 35 })
+  })
+
+  it('holds every rule with his advice fed in, and reports only couples who argued and stayed together', () => {
+    const seen = { argued: 0, together: 0, turnedDown: 0, brokeUp: 0 }
+    const answers = ['breakUp', 'talk', 'yes', 'no'] as const
+    for (let run = 0; run < 12; run++) {
+      const rand = seededRand(`advice:${run}`)
+      let map: NpcRelationshipMap = {}
+      for (const x of ids) for (const y of ids) if (x < y) map[pairKeyOf(x, y)] = { affinity: 2 }
+
+      for (let slot = 0; slot < 240; slot++) {
+        const date = Math.floor(slot / 2)
+        // A few answers a slot, to whatever pair the dice land on, standing or not.
+        const advice: NpcAdvice[] = []
+        for (let i = 0; i < 3; i++) {
+          const charId = ids[Math.floor(rand() * ids.length)]
+          const about = ids[Math.floor(rand() * ids.length)]
+          if (charId !== about) advice.push({ charId, about, answer: answers[Math.floor(rand() * 4)] })
+        }
+        const before = map
+        const settled = settleNpcPairsFull(
+          {
+            date,
+            relationships: before,
+            cast: [],
+            groups: groupsOf(rand),
+            characters,
+            roster: ids,
+            attraction,
+            readerLovers: lovers,
+            advice,
+            night: slot % 2 === 1
+          },
+          rand
+        )
+        map = settled.relationships
+
+        for (const charId of ids) {
+          if (!open.has(charId)) expect(partners(map, charId).length).toBeLessThanOrEqual(1)
+        }
+        // Nobody the reader is dating, not being open, is put with anybody.
+        for (const lover of lovers) expect(partners(map, lover)).toEqual([])
+        for (const pair of Object.values(map)) {
+          for (const holder of pair.crushAsked ?? []) expect(pair.crush).toContain(holder)
+        }
+        for (const { a, b } of settled.argued) {
+          seen.argued++
+          expect(map[pairKeyOf(a, b)].dating).toBeDefined()
+          expect(a < b).toBe(true)
+        }
+        for (const { charId, about, result } of settled.outcomes) {
+          seen[result]++
+          const pair = map[pairKeyOf(charId, about)]
+          if (result === 'together') expect(advice).toContainEqual({ charId, about, answer: 'yes' })
+          if (result === 'turnedDown') expect(pair.crush ?? []).not.toContain(charId)
+          if (result === 'brokeUp') expect(before[pairKeyOf(charId, about)].dating).toBeDefined()
+        }
+      }
+    }
+    expect(seen.argued).toBeGreaterThan(0)
+    expect(seen.together).toBeGreaterThan(0)
+    expect(seen.turnedDown).toBeGreaterThan(0)
+    expect(seen.brokeUp).toBeGreaterThan(0)
+  })
+
+  it("keeps a couple's dates and crushes through a meeting that only moves the number", () => {
+    const before = {
+      [pairKeyOf('a', 'm')]: { affinity: 2, dating: 1, ended: 0, crush: ['a'] }
+    }
+    const groups = [{ kind: 'class' as const, ref: 'HUM101', members: ['a', 'm'] }]
+    const map = settleNpcPairs(
+      { date: 40, relationships: before, cast: [], groups, characters, roster: ids, attraction },
+      () => 0.99
+    )
+    expect(map[pairKeyOf('a', 'm')]).toMatchObject({ dating: 1, ended: 0, crush: ['a'] })
+  })
+})
+
+/** What being taken does to her odds of falling for the reader. */
+describe('readerCrushFactorOf', () => {
+  const AM = pairKeyOf('a', 'm')
+
+  it('stops a crush while she is happy, cuts it while rocky, and leaves the single and the open alone', () => {
+    const happy = { [AM]: { affinity: 5, dating: 0 } }
+    const rocky = { [AM]: { affinity: 1, dating: 0 } }
+    const honeymoon = { [AM]: { affinity: 1, dating: 30 } }
+    expect(readerCrushFactorOf({}, 'a', character(), 40)).toBe(1)
+    expect(readerCrushFactorOf(happy, 'a', character(), 40)).toBe(0)
+    expect(readerCrushFactorOf(honeymoon, 'a', character(), 40)).toBe(0)
+    expect(readerCrushFactorOf(rocky, 'a', character(), 40)).toBeCloseTo(0.1)
+    expect(readerCrushFactorOf(happy, 'a', character({ traits: ['Promiscuous'] }), 40)).toBe(1)
+  })
+})
+
+/** What the reader's affairs and new lovers do to the couples the map holds. */
+describe('affairs and couples left', () => {
+  const AM = pairKeyOf('a', 'm')
+  const AF = pairKeyOf('a', 'f')
+  const FM = pairKeyOf('f', 'm')
+
+  it('drops a couple found out, records who cheated, ends its honeymoon and leaves a later one its own', () => {
+    const map: NpcRelationshipMap = {
+      [AM]: { affinity: 5, dating: 20, crush: ['a'] },
+      [AF]: { affinity: 0, crush: ['f'] },
+      [FM]: { affinity: 5 }
+    }
+    const found = withAffairsFound(
+      map,
+      [{ cheater: 'a', partner: 'm', saw: true }],
+      [{ by: 'f', cheater: 'a', partner: 'm' }],
+      24
+    )
+
+    expect(found[AM]).toEqual({
+      affinity: 1,
+      dating: 20,
+      crush: ['a'],
+      cheated: { a: 24 },
+      encounter: { date: 24, kind: 'foundOut', by: 'm' }
+    })
+    expect(inHoneymoon(found[AM], 25)).toBe(false)
+    // Below nothing, a pair holds no crush.
+    expect(found[AF]).toEqual({
+      affinity: -1,
+      encounter: { date: 24, kind: 'sided', by: 'f', of: 'm' }
+    })
+    // Heard rather than seen, a second time costs it less.
+    expect(
+      withAffairsFound(found, [{ cheater: 'a', partner: 'm', saw: false }], [], 25)[AM].affinity
+    ).toBe(-1)
+    // Back together after it, the couple has a honeymoon again.
+    expect(inHoneymoon({ ...found[AM], dating: 40 }, 45)).toBe(true)
+    // An affair the map holds no couple for, and nobody siding who knows her, move nothing.
+    expect(
+      withAffairsFound(
+        map,
+        [{ cheater: 'a', partner: 'f', saw: true }],
+        [{ by: 'x', cheater: 'a', partner: 'm' }],
+        24
+      )
+    ).toBe(map)
+  })
+
+  it('ends a couple left for the reader at no cost, and leaves the map alone where none was', () => {
+    const map: NpcRelationshipMap = { [AM]: { affinity: 5, dating: 20, crush: ['a'] } }
+    expect(withCouplesLeft(map, [{ charId: 'a', partner: 'm' }], 30)[AM]).toEqual({
+      affinity: 5,
+      crush: ['a'],
+      ended: 30,
+      encounter: { date: 30, kind: 'brokeUp' }
+    })
+    expect(withCouplesLeft(map, [{ charId: 'a', partner: 'f' }], 30)).toBe(map)
   })
 })

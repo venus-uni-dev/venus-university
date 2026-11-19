@@ -10,6 +10,7 @@ import {
 import { shuffle } from '@shared/shuffle'
 import { hairColorOf } from '@shared/tags'
 import { fullNameOf, type Character } from '@shared/types'
+import { CheckField } from '../components/CheckField'
 import { MaskedFace, SpoilerName } from '../components/Spoiler'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -25,6 +26,33 @@ const PCT_STEP = Math.round(SPRITE_SCALE_STEP * 100)
 
 /** No girl masked. */
 const NONE_MASKED: ReadonlySet<string> = new Set()
+
+/**
+ * The most girls a roster lineup stands on its floor at once. A bigger roster is picked from a
+ * list beside the clusters, twelve at a time, and nobody's height is lost by being unpicked.
+ */
+const MAX_LINEUP = 12
+
+/**
+ * The roster as the pick list orders it: by name, given then surname, and a masked pick after
+ * everybody named, in roster order, so where she stands says nothing of her name.
+ */
+function pickOrderOf(roster: readonly Character[], masked: ReadonlySet<string>): Character[] {
+  const named = roster
+    .filter((c) => !masked.has(c.charId))
+    .sort(
+      (a, b) =>
+        a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)
+    )
+  return [...named, ...roster.filter((c) => masked.has(c.charId))]
+}
+
+/** The first of the pick list, as many as the floor holds: who a big roster's lineup opens on. */
+function firstPicksOf(roster: readonly Character[], masked: ReadonlySet<string>): string[] {
+  return pickOrderOf(roster, masked)
+    .slice(0, MAX_LINEUP)
+    .map((c) => c.charId)
+}
 
 /**
  * One end of a height: the square that shortens her or heightens her by a step. A roster
@@ -110,20 +138,26 @@ export function CharacterHeightModal({
   const [active, setActive] = useState<string | null>(focus ?? null)
   /* The lineup order, shared by the strip and the rows so a row still points at a position. */
   const [order, setOrder] = useState<string[]>(() => roster.map((c) => c.charId))
+  /* Who of a roster too big for one floor stands on it, by charId. */
+  const [picked, setPicked] = useState<string[]>(() => firstPicksOf(roster, masked))
 
   const spriteVersion = useCharacterStore((s) => s.spriteVersion)
 
-  /* A roster swapped out under the modal restarts the ordering, during render so
+  /* A roster swapped out under the modal restarts the ordering and the picks, during render so
      no frame shows the new company in the old company's places. */
   const rosterKey = roster.map((c) => c.charId).join(',')
   const [drawnKey, setDrawnKey] = useState(rosterKey)
   if (drawnKey !== rosterKey) {
     setDrawnKey(rosterKey)
     setOrder(roster.map((c) => c.charId))
+    setPicked(firstPicksOf(roster, masked))
   }
 
   const byId = Object.fromEntries(roster.map((c) => [c.charId, c]))
   const lineup = order.map((id) => byId[id]).filter(Boolean)
+  /* A roster past the floor's twelve stands only the girls ticked off the list beside it. */
+  const picking = focus === undefined && roster.length > MAX_LINEUP
+  const standing = picking ? lineup.filter((c) => picked.includes(c.charId)) : lineup
   const locked = new Set(lockedIds ?? [])
 
   /* Her label's colour, and a roster's alone: a focus lineup is about one girl among a ruler,
@@ -165,6 +199,14 @@ export function CharacterHeightModal({
     setOrder((prev) =>
       [...prev].sort((a, b) => (byId[a] ? scaleOf(byId[a]) : 1) - (byId[b] ? scaleOf(byId[b]) : 1))
     )
+  }
+
+  /** Ticks a girl onto the floor or off it: never past twelve, and never the last one off. */
+  function pick(charId: string, on: boolean): void {
+    setPicked((prev) => {
+      if (on) return prev.length < MAX_LINEUP && !prev.includes(charId) ? [...prev, charId] : prev
+      return prev.length > 1 ? prev.filter((id) => id !== charId) : prev
+    })
   }
 
   /** Sets one character's height, from either the slider or a stepper. */
@@ -214,7 +256,7 @@ export function CharacterHeightModal({
         <div
           className={`vu-heights-strip${focus === undefined ? ' vu-heights-strip--roster' : ''}`}
         >
-          {lineup.map((character) => {
+          {standing.map((character) => {
             const ruler = rulerOf(character.charId)
             const isFocus = character.charId === focus
             return (
@@ -241,58 +283,83 @@ export function CharacterHeightModal({
         {focus === undefined ? (
           /* One cluster apiece — her face, her label and the two steps that size her. There
              is no reading beside them: a height is judged against the girl next to her, and
-             the strip above is where that judgement is made. */
-          <div className="vu-heights-list vu-heights-list--roster">
-            {lineup.map((character) => (
-              <div
-                className="vu-heights-cluster"
-                key={character.charId}
-                data-hair={hairOf(character)}
-              >
-                <span className="vu-arch vu-paper vu-heights-arch">
-                  {masked.has(character.charId) ? (
-                    <MaskedFace />
-                  ) : (
-                    <span className="vu-crop">
-                      <img
-                        className="vu-crop-img"
-                        src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
-                        alt=""
+             the strip above is where that judgement is made. A roster past twelve picks who
+             stands from a list beside them. */
+          <div className={`vu-heights-under${picking ? ' vu-heights-under--picking' : ''}`}>
+            {picking && (
+              <div className="vu-scroll-box vu-heights-picks-box">
+                <div className="vu-heights-picks" role="group" aria-label="Who stands in the lineup">
+                  {pickOrderOf(roster, masked).map((character) => {
+                    const on = picked.includes(character.charId)
+                    return (
+                      <CheckField
+                        key={character.charId}
+                        id={`heights-pick-${character.charId}`}
+                        label={nameOf(character)}
+                        checked={on}
+                        disabled={on ? picked.length <= 1 : picked.length >= MAX_LINEUP}
+                        onChange={(checked) => pick(character.charId, checked)}
                       />
-                    </span>
-                  )}
-                </span>
-                <span className="vu-heights-side">
-                  {masked.has(character.charId) && onReveal ? (
-                    <SpoilerName onReveal={() => onReveal(character.charId)} />
-                  ) : (
-                    <span className="vu-heights-name">
-                      <span className="vu-heights-given">{givenOf(character)}</span>
-                    </span>
-                  )}
-                  {/* Hers is not the player's to change, so the steps are not there at
-                      all rather than dead on every shipped cluster. */}
-                  {!locked.has(character.charId) && (
-                    <span className="vu-heights-steps">
-                      <Stepper
-                        character={character}
-                        name={nameOf(character)}
-                        scale={scaleOf(character)}
-                        step={-1}
-                        onSet={setScale}
-                      />
-                      <Stepper
-                        character={character}
-                        name={nameOf(character)}
-                        scale={scaleOf(character)}
-                        step={1}
-                        onSet={setScale}
-                      />
-                    </span>
-                  )}
-                </span>
+                    )
+                  })}
+                </div>
+                <div className="vu-scroll-fade" />
               </div>
-            ))}
+            )}
+            <div
+              className={`vu-heights-list vu-heights-list--roster${picking ? ' vu-heights-list--picked' : ''}`}
+            >
+              {standing.map((character) => (
+                <div
+                  className="vu-heights-cluster"
+                  key={character.charId}
+                  data-hair={hairOf(character)}
+                >
+                  <span className="vu-arch vu-paper vu-heights-arch">
+                    {masked.has(character.charId) ? (
+                      <MaskedFace />
+                    ) : (
+                      <span className="vu-crop">
+                        <img
+                          className="vu-crop-img"
+                          src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
+                          alt=""
+                        />
+                      </span>
+                    )}
+                  </span>
+                  <span className="vu-heights-side">
+                    {masked.has(character.charId) && onReveal ? (
+                      <SpoilerName onReveal={() => onReveal(character.charId)} />
+                    ) : (
+                      <span className="vu-heights-name">
+                        <span className="vu-heights-given">{givenOf(character)}</span>
+                      </span>
+                    )}
+                    {/* Hers is not the player's to change, so the steps are not there at
+                        all rather than dead on every shipped cluster. */}
+                    {!locked.has(character.charId) && (
+                      <span className="vu-heights-steps">
+                        <Stepper
+                          character={character}
+                          name={nameOf(character)}
+                          scale={scaleOf(character)}
+                          step={-1}
+                          onSet={setScale}
+                        />
+                        <Stepper
+                          character={character}
+                          name={nameOf(character)}
+                          scale={scaleOf(character)}
+                          step={1}
+                          onSet={setScale}
+                        />
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           /* One girl, one row: here the slider is the control and the number beside it is the

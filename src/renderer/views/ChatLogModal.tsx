@@ -11,7 +11,7 @@ import { useFitToText } from '../components/useFitToText'
 import { graduationScrollLines, isEpilogueNight } from '../prompts/graduation'
 import { rewriteLine, speakerNameOf } from '../stores/gameLoop'
 import { graduatingNames } from '../stores/loop/farewells'
-import { interjectOfferOf } from '../stores/loop/playback'
+import { inOpeningReply, interjectOfferOf, openingLockOf } from '../stores/loop/playback'
 import { useGameStore } from '../stores/gameStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { lineEditable } from '../stores/stageStep'
@@ -30,7 +30,8 @@ export interface ChatLogModalProps {
 /**
  * The scene so far, as the player read it. Renders `sceneLog` and nothing else — never
  * `sceneSummary`, which is written for the model — and rewrites any reply line of it in place,
- * one row at a time, never the reader's own line or a status line. While the scene's ending is
+ * one row at a time, never the reader's own line, a status line or a line of an opening reply
+ * that held the reader back. While the scene's ending is
  * under way a line may still be rewritten for as long as the ending can be interrupted, behind a
  * warning: the ending already banked keeps the original words. On the goodbye menu it holds the
  * last goodbye instead, since the epilogue's save carries no scene of its own to render, and
@@ -49,6 +50,8 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const created = useGameStore((s) => s.createdScene !== null)
   const replaying = useGameStore((s) => s.replaying !== null)
   const offer = useGameStore(interjectOfferOf)
+  // A lecture, her present or her secret holds the opening reply as it was delivered.
+  const openingLock = useGameStore(openingLockOf)
   const sceneActive = useGameStore(sceneActiveOf)
   const inScene = useGameStore(sceneOnScreenOf)
   const { host, overlayProps } = useModalShell(onClose)
@@ -148,7 +151,10 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
                   const reader = line.speaker === READER_SPEAKER
                   // During the ending, only while an interjection could still carry the rewrite.
                   const editable =
-                    !menu && lineEditable(sceneLog, at) && (!sceneEnding || offer !== 'none')
+                    !menu &&
+                    lineEditable(sceneLog, at) &&
+                    !(openingLock !== null && inOpeningReply(sceneLog, at)) &&
+                    (!sceneEnding || offer !== 'none')
                   const editing = editable && edit?.at === at
                   return (
                     // Lines carry no id and the list is append-only, so the place is the key.

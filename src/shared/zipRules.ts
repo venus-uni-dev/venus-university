@@ -37,6 +37,12 @@ export const MAX_ZIP_ENTRIES = 4096
 /** Uncompressed bytes a zip the app opens may hold; a character export is 42-67 MB. */
 export const MAX_ZIP_BYTES = 512 * 1024 * 1024
 
+/**
+ * The caps a character pack is opened under: about thirty exports, each zip inside it still
+ * held to {@link MAX_ZIP_BYTES} once it is opened in turn.
+ */
+export const PACK_ZIP_LIMITS = { maxEntries: MAX_ZIP_ENTRIES, maxTotalBytes: 2 * 1024 ** 3 }
+
 /** Basenames Windows reserves for devices, whatever extension follows them. */
 const RESERVED_BASENAMES = new Set([
   'CON',

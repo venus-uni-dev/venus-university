@@ -1,3 +1,4 @@
+import { genderOf } from '@shared/gender'
 import { emptyFlags } from '@shared/relationship'
 import { upsertJealousyMemory, type RumorPassOutcome } from '@shared/rumors'
 import type { NpcRelationshipMap } from '@shared/npcRelationships'
@@ -39,6 +40,7 @@ export function withRumorPass(
   charInfo: Readonly<Record<string, CharInfo>>,
   outcome: RumorPassOutcome
 ): Record<string, CharInfo> {
+  const { characters } = useGameStore.getState()
   const projected: Record<string, CharInfo> = { ...charInfo }
   for (const [charId, records] of Object.entries(outcome.suspicions)) {
     const info = projected[charId] ?? blankCharInfo()
@@ -54,7 +56,11 @@ export function withRumorPass(
     const info = projected[charId] ?? blankCharInfo()
     projected[charId] = {
       ...info,
-      jealousyMemories: upsertJealousyMemory(info.jealousyMemories, memory)
+      jealousyMemories: upsertJealousyMemory(
+        info.jealousyMemories,
+        memory,
+        genderOf(characters[charId])
+      )
     }
   }
   return projected

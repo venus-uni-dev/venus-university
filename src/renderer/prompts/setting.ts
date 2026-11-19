@@ -1,6 +1,7 @@
 import { describePlayer, describeReaderProfile, type PlayerStats } from '@shared/playerStats'
-import { acedExamsLine, GRADES_BAD_LINE, GRADES_GOOD_LINE } from '@shared/academics'
+import { acedExamsLine, gradesBadLine, GRADES_GOOD_LINE } from '@shared/academics'
 import { yearLabel } from '@shared/classes'
+import { readerWords, type ReaderPronouns, type ReaderWords } from '@shared/gender'
 import { andList } from '@shared/sentences'
 import { readerStandingOf, type ReaderStanding } from '@shared/relationship'
 import {
@@ -49,15 +50,32 @@ Stanchion: BTB Arcade, Stalestein Bar (and stage), Hotel DREAMS (love hotel), Fr
 Downtown: Green Hill Park, Lotterdale Market, Reserve Bank Cafe, Bobby's Diner, SpringMart, Fast Eats, Pier 44 Amusement Park.
 Promenade: Riverside Mall, Aquarium at Riverside, Future Cinema, Selkie Beach, Club Apogee, Lumiere Fusion (fine dining), Veridan Museum of Art.`
 
+/**
+ * The reader's words in a line about the characters at large: he, him and his for a he/him
+ * reader, and the reader named outright otherwise, since a she or they pronoun could be read as
+ * a character's.
+ */
+export function readerAmongCast(reader: ReaderPronouns): ReaderWords {
+  const words = reader === 'he' ? readerWords('he', 'female') : readerWords('he', 'male')
+  return { ...words, list: readerWords(reader).list }
+}
+
 /** Who he is dating, one sentence each, or the single sentence an all-sharing set of them earns. */
-function loveLifeLines(lovers: ReaderStanding['lovers'], season: Season): string[] {
+function loveLifeLines(
+  lovers: ReaderStanding['lovers'],
+  season: Season,
+  reader: ReaderPronouns
+): string[] {
   if (lovers.length >= 2 && lovers.every(({ harem }) => harem)) {
     return [`The reader is in an open relationship with ${andList(lovers.map(({ name }) => name))}.`]
   }
   return lovers.map(({ name, since, harem, leftFor }) => {
     const started = harem ? 'entered an open relationship with' : 'started dating'
     const when = since !== undefined ? ` on ${formatShortGameDate(since, season)}` : ''
-    const over = leftFor.length > 0 ? ` even though he was already dating ${andList(leftFor)}` : ''
+    const over =
+      leftFor.length > 0
+        ? ` even though ${readerAmongCast(reader).he} was already dating ${andList(leftFor)}`
+        : ''
     return `The reader ${started} ${name}${when}${over}.`
   })
 }
@@ -88,18 +106,30 @@ function bioLine(bio: string): string | null {
   return `The reader is ${closed}`
 }
 
+/** What the reader's name line calls them, by pronouns. */
+const READER_KIND: Readonly<Record<ReaderPronouns, string>> = {
+  he: 'a male',
+  she: 'a female',
+  they: 'a nonbinary person (they/them)'
+}
+
 /**
  * Who he is at Venus, the paragraph his bio continues: a freshman in his first semester, and
  * from his second on his year and which semester this is, the last of them said to be his last.
  */
-export function readerYearLine(fullName: string, semesterIndex: number): string {
-  const name = `${fullName}, a male who has a single dorm in Lowrise 4.`
+export function readerYearLine(
+  fullName: string,
+  semesterIndex: number,
+  reader: ReaderPronouns
+): string {
+  const name = `${fullName}, ${READER_KIND[reader]} who has a single dorm in Lowrise 4.`
+  const his = readerWords(reader).his
   if (semesterIndex === 0) return `The reader is a freshman named ${name}`
   const year = yearLabel(readerYearOf(semesterIndex)).toLowerCase()
   const which =
     semesterIndex === LAST_SEMESTER
-      ? `his ${semesterOrdinal(semesterIndex)} and final semester`
-      : `his ${semesterOrdinal(semesterIndex)} semester`
+      ? `${his} ${semesterOrdinal(semesterIndex)} and final semester`
+      : `${his} ${semesterOrdinal(semesterIndex)} semester`
   return `The reader is a ${year} taking ${which}, named ${name}`
 }
 
@@ -120,18 +150,19 @@ export function readerText(
     exes?: ReaderStanding['exes']
     /** How his cold stands, where he has one that shows. */
     cold?: string
-  }
+  },
+  reader: ReaderPronouns
 ): string {
   const bio = bioLine(reputation.bio ?? '')
   return [
-    readerYearLine(`${firstName} ${lastName}`, reputation.semesterIndex),
-    describePlayer(stats),
+    readerYearLine(`${firstName} ${lastName}`, reputation.semesterIndex, reader),
+    describePlayer(stats, reader),
     ...(reputation.cold ? [reputation.cold] : []),
     ...(bio ? [bio] : []),
     ...(reputation.aced && reputation.aced > 0 ? [acedExamsLine(reputation.aced)] : []),
     ...(reputation.standing === 'good' ? [GRADES_GOOD_LINE] : []),
-    ...(reputation.standing === 'bad' ? [GRADES_BAD_LINE] : []),
-    ...loveLifeLines(reputation.lovers ?? [], reputation.season),
+    ...(reputation.standing === 'bad' ? [gradesBadLine(reader)] : []),
+    ...loveLifeLines(reputation.lovers ?? [], reputation.season, reader),
     ...(reputation.exes?.length ? [exesLine(reputation.exes, reputation.season)] : [])
   ].join(' ')
 }
@@ -157,6 +188,8 @@ export interface ReaderView {
   charInfo: Readonly<Record<string, CharInfo>>
   characters: Readonly<Record<string, Character>>
   readerCold: ColdCase | null
+  /** The pronouns the reader goes by. */
+  playerPronouns: ReaderPronouns
 }
 
 /** The roster and the graduates: a girl he is dating, or used to, may be either. */
@@ -184,16 +217,22 @@ export function readerBlockOf(
   override?: { stats: PlayerStats; charInfo: Readonly<Record<string, CharInfo>> },
   at: { date: number; time: TimeSlot } = view
 ): string {
-  const cold = readerColdLine(view.readerCold, globalSlotOf(at.date, at.time))
-  return readerText(view.playerFirstName, view.playerLastName, override?.stats ?? view.stats, {
-    semesterIndex: view.semesterIndex,
-    bio: view.bio,
-    aced: acedOf(view),
-    standing: view.gradesStanding,
-    season: view.calendar.season,
-    ...(cold ? { cold } : {}),
-    ...readerStandingOf(everyoneOf(view), override?.charInfo ?? view.charInfo, firstNamesOf(view))
-  })
+  const cold = readerColdLine(view.readerCold, globalSlotOf(at.date, at.time), view.playerPronouns)
+  return readerText(
+    view.playerFirstName,
+    view.playerLastName,
+    override?.stats ?? view.stats,
+    {
+      semesterIndex: view.semesterIndex,
+      bio: view.bio,
+      aced: acedOf(view),
+      standing: view.gradesStanding,
+      season: view.calendar.season,
+      ...(cold ? { cold } : {}),
+      ...readerStandingOf(everyoneOf(view), override?.charInfo ?? view.charInfo, firstNamesOf(view))
+    },
+    view.playerPronouns
+  )
 }
 
 /**

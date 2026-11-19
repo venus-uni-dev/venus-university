@@ -8,10 +8,11 @@ import {
   START_DATE_FIRST,
   START_DATE_LAST,
   startLocksOf,
-  startMemoriesOf,
+  writtenStartMemories,
   startMilestonesOf,
   startMilestonesWith,
   withGirlChanged,
+  withNotes,
   withPair,
   withProfileField,
   withPursuit,
@@ -24,11 +25,17 @@ import {
 } from '@shared/application'
 import { yearLabel } from '@shared/classes'
 import { DORM_IDS, dormLabel, type DormId } from '@shared/dorms'
+import { genderOf, pronounsOf } from '@shared/gender'
 import { JOB_CATALOG } from '@shared/jobs'
 import { ACTIVITY_LOCATIONS, FUN_LOCATIONS, MEAL_LOCATIONS, STUDY_LOCATIONS } from '@shared/locations'
-import { pairKeyOf } from '@shared/npcRelationships'
+import { pairKeyOf, type NpcRelationshipMap } from '@shared/npcRelationships'
 import { DISPOSITION_LABELS } from '@shared/relationship'
-import { SCENE_MILESTONES, SCENE_RELATIONS, type SceneRelation } from '@shared/sceneCreator'
+import {
+  pairsAsLaid,
+  SCENE_MILESTONES,
+  type SceneRelation,
+  type SetupPeople
+} from '@shared/sceneCreator'
 import { SECRET_TIERS, secretTiersWanted } from '@shared/secrets'
 import { fullNameOf, type Character, type SecretTier } from '@shared/types'
 import { CheckField } from '../components/CheckField'
@@ -49,9 +56,10 @@ import type { ScreenTheme } from './clockTheme'
 import { DatePickerModal } from './DatePickerModal'
 import { gestures, quietLift, quietPress } from './motion'
 import { EntriesPanel, EntryRow, EntrySection, PaneSection } from './NewGameEntries'
+import { NOTES_HINT } from './CharacterNotesModal'
 import { BLANK, counts, numberOf, placeOptions, withBlank } from './profileOptions'
 import { milestoneLabel } from './SceneMilestonesModal'
-import { RELATION_LABELS } from './SceneRelationshipsModal'
+import { relationOptions } from './SceneRelationshipsModal'
 import { StartMemoriesModal, startReadingOf } from './StartMemoriesModal'
 import '../vu_styles/NewGameProfiles.css'
 
@@ -154,6 +162,35 @@ interface PaneProps {
 }
 
 /**
+ * What decides who on `roster` may be set to dating: the pairs a New Game+ carries, and each
+ * girl's traits with whether she is the reader's lover and shares him — set here for a newcomer,
+ * carried for a returning girl.
+ */
+function useDatingSetup(roster: readonly Character[]): {
+  base: NpcRelationshipMap
+  people: SetupPeople
+} {
+  const girls = useApplicationStore((s) => s.application?.girls)
+  const carry = useApplicationStore((s) => s.application?.continued?.carry)
+  return useMemo(() => {
+    const people: Record<string, NonNullable<SetupPeople[string]>> = {}
+    for (const character of roster) {
+      const carried = carry?.charInfo[character.charId]?.flags
+      if (carried) {
+        people[character.charId] = { character, flags: carried }
+        continue
+      }
+      const milestones = startMilestonesOf(girls?.[character.charId] ?? emptyGirl(), character)
+      people[character.charId] = {
+        character,
+        flags: { isLover: milestones.lovers, harem: milestones.agreed_to_harem }
+      }
+    }
+    return { base: carry?.npcRelationships ?? {}, people }
+  }, [roster, girls, carry])
+}
+
+/**
  * Everything the player can set for one girl new to the roster, section by section; spring break
  * only before a spring.
  */
@@ -168,6 +205,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
   const profile = girl.profile
   // Her name wherever it stands inside another control; elsewhere the mask is its own control.
   const name = hidden ? UNKNOWN_NAME : character.firstName
+  const gender = genderOf(character)
   const reveal = (): void => revealPick(charId)
   const set = <F extends ProfileField>(field: F, value: DecidedProfile[F] | undefined): void =>
     setField(charId, field, value)
@@ -183,7 +221,10 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
   const shown = startMilestonesOf(girl, character)
   const locks = startLocksOf(girl, character)
   const disposition = startReadingOf(girl, character)
-  const memories = startMemoriesOf(girl).length
+  const memories = writtenStartMemories(girl).length
+  // Each pair as it will be laid: a Dating that cannot hold reads as Friends.
+  const dating = useDatingSetup(roster)
+  const laid = pairsAsLaid(dating.base, pairs ?? {}, dating.people)
 
   return (
     <>
@@ -288,15 +329,16 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
         </div>
       </PaneSection>
 
-      <PaneSection
-        title="Free time"
-      >
+      <PaneSection title="Free time">
         <div className="vu-entries-grid">
           <SelectField
             id="profile-study"
             label="Studies at"
             value={profile.study === null ? 'none' : (profile.study ?? '')}
-            options={withBlank([{ value: 'none', label: 'Her room' }, ...placeOptions(STUDY_LOCATIONS)])}
+            options={withBlank([
+              { value: 'none', label: `${pronounsOf(character).Their} room` },
+              ...placeOptions(STUDY_LOCATIONS)
+            ])}
             onChange={(value) => set('study', value === 'none' ? null : value === '' ? undefined : value)}
           />
           <SelectField
@@ -344,19 +386,21 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
               else set('activity', { location: value, ...(doing ? { doing } : {}) })
             }}
           />
-          <TextField
-            id="profile-activity-doing"
-            label="Describe the activity"
-            value={activity?.doing ?? ''}
-            placeholder={BLANK}
-            maxLength={120}
-            disabled={activity === null}
-            onChange={(value) => {
-              const location = activity?.location
-              if (value === '') set('activity', location ? { location } : undefined)
-              else set('activity', { ...(location ? { location } : {}), doing: value })
-            }}
-          />
+          <div className="vu-entries-wide">
+            <TextField
+              id="profile-activity-doing"
+              label="Describe the activity"
+              value={activity?.doing ?? ''}
+              placeholder={BLANK}
+              maxLength={120}
+              disabled={activity === null}
+              onChange={(value) => {
+                const location = activity?.location
+                if (value === '') set('activity', location ? { location } : undefined)
+                else set('activity', { ...(location ? { location } : {}), doing: value })
+              }}
+            />
+          </div>
         </div>
       </PaneSection>
 
@@ -379,7 +423,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
             <TextField
               id="profile-spring-break"
               label="Plans"
-              hint="Like “Drive down to her aunt's place in Texas.”"
+              hint="Like “Drive down to visit an aunt in Texas.”"
               value={profile.springBreakPlans ?? ''}
               placeholder={BLANK}
               maxLength={160}
@@ -393,7 +437,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
         title="Secrets"
         lines={[
           <>
-            Secrets are revealed at the associated disposition level. Use third person and mention her name.
+            Secrets are revealed at the associated disposition level. Use third person and mention the character's name.
           </>
         ]}
       >
@@ -419,6 +463,20 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
         </div>
       </PaneSection>
 
+      <PaneSection title="Character notes">
+        <div className="vu-entries-column">
+          <TextField
+            id="profile-notes"
+            label="Notes"
+            hint={NOTES_HINT}
+            value={girl.notes ?? ''}
+            multiline
+            autoGrow
+            onChange={(value) => changeGirl(charId, (g) => withNotes(g, value))}
+          />
+        </div>
+      </PaneSection>
+
       <PaneSection
         title="With you"
         lines={['Adding a memory or milestone will automatically set the character to already met.']}
@@ -428,7 +486,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
             <CheckField
               key={box}
               id={`profile-box-${box}`}
-              label={milestoneLabel(box, name)}
+              label={milestoneLabel(box, name, gender)}
               checked={shown[box]}
               disabled={box in locks}
               onChange={(checked) =>
@@ -482,7 +540,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
             {roster
               .filter((other) => other.charId !== charId)
               .map((other) => {
-                const relation = pairs?.[pairKeyOf(charId, other.charId)]
+                const relation = laid[pairKeyOf(charId, other.charId)]
                 return (
                   <SelectField
                     key={other.charId}
@@ -490,7 +548,7 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
                     label={`${name} and ${masked.has(other.charId) ? UNKNOWN_NAME : other.firstName}`}
                     value={relation ?? ''}
                     options={withBlank(
-                      SCENE_RELATIONS.map((value) => ({ value, label: RELATION_LABELS[value] }))
+                      relationOptions(dating.base, laid, charId, other.charId, dating.people)
                     )}
                     onChange={(value) =>
                       updateApplication((d) => {
@@ -515,18 +573,19 @@ const ProfilePane = memo(function ProfilePane({ character, roster, onOpen }: Pan
 
 /**
  * A girl returning from the last semester: nothing of hers is set here, so the pane says what
- * will be generated for her.
+ * will be generated for her, in her own pronouns.
  */
 const ReturningPane = memo(function ReturningPane({ character }: { character: Character }): JSX.Element {
   const season = useApplicationStore((s) => s.application?.season)
   const carried = useApplicationStore(
     (s) => s.application?.continued?.carry.charInfo[character.charId]
   )
+  const { their, Their } = pronounsOf(character)
   const tiers = secretTiersWanted(carried)
   const secrets =
     tiers.length === 1 && tiers[0] === 'devoted'
       ? "a new secret revealed at the devoted level."
-      : 'her secrets.'
+      : `${their} secrets.`
   return (
     <div className="vu-entries-head">
       <h2 className="vu-entries-heading">{fullNameOf(character)}</h2>
@@ -535,8 +594,8 @@ const ReturningPane = memo(function ReturningPane({ character }: { character: Ch
       </p>
       <p className="vu-entries-text">
         {season === 'spring'
-          ? `Her break posts and spring break plans will be generated, along with ${secrets}`
-          : `Her break posts will be generated, along with ${secrets}`}
+          ? `${Their} break posts and spring break plans will be generated, along with ${secrets}`
+          : `${Their} break posts will be generated, along with ${secrets}`}
       </p>
     </div>
   )
@@ -557,7 +616,7 @@ const GraduatePane = memo(function GraduatePane({ character }: { character: Char
       <div className="vu-entries-column">
         <TextField
           id="profile-pursuit"
-          label="What she's doing now"
+          label={`What ${character.firstName} is doing now`}
           hint="Like “teaching English in Seoul”."
           value={pursuit}
           placeholder={BLANK}

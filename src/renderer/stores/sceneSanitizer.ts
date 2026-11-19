@@ -1,5 +1,7 @@
 import { offeredCustomCgs, storedCgOf, type OfferedCg } from '@shared/customCgs'
 import { settleDating, type DatingPassInput, type DatingPassOutcome } from '@shared/dating'
+import { genderOf, type ReaderPronouns } from '@shared/gender'
+import { readerCrushFactorOf } from '@shared/npcRelationships'
 import {
   isCustomOutfitSlot,
   offeredCustomOutfits,
@@ -13,18 +15,25 @@ import {
   crushHintUpdate,
   emptyFlags,
   foldRelationshipEvents,
+  ignoredTextDesc,
+  ignoredVentDesc,
   isRelationshipEvent,
+  isRomanceable,
   memoryStatusLine as memoryLineOf,
   milestoneEmotionOf,
   milestoneSoured,
   milestoneStatusLines as milestoneLinesFor,
-  overTextDesc
+  overTextDesc,
+  overTextMemory,
+  turnedDownDesc,
+  type CrushStanding
 } from '@shared/relationship'
-import { storedMemoryDesc } from '@shared/readerVoice'
-import { customCgSlotOf } from '@shared/positions'
+import { storedMemoryDesc, storedYouDesc } from '@shared/readerVoice'
+import { customCgSlotOf, stockCgsInPlay } from '@shared/positions'
 import { cgAction, parseAction, showAction, spriteAction } from '@shared/sceneActions'
 import { splitSentences } from '@shared/sentences'
 import { giftStatusMarkedLine } from '@shared/shop'
+import { hasTrait } from '@shared/traits'
 import {
   allBackgrounds,
   charKeyOf,
@@ -32,6 +41,7 @@ import {
   type CharInfo,
   type CharMemory,
   type Emotion,
+  type Gender,
   type IntimateAct,
   type LedgerResponse,
   MEMORY_TYPES,
@@ -46,13 +56,15 @@ import { ACT_KINDS } from '../prompts/scenePrompt'
 import { useAssetStore } from './assetStore'
 import {
   blankCharInfo,
+  gendersOf,
   PORTRAIT_SLOTS,
   stageContextOf,
   UNKNOWN_NAME,
   useGameStore
 } from './gameStore'
+import { matchCgBiologyOf, useSettingsStore } from './settingsStore'
 import { stageFactsOf, stepStage } from './stageStep'
-import { addContact, IGNORED_TEXT_DESC, TURNED_DOWN_DESC, unblockContact } from './textingLoop'
+import { addContact, unblockContact } from './textingLoop'
 
 /**
  * The double quotes RITA sometimes wraps a whole line in — never single quotes, which a line can
@@ -140,7 +152,10 @@ export function createSceneSanitizer(options: SanitizerOptions = {}): {
     if (character && game.roomReady[charId]) backgrounds.add(roomBgIdOf(character))
   }
   const charKeyToId = game.charKeyToId
-  const cgReady = game.cgReady
+  // The stock eight are offered only where they match the reader, so only then accepted.
+  const cgReady = stockCgsInPlay(game.playerPronouns, matchCgBiologyOf(useSettingsStore.getState()))
+    ? game.cgReady
+    : {}
   const outfitReady = game.outfitReady
 
   // Seeded once and predicted forward from show/hide. Never re-read slots after
@@ -363,11 +378,37 @@ export interface ValidMemory {
   charId: string
   type: MemoryType
   desc: string
+  /** The ledger's second-person words for it, where they could be kept. */
+  youDesc?: string
 }
 
-/** The ledger's memories, minus the rows that cannot be filed, each in the reader's voice. */
+/** One ledger row as it is filed: the reader's voice, and the second person beside it if kept. */
+function validMemory(
+  charId: string,
+  entry: { type: MemoryType; desc: string; youDesc?: string },
+  holder: Gender,
+  reader: ReaderPronouns
+): ValidMemory {
+  const desc = storedMemoryDesc(entry.desc, holder, reader)
+  const kept: ValidMemory = { charId, type: entry.type, desc }
+  const youDesc = storedYouDesc(entry.youDesc)
+  if (youDesc !== undefined) kept.youDesc = youDesc
+  return kept
+}
+
+/** A filed memory as it is kept on her entry, dated `date`, carrying no absent key. */
+function memoryOn(date: number, entry: Omit<ValidMemory, 'charId'>): CharMemory {
+  const memory: CharMemory = { date, type: entry.type, desc: entry.desc }
+  if (entry.youDesc !== undefined) memory.youDesc = entry.youDesc
+  return memory
+}
+
+/**
+ * The ledger's memories, minus the rows that cannot be filed, each in the reader's voice as its
+ * holder's gender has it.
+ */
 export function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
-  const { charKeyToId } = useGameStore.getState()
+  const { charKeyToId, characters, playerPronouns } = useGameStore.getState()
   const kept: ValidMemory[] = []
 
   for (const entry of ledger.memories ?? []) {
@@ -384,7 +425,7 @@ export function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[
       if (log) console.warn('[ledger] memory entry has no description — dropping it.')
       continue
     }
-    kept.push({ charId, type: entry.type, desc: storedMemoryDesc(entry.desc) })
+    kept.push(validMemory(charId, entry, genderOf(characters[charId]), playerPronouns))
   }
 
   return kept
@@ -395,7 +436,7 @@ export function ledgerMemories(ledger: LedgerResponse, log = true): ValidMemory[
  * rows, and then **capped at one per character**.
  */
 function ledgerTextMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
-  const { charKeyToId } = useGameStore.getState()
+  const { charKeyToId, characters, playerPronouns } = useGameStore.getState()
   const kept: ValidMemory[] = []
   const seen = new Set<string>()
 
@@ -422,7 +463,7 @@ function ledgerTextMemories(ledger: LedgerResponse, log = true): ValidMemory[] {
       continue
     }
     seen.add(charId)
-    kept.push({ charId, type: entry.type, desc: storedMemoryDesc(entry.desc) })
+    kept.push(validMemory(charId, entry, genderOf(characters[charId]), playerPronouns))
   }
 
   return kept
@@ -501,6 +542,12 @@ function ledgerEvents(ledger: LedgerResponse, log = true): Map<string, Relations
     else byChar.set(charId, [entry.event])
   }
 
+  // A closed relationship is agreed by a lover, so it folds after a relationship the scene began.
+  for (const events of byChar.values()) {
+    const at = events.indexOf('agreed_to_closed')
+    if (at >= 0 && at < events.length - 1) events.push(...events.splice(at, 1))
+  }
+
   const add = (charId: string, event: RelationshipEvent): void => {
     const existing = byChar.get(charId)
     if (!existing) byChar.set(charId, [event])
@@ -529,15 +576,20 @@ function statusNameOf(charId: string): string {
 /**
  * What each girl took away from the slot, as narrator lines after the stat messages: memories,
  * texting, gift landings, then what she's still waiting for. `stats` is post-scene (what the
- * crush roll reads); `ignored`/`turnedDown` are who waited on an invitation and who got a no.
+ * crush roll reads); `ignored`/`turnedDown` are who waited on an invitation and who got a no,
+ * `ignoredVents` who vented to him and got no answer; `projected` is the map the scene leaves,
+ * which says who the reader may romance by now.
  */
 export function memoryStatusLines(
   ledger: LedgerResponse | null,
   stats: PlayerStats,
   gifts: readonly SceneGift[],
   ignored: readonly string[],
-  turnedDown: readonly string[]
+  turnedDown: readonly string[],
+  ignoredVents: readonly string[] = [],
+  projected: Readonly<Record<string, CharInfo>> = useGameStore.getState().charInfo
 ): SceneLine[] {
+  const { characters, playerPronouns } = useGameStore.getState()
   const texted = new Map(
     (ledger ? ledgerTextMemories(ledger, false) : []).map((entry) => [entry.charId, entry])
   )
@@ -564,18 +616,30 @@ export function memoryStatusLines(
     }
     lines.push(...giftLinesFor(entry.charId))
     // Last of all of hers, and only for a girl who was actually in the scene.
-    const hint = crushStatusLine(entry.charId, stats)
+    const hint = crushStatusLine(entry.charId, stats, projected[entry.charId])
     // Plain: its stat word is coloured downstream, where the three hues are known.
     if (hint) lines.push({ speaker: '', text: hint })
   })
 
   for (const entry of texted.values()) lines.push(textMemoryStatusLine(entry))
   // The invitation he spent the slot not answering, said in the same words it was recorded in.
-  for (const charId of ignored)
-    lines.push(memoryLineOf(statusNameOf(charId), { type: 'disliked', desc: IGNORED_TEXT_DESC }))
+  for (const charId of ignored) {
+    const holder = genderOf(characters[charId])
+    const entry = { type: 'disliked', desc: ignoredTextDesc(holder) } as const
+    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+  }
   // The invitation he did answer, and said no to.
-  for (const charId of turnedDown)
-    lines.push(memoryLineOf(statusNameOf(charId), { type: 'disliked', desc: TURNED_DOWN_DESC }))
+  for (const charId of turnedDown) {
+    const holder = genderOf(characters[charId])
+    const entry = { type: 'disliked', desc: turnedDownDesc(holder) } as const
+    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+  }
+  // The vent he left unanswered, in the texting memory's own words.
+  for (const charId of ignoredVents) {
+    const holder = genderOf(characters[charId])
+    const entry = { type: 'disliked', desc: overTextDesc(ignoredVentDesc(holder)) } as const
+    lines.push(memoryLineOf(statusNameOf(charId), entry, holder, playerPronouns))
+  }
   // A present to a girl the ledger left nothing about still lands, at the end.
   for (const gift of given)
     lines.push(giftStatusMarkedLine(statusNameOf(gift.charId), gift.reaction))
@@ -583,10 +647,17 @@ export function memoryStatusLines(
 }
 
 /**
- * What she is still waiting for him to be, or that he finally is — one line
- * for a girl with nothing going on with him yet. Records what it said: owed once per tier.
+ * What she is still waiting for him to be, or that he finally is — one line for a girl who is
+ * not yet his lover or friend with benefits, and none for somebody the reader may not romance,
+ * read off `projected`, her entry as the scene leaves it. That he caught her interest waits
+ * while another couple holds her odds down, until she is free of it or has a crush on him
+ * anyway. Records what it said: owed once per tier.
  */
-function crushStatusLine(charId: string, stats: PlayerStats): string | null {
+function crushStatusLine(
+  charId: string,
+  stats: PlayerStats,
+  projected: CharInfo | undefined
+): string | null {
   const game = useGameStore.getState()
   const character = game.characters[charId]
   if (!character) return null
@@ -594,9 +665,18 @@ function crushStatusLine(charId: string, stats: PlayerStats): string | null {
   const info = game.charInfo[charId]
   const flags = info?.flags ?? emptyFlags()
   // Nothing to advise somebody already past the roll this is about.
-  if (flags.isLover || flags.hasCrush || flags.benefits) return null
+  if (flags.isLover || flags.benefits) return null
+  // Nor somebody the roll is never made for; a first kiss in this very scene opens it.
+  if (!isRomanceable(character, projected ?? info, game.romance, game.playerPronouns)) return null
 
-  const update = crushHintUpdate(statusNameOf(charId), character, stats, info?.crushHint)
+  // Off the map and date the scene's own crush roll reads, so the payoff waits exactly while
+  // being taken cuts her odds.
+  const standing: CrushStanding = flags.hasCrush
+    ? 'crush'
+    : readerCrushFactorOf(game.npcRelationships, charId, character, game.date) < 1
+      ? 'taken'
+      : 'free'
+  const update = crushHintUpdate(statusNameOf(charId), character, stats, info?.crushHint, standing)
   // Written as the line is queued, for `spendMoney`'s reason.
   if (update.hint !== info?.crushHint) game.setCrushHint(charId, update.hint)
   return update.line
@@ -604,7 +684,8 @@ function crushStatusLine(charId: string, stats: PlayerStats): string | null {
 
 /** One memory as the player reads it, and the base its texting sibling extends. */
 function memoryStatusLine(entry: ValidMemory): SceneLine {
-  return memoryLineOf(statusNameOf(entry.charId), entry)
+  const { characters, playerPronouns } = useGameStore.getState()
+  return memoryLineOf(statusNameOf(entry.charId), entry, genderOf(characters[entry.charId]), playerPronouns)
 }
 
 /**
@@ -612,10 +693,13 @@ function memoryStatusLine(entry: ValidMemory): SceneLine {
  * that says where it came from.
  */
 function textMemoryStatusLine(entry: ValidMemory): SceneLine {
-  return memoryLineOf(statusNameOf(entry.charId), {
-    type: entry.type,
-    desc: overTextDesc(entry.desc)
-  })
+  const { characters, playerPronouns } = useGameStore.getState()
+  return memoryLineOf(
+    statusNameOf(entry.charId),
+    overTextMemory(entry),
+    genderOf(characters[entry.charId]),
+    playerPronouns
+  )
 }
 
 /**
@@ -668,13 +752,18 @@ export interface MilestoneReport {
  * open relationship (she finds out, not a scene event), and a girl nothing moved for.
  */
 export function milestoneReports(projected: ProjectedLedger): MilestoneReport[] {
-  const { chars, charInfo } = useGameStore.getState()
+  const { chars, charInfo, characters } = useGameStore.getState()
   const reports: MilestoneReport[] = []
 
   for (const charId of chars) {
     const before = charInfo[charId]?.flags ?? emptyFlags()
     const after = projected.scene[charId]?.flags ?? before
-    const lines = milestoneLinesFor(statusNameOf(charId), before, after)
+    const lines = milestoneLinesFor(
+      statusNameOf(charId),
+      before,
+      after,
+      genderOf(characters[charId])
+    )
     if (lines.length === 0) continue
     reports.push({
       charId,
@@ -698,7 +787,8 @@ export function milestoneReports(projected: ProjectedLedger): MilestoneReport[] 
 export function datingInputOf(
   before: Readonly<Record<string, CharInfo>>,
   after: Readonly<Record<string, CharInfo>>,
-  date: number
+  date: number,
+  closed: readonly string[] = []
 ): DatingPassInput {
   const game = useGameStore.getState()
   const roster = [...game.chars, ...game.alumni]
@@ -712,9 +802,17 @@ export function datingInputOf(
     before,
     after,
     firstNames,
+    genders: gendersOf(roster, game.characters),
     npcRelationships: game.npcRelationships,
-    date
+    date,
+    promiscuous: roster.filter((charId) => hasTrait(game.characters[charId], 'Promiscuous')),
+    closed
   }
+}
+
+/** Who the ledger reports agreeing to a closed relationship with the reader. */
+function closedOf(events: ReadonlyMap<string, readonly RelationshipEvent[]>): string[] {
+  return [...events].filter(([, list]) => list.includes('agreed_to_closed')).map(([id]) => id)
 }
 
 /**
@@ -734,7 +832,7 @@ export function applyLedger(ledger: LedgerResponse): DatingPassOutcome {
   }
 
   for (const entry of ledgerMemories(ledger)) {
-    game.recordMemory(entry.charId, { date: game.date, type: entry.type, desc: entry.desc })
+    game.recordMemory(entry.charId, memoryOn(game.date, entry))
   }
 
   // Still the finished slot's date: `advanceSlot` runs later in the boundary.
@@ -742,17 +840,14 @@ export function applyLedger(ledger: LedgerResponse): DatingPassOutcome {
   // her memories instead, saying it came by text, since texting is all she has of him now.
   for (const entry of ledgerTextMemories(ledger)) {
     if (game.charInfo[entry.charId]?.pursuing !== undefined) {
-      game.recordMemory(entry.charId, {
-        date: game.date,
-        type: entry.type,
-        desc: overTextDesc(entry.desc)
-      })
+      game.recordMemory(entry.charId, overTextMemory(memoryOn(game.date, entry)))
     } else {
-      game.setTextMemory(entry.charId, { date: game.date, type: entry.type, desc: entry.desc })
+      game.setTextMemory(entry.charId, memoryOn(game.date, entry))
     }
   }
 
-  for (const [charId, events] of ledgerEvents(ledger)) {
+  const byChar = ledgerEvents(ledger)
+  for (const [charId, events] of byChar) {
     console.log(`[ledger] ${charId}: ${events.join(', ')}`)
     // Ahead of the fold, so `addContact` still sees the flag unset and posts its line, unread.
     if (events.includes('gave_contact_info')) addContact(charId, 1)
@@ -765,7 +860,9 @@ export function applyLedger(ledger: LedgerResponse): DatingPassOutcome {
   // it, so this lands once however often it runs.
   game.recordActs(ledgerActs(ledger, false))
 
-  const dating = settleDating(datingInputOf(before, useGameStore.getState().charInfo, game.date))
+  const dating = settleDating(
+    datingInputOf(before, useGameStore.getState().charInfo, game.date, closedOf(byChar))
+  )
   useGameStore.getState().applyDatingSettle(dating)
   return dating
 }
@@ -780,6 +877,8 @@ export interface ProjectedLedger {
   /** The map as the ledger's rows and relationship events leave it, before the dating pass. */
   scene: Record<string, CharInfo>
   breakups: DatingPassOutcome['breakups']
+  /** The couples his lovers left for him, which the character map ends. */
+  left: NonNullable<DatingPassOutcome['left']>
 }
 
 /**
@@ -800,7 +899,7 @@ export function projectLedger(
     projected[entry.charId] = {
       ...info,
       // Every memory is kept, as the boundary will keep it.
-      memories: [...info.memories, { date, type: entry.type, desc: entry.desc }]
+      memories: [...info.memories, memoryOn(date, entry)]
     }
   }
 
@@ -810,23 +909,24 @@ export function projectLedger(
       info.pursuing !== undefined
         ? {
             ...info,
-            memories: [
-              ...info.memories,
-              { date, type: entry.type, desc: overTextDesc(entry.desc) }
-            ]
+            memories: [...info.memories, overTextMemory(memoryOn(date, entry))]
           }
-        : { ...info, textMemory: { date, type: entry.type, desc: entry.desc } }
+        : { ...info, textMemory: memoryOn(date, entry) }
   }
 
   // Last, like the apply, so the cap evicts in the same order.
-  for (const [charId, events] of ledgerEvents(ledger, false)) {
-    projected[charId] = foldRelationshipEvents(entryFor(charId), events, date)
+  const { characters } = useGameStore.getState()
+  const byChar = ledgerEvents(ledger, false)
+  for (const [charId, events] of byChar) {
+    const holder = genderOf(characters[charId])
+    projected[charId] = foldRelationshipEvents(entryFor(charId), events, date, holder)
   }
 
-  const dating = settleDating(datingInputOf(charInfo, projected, date))
+  const dating = settleDating(datingInputOf(charInfo, projected, date, closedOf(byChar)))
   return {
     charInfo: { ...projected, ...dating.charInfo },
     scene: projected,
-    breakups: dating.breakups
+    breakups: dating.breakups,
+    left: dating.left ?? []
   }
 }

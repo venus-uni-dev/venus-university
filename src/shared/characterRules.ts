@@ -2,6 +2,7 @@ import { CHARACTER_FILE_NAME } from './characterFiles'
 import { DEFAULT_LORA_WEIGHT, isLoraWeight, loraToStore } from './comfyModels'
 import { SUBJECT_TAGS, withoutSubjectTags } from './defaultTags'
 import { EMOTIONS } from './emotions'
+import { genderOf } from './gender'
 import { assertSafeId, validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import { allFollowMain } from './outfits'
 import { defaultSpriteScale } from './spriteScale'
@@ -12,7 +13,8 @@ import {
   type CharacterBrief,
   type CharacterLoraBrief,
   type DefaultsStatus,
-  type Emotion
+  type Emotion,
+  type Gender
 } from './types'
 import { randomId } from './uuid'
 
@@ -30,10 +32,12 @@ export const CHARACTER_SCHEMA_VERSION = 3
 const CHARACTER_REQUIRED: Record<
   keyof Omit<
     Character,
+    | 'attractedTo'
     | 'brief'
     | 'charId'
     | 'customCgs'
     | 'customOutfits'
+    | 'gender'
     | 'lora'
     | 'negativeTags'
     | 'profileCrop'
@@ -150,11 +154,13 @@ function emptyBehavior(): CharacterBehavior {
 /**
  * The pre-LLM record a new character starts as; an empty `pose` marks her as not generated.
  * The brief rides along until her sheet lands, so an interrupted write can be rerun from it.
- * Her appearance opens on `subject`, the subject tags in force.
+ * Her gender is written only for a male character, and her appearance opens on `subject`, the
+ * subject tags in force for it.
  */
 export function newCharacter(
   firstName: string,
   lastName: string,
+  gender: Gender,
   subject: readonly string[],
   brief?: CharacterBrief
 ): Character {
@@ -163,6 +169,7 @@ export function newCharacter(
     charId: randomId(),
     firstName,
     lastName,
+    ...(gender === 'male' ? { gender: 'male' as const } : {}),
     personality: '',
     behavior: emptyBehavior(),
     backstory: '',
@@ -176,7 +183,7 @@ export function newCharacter(
     traits: [],
     preferredStat: 'heart',
     // The tagless default; the write pipeline sets the real one from her build.
-    height: defaultSpriteScale([]),
+    height: defaultSpriteScale([], gender),
     generationSeed: randomSeed(),
     seedFollowsMain: allFollowMain(),
     setSeeds: {},
@@ -194,6 +201,11 @@ export function newCharacter(
 /** Whether the LLM has filled her sheet in: an empty `pose` is the marker a new record carries. */
 export function isWritten(character: Character): boolean {
   return character.pose !== ''
+}
+
+/** What two characters on one roster, its graduates among them, may not share. */
+export function firstNameKeyOf(character: Character): string {
+  return character.firstName.trim().toLowerCase()
 }
 
 /** One sensible tag per emotion, drawn only from the groups Appendix A defines. */
@@ -234,10 +246,10 @@ function joinedTags(...groups: readonly (readonly string[])[]): string[] {
 
 /**
  * Her sheet with the LoRA the New Character modal picked: the LoRA on her record, its trigger
- * word and appearance tags after `subject`, the subject tags in force, and its outfit tags in
- * her default outfit. A group the player filled stands in for the one her sheet already holds
- * where `replace` is on, and goes in front of it otherwise; a group left empty keeps what her
- * sheet holds.
+ * word and appearance tags after `subject`, the subject tags in force for her gender, and its
+ * outfit tags in her default outfit. A group the player filled stands in for the one her sheet
+ * already holds where `replace` is on, and goes in front of it otherwise; a group left empty
+ * keeps what her sheet holds.
  */
 export function withCharacterLora(
   character: Character,
@@ -246,7 +258,8 @@ export function withCharacterLora(
 ): Character {
   const appearance = joinedTags([lora.trigger], lora.appearance)
   const outfit = joinedTags(lora.outfit)
-  const written = withoutSubjectTags(character.baseAppearance, subject)
+  const gender = genderOf(character)
+  const written = withoutSubjectTags(character.baseAppearance, gender, subject)
   const baseAppearance = joinedTags(
     subject,
     appearance,
@@ -261,7 +274,7 @@ export function withCharacterLora(
     baseAppearance,
     outfit: joinedTags(outfit, lora.replace && outfit.length > 0 ? [] : character.outfit),
     // Her build tags may have changed, and the height is read off them.
-    height: defaultSpriteScale(baseAppearance)
+    height: defaultSpriteScale(baseAppearance, gender)
   }
 }
 

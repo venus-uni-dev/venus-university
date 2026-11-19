@@ -14,7 +14,6 @@ import {
   startMilestonesOf,
   type ApplicationDraft,
   type ApplicationGirl,
-  type BankedReply,
   type CatalogEntry,
   type CatalogPool,
   type DecidedProfile,
@@ -25,6 +24,7 @@ import {
 import { SENIOR_YEAR } from '@shared/classes'
 import { appError } from '@shared/errors'
 import { fallbackHandleOf } from '@shared/feed'
+import { asReaderPronouns } from '@shared/gender'
 import { pairsWithin } from '@shared/sceneCreator'
 import { heldSecretsOf, SECRET_TIERS, secretText, secretTiersWanted } from '@shared/secrets'
 import { intakeOf } from '@shared/semesters'
@@ -38,12 +38,17 @@ import {
   type StructuredRequest
 } from '@shared/types'
 import {
-  buildClassPrompt,
+  buildClassPartPrompt,
+  classAsksOf,
+  classReplyOf,
   dealtClassReply,
   decorateClasses,
+  poolAsksOf,
   validateClassDraft,
+  validateClassPart,
+  type ClassAsk,
+  type ClassGenReply,
   type ClassPromptInput,
-  type ClassReply,
   type DealtClasses,
   type FilledCatalog
 } from '../prompts/classPrompt'
@@ -55,7 +60,12 @@ import {
 } from '../prompts/occasionPrompt'
 import { fixedOccasionsOf, keptFixedEdits } from '../prompts/occasions'
 import {
-  buildProfilePrompt,
+  answeredLowrise,
+  buildGraduatePrompt,
+  buildMajorPrompt,
+  buildReturningPrompt,
+  buildStudentPrompt,
+  dealLowrises,
   decidedProfileOf,
   fallbackPursuit,
   feedAssignmentsOf,
@@ -64,10 +74,13 @@ import {
   majorSpeller,
   mergeProfiles,
   normalizeActivity,
+  replyRecord,
   springBreakAssignmentsOf,
+  validateMajorDraft,
   validateNextProfiles,
   validateProfileDraft,
   type ContinuedProfileReply,
+  type GraduateBrief,
   type NextProfileInput,
   type NextProfiles,
   type ProfileAcademics,
@@ -75,12 +88,7 @@ import {
   type ProfileGenReply,
   type ProfileValidation
 } from '../prompts/profilePrompt'
-import {
-  buildSecretsPrompt,
-  validateSecretDraft,
-  type SecretsEntry,
-  type SecretsReply
-} from '../prompts/secretsPrompt'
+import { validateSecretsOf, type SecretsEntry } from '../prompts/secretsPrompt'
 import { buildSchedules } from './classScheduler'
 
 /**
@@ -99,8 +107,10 @@ export interface RequestWorld {
   graduates?: readonly Character[]
 }
 
-/** One call's request as the application stands, ready to send and to check its reply against. */
-export interface CallRequest {
+/** One part of a call as the application stands: its request, ready to send, and its reply's check. */
+export interface CallPart {
+  /** What its reply is banked under: the call's name, then what the part is for. */
+  id: string
   request: StructuredRequest
   key: string
   /** Refuses a reply that cannot be used, as an `AppError`. */
@@ -126,14 +136,35 @@ export interface SkipFill {
 }
 
 /**
- * What a call needs now: nothing, since nothing is left to generate; to wait, the class call
- * while a major is still unknown; or a request.
+ * What a call needs now: nothing, since nothing is left to generate; or its parts as far as they
+ * can be built, `waiting` while some cannot be yet — a student's, a major's or an interest class
+ * while a major is still unknown.
  */
-export type CallNeed = 'none' | 'waiting' | CallRequest
+export type CallNeed = 'none' | { parts: CallPart[]; waiting: boolean }
 
 /** The hash a request is banked under: of its system, user and schema. */
 function keyOf(request: StructuredRequest): string {
   return sha256Hex(JSON.stringify([request.system, request.user, request.schema]))
+}
+
+/** One part, its request hashed. */
+function partOf(id: string, request: StructuredRequest, check: (reply: unknown) => void): CallPart {
+  return { id, request, key: keyOf(request), check }
+}
+
+/** A need of `parts`, nothing where none is left and none waits. */
+function needFrom(parts: CallPart[], waiting: boolean): CallNeed {
+  return parts.length === 0 && !waiting ? 'none' : { parts, waiting }
+}
+
+/** Whether a banked reply still answers a part. */
+export function bankAnswers(replies: ApplicationDraft['replies'], part: CallPart): boolean {
+  return replies[part.id]?.key === part.key
+}
+
+/** A part's banked reply, where it still answers the part. */
+function bankedReply(draft: ApplicationDraft, part: CallPart): { reply: unknown } | null {
+  return bankAnswers(draft.replies, part) ? { reply: draft.replies[part.id].reply } : null
 }
 
 /** A roster girl's prompt identity. */
@@ -144,6 +175,29 @@ function charKey(character: Character): string {
 /** Everything the player set for one girl, or nothing. */
 function girlOf(draft: ApplicationDraft, charId: string): ApplicationGirl {
   return draft.girls[charId] ?? emptyGirl()
+}
+
+/**
+ * The player's notes on one girl as the setup calls are told them: what a returning girl or a
+ * graduate carries, else what the Profiles screen took down.
+ */
+function promptNotesOf(draft: ApplicationDraft, charId: string): string | undefined {
+  const carried = draft.continued?.carry.charInfo[charId]
+  const notes = (carried ? carried.notes : girlOf(draft, charId).notes)?.trim()
+  return notes || undefined
+}
+
+/** The player's notes on each of `characters` that has any, by charKey. */
+function promptNotesByKey(
+  draft: ApplicationDraft,
+  characters: readonly Character[]
+): Record<string, string> {
+  return Object.fromEntries(
+    characters.flatMap((character) => {
+      const notes = promptNotesOf(draft, character.charId)
+      return notes ? [[charKey(character), notes] as const] : []
+    })
+  )
 }
 
 /**
@@ -190,8 +244,8 @@ function validationOf(draft: ApplicationDraft, roster: readonly Character[]): Pr
 }
 
 /**
- * What a later semester's profile call asks beyond its new students: the returning girls' break
- * and the life since of every graduate with a profile to read; none on a first semester.
+ * What a later semester asks beyond its new students: the returning girls' break and the life
+ * since of every graduate with a profile to read; none on a first semester.
  */
 function nextInputOf(
   draft: ApplicationDraft,
@@ -237,171 +291,292 @@ function occasionInput(draft: ApplicationDraft, world: RequestWorld): OccasionPr
   }
 }
 
-/** What the occasions call needs. */
-function occasionNeed(draft: ApplicationDraft, world: RequestWorld): CallNeed {
+/** The occasions call's one part, banked under the call's own name. */
+function occasionPart(draft: ApplicationDraft, world: RequestWorld): CallPart | null {
   const input = occasionInput(draft, world)
-  if (input.asked.length === 0) return 'none'
-  const request = buildOccasionPrompt(input)
-  return {
-    request,
-    key: keyOf(request),
-    check: (reply) => {
-      if (normalizeOccasions(reply, input.asked).length > 0) return
-      throw appError(
-        'OCCASION_GEN_INVALID',
-        'The semester’s occasions came back empty.',
-        `${input.asked.length} were asked for; none could be written.`
-      )
-    }
-  }
+  if (input.asked.length === 0) return null
+  return partOf('occasions', buildOccasionPrompt(input), (reply) => {
+    if (normalizeOccasions(reply, input.asked).length > 0) return
+    throw appError(
+      'OCCASION_GEN_INVALID',
+      'The semester’s occasions came back empty.',
+      `${input.asked.length} were asked for; none could be written.`
+    )
+  })
 }
 
 /**
- * The profile call's input for the girls new to the playthrough, with whom it asks and what it
- * validates against; a returning girl's major is one the others may share.
+ * The secrets one girl is asked: a new girl every tier she left blank, her written ones held, and
+ * a returning girl the tiers she is owed, what she carries held; each with the player's notes on
+ * her. Null where none is asked.
  */
-function profileInput(
-  draft: ApplicationDraft,
-  roster: readonly Character[]
-): {
+function secretEntryOf(draft: ApplicationDraft, character: Character): SecretsEntry | null {
+  const notes = promptNotesOf(draft, character.charId)
+  const noted = notes ? { notes } : {}
+  if (isReturning(draft, character.charId)) {
+    const carried = draft.continued?.carry.charInfo[character.charId]
+    const tiers = secretTiersWanted(carried)
+    if (tiers.length === 0) return null
+    return {
+      character,
+      tiers,
+      held: heldSecretsOf(carried),
+      ...(carried?.flags?.hadSex ? { hadSex: true } : {}),
+      ...noted
+    }
+  }
+  const girl = girlOf(draft, character.charId)
+  const tiers = secretTiersBlank(girl.secrets)
+  if (tiers.length === 0) return null
+  const held = SECRET_TIERS.flatMap((tier) => {
+    const text = girl.secrets[tier]?.trim()
+    return text ? [secretText(text)] : []
+  })
+  const hadSex = startMilestonesOf(girl, character).sex
+  return { character, tiers, held, ...(hadSex ? { hadSex: true } : {}), ...noted }
+}
+
+/** A part that writes one girl's file: the profile fields it asks, and her secrets where any are. */
+interface StudentPart {
+  character: Character
+  part: CallPart
+  profile: boolean
+  secrets: SecretsEntry | null
+}
+
+/** A later semester's part for one returning girl, and her secrets where any are owed. */
+interface ReturningPart {
+  character: Character
+  part: CallPart
+  secrets: SecretsEntry | null
+}
+
+/**
+ * Everything the profile call's parts come to as the application stands: the majors part and the
+ * majors it spells, each new girl's part, and a later semester's returning girls' and graduates'.
+ */
+interface ProfilePlan {
   newcomers: Character[]
+  /** Each new girl's decided fields in the reply's vocabulary, by charKey, her major spelt. */
   decided: Record<string, ReturnType<typeof decidedProfileOf>>
-  asked: Set<string>
-  students: { character: Character; decided: ReturnType<typeof decidedProfileOf> }[]
-  otherMajors: string[]
-} {
+  majors: CallPart | null
+  /** Every roster girl's major by charId, or null while the majors part is not in. */
+  spelled: Record<string, string> | null
+  students: StudentPart[]
+  returning: ReturningPart[]
+  graduates: { graduate: GraduateBrief; part: CallPart }[]
+  /** A student's part waits on the majors. */
+  waiting: boolean
+  next?: NextProfileInput
+}
+
+/** The majors part, and the majors as they stand. */
+type MajorPlan = Pick<ProfilePlan, 'newcomers' | 'decided' | 'majors' | 'spelled'>
+
+/**
+ * The majors part and the majors it spells: every returning one first, then every one the player
+ * typed in roster order, then the majors reply's in roster order, so a girl's own spelling stands
+ * over a generated one.
+ */
+function majorPlanOf(
+  draft: ApplicationDraft,
+  roster: readonly Character[],
+  world: RequestWorld
+): MajorPlan {
   const { newcomers } = splitRoster(draft, roster)
   const fields = profileFieldsOf(draft)
-  const decided: Record<string, ReturnType<typeof decidedProfileOf>> = {}
-  const asked = new Set<string>()
-  const students: { character: Character; decided: ReturnType<typeof decidedProfileOf> }[] = []
-  const otherMajors = new Set<string>(returningMajorsOf(draft, roster))
-  for (const character of newcomers) {
-    const key = charKey(character)
-    const profile = girlOf(draft, character.charId).profile
-    decided[key] = decidedProfileOf(profile, fields)
-    if (profileBlanks(profile, fields).length > 0) {
-      asked.add(key)
-      students.push({ character, decided: decided[key] })
-    } else if (decided[key].major) otherMajors.add(decided[key].major)
-  }
-  return { newcomers, decided, asked, students, otherMajors: [...otherMajors] }
-}
+  const spell = majorSpeller()
+  const known = returningMajorsOf(draft, roster).map((major) => spell(major))
 
-/** What the profile call needs. */
-function profileNeed(
-  draft: ApplicationDraft,
-  roster: readonly Character[],
-  world: RequestWorld
-): CallNeed {
-  const input = profileInput(draft, roster)
-  const next = nextInputOf(draft, roster, world)
-  const request = buildProfilePrompt({
-    students: input.students,
-    otherMajors: input.otherMajors,
-    ...(next ? { next } : {}),
+  const decided: Record<string, ReturnType<typeof decidedProfileOf>> = {}
+  const lacking: Character[] = []
+  for (const character of newcomers) {
+    const own = decidedProfileOf(girlOf(draft, character.charId).profile, fields)
+    if (own.major) own.major = spell(own.major)
+    else lacking.push(character)
+    decided[charKey(character)] = own
+  }
+
+  const otherMajors = [
+    ...new Set([...known, ...newcomers.flatMap((c) => decided[charKey(c)].major ?? [])])
+  ].filter((major) => major !== '')
+  const majorRequest = buildMajorPrompt({
+    students: lacking,
+    otherMajors,
+    notes: promptNotesByKey(draft, lacking),
     setting: world.setting
   })
-  if (!request) return 'none'
-  const validation = validationOf(draft, roster)
-  return {
-    request,
-    key: keyOf(request),
-    check: (reply) => {
-      validateProfileDraft(
-        reply as ProfileGenReply,
-        input.newcomers,
-        input.decided,
-        input.asked,
-        validation
-      )
-      if (next) validateNextProfiles(reply as ContinuedProfileReply, next)
-    }
+  const majors = majorRequest
+    ? partOf('profiles:majors', majorRequest, (reply) => {
+        validateMajorDraft(reply, lacking)
+      })
+    : null
+
+  // The majors reply, spelt after every major already decided; null while it is not in.
+  let generated: Record<string, string> | null = {}
+  if (majors) {
+    const banked = bankedReply(draft, majors)
+    generated = banked ? validateMajorDraft(banked.reply, lacking) : null
   }
+  let spelled: Record<string, string> | null = null
+  if (generated) {
+    for (const character of lacking) {
+      const key = charKey(character)
+      decided[key] = { ...decided[key], major: spell(generated[key]) }
+    }
+    spelled = Object.fromEntries(
+      roster.map((c) => [c.charId, priorMajorOf(draft, c.charId) ?? decided[charKey(c)]?.major ?? ''])
+    )
+  }
+  return { newcomers, decided, majors, spelled }
 }
 
 /**
- * The secrets call's entries: every new girl with a tier left, her written ones held, and every
- * returning girl the tiers she is owed, what she carries held.
+ * The profile call's parts: the majors part, then each new girl's, told her major and so waiting
+ * on the majors part where her major is left to it, then a later semester's returning girls' and
+ * graduates'.
  */
-function secretEntries(draft: ApplicationDraft, roster: readonly Character[]): SecretsEntry[] {
-  return roster.flatMap((character) => {
-    if (isReturning(draft, character.charId)) {
-      const carried = draft.continued?.carry.charInfo[character.charId]
-      return [
-        {
-          character,
-          tiers: secretTiersWanted(carried),
-          held: heldSecretsOf(carried),
-          ...(carried?.flags?.hadSex ? { hadSex: true } : {})
-        }
-      ]
-    }
-    const girl = girlOf(draft, character.charId)
-    const tiers = secretTiersBlank(girl.secrets)
-    if (tiers.length === 0) return []
-    const held = SECRET_TIERS.flatMap((tier) => {
-      const text = girl.secrets[tier]?.trim()
-      return text ? [secretText(text)] : []
-    })
-    const hadSex = startMilestonesOf(girl, character).sex
-    return [{ character, tiers, held, ...(hadSex ? { hadSex: true } : {}) }]
-  })
-}
-
-/** What the secrets call needs. */
-function secretNeed(
+function profilePlanOf(
   draft: ApplicationDraft,
   roster: readonly Character[],
   world: RequestWorld
-): CallNeed {
-  const entries = secretEntries(draft, roster)
-  if (entries.length === 0) return 'none'
-  const request = buildSecretsPrompt(entries, world.setting)
-  return {
-    request,
-    key: keyOf(request),
-    check: (reply) => {
-      validateSecretDraft(reply as SecretsReply, entries)
+): ProfilePlan {
+  const { newcomers, decided, majors, spelled } = majorPlanOf(draft, roster, world)
+  const fields = profileFieldsOf(draft)
+  const students: StudentPart[] = []
+  let waiting = false
+  for (const character of newcomers) {
+    const key = charKey(character)
+    const asked = profileBlanks(girlOf(draft, character.charId).profile, fields).filter(
+      (field) => field !== 'major'
+    )
+    const secrets = secretEntryOf(draft, character)
+    if (asked.length === 0 && !secrets) continue
+    if (!decided[key].major) {
+      waiting = true
+      continue
     }
+    const notes = promptNotesOf(draft, character.charId)
+    const request = buildStudentPrompt({
+      character,
+      decided: decided[key],
+      fields: asked,
+      ...(secrets ? { secrets } : {}),
+      ...(notes ? { notes } : {}),
+      setting: world.setting
+    })
+    if (!request) continue
+    const profile = asked.length > 0
+    students.push({
+      character,
+      profile,
+      secrets,
+      part: partOf(`profiles:student:${character.charId}`, request, (reply) => {
+        if (secrets) validateSecretsOf(secrets, reply)
+        if (profile && (typeof reply !== 'object' || reply === null)) {
+          throw appError(
+            'PROFILE_GEN_INVALID',
+            'The generated student profiles were not usable.',
+            `${character.firstName} was left unprofiled.`
+          )
+        }
+      })
+    })
+  }
+
+  const next = nextInputOf(draft, roster, world)
+  const returning: ReturningPart[] = (next?.returning ?? []).map((character) => {
+    const secrets = secretEntryOf(draft, character)
+    const notes = promptNotesOf(draft, character.charId)
+    const request = buildReturningPrompt({
+      character,
+      season: draft.season,
+      ...(secrets ? { secrets } : {}),
+      ...(notes ? { notes } : {}),
+      setting: world.setting
+    })
+    return {
+      character,
+      secrets,
+      part: partOf(`profiles:returning:${character.charId}`, request, (reply) => {
+        if (secrets) validateSecretsOf(secrets, reply)
+      })
+    }
+  })
+  const graduates = (next?.graduates ?? []).map((graduate) => {
+    const notes = promptNotesOf(draft, graduate.character.charId)
+    const request = buildGraduatePrompt({
+      graduate,
+      season: draft.season,
+      ...(notes ? { notes } : {}),
+      setting: world.setting
+    })
+    // A graduate's reply is never refused: one left out keeps her last pursuit.
+    return { graduate, part: partOf(`profiles:graduate:${graduate.character.charId}`, request, () => {}) }
+  })
+
+  return {
+    newcomers,
+    decided,
+    majors,
+    spelled,
+    students,
+    returning,
+    graduates,
+    waiting,
+    ...(next ? { next } : {})
   }
 }
 
-/** Whether a banked reply still answers a call's need. */
-export function bankAnswers(banked: BankedReply | undefined, need: CallNeed): boolean {
-  if (!banked || typeof need === 'string') return false
-  return banked.key === need.key
+/** Every part of a profile plan, in the order it is merged. */
+function profileParts(plan: ProfilePlan): CallPart[] {
+  return [
+    ...(plan.majors ? [plan.majors] : []),
+    ...plan.students.map((student) => student.part),
+    ...plan.returning.map((returning) => returning.part),
+    ...plan.graduates.map((graduate) => graduate.part)
+  ]
 }
 
 /**
- * The new girls' profiles as they stand: decided alone where nothing was left to write, else the
- * banked reply laid under the decided fields; null while that reply is not in.
+ * The new girls' profiles as they stand: each laid under her decided fields and the major spelt
+ * for her, a girl answered as living in a Lowrise dealt the one fewest live in; null while the
+ * majors or a student's part is not in.
  */
 function profilesOf(
   draft: ApplicationDraft,
   roster: readonly Character[],
-  world: RequestWorld
+  plan: ProfilePlan
 ): ProfileGenDraft | null {
-  const need = profileNeed(draft, roster, world)
-  const input = profileInput(draft, roster)
-  const validation = validationOf(draft, roster)
-  if (need === 'none') {
-    return validateProfileDraft(undefined, input.newcomers, input.decided, new Set(), validation)
+  if (!plan.spelled || plan.waiting) return null
+  const rows: (Record<string, unknown> & { key: string })[] = []
+  for (const student of plan.students) {
+    if (!student.profile) continue
+    const banked = bankedReply(draft, student.part)
+    if (!banked) return null
+    rows.push({ ...replyRecord(banked.reply), key: charKey(student.character) })
   }
-  const banked = draft.replies.profiles
-  if (!bankAnswers(banked, need)) return null
+  const held = [
+    ...plan.newcomers.map((c) => plan.decided[charKey(c)].dorm),
+    ...splitRoster(draft, roster).returning.map((c) => draft.continued?.priorProfiles[c.charId]?.dorm)
+  ]
+  const dealt = dealLowrises(
+    rows.filter((row) => answeredLowrise(row.dorm)).map((row) => row.key),
+    held
+  )
+  for (const row of rows) if (dealt[row.key]) row.dorm = dealt[row.key]
   return validateProfileDraft(
-    banked?.reply as ProfileGenReply,
-    input.newcomers,
-    input.decided,
-    input.asked,
-    validation
+    { characters: rows } as unknown as ProfileGenReply,
+    plan.newcomers,
+    plan.decided,
+    new Set(rows.map((row) => row.key)),
+    validationOf(draft, roster)
   )
 }
 
 /**
  * Every roster girl's major by charId: a returning girl's as last semester spelt it, a new girl's
- * as decided or as the profile reply wrote it; null while one is still unknown.
+ * as decided or as the majors part wrote it; null while one is still unknown.
  */
 export function majorsOf(
   draft: ApplicationDraft,
@@ -409,23 +584,7 @@ export function majorsOf(
   world: RequestWorld
 ): Record<string, string> | null {
   if (isSkipped(draft, 'profiles')) return skippedMajorsOf(draft, roster)
-  const profiles = profilesOf(draft, roster, world)
-  if (profiles) {
-    return Object.fromEntries(
-      roster.map((c) => [
-        c.charId,
-        priorMajorOf(draft, c.charId) ?? profiles.characters[charKey(c)]?.major ?? ''
-      ])
-    )
-  }
-  // Every major decided: read as the profile call's validation would spell them.
-  const spell = majorSpeller()
-  for (const major of returningMajorsOf(draft, roster)) spell(major)
-  const decided = roster.map(
-    (c) => priorMajorOf(draft, c.charId) ?? spell(girlOf(draft, c.charId).profile.major)
-  )
-  if (decided.some((major) => major === '')) return null
-  return Object.fromEntries(roster.map((c, index) => [c.charId, decided[index]]))
+  return majorPlanOf(draft, roster, world).spelled
 }
 
 /**
@@ -454,6 +613,20 @@ function skippedMajorsOf(
   return majors
 }
 
+/** Each pool's whole entries, no more than it holds: all a pool's part reads of the catalog. */
+function wholePools(draft: ApplicationDraft): Pick<FilledCatalog, CatalogPool> {
+  const whole = (pool: CatalogPool): CatalogEntry[] =>
+    draft.catalog[pool]
+      .filter((entry) => courseFilled(entry, pool === 'pe'))
+      .slice(0, POOL_SIZES[pool])
+  return {
+    pe: whole('pe'),
+    humanities: whole('humanities'),
+    arts: whole('arts'),
+    misc: whole('misc')
+  }
+}
+
 /** The class call's input, once every major is known. */
 export function classInput(
   draft: ApplicationDraft,
@@ -462,16 +635,8 @@ export function classInput(
   majors: Record<string, string>
 ): ClassPromptInput {
   const known = new Set(Object.values(majors))
-  /** A pool's whole entries, no more than it holds. */
-  const whole = (pool: CatalogPool): CatalogEntry[] =>
-    draft.catalog[pool]
-      .filter((entry) => courseFilled(entry, pool === 'pe'))
-      .slice(0, POOL_SIZES[pool])
   const filled: FilledCatalog = {
-    pe: whole('pe'),
-    humanities: whole('humanities'),
-    arts: whole('arts'),
-    misc: whole('misc'),
+    ...wholePools(draft),
     major: Object.fromEntries(
       Object.entries(draft.catalog.major)
         .filter(([major]) => known.has(major))
@@ -496,29 +661,47 @@ export function classInput(
   }
 }
 
-/** What the class call needs. */
-function classNeed(
-  draft: ApplicationDraft,
-  roster: readonly Character[],
-  world: RequestWorld
-): CallNeed {
-  const majors = majorsOf(draft, roster, world)
-  if (!majors) return 'waiting'
-  const input = classInput(draft, roster, world, majors)
-  const request = buildClassPrompt(input)
-  if (!request) return 'none'
-  return {
-    request,
-    key: keyOf(request),
-    check: (reply) => {
-      validateClassDraft(reply as ClassReply, input)
-    }
+/** The id a class part is banked under. */
+function classPartId(ask: ClassAsk): string {
+  switch (ask.kind) {
+    case 'pool':
+      return `classes:pool:${ask.pool}`
+    case 'major':
+      return `classes:major:${ask.major}`
+    case 'interest':
+      return `classes:interest:${ask.student.character.charId}`
   }
 }
 
 /**
+ * The class call's parts: each pool's at once, read off the pools alone, and each major's and
+ * interest class's once every major is known. `input` is absent while one is not.
+ */
+function classPlanOf(
+  draft: ApplicationDraft,
+  roster: readonly Character[],
+  world: RequestWorld
+): { asks: { ask: ClassAsk; part: CallPart }[]; waiting: boolean; input?: ClassPromptInput } {
+  const withPart = (ask: ClassAsk): { ask: ClassAsk; part: CallPart } => ({
+    ask,
+    part: partOf(classPartId(ask), buildClassPartPrompt(ask, world.setting), (reply) => {
+      validateClassPart(ask, reply)
+    })
+  })
+  const pools = poolAsksOf(wholePools(draft), draft.continued?.taken).map(withPart)
+  const majors = majorsOf(draft, roster, world)
+  if (!majors) return { asks: pools, waiting: true }
+  const input = classInput(draft, roster, world, majors)
+  const rest = classAsksOf(input, promptNotesByKey(draft, roster))
+    .filter((ask) => ask.kind !== 'pool')
+    .map(withPart)
+  return { asks: [...pools, ...rest], waiting: false, input }
+}
+
+/**
  * What one call needs as the application stands. A skipped call needs nothing sent, though a
- * skipped catalog still waits on the majors it is dealt around.
+ * skipped catalog still waits on the majors it is dealt around; the secrets call sends nothing of
+ * its own, its asks riding each student's part of the profile call.
  */
 export function needOf(
   call: NewGameCall,
@@ -527,17 +710,26 @@ export function needOf(
   world: RequestWorld
 ): CallNeed {
   if (isSkipped(draft, call)) {
-    return call === 'classes' && !majorsOf(draft, roster, world) ? 'waiting' : 'none'
+    return call === 'classes' && !majorsOf(draft, roster, world) ? needFrom([], true) : 'none'
   }
   switch (call) {
-    case 'occasions':
-      return occasionNeed(draft, world)
-    case 'profiles':
-      return profileNeed(draft, roster, world)
+    case 'occasions': {
+      const part = occasionPart(draft, world)
+      return needFrom(part ? [part] : [], false)
+    }
+    case 'profiles': {
+      const plan = profilePlanOf(draft, roster, world)
+      return needFrom(profileParts(plan), plan.waiting)
+    }
     case 'secrets':
-      return secretNeed(draft, roster, world)
-    case 'classes':
-      return classNeed(draft, roster, world)
+      return 'none'
+    case 'classes': {
+      const plan = classPlanOf(draft, roster, world)
+      return needFrom(
+        plan.asks.map(({ part }) => part),
+        plan.waiting
+      )
+    }
   }
 }
 
@@ -546,17 +738,19 @@ function unanswered(call: NewGameCall): never {
   throw appError('NEW_GAME_INCOMPLETE', 'New Game is still waiting on a reply.', `${call} is not in.`)
 }
 
-/** A banked reply, where it still answers its call; `undefined` where the call needs none. */
-function answered(
+/** The banked reply of every part, in order, or a refusal naming `call` while one is not in. */
+function answeredAll(
   call: NewGameCall,
   draft: ApplicationDraft,
-  roster: readonly Character[],
-  world: RequestWorld
-): { need: CallNeed; reply: unknown } {
-  const need = needOf(call, draft, roster, world)
-  if (need === 'none') return { need, reply: undefined }
-  if (need === 'waiting' || !bankAnswers(draft.replies[call], need)) unanswered(call)
-  return { need, reply: draft.replies[call]?.reply }
+  parts: readonly CallPart[],
+  waiting = false
+): unknown[] {
+  if (waiting) unanswered(call)
+  return parts.map((part) => {
+    const banked = bankedReply(draft, part)
+    if (!banked) unanswered(call)
+    return banked.reply
+  })
 }
 
 /** Where a skipped call's fill is needed and the composition was handed none. */
@@ -641,9 +835,10 @@ export function composeApplication(
       if (words) generated.set(planned.id, occasionOf(planned, words))
     }
   } else {
-    const occasionReply = answered('occasions', draft, roster, world)
-    if (occasionReply.need !== 'none') {
-      for (const occasion of normalizeOccasions(occasionReply.reply, occasionInput(draft, world).asked)) {
+    const part = occasionPart(draft, world)
+    if (part) {
+      const [reply] = answeredAll('occasions', draft, [part])
+      for (const occasion of normalizeOccasions(reply, occasionInput(draft, world).asked)) {
         generated.set(occasion.id, occasion)
       }
     }
@@ -658,36 +853,64 @@ export function composeApplication(
 
   const continued = draft.continued
   const { returning } = splitRoster(draft, roster)
-  const next = nextInputOf(draft, roster, world)
   let profiles: ProfileGenDraft
-  // What a later semester's reply says of its returning girls and graduates, where it was asked.
+  // What a later semester's parts say of its returning girls and graduates, where they were asked.
   let nextProfiles: NextProfiles | undefined
+  // The new secrets each student's part wrote, by charKey.
+  let written: Record<string, CharSecret[]> = {}
   if (isSkipped(draft, 'profiles')) {
     profiles = skippedProfilesOf(draft, roster, fill)
   } else {
-    const profileReply = answered('profiles', draft, roster, world)
-    profiles = profilesOf(draft, roster, world) ?? unanswered('profiles')
-    if (next && profileReply.need !== 'none') {
-      nextProfiles = validateNextProfiles(profileReply.reply as ContinuedProfileReply, next)
+    const plan = profilePlanOf(draft, roster, world)
+    answeredAll('profiles', draft, profileParts(plan), plan.waiting)
+    profiles = profilesOf(draft, roster, plan) ?? unanswered('profiles')
+    if (plan.next) {
+      const reply: ContinuedProfileReply = {
+        returning: plan.returning.map(({ character, part }) => ({
+          ...replyRecord(bankedReply(draft, part)?.reply),
+          key: charKey(character)
+        })),
+        graduates: plan.graduates.map(({ graduate, part }) => ({
+          ...replyRecord(bankedReply(draft, part)?.reply),
+          key: charKey(graduate.character)
+        }))
+      }
+      nextProfiles = validateNextProfiles(reply, plan.next)
+    }
+    for (const { secrets: entry, part } of [...plan.students, ...plan.returning]) {
+      if (!entry) continue
+      written[charKey(entry.character)] = validateSecretsOf(entry, bankedReply(draft, part)?.reply)
     }
   }
 
   const majors = majorsOf(draft, roster, world) ?? unanswered('classes')
   const input = classInput(draft, roster, world, majors)
-  const catalog = isSkipped(draft, 'classes')
-    ? validateClassDraft(dealtClassReply(fill?.classes ?? unfilled('classes'), input.students), {
-        ...input,
-        openMajors: true
-      })
-    : validateClassDraft(answered('classes', draft, roster, world).reply as ClassReply | undefined, input)
+  let catalog: ClassGenReply
+  if (isSkipped(draft, 'classes')) {
+    catalog = validateClassDraft(dealtClassReply(fill?.classes ?? unfilled('classes'), input.students), {
+      ...input,
+      openMajors: true
+    })
+  } else {
+    const plan = classPlanOf(draft, roster, world)
+    const replies = answeredAll(
+      'classes',
+      draft,
+      plan.asks.map(({ part }) => part),
+      plan.waiting
+    )
+    catalog = validateClassDraft(
+      classReplyOf(plan.asks.map(({ ask }, index) => ({ ask, reply: replies[index] }))),
+      input
+    )
+  }
   const academics = { ...profiles.characters, ...returningAcademicsOf(draft, returning) }
   const schedules = buildSchedules(
     decorateClasses(mergeProfiles(catalog, { characters: academics })),
     roster
   )
 
-  // Secrets: the player's tiers where written, the fill's or the reply's for the rest, lowest first.
-  let written: Record<string, CharSecret[]> = {}
+  // Secrets: the player's tiers where written, the fill's or the parts' for the rest, lowest first.
   if (isSkipped(draft, 'secrets')) {
     written = Object.fromEntries(
       roster.map((character) => [
@@ -698,11 +921,6 @@ export function composeApplication(
         })
       ])
     )
-  } else {
-    const secretReply = answered('secrets', draft, roster, world)
-    if (secretReply.need !== 'none') {
-      written = validateSecretDraft(secretReply.reply as SecretsReply, secretEntries(draft, roster))
-    }
   }
   const secrets: Record<string, CharSecret[]> = {}
   for (const character of roster) {
@@ -718,6 +936,14 @@ export function composeApplication(
         : theirs.filter((secret) => secret.tier === tier)
     })
     if (held.length > 0) secrets[character.charId] = held
+  }
+
+  // The player's notes on each girl new to the roster; a returning girl's ride the carry.
+  const notes: Record<string, string> = {}
+  for (const character of roster) {
+    if (isReturning(draft, character.charId)) continue
+    const text = girlOf(draft, character.charId).notes?.trim()
+    if (text) notes[character.charId] = text
   }
 
   /** One profile assignment map re-keyed from charKey to charId, absences dropped. */
@@ -792,9 +1018,10 @@ export function composeApplication(
     occasions,
     fixedEdits: keptFixedEdits(draft.season, draft.fixedEdits ?? {}),
     secrets,
+    ...(Object.keys(notes).length > 0 ? { notes } : {}),
     starts: Object.fromEntries(
       roster.flatMap((c) => {
-        const start = charStartOf(draft.girls[c.charId], c)
+        const start = charStartOf(draft.girls[c.charId], c, asReaderPronouns(draft.reader?.pronouns))
         return start ? [[c.charId, start] as const] : []
       })
     ),

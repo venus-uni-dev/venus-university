@@ -6,13 +6,14 @@ import { MAX_GROUP } from '../src/renderer/stores/npcOverlay'
 import {
   rollDormRunIns,
   rollLooseRunIns,
+  sharedHauntGroups,
   type RunInCharInput
 } from '../src/renderer/stores/npcRunIns'
 
 /**
- * The two run-in rolls the settle folds in on top of the overlay. What they return is
- * written into a save as encounters between pairs, so these are invariant checks over many
- * random runs, with the two extremes pinned by an injected `rand`.
+ * The shared haunts and the two run-in rolls the settle folds in on top of the overlay. What
+ * they return is written into a save as encounters between pairs, so these are invariant checks
+ * over many random runs, with the two extremes pinned by an injected `rand`.
  */
 
 const RUNS = 60
@@ -33,6 +34,22 @@ function input(over: Partial<RunInCharInput> = {}): RunInCharInput {
 function placed(groups: readonly NpcEncounterGroup[]): string[] {
   return groups.flatMap((group) => [...group.members])
 }
+
+describe('sharedHauntGroups', () => {
+  it('meets the girls keeping a haunt at one place, and nobody else', () => {
+    const groups = sharedHauntGroups({
+      a: { haunt: 'cutetea', excluded: false },
+      b: { haunt: 'cutetea', excluded: false },
+      alone: { haunt: 'btb_arcade', excluded: false },
+      home1: { haunt: ROOM_LOCATION, excluded: false },
+      home2: { haunt: ROOM_LOCATION, excluded: false },
+      inScene: { haunt: 'kendall_library', excluded: true },
+      studying: { haunt: 'kendall_library', excluded: false },
+      nowhere: { haunt: null, excluded: false }
+    })
+    expect(groups).toEqual([{ kind: 'hangout', ref: 'cutetea', members: ['a', 'b'] }])
+  })
+})
 
 describe('rollDormRunIns', () => {
   it('never puts out anybody who is busy, spoken for, or not in her room', () => {

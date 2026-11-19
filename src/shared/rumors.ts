@@ -1,14 +1,23 @@
-import { areNpcFriends, npcFriendsOf, type NpcRelationshipMap } from './npcRelationships'
+import { PRONOUNS } from './gender'
+import {
+  areNpcFriends,
+  npcFriendsOf,
+  npcPairOf,
+  type NpcAffair,
+  type NpcRelationshipMap,
+  type NpcSiding
+} from './npcRelationships'
 import { PASSERBY_CHANCE } from './odds'
 import { readerize } from './readerVoice'
 import { andList } from './sentences'
 import { shuffle } from './shuffle'
-import type { CharInfo, CharMemory, IntimateAct, Suspicion } from './types'
+import type { CharInfo, CharMemory, Gender, IntimateAct, Suspicion } from './types'
 
 /**
  * Who saw the reader with whom and who they told: the suspicion one girl carries about one
  * other, the second sign that turns it into telling her friends, and what a sighting or a
- * telling costs him with a lover, a crush or the friend of a lover he has just cheated on.
+ * telling costs him with a lover, a crush, the partner or an admirer of the girl he was with, or
+ * the friend of a lover he has just cheated on.
  */
 
 /** The window a suspicion lives in, in global slots — a week. */
@@ -16,15 +25,17 @@ const SUSPICION_SLOTS = 14
 
 /**
  * Files a jealousy memory, refreshing rather than duplicating: one that says the same in either
- * voice takes the new date and the new wording.
+ * voice, as its holder's gender reads it, takes the new date and the new wording.
  */
 export function upsertJealousyMemory(
   list: readonly CharMemory[] | undefined,
-  entry: CharMemory
+  entry: CharMemory,
+  holder: Gender
 ): CharMemory[] {
   const existing = list ?? []
-  const said = readerize(entry.desc)
-  const at = existing.findIndex((memory) => readerize(memory.desc) === said)
+  // Both are read in one voice, so which reflexive it gives the reader cannot change the match.
+  const said = readerize(entry.desc, holder, 'he')
+  const at = existing.findIndex((memory) => readerize(memory.desc, holder, 'he') === said)
   if (at < 0) return [...existing, entry]
   const next = [...existing]
   next[at] = { ...next[at], date: entry.date, desc: entry.desc }
@@ -70,6 +81,13 @@ export interface RumorPassInput {
   /** Available, placed nowhere and not in the scene: who can walk past. */
   loose: readonly string[]
   firstNames: Readonly<Record<string, string>>
+  /** Each character's gender by charId, which her memories are worded in; absent is female. */
+  genders?: Readonly<Record<string, Gender>>
+  /**
+   * Whoever is open: she cheats on nobody, nobody cheats on her, and she resents nobody. Absent,
+   * nobody's partner or admirer takes the hour personally.
+   */
+  open?: readonly string[]
 }
 
 /**
@@ -83,6 +101,10 @@ export interface RumorPassOutcome {
   memories: { charId: string; memory: CharMemory }[]
   /** Who watched him with whom, which is what the player is told and what BunnyBot reads. */
   sightings: { witness: string; subjects: string[] }[]
+  /** Each character who found out her partner cheated with the reader; absent where nobody did. */
+  affairs?: NpcAffair[]
+  /** Each friend of one cheated on who saw or heard it; absent where nobody did. */
+  sided?: NpcSiding[]
 }
 
 /**
@@ -119,6 +141,12 @@ export function rumorPass(
 
   const departed = new Set(input.departed)
   const inScene = new Set(input.cast)
+  const open = input.open === undefined ? null : new Set(input.open)
+  const everyone = [...input.roster, ...input.alumni]
+
+  // Each partner who found out, keyed cheater|partner; each friend who sided, keyed by|cheater.
+  const affairs = new Map<string, NpcAffair>()
+  const sided = new Map<string, NpcSiding>()
 
   for (const act of input.acts) {
     // The girls in it: none of them witnesses it, and an open relationship is nobody's business.
@@ -127,14 +155,54 @@ export function rumorPass(
     if (subjects.length === 0) continue
     const named = andList(subjects.map(nameOf))
 
+    // Who each girl in it is cheating on: a partner outside the act, where neither of them is open.
+    const cheatedOn = new Map<string, string[]>()
+    // Who holds a crush on each girl in it, outside the act and not open.
+    const admirers = new Map<string, string[]>()
+    if (open !== null) {
+      for (const subject of subjects) {
+        const others = everyone.filter((other) => other !== subject && !participants.has(other))
+        cheatedOn.set(
+          subject,
+          open.has(subject)
+            ? []
+            : others.filter(
+                (other) =>
+                  !open.has(other) &&
+                  npcPairOf(input.npcRelationships, subject, other)?.dating !== undefined
+              )
+        )
+        admirers.set(
+          subject,
+          input.roster.filter(
+            (other) =>
+              other !== subject &&
+              !participants.has(other) &&
+              !open.has(other) &&
+              npcPairOf(input.npcRelationships, subject, other)?.crush?.includes(other) === true
+          )
+        )
+      }
+    }
+
     // Which claim of hers the hour steps on, and whose heart she minds it on behalf of.
     const stakeOf = (
       w: string
-    ): { kind: 'lover' } | { kind: 'crush' } | { kind: 'friend'; jilted: string[] } | null => {
+    ):
+      | { kind: 'lover' }
+      | { kind: 'crush' }
+      | { kind: 'partner'; cheaters: string[] }
+      | { kind: 'rival'; admired: string[] }
+      | { kind: 'friend'; jilted: string[] }
+      | null => {
       if (!flagOf(w, 'harem')) {
         if (flagOf(w, 'isLover')) return { kind: 'lover' }
         if (flagOf(w, 'hasCrush')) return { kind: 'crush' }
       }
+      const cheaters = subjects.filter((subject) => cheatedOn.get(subject)?.includes(w))
+      if (cheaters.length > 0) return { kind: 'partner', cheaters }
+      const admired = subjects.filter((subject) => admirers.get(subject)?.includes(w))
+      if (admired.length > 0) return { kind: 'rival', admired }
       const jilted = [...input.roster, ...input.alumni].filter(
         (lover) =>
           flagOf(lover, 'isLover') &&
@@ -151,23 +219,36 @@ export function rumorPass(
       if (stake === null) return
       const saw = from === null
       const teller = from === null ? '' : nameOf(from)
+      const { they, them } = PRONOUNS[input.genders?.[w] ?? 'female']
       let type: CharMemory['type'] = 'disliked'
       let desc: string
       if (stake.kind === 'lover') {
         if (saw) type = 'hated'
         desc = saw
-          ? `she saw the reader cheating on her with ${named}`
-          : `she heard from ${teller} that the reader cheated on her with ${named}`
+          ? `${they} saw the reader cheating on ${them} with ${named}`
+          : `${they} heard from ${teller} that the reader cheated on ${them} with ${named}`
       } else if (stake.kind === 'crush') {
         if (saw) type = 'hated'
         desc = saw
-          ? `she saw the reader with ${named}`
-          : `she heard from ${teller} that the reader was with ${named}`
+          ? `${they} saw the reader with ${named}`
+          : `${they} heard from ${teller} that the reader was with ${named}`
+      } else if (stake.kind === 'partner') {
+        if (saw) type = 'hated'
+        const cheaters = andList(stake.cheaters.map(nameOf))
+        desc = saw
+          ? `${they} saw ${cheaters} cheating on ${them} with the reader`
+          : `${they} heard from ${teller} that ${cheaters} cheated on ${them} with the reader`
+      } else if (stake.kind === 'rival') {
+        if (saw) type = 'hated'
+        const admired = andList(stake.admired.map(nameOf))
+        desc = saw
+          ? `${they} saw the reader with ${admired}, who ${they} had a crush on`
+          : `${they} heard from ${teller} that the reader was with ${admired}, who ${they} had a crush on`
       } else {
         const jilted = andList(stake.jilted.map(nameOf))
         desc = saw
-          ? `she saw the reader cheating on ${jilted} with ${named}`
-          : `she heard from ${teller} that the reader cheated on ${jilted} with ${named}`
+          ? `${they} saw the reader cheating on ${jilted} with ${named}`
+          : `${they} heard from ${teller} that the reader cheated on ${jilted} with ${named}`
       }
       const key = `${w}|${desc}`
       if (written.has(key)) return
@@ -193,10 +274,31 @@ export function rumorPass(
     // Whoever is sure of it, in the order they became sure, waiting to pass it on.
     const tellers: string[] = []
 
+    // What it costs the couples it broke faith with: a partner finds out, and a friend of the one
+    // cheated on sides with them.
+    const learn = (w: string, saw: boolean): void => {
+      for (const subject of subjects) {
+        for (const partner of cheatedOn.get(subject) ?? []) {
+          if (partner === w) {
+            const key = `${subject}|${w}`
+            const known = affairs.get(key)
+            affairs.set(key, { cheater: subject, partner: w, saw: saw || known?.saw === true })
+          } else if (
+            !open?.has(w) &&
+            !sided.has(`${w}|${subject}`) &&
+            areNpcFriends(input.npcRelationships, w, partner)
+          ) {
+            sided.set(`${w}|${subject}`, { by: w, cheater: subject, partner })
+          }
+        }
+      }
+    }
+
     // She watched it happen: it costs her now, the player is told, and she will say so.
     const see = (w: string): void => {
       if (participants.has(w)) return
       remember(w, null)
+      learn(w, true)
       for (const subject of subjects) witnessed.add(`${w}|${subject}`)
       sightings.push({ witness: w, subjects: [...subjects] })
       refresh(w)
@@ -217,6 +319,7 @@ export function rumorPass(
       if (participants.has(w)) return
       const sure = hadEarlierSign(w)
       if (!subjects.every((subject) => witnessed.has(`${w}|${subject}`))) remember(w, from)
+      learn(w, false)
       refresh(w)
       if (sure) tellers.push(w)
     }
@@ -261,6 +364,8 @@ export function rumorPass(
   }
 
   const outcome: RumorPassOutcome = { suspicions: {}, memories, sightings }
+  if (affairs.size > 0) outcome.affairs = [...affairs.values()]
+  if (sided.size > 0) outcome.sided = [...sided.values()]
   for (const charId of new Set([...input.roster, ...working.keys()])) {
     const before = input.charInfo[charId]?.suspicions ?? []
     const after = working.get(charId) ?? liveSuspicionsOf(input.charInfo[charId], input.slot)

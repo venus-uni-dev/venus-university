@@ -8,28 +8,44 @@ import {
   ROOM_LOCATION
 } from '@shared/locations'
 import {
+  newCouples,
   newFriendships,
   npcFriendsOf,
-  settleNpcPairs,
+  npcPartnersOf,
+  settleNpcPairsFull,
+  type NpcAdvice,
   type NpcEncounterGroup,
+  type NpcSettleResult,
   type NpcRelationshipMap,
   type NpcSlotOverlay
 } from '@shared/npcRelationships'
-import type { CharInfo, Haunt, TimeSlot } from '@shared/types'
-import { globalSlotOf, shiftSlotOf } from '@shared/jobs'
+import { npcAttractionOf } from '@shared/relationship'
+import type { Attraction, Character, CharInfo, Haunt, TimeSlot } from '@shared/types'
+import { globalSlotOf, jobDefOf, shiftSlotOf } from '@shared/jobs'
 import { isRainedOut, weatherAt } from '@shared/weather'
 import { classSlotOf, hauntClosedOn, isBreakOutingWeek } from '../../prompts/occasions'
 import { prevSlot, shiftWeekdayOf, weekendSaturdayOf } from '../../prompts/gameDate'
 import { useGameStore } from '../gameStore'
 import { rollNpcOverlay, type OutingWindow, type OverlayCharInput } from '../npcOverlay'
-import { rollDormRunIns, rollLooseRunIns, type RunInCharInput } from '../npcRunIns'
 import {
+  rollDormRunIns,
+  rollLooseRunIns,
+  sharedHauntGroups,
+  type RunInCharInput,
+  type SharedHauntCharInput
+} from '../npcRunIns'
+import {
+  charAwayNow,
   charHiddenLocationNow,
   charOverlayGroupNow,
   charSickAtHomeNow,
   charStandingHauntAt,
+  charStandingHauntNow,
   charUnavailableNow,
-  isHomebound
+  classCodeIn,
+  isHomebound,
+  jobIn,
+  standingHauntIn
 } from '../timetable'
 
 /** The roster's own social life, where it meets the store. */
@@ -46,11 +62,50 @@ export interface NpcWhereabouts {
   haunt?: Haunt
 }
 
-/** Rolls who spends `date`/`time` with whom. */
+/** A transfer arriving at the slot being rolled, not yet on the roster: her character and entry. */
+export interface Arrival {
+  charId: string
+  character: Character
+  info: CharInfo
+}
+
+/**
+ * Where a student whose entry is `info` stands in a slot, off that entry and whether she is off
+ * campus: her standing haunt, whether she is out of the overlay's passes, whether she stays in,
+ * and the employer she is working for.
+ */
+function standingOf(
+  charId: string,
+  character: Character | undefined,
+  info: CharInfo | undefined,
+  date: number,
+  time: TimeSlot
+): Pick<OverlayCharInput, 'haunt' | 'busy' | 'moodHomebound'> & { jobId: string | null } {
+  const game = useGameStore.getState()
+  const away = charAwayNow(charId, date)
+  const jobId = jobIn(info, date, time, game.calendar, away)
+  const committed = classCodeIn(info, date, time, game.calendar) !== null || jobId !== null
+  return {
+    // The standing haunt, not `charHiddenLocationNow`, which reads the overlay this call is
+    // producing and would deal a replay a second evening.
+    haunt:
+      standingHauntIn(info, date, time, game.calendar, game.weather, committed)?.location ?? null,
+    // Off campus takes her out of all three passes at once.
+    busy: committed || away,
+    moodHomebound: isHomebound(character, info, date, time),
+    jobId
+  }
+}
+
+/**
+ * Rolls who spends `date`/`time` with whom: the roster, and whoever is `arriving` at that slot,
+ * each a stranger to everybody with nothing yet to keep her in.
+ */
 export function rollNpcOverlayNow(
   date: number,
   time: TimeSlot,
-  relationships: NpcRelationshipMap = useGameStore.getState().npcRelationships
+  relationships: NpcRelationshipMap = useGameStore.getState().npcRelationships,
+  arriving: readonly Arrival[] = []
 ): NpcSlotOverlay {
   const game = useGameStore.getState()
   const window = outingWindowOf(date)
@@ -58,14 +113,23 @@ export function rollNpcOverlayNow(
   const previous = prevSlot(date, time)
 
   const chars: Record<string, OverlayCharInput> = {}
+  // Where one of the roster or an arrival is working a shift.
+  const worked = new Set<string>()
+  const addWorkplace = (jobId: string | null): void => {
+    const workplace = jobId === null ? undefined : jobDefOf(jobId)?.locationId
+    if (workplace) worked.add(workplace)
+  }
   for (const charId of game.chars) {
+    const { jobId, ...standing } = standingOf(
+      charId,
+      game.characters[charId],
+      game.charInfo[charId],
+      date,
+      time
+    )
+    addWorkplace(jobId)
     chars[charId] = {
-      // The standing haunt, not `charHiddenLocationNow`, which reads the overlay this call is
-      // producing and would deal a replay a second evening.
-      haunt: charStandingHauntAt(charId, date, time)?.location ?? null,
-      // Off campus takes her out of all three passes at once.
-      busy: charUnavailableNow(charId, date, time),
-      moodHomebound: isHomebound(game.charInfo[charId], date, time),
+      ...standing,
       // Each window reads only its own record, off the arguments rather than the clock, which
       // at an ending names the slot before the one being rolled.
       wentOutRecently:
@@ -74,14 +138,25 @@ export function rollNpcOverlayNow(
           : window === 'weekend' &&
             saturday !== null &&
             game.weekendOutings[charId] === saturday,
-      friends: npcFriendsOf(relationships, charId, game.chars)
+      friends: npcFriendsOf(relationships, charId, game.chars),
+      partners: npcPartnersOf(relationships, charId, game.chars)
     }
   }
+  for (const { charId, character, info } of arriving) {
+    if (chars[charId]) continue
+    const { jobId, ...standing } = standingOf(charId, character, info, date, time)
+    addWorkplace(jobId)
+    chars[charId] = { ...standing, wentOutRecently: false, friends: [], partners: [] }
+  }
 
-  // A spot shut this half of the day, or open-air under rain, is never drawn for an outing.
+  // A spot shut this half of the day, open-air under rain, or where one of the roster is working
+  // a shift is never drawn for an outing.
   const sky = weatherAt(game.weather, date, time)
   const spots = OUTING_LOCATIONS.filter(
-    (id) => isLocationOpen(id, shiftSlotOf(shiftWeekdayOf(date), time)) && !isRainedOut(id, sky)
+    (id) =>
+      isLocationOpen(id, shiftSlotOf(shiftWeekdayOf(date), time)) &&
+      !isRainedOut(id, sky) &&
+      !worked.has(id)
   )
   return rollNpcOverlay(date, time, window, chars, spots)
 }
@@ -105,8 +180,9 @@ export function applyNpcOverlay(overlay: NpcSlotOverlay): void {
 }
 
 /**
- * Every encounter the finished slot held — the lectures, the hour's hangouts and the
- * run-ins. Rolled once per ending, because the run-ins are dice, and read by both settles.
+ * Every encounter the finished slot held — the lectures, the hour's hangouts, the haunts kept
+ * side by side and the run-ins. Rolled once per ending, because the run-ins are dice, and read
+ * by both settles.
  */
 export function rollSlotEncounterGroups(): NpcEncounterGroup[] {
   const game = useGameStore.getState()
@@ -139,6 +215,21 @@ export function rollSlotEncounterGroups(): NpcEncounterGroup[] {
     }
   }
 
+  // Who kept a haunt at the same place, met there. No pair is counted twice over the overlay:
+  // a girl keeping a haunt is in an overlay group only as its one host, never pulled into
+  // another's, so no overlay group holds two of them.
+  const haunters: Record<string, SharedHauntCharInput> = {}
+  for (const charId of game.chars) {
+    haunters[charId] = {
+      haunt: charStandingHauntNow(charId, game.date, game.time)?.location ?? null,
+      excluded:
+        game.cast.includes(charId) ||
+        charUnavailableNow(charId, game.date, game.time) ||
+        charSickAtHomeNow(charId)
+    }
+  }
+  groups.push(...sharedHauntGroups(haunters))
+
   // Nobody is counted twice: the cast and everybody already grouped above are out of both rolls.
   const spokenFor = new Set([...game.cast, ...groups.flatMap((group) => group.members)])
   const runIns: Record<string, RunInCharInput> = {}
@@ -157,20 +248,66 @@ export function rollSlotEncounterGroups(): NpcEncounterGroup[] {
   return groups
 }
 
-/** Rolls every affinity the finished slot earned and returns the settled map, writing nothing. */
+/**
+ * Rolls every affinity and love life the finished slot earned and returns the settled map,
+ * writing nothing. `charInfo` is who stands where with the reader once the scene is paid for,
+ * which the ending projects.
+ */
 export function rollNpcRelationshipSettle(
   bonded: readonly string[] = [],
-  groups: readonly NpcEncounterGroup[] = rollSlotEncounterGroups()
+  groups: readonly NpcEncounterGroup[] = rollSlotEncounterGroups(),
+  charInfo: Readonly<Record<string, CharInfo | undefined>> = useGameStore.getState().charInfo,
+  relationships: NpcRelationshipMap = useGameStore.getState().npcRelationships
 ): NpcRelationshipMap {
+  return rollNpcSettle(bonded, groups, charInfo, relationships).relationships
+}
+
+/**
+ * {@link rollNpcRelationshipSettle} with the reader's `advice` this slot taken first, and what
+ * the texts read off the settle: who argued and stayed together, and what his advice came to.
+ */
+export function rollNpcSettle(
+  bonded: readonly string[],
+  groups: readonly NpcEncounterGroup[],
+  charInfo: Readonly<Record<string, CharInfo | undefined>>,
+  relationships: NpcRelationshipMap,
+  advice: readonly NpcAdvice[] = []
+): NpcSettleResult {
   const game = useGameStore.getState()
-  return settleNpcPairs({
+  const everyone = [...game.chars, ...game.alumni]
+  const attraction: Record<string, Attraction> = {}
+  for (const charId of everyone) {
+    attraction[charId] = npcAttractionOf(game.characters[charId], charInfo[charId], game.romance)
+  }
+  return settleNpcPairsFull({
     date: game.date,
-    relationships: game.npcRelationships,
+    relationships,
     cast: game.cast,
     bonded,
     groups,
-    characters: game.characters
+    characters: game.characters,
+    roster: game.chars,
+    alumni: game.alumni,
+    attraction,
+    readerCrush: game.chars.filter((charId) => charInfo[charId]?.flags?.hasCrush === true),
+    readerLovers: game.chars.filter((charId) => charInfo[charId]?.flags?.isLover === true),
+    readerClosed: game.chars.filter((charId) => {
+      const flags = charInfo[charId]?.flags
+      return flags?.isLover === true && flags.harem !== true
+    }),
+    night: game.time === 1,
+    ...(advice.length > 0 ? { advice } : {})
   })
+}
+
+/** Every answer the reader gave this slot to a vent or a question about a crush, off the phone. */
+export function adviceGivenNow(): NpcAdvice[] {
+  const given: NpcAdvice[] = []
+  for (const [charId, chat] of Object.entries(useGameStore.getState().bunnyboard.conversations)) {
+    const advice = chat.advice
+    if (advice?.answer) given.push({ charId, about: advice.about, answer: advice.answer })
+  }
+  return given
 }
 
 /**
@@ -204,6 +341,18 @@ export function applyNewFriendships(before: NpcRelationshipMap, after: NpcRelati
 }
 
 /**
+ * Records whoever the settle just put together, stamped with the slot that did it, and takes
+ * each one's crush on the reader and friends-with-benefits standing where she is not open.
+ * **Run before the settled map is stored**; idempotent under the boundary's replay.
+ */
+export function applyNewCouples(before: NpcRelationshipMap, after: NpcRelationshipMap): void {
+  const game = useGameStore.getState()
+  const fresh = newCouples(before, after, game.npcCouples)
+  if (fresh.length === 0) return
+  game.recordNpcCouples(fresh.map((couple) => ({ ...couple, time: game.time })))
+}
+
+/**
  * Where a character is and who is with her, for the two prompts that say so.
  */
 export function npcWhereaboutsFor(
@@ -224,7 +373,7 @@ export function npcWhereaboutsFor(
     ? (stamped.groups.find((g) => g.members.includes(charId)) ?? null)
     : charOverlayGroupNow(charId, date, time)
 
-  const homebound = isHomebound(charInfo[charId], date, time)
+  const homebound = isHomebound(game.characters[charId], charInfo[charId], date, time)
   const standing = charStandingHauntAt(charId, date, time)
   const location = homebound ? ROOM_LOCATION : (group?.location ?? standing?.location)
   if (!location) return null

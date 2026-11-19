@@ -1,13 +1,14 @@
 /**
  * What one custom CG pair tells the writer and plays, asked for from its card in the Custom CG
- * panel: when to use it, and the breath and act loop its main image plays. Blank instructions
- * take the pair off the writer's list.
+ * panel: when to use it, and the breath and act loop its main image plays, a male character's
+ * pair being asked its act loop alone. Blank instructions take the pair off the writer's list.
  */
 import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
 import { customCgSfxOf, customCgVoiceOf, isCgSfx, isCgVoice } from '@shared/customCgs'
+import { genderOf } from '@shared/gender'
 import { CUSTOM_OUTFIT_INSTRUCTIONS_MAX, customOutfitInstructions } from '@shared/outfits'
 import type { CgSfx, CgVoice, CustomCgSlot } from '@shared/types'
 import { SelectField } from '../components/SelectField'
@@ -15,7 +16,7 @@ import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import { useCharacterStore } from '../stores/characterStore'
-import { CG_INSTRUCTIONS_HINT, CG_SFX_OPTIONS, CG_VOICE_OPTIONS } from './characterFields'
+import { cgInstructionsHint, CG_SFX_OPTIONS, CG_VOICE_OPTIONS } from './characterFields'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/OutfitInstructions.css'
 import '../vu_styles/CustomCgs.css'
@@ -36,6 +37,9 @@ export function CustomCgEditModal({
 }: CustomCgEditModalProps): JSX.Element | null {
   const character = useCharacterStore.getState().characters[charId]
   const entry = character?.customCgs?.[slot]
+  // A male character's pair plays no breath, so it is neither asked for one nor written one.
+  const gender = genderOf(character)
+  const voiced = gender === 'female'
   const stored = customOutfitInstructions(entry?.instructions)
   const storedVoice = customCgVoiceOf(character ?? {}, slot)
   const storedSfx = customCgSfxOf(character ?? {}, slot)
@@ -55,7 +59,7 @@ export function CustomCgEditModal({
     setBusy(true)
     const written = await useCharacterStore
       .getState()
-      .writeCustomCg(charId, slot, { instructions: text, voice, sfx })
+      .writeCustomCg(charId, slot, { instructions: text, ...(voiced ? { voice } : {}), sfx })
     setBusy(false)
     if (written) onClose()
   }
@@ -99,7 +103,7 @@ export function CustomCgEditModal({
         <TextField
           id="custom-cg-edit-instructions"
           label="Instructions"
-          hint={CG_INSTRUCTIONS_HINT}
+          hint={cgInstructionsHint(gender)}
           value={text}
           onChange={setText}
           maxLength={CUSTOM_OUTFIT_INSTRUCTIONS_MAX}
@@ -107,15 +111,17 @@ export function CustomCgEditModal({
         />
 
         <div className="vu-customcg-sounds">
-          <SelectField
-            id="custom-cg-edit-voice"
-            label="Voice loop"
-            value={voice}
-            onChange={(value) => {
-              if (isCgVoice(value)) setVoice(value)
-            }}
-            options={CG_VOICE_OPTIONS}
-          />
+          {voiced && (
+            <SelectField
+              id="custom-cg-edit-voice"
+              label="Voice loop"
+              value={voice}
+              onChange={(value) => {
+                if (isCgVoice(value)) setVoice(value)
+              }}
+              options={CG_VOICE_OPTIONS}
+            />
+          )}
           <SelectField
             id="custom-cg-edit-sfx"
             label="SFX loop"

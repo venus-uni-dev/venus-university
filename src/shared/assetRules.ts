@@ -1,5 +1,6 @@
 import { appError } from './errors'
-import type { PoseEntry, PoseManifest, QuickstartBundle } from './types'
+import { genderOf } from './gender'
+import type { Gender, PoseEntry, PoseManifest, QuickstartBundle } from './types'
 
 /** The shape checks the two shipped JSON files pass, wherever they are read from. */
 
@@ -7,8 +8,9 @@ import type { PoseEntry, PoseManifest, QuickstartBundle } from './types'
 const QUICKSTART_MAPS = ['classes', 'perChar', 'jobs', 'haunts', 'feeds', 'springBreakPlans'] as const
 
 /**
- * The pose manifest a parsed `pose.json` amounts to: an entry without a tag list is dropped
- * with a warning, and one without a description keeps its key.
+ * The pose manifest a parsed `pose.json` amounts to: an entry without a tag list, or with a
+ * gender that is not `male`, is dropped with a warning, and one without a description keeps its
+ * key.
  */
 export function validatePoseManifest(parsed: unknown, where: string): PoseManifest {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -26,9 +28,14 @@ export function validatePoseManifest(parsed: unknown, where: string): PoseManife
       console.warn(`[assets] pose "${key}" is not an entry object — ignoring it.`)
       continue
     }
-    const { tags, description } = entry
+    const { tags, description, gender } = entry
     if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== 'string')) {
       console.warn(`[assets] pose "${key}" has no list of tag strings — ignoring it.`)
+      continue
+    }
+    // Whose pose it is cannot be told, so it is offered to nobody.
+    if (gender !== undefined && gender !== 'male') {
+      console.warn(`[assets] pose "${key}" has a gender other than "male" — ignoring it.`)
       continue
     }
     // A missing description warns rather than drops: the pose still renders.
@@ -37,11 +44,19 @@ export function validatePoseManifest(parsed: unknown, where: string): PoseManife
     }
     manifest[key] = {
       tags,
-      description: typeof description === 'string' ? description.trim() : ''
+      description: typeof description === 'string' ? description.trim() : '',
+      ...(gender === 'male' ? { gender } : {})
     }
   }
 
   return manifest
+}
+
+/** The keys of one gender's poses, sorted: a female character's are the entries with no gender. */
+export function poseKeysFor(manifest: PoseManifest, gender: Gender): string[] {
+  return Object.keys(manifest)
+    .filter((key) => genderOf(manifest[key]) === gender)
+    .sort()
 }
 
 /** The canned semester a parsed `quickstart.json` amounts to; a missing map is refused by name. */

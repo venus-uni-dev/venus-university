@@ -4,13 +4,14 @@ import { npcFriendsOf } from '@shared/npcRelationships'
 import { breakDecayedStats, STAT_KEYS, tierOf, type PlayerStats } from '@shared/playerStats'
 import {
   affectionFor,
+  attractionOf,
   breakPenaltyAt,
   initialFlags,
   meetsCrushStandards,
   observedUpperHalves
 } from '@shared/relationship'
 import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
-import { pairsOver } from '@shared/sceneCreator'
+import { pairsOver, withDatingAttraction } from '@shared/sceneCreator'
 import { observedSecretTiers } from '@shared/secrets'
 import { calendarOf, seasonOf } from '@shared/semesters'
 import { shuffle } from '@shared/shuffle'
@@ -131,8 +132,20 @@ export function continuedStartOf(
   if (!continued) throw new Error('a first semester has no continuation')
   const season = seasonOf(continued.index)
   const { carry, priorProfiles, alumni } = continued
-  // Who knows whom: the carried pairs, those the player set laid over them.
-  const npcRelationships = pairsOver(carry.npcRelationships, enrollment.pairs ?? {})
+  // Who knows whom: the carried pairs, those the player set laid over them, a pair set to dating
+  // a couple on day 0 where each may date, off how she stands with the reader.
+  const npcRelationships = pairsOver(
+    carry.npcRelationships,
+    enrollment.pairs ?? {},
+    0,
+    Object.fromEntries(
+      roster.map((c) => [
+        c.charId,
+        { character: c, flags: (carry.charInfo[c.charId] ?? enrollment.starts?.[c.charId])?.flags }
+      ])
+    )
+  )
+  const rosterById = Object.fromEntries(roster.map((c) => [c.charId, c]))
   const returning = new Set(roster.map((c) => c.charId).filter((charId) => priorProfiles[charId]))
 
   // Rolled once and read twice: by the record and by the roster's shift placement.
@@ -218,8 +231,16 @@ export function continuedStartOf(
     const charId = character.charId
     const hiddenSchedule = hiddenSchedules[charId]
     const prior = priorProfiles[charId]
+    // Her sexuality as settled, with whoever she starts the semester dating's gender added.
+    const settled = prior?.attractedTo ?? attractionOf(character)
+    const attractedTo = withDatingAttraction(settled, charId, npcRelationships, rosterById)
     profiles[charId] = {
-      ...(prior ?? { moodCycleOffset: offsetFor(), intake: season }),
+      ...(prior ?? {
+        moodCycleOffset: offsetFor(),
+        intake: season,
+        attractedTo
+      }),
+      ...(prior && attractedTo !== settled ? { attractedTo } : {}),
       ...enrollment.perChar[charId],
       // Omitted when the deal found nowhere to put her.
       ...(hiddenSchedule && Object.keys(hiddenSchedule).length > 0 ? { hiddenSchedule } : {}),
@@ -251,13 +272,15 @@ export function continuedStartOf(
       charInfo[charId] = entry
     } else {
       // New to the roster: where the Profiles screen set her, else a stranger to everybody, and
-      // posting nothing from before she arrived.
+      // posting nothing from before she arrived; the notes the screen took down on her either way.
       const start = enrollment.starts?.[charId]
+      const notes = enrollment.notes?.[charId]
       if (start?.flags.gaveContactInfo) contactAtStart = true
       charInfo[charId] = {
         ...(start ?? { memories: [], flags: initialFlags(character), nameKnown: false }),
         ...(job ? { job } : {}),
-        ...(written.length > 0 ? { secrets: written } : {})
+        ...(written.length > 0 ? { secrets: written } : {}),
+        ...(notes ? { notes } : {})
       }
     }
   }
@@ -358,6 +381,7 @@ export function continuedStartOf(
     addedClasses: {},
     npcRelationships,
     npcFriendships: carry.npcFriendships ?? [],
+    npcCouples: carry.npcCouples ?? [],
     // Generated occasion ids repeat from semester to semester, so nothing turned down carries.
     occasionsDeclined: [],
     npcOverlay: null,

@@ -194,6 +194,24 @@ const HANDS_NODE = {
   regionSaveImage: '79'
 } as const
 
+/**
+ * Node ids overwritten in `assets/workflows/characterRepaint.json`; `sourceImage` is the neutral
+ * sprite flattened on white, `paintImage` the strokes laid over it and `maskImage` everything
+ * painted or marked, and the graph has two sinks as the hands graph does.
+ */
+const REPAINT_NODE = {
+  seed: '14',
+  characterLora: CHARACTER_LORA_NODE,
+  positivePrompt: '4',
+  negativePrompt: '5',
+  sourceImage: '10',
+  paintImage: '80',
+  maskImage: '90',
+  detailer: '20',
+  saveImage: '9',
+  regionSaveImage: '79'
+} as const
+
 /** Minimal API-format graph used to pull the checkpoint into VRAM. */
 const WARM_WORKFLOW = {
   '1': {
@@ -631,8 +649,9 @@ function missingModel(
 
 /**
  * Refuses a graph naming a model the server does not list, asking the server again once first,
- * since the player may have added the file since the listing was kept. Her own LoRA's loader,
- * where the graph keeps one, is named as hers, and a custom pair's as the CG's.
+ * since the player may have added the file since the listing was kept. The character's own
+ * LoRA's loader, where the graph keeps one, is named as the character's, and a custom pair's as
+ * the CG's.
  */
 async function assertGraphModels(
   target: ComfyTarget,
@@ -648,22 +667,22 @@ async function assertGraphModels(
   if (missing && missing.node === characterLoraNode) {
     throw appError(
       'COMFY_MODEL_MISSING',
-      `ComfyUI does not have her LoRA, ${missing.value}.`,
-      "Add it to ComfyUI's LoRA folder, or pick another under her Generation settings."
+      `LoRA ${missing.value} is missing.`,
+      "Please re-upload it to the folder and try again."
     )
   }
   if (missing && missing.node === positionLoraNode) {
     throw appError(
       'COMFY_MODEL_MISSING',
-      `ComfyUI does not have the CG's position LoRA, ${missing.value}.`,
-      "Add it to ComfyUI's LoRA folder, or pick another when you regenerate the CG."
+      `Position LoRA ${missing.value} is missing.`,
+      "Please re-upload it to the folder and try again."
     )
   }
   if (missing) {
     throw appError(
       'COMFY_MODEL_MISSING',
-      `ComfyUI does not have the ${missing.label.toLowerCase()} ${missing.value}.`,
-      'Pick another on the ComfyUI tab of Settings.'
+      `${missing.label} ${missing.value} is missing.`,
+      'Please pick another on the ComfyUI tab of Settings.'
     )
   }
 }
@@ -1119,10 +1138,14 @@ interface GenerationNodes {
   detailerPositivePrompt?: string
   /** ControlNet skeleton `LoadImage`; every graph has one. */
   poseImage?: string
-  /** Source `LoadImage`; the expression, cutout and hands graphs. */
+  /** Source `LoadImage`; the expression, cutout, hands and repaint graphs. */
   sourceImage?: string
-  /** The painted-strokes `LoadImage`; the hands graph only. */
+  /** The painted-strokes `LoadImage`; the hands and repaint graphs. */
   paintImage?: string
+  /** The `LoadImage` of everything to redraw; the repaint graph only. */
+  maskImage?: string
+  /** The detailer whose denoise a job sets; the repaint graph only. */
+  detailer?: string
   /** Her own LoRA's loader; every graph that samples. */
   characterLora?: string
   /** A custom CG pair's position LoRA's loader; the CG graph only. */
@@ -1156,6 +1179,10 @@ interface GenerationSpec {
   sourceImageName?: string
   /** Staged filename for `nodes.paintImage`, if the graph has one. */
   paintImageName?: string
+  /** Staged filename for `nodes.maskImage`, if the graph has one. */
+  maskImageName?: string
+  /** What `nodes.detailer`'s denoise is set to, where the graph names one. */
+  denoise?: number
   /** Where the finished image lands. */
   destPath: string
   /** How the finished image and the hand fix's region are kept; the face mask is lossless. */
@@ -1251,6 +1278,12 @@ async function runGraph(spec: GenerationSpec, options: RunOptions): Promise<stri
   }
   if (nodes.paintImage && spec.paintImageName) {
     node(nodes.paintImage).inputs.image = spec.paintImageName
+  }
+  if (nodes.maskImage && spec.maskImageName) {
+    node(nodes.maskImage).inputs.image = spec.maskImageName
+  }
+  if (nodes.detailer && spec.denoise !== undefined) {
+    node(nodes.detailer).inputs.denoise = spec.denoise
   }
 
   // Only a job that wants the face mask keeps its branch.
@@ -1503,13 +1536,15 @@ async function ensureCutBase(
 }
 
 /**
- * Hands the player's strokes to the server for the hands graph's `LoadImage`, under
- * {@link stageBase}'s scoped-name rule. **The alpha channel is the whole input** — node `80`'s
- * MASK is `1 − alpha`, so a PNG saved without one hands the graph an all-painted mask.
+ * Hands one layer the player drew to the server for a repair graph's `LoadImage`, under
+ * {@link stageBase}'s scoped-name rule, `name` saying which repair and which layer it is.
+ * **The alpha channel is the whole input** — a `LoadImage`'s MASK is `1 − alpha`, so a PNG
+ * saved without one hands the graph an all-painted mask.
  */
 async function stagePaint(
   charId: string,
   scope: string,
+  name: string,
   paint: Buffer,
   target: ComfyTarget
 ): Promise<string> {
@@ -1521,7 +1556,7 @@ async function stagePaint(
     )
   }
 
-  return uploadInput(target, `hands_paint_${charId}_${scope}.png`, paint)
+  return uploadInput(target, `${name}_${charId}_${scope}.png`, paint)
 }
 
 /**
@@ -1726,7 +1761,7 @@ export async function fixHands(
   const { poseTags, skeletonName } = await stagePose(character, target)
   // Live only: a fix repairs the set on disk, and a staged run is a different set of images.
   const { sourceName } = await stageBase(charId, basePath, basePath, false, scope, target)
-  const paintName = await stagePaint(charId, scope, paint, target)
+  const paintName = await stagePaint(charId, scope, 'hands_paint', paint, target)
 
   // Both frames land in scratch and are read back: neither belongs in her folder, since what
   // is kept is the strokes and the sprites they repaired.
@@ -1761,6 +1796,77 @@ export async function fixHands(
     }
   } finally {
     // A cancel between the two sinks leaves one PNG behind; nothing else sweeps this folder.
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Redraws what the player painted or marked over one wardrobe: the cutout and the region
+ * changed, for the renderer to place, as the hand fix answers. **The source is the neutral
+ * sprite the strokes were drawn over, not the base frame**: the other repairs write the sprites
+ * and leave that frame behind, so it can be missing what the player sees. The graph leaves her
+ * face out of the region, since one patch over seven expressions would give them all one face.
+ */
+export async function repaintWardrobe(
+  character: Character,
+  set: OutfitSet | null,
+  source: Buffer,
+  paint: Buffer,
+  mask: Buffer,
+  denoise: number,
+  seed: number,
+  jobOptions: JobOptions = {}
+): Promise<{ cutout: Buffer; region: Buffer }> {
+  assertSafeCharId(character.charId)
+  if (set !== null) assertVocab(set, isOutfitSet, 'OUTFIT_SET_UNKNOWN', 'an outfit set')
+  throwIfCancelled(jobOptions.signal)
+  jobOptions.onProgress?.('Preparing')
+  const options = await runOptionsOf(jobOptions)
+  const { target } = options
+
+  const { charId } = character
+  const scope = set ?? 'default'
+  const suffix = set ? `_${set}` : ''
+
+  const { lora, logged } = loraOfJob(character)
+  // The pose's tags reach the prompt; its skeleton does not, since a crop is no full body.
+  const poseTags = await resolvePoseTags(character)
+  const sourceName = await uploadInput(target, `repaint_src_${charId}_${scope}.png`, source)
+  const paintName = await stagePaint(charId, scope, 'repaint_paint', paint, target)
+  const maskName = await stagePaint(charId, scope, 'repaint_mask', mask, target)
+
+  // Both frames land in scratch and are read back: nothing is hers until the player says yes.
+  const scratch = join(getTempPath(), `repaint-${randomUUID()}`)
+  try {
+    await mkdir(scratch, { recursive: true })
+    await runGenerationJob(
+      {
+        // The set's base prompt, no expression group, as the hand fix sends.
+        workflowFile: 'characterRepaint.json',
+        nodes: REPAINT_NODE,
+        prompts: set
+          ? buildOutfitBasePrompt(character, poseTags, set, target.tags)
+          : buildBasePrompt(character, poseTags, target.tags),
+        seed,
+        lora,
+        sourceImageName: sourceName,
+        paintImageName: paintName,
+        maskImageName: maskName,
+        denoise,
+        destPath: join(scratch, 'cutout.png'),
+        regionDestPath: join(scratch, 'region.png'),
+        format: 'raw',
+        label: `${charId} / repaint${suffix}`,
+        logContext: `pose=${character.pose}, seed=${seed}, denoise=${denoise}${logged}`
+      },
+      options
+    )
+
+    return {
+      cutout: await readFile(join(scratch, 'cutout.png')),
+      region: await readFile(join(scratch, 'region.png'))
+    }
+  } finally {
     await rm(scratch, { recursive: true, force: true })
   }
 }

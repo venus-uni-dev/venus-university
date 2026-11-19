@@ -67,3 +67,10 @@
 .vu-pick-card--taken .vu-card-surname {
   color: var(--vu-text-muted);
 }
+
+/* The grid's order, at the foot's far end from Close, under the grid's first column: the foot
+   has the room, and the list it opens hangs over the grid rather than past the panel. */
+.vu-pick-sort {
+  display: flex;
+  margin-right: auto;
+}

@@ -206,6 +206,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [warnEndingEdit, setWarnEndingEdit] = useState(settings?.warnEndingEdit !== false)
   // And absent means the reader's picture stays out of scenes.
   const [showPicture, setShowPicture] = useState(settings?.showProfilePictureInScenes === true)
+  // And absent means the stock CGs are kept to a reader they match.
+  const [matchCgBiology, setMatchCgBiology] = useState(settings?.matchCgBiology !== false)
 
   // The typed fields, staged until Save. Each is the endpoint's own, seeded whichever provider
   // is stored, so a panel switched away and back finds them as they were.
@@ -568,6 +570,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     )
   }
 
+  /** Whether a girl's stock CGs are withheld from a reader whose pronouns are not he/him. */
+  function handleMatchCgBiologyChange(checked: boolean): void {
+    setMatchCgBiology(checked)
+    void write({ matchCgBiology: checked }).then(
+      reseed((stored) => setMatchCgBiology(stored.matchCgBiology !== false))
+    )
+  }
+
   /** A group's slider: heard at once, and written once it has stood still for a moment. */
   function handleVolumeChange(key: AudioGroup, value: number): void {
     const next: Volumes = { ...volumesRef.current, [key]: value }
@@ -785,6 +795,13 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                     {/* Each toggle carries what turning it on costs; the note is the whole of
                         what the app promises about either setting. */}
                     <SfwCheckList fields={SFW_FIELDS} sfw={sfw} onChange={handleSfwChange} />
+                    <CheckField
+                      id="settings-match-cg-biology"
+                      label="Disable default CG when biology doesn't match"
+                      note="Default NSFW CGs for female characters assume male biology. They won't be used unless your pronouns are he/him."
+                      checked={matchCgBiology}
+                      onChange={handleMatchCgBiologyChange}
+                    />
 
                     {/* One zip of everything this build keeps, and one read back over it. Both
                         builds write the same format, so a semester started in one goes on in

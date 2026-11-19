@@ -12,7 +12,7 @@ import {
   composeApplication,
   majorsOf,
   needOf,
-  type CallRequest,
+  type CallPart,
   type RequestWorld
 } from '../src/renderer/stores/applicationCompose'
 import {
@@ -23,9 +23,9 @@ import {
 import { character, charInfo } from './fixtures'
 
 /**
- * What New Game composes out of its banked replies and the player's own values, and when a
- * banked reply still answers its call: a value of the player's lost at the merge, or a reply
- * kept for a request it no longer answers, is a semester quietly unlike the one set up.
+ * What New Game composes out of its banked parts and the player's own values, and when a banked
+ * part still answers its call: a value of the player's lost at the merge, or a part kept for a
+ * request it no longer answers, is a semester quietly unlike the one set up.
  */
 
 const SARAH = character({ charId: 'sarah', firstName: 'Sarah', lastName: 'Rose' })
@@ -59,32 +59,110 @@ function draftOf(over: Partial<ApplicationDraft> = {}): ApplicationDraft {
   }
 }
 
-/** The request a call needs, which these drafts always leave it one. */
-function requestOf(call: NewGameCall, draft: ApplicationDraft): CallRequest {
-  const need = needOf(call, draft, ROSTER, WORLD)
-  if (typeof need === 'string') throw new Error(`${call} needs ${need}`)
-  return need
+/** The schema a request carries, loosely typed for reading back. */
+type Schema = { properties: Record<string, any>; required: string[] }
+const schemaOf = (part: CallPart): Schema => part.request.schema.schema as unknown as Schema
+
+/** The parts a call needs as `draft` stands, on `roster` in `world`. */
+function partsOf(
+  call: NewGameCall,
+  draft: ApplicationDraft,
+  roster = ROSTER,
+  world = WORLD
+): CallPart[] {
+  const need = needOf(call, draft, roster, world)
+  return need === 'none' ? [] : need.parts
 }
 
 /** The occasion ids a draft's occasions call asks the model to write. */
 function askedIds(draft: ApplicationDraft): string[] {
-  const schema = requestOf('occasions', draft).request.schema.schema as unknown as {
-    properties: { events: { required: string[] } }
-  }
-  return schema.properties.events.required
+  return schemaOf(partsOf('occasions', draft)[0]).properties.events.required
 }
 
-/** The draft with `reply` banked for `call` against the request it needs now. */
-function banked(call: NewGameCall, draft: ApplicationDraft, reply: unknown): ApplicationDraft {
-  const need = requestOf(call, draft)
-  need.check(reply)
-  return {
-    ...draft,
-    replies: { ...draft.replies, [call]: { key: need.key, reply } }
+/** What a student's or a later semester's part answers in each field it asks. */
+const FIELDS: Record<string, unknown> = {
+  year: 2,
+  classesTaken: 4,
+  majorClassesTaken: 2,
+  dorm: 'lowrise',
+  job: '',
+  jobShifts: 0,
+  homeSlots: 2,
+  study: '',
+  fun: [],
+  activity: '',
+  activityLocation: '',
+  meal: '',
+  handle: 'handle',
+  winterPosts: ['home'],
+  springBreakPlans: 'Go home.',
+  breakPosts: ['home'],
+  pursuing: '',
+  friendly: 'She sings.',
+  trusted: 'She cried.',
+  devoted: 'She ran.'
+}
+
+/** Two courses a pool's or a major's part writes, coded off the part so no two parts share one. */
+function coursesOf(part: CallPart, count = 2): Record<string, unknown>[] {
+  const prefix = part.id.split(':').slice(1).join('').slice(-4).toUpperCase()
+  return Array.from({ length: count }, (_, i) => ({
+    code: `${prefix} ${200 + i}`,
+    name: `${prefix} ${i}`,
+    description: 'Study.',
+    kind: 'lecture'
+  }))
+}
+
+/** The plain answer to any part: every field filled, every major Art. */
+function answerOf(part: CallPart): unknown {
+  const { properties, required } = schemaOf(part)
+  switch (part.request.schema.name) {
+    case 'calendar_occasions':
+      return {
+        events: Object.fromEntries(
+          properties.events.required.map((id: string) => [id, { title: id, description: 'On.' }])
+        )
+      }
+    case 'student_majors':
+      return {
+        characters: properties.characters.items.properties.key.enum.map((key: string) => ({
+          key,
+          major: 'Art'
+        }))
+      }
+    case 'pool_classes':
+    case 'major_classes':
+      return { classes: coursesOf(part) }
+    case 'interest_class':
+      return { interestClass: { ...coursesOf(part, 1)[0], kind: 'project' } }
+    default:
+      return Object.fromEntries(required.map((field) => [field, FIELDS[field]]))
   }
 }
 
-/** A whole profile row as the model writes one. */
+/**
+ * The draft with every part of `call` not yet banked banked, `answers` standing over the plain
+ * answer by part id.
+ */
+function banked(
+  call: NewGameCall,
+  draft: ApplicationDraft,
+  answers: Record<string, unknown> = {},
+  roster = ROSTER,
+  world = WORLD
+): ApplicationDraft {
+  const replies = { ...draft.replies }
+  for (const part of partsOf(call, draft, roster, world)) {
+    if (replies[part.id]?.key === part.key) continue
+    const reply = part.id in answers ? answers[part.id] : answerOf(part)
+    part.check(reply)
+    replies[part.id] = { key: part.key, reply }
+  }
+  return { ...draft, replies }
+}
+
+/** A whole profile row as the model wrote one before profiles went in parts. */
 function profileRow(key: string, major: string): Record<string, unknown> {
   return {
     key,
@@ -108,7 +186,7 @@ function profileRow(key: string, major: string): Record<string, unknown> {
 }
 
 describe('composeApplication', () => {
-  it("lays the player's values over every reply and seats every girl", () => {
+  it("lays the player's values over every part and seats every girl", () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     let draft = draftOf({
       occasions: { gala: { title: 'The Lantern Ball', description: 'In the Quad.' } },
@@ -122,37 +200,45 @@ describe('composeApplication', () => {
         sarah: {
           profile: { major: 'Biology', majorClassesTaken: 1, year: 3 },
           secrets: { friendly: 'Sarah knits' },
-          memories: []
-        }
+          memories: [],
+          notes: '  Sarah is pre-med. '
+        },
+        mia: { profile: {}, secrets: {}, memories: [], notes: '   ' }
       }
     })
 
     // The gala is the player's, so only the filler is asked for.
     expect(askedIds(draft)).toEqual([FILLER.id])
     draft = banked('occasions', draft, {
-      events: { 'filler-3': { title: 'Kite Day', description: 'Kites on the Quad.' } }
+      occasions: { events: { 'filler-3': { title: 'Kite Day', description: 'Kites on the Quad.' } } }
     })
+    // Only Mia's major is left to the majors part, and her part waits on it.
+    expect(partsOf('profiles', draft).map((part) => part.id)).toEqual([
+      'profiles:majors',
+      'profiles:student:sarah'
+    ])
     draft = banked('profiles', draft, {
-      characters: [profileRow('sarah_rose', 'Physics'), profileRow('mia_park', 'Chemistry')]
+      'profiles:majors': { characters: [{ key: 'mia_park', major: 'Chemistry' }] },
+      'profiles:student:sarah': { ...answerOf(partsOf('profiles', draft)[1]) as object, trusted: 'Sarah lied.', devoted: 'Sarah left.' }
     })
-    draft = banked('secrets', draft, {
-      trusted_devoted: [{ key: 'sarah_rose', trusted: 'Sarah lied.', devoted: 'Sarah left.' }],
-      characters: [
-        { key: 'mia_park', friendly: 'Mia sings.', trusted: 'Mia cried.', devoted: 'Mia ran.' }
-      ]
-    })
-    // Biology is the player's in full but for three, so the reply writes those and Chemistry.
+    draft = banked('profiles', draft)
+    // Biology is the player's but for three, so its part writes those; Chemistry is whole.
+    const classParts = partsOf('classes', draft)
+    expect(classParts.map((part) => part.id)).toEqual([
+      'classes:pool:pe',
+      'classes:pool:humanities',
+      'classes:pool:arts',
+      'classes:pool:misc',
+      'classes:major:Biology',
+      'classes:major:Chemistry',
+      'classes:interest:sarah',
+      'classes:interest:mia'
+    ])
+    expect(classParts[4].request.user).toContain('Create 3 classes for the Biology major.')
     draft = banked('classes', draft, {
-      characters: {
-        sarah_rose: { interestClass: { code: 'ART 101', name: 'Pots', description: 'Pots.', kind: 'project' } },
-        mia_park: { interestClass: { code: 'MUS 101', name: 'Choir', description: 'Song.', kind: 'lecture' } }
-      },
-      classes: [
-        { code: 'BIO 210', name: 'Genes', description: 'Genes.', category: 'major', major: 'Biology', kind: 'lecture' },
-        { code: 'CHM 101', name: 'Atoms', description: 'Atoms.', category: 'major', major: 'Chemistry', kind: 'lecture' },
-        { code: 'PE 101', name: 'Running', description: 'Running.', category: 'pe', kind: 'lecture' },
-        { code: 'HIS 101', name: 'Rome', description: 'Rome.', category: 'humanities', kind: 'lecture' }
-      ]
+      'classes:major:Biology': {
+        classes: [{ code: 'BIO 210', name: 'Genes', description: 'Genes.', kind: 'lecture' }]
+      }
     })
 
     const semester = composeApplication(draft, ROSTER, WORLD)
@@ -160,7 +246,7 @@ describe('composeApplication', () => {
     expect(semester.occasions.map((o) => o.title)).toEqual(['The Lantern Ball', 'Kite Day'])
     expect(semester.schedules.perChar.sarah).toMatchObject({ year: 3, major: 'Biology' })
     expect(semester.schedules.perChar.mia.major).toBe('Chemistry')
-    // One Biology class, the player's load; the player's kept its code over the reply's repeat.
+    // One Biology class, the player's load; the player's kept its code over the part's repeat.
     const sarahs = Object.values(semester.schedules.perChar.sarah.schedule)
     const majorClasses = sarahs.filter(
       (code) => semester.schedules.classes[code]?.category === 'major'
@@ -173,9 +259,74 @@ describe('composeApplication', () => {
       { text: 'Sarah lied.', tier: 'trusted' },
       { text: 'Sarah left.', tier: 'devoted' }
     ])
+    // Her notes are carried trimmed without making her met; blank ones are not carried.
+    expect(semester.notes).toEqual({ sarah: 'Sarah is pre-med.' })
+    expect(semester.starts.sarah).toBeUndefined()
     for (const c of ROSTER) {
       expect(Object.keys(semester.schedules.perChar[c.charId].schedule).length).toBeGreaterThan(0)
     }
+    vi.restoreAllMocks()
+  })
+
+  it('keeps every part as it was while the others bank, spells a generated major as the player did, and deals the Lowrises evenly', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const five = ['ana', 'bea', 'cat', 'dee', 'eve'].map((name) =>
+      character({ charId: name, firstName: name[0].toUpperCase() + name.slice(1), lastName: 'Lowe' })
+    )
+    const world: RequestWorld = { setting: 'A campus.', book: [] }
+    let draft = draftOf({
+      chars: five.map((c) => c.charId),
+      girls: {
+        cat: { profile: { major: 'Biology' }, secrets: {}, memories: [] },
+        eve: { profile: { dorm: 'lowrise_1' }, secrets: {}, memories: [] }
+      }
+    })
+    const keys = (call: NewGameCall): Record<string, string> =>
+      Object.fromEntries(partsOf(call, draft, five, world).map((part) => [part.id, part.key]))
+
+    // Cat's major is hers, so her part goes at once; the rest wait on the majors part.
+    expect(Object.keys(keys('profiles'))).toEqual(['profiles:majors', 'profiles:student:cat'])
+    const pools = keys('classes')
+    draft = banked('profiles', draft, {
+      'profiles:majors': {
+        characters: ['ana_lowe', 'bea_lowe', 'dee_lowe', 'eve_lowe'].map((key, i) => ({
+          key,
+          major: i === 0 ? 'biology' : 'Art'
+        }))
+      }
+    }, five, world)
+    expect(majorsOf(draft, five, world)).toEqual({
+      ana: 'Biology',
+      bea: 'Art',
+      cat: 'Biology',
+      dee: 'Art',
+      eve: 'Art'
+    })
+    const students = keys('profiles')
+    // The pools never waited on the majors, and keep their requests now they are known.
+    expect(Object.fromEntries(Object.entries(keys('classes')).filter(([id]) => id in pools))).toEqual(pools)
+    expect(Object.keys(keys('classes')).filter((id) => id.startsWith('classes:major:'))).toEqual([
+      'classes:major:Art',
+      'classes:major:Biology'
+    ])
+
+    // Banking one student's part changes nobody else's.
+    const [ana] = partsOf('profiles', draft, five, world).filter((p) => p.id === 'profiles:student:ana')
+    draft = { ...draft, replies: { ...draft.replies, [ana.id]: { key: ana.key, reply: answerOf(ana) } } }
+    expect(keys('profiles')).toEqual(students)
+
+    draft = banked('occasions', draft, {}, five, world)
+    draft = banked('profiles', draft, {}, five, world)
+    draft = banked('classes', draft, {}, five, world)
+    const semester = composeApplication(draft, five, world)
+    expect(five.map((c) => semester.schedules.perChar[c.charId].dorm)).toEqual([
+      'lowrise_2',
+      'lowrise_3',
+      'lowrise_4',
+      'lowrise_5',
+      'lowrise_1'
+    ])
+    expect(semester.schedules.perChar.ana.major).toBe('Biology')
     vi.restoreAllMocks()
   })
 
@@ -246,7 +397,10 @@ describe('a later semester', () => {
     carry: {
       charInfo: { anna: charInfo({ secrets: [{ text: 'Anna lied.', tier: 'friendly' }] }) }
     } as unknown as SemesterCarry,
-    taken: [{ code: 'BIO 101', name: 'Cells' }]
+    taken: [
+      { code: 'BIO 101', name: 'Cells', category: 'major', major: 'Biology' },
+      { code: 'ART 101', name: 'Pots', category: 'interest' }
+    ]
   }
 
   /** A later fall with June decided in full and Liv's major alone. */
@@ -287,106 +441,69 @@ describe('a later semester', () => {
     }
   }
 
-  /** The request a later semester's call needs. */
-  function laterRequest(call: NewGameCall, draft: ApplicationDraft): CallRequest {
-    const need = needOf(call, draft, LATER, LATER_WORLD)
-    if (typeof need === 'string') throw new Error(`${call} needs ${need}`)
-    return need
+  const later = (call: NewGameCall, draft: ApplicationDraft): CallPart[] =>
+    partsOf(call, draft, LATER, LATER_WORLD)
+  const bankedLater = (call: NewGameCall, draft: ApplicationDraft, answers = {}) =>
+    banked(call, draft, answers, LATER, LATER_WORLD)
+
+  const PROFILE_ANSWERS = {
+    'profiles:returning:anna': { breakPosts: ['beach day'], devoted: 'Anna ran away once.' },
+    'profiles:graduate:olive': { pursuing: 'Running a gallery in Rome', breakPosts: ['ciao'] },
+    'profiles:graduate:pia': { pursuing: '', breakPosts: [] },
+    'profiles:graduate:grace': { pursuing: 'selling boats', breakPosts: ['hi'] }
   }
 
-  /** The later draft with `reply` banked for `call`. */
-  function bankedLater(call: NewGameCall, draft: ApplicationDraft, reply: unknown): ApplicationDraft {
-    const need = laterRequest(call, draft)
-    need.check(reply)
-    return { ...draft, replies: { ...draft.replies, [call]: { key: need.key, reply } } }
-  }
-
-  const PROFILE_REPLY = {
-    characters: [profileRow('liv_dunn', 'Chemistry')],
-    returning: [{ key: 'anna_bell', breakPosts: ['beach day'] }],
-    graduates: [
-      { key: 'olive_gray', pursuing: 'Running a gallery in Rome', breakPosts: ['ciao'] },
-      { key: 'grace_ivy', pursuing: 'selling boats', breakPosts: ['hi'] }
-    ]
-  }
-
-  it("asks for the returning girls and graduates beside whoever has a blank, with a graduate's own words", () => {
-    const { request } = laterRequest('profiles', laterDraft())
-    const groups = request.schema.schema.properties as Record<
-      string,
-      { items: { properties: { key: { enum: string[] } } } }
-    >
-    const keysOf = (group: string): string[] => groups[group].items.properties.key.enum
-
-    expect(Object.keys(groups)).toEqual(['characters', 'returning', 'graduates'])
-    expect(keysOf('characters')).toEqual(['liv_dunn'])
-    expect(keysOf('returning')).toEqual(['anna_bell'])
-    expect(keysOf('graduates')).toEqual(['olive_gray', 'pia_hart', 'grace_ivy'])
-    expect(request.user).toContain('"Teaching in Japan."')
+  it("asks a part of each new girl with a blank, each returning girl and each graduate, with a graduate's own words", () => {
+    const parts = later('profiles', laterDraft())
+    expect(parts.map((part) => part.id)).toEqual([
+      'profiles:student:june',
+      'profiles:student:liv',
+      'profiles:returning:anna',
+      'profiles:graduate:olive',
+      'profiles:graduate:pia',
+      'profiles:graduate:grace'
+    ])
+    // June decided every field, so her part asks only her secrets.
+    expect(schemaOf(parts[0]).required).toEqual(['friendly', 'trusted', 'devoted'])
+    // A returning girl who holds a secret is owed only her deepest.
+    expect(schemaOf(parts[2]).required).toEqual(['breakPosts', 'devoted'])
+    expect(parts[5].request.user).toContain('"Teaching in Japan."')
     // Only a girl who graduated at this ending is the player's to write.
-    expect(request.user).not.toContain('Running for mayor.')
+    expect(parts[3].request.user).not.toContain('Running for mayor.')
+    // A major's part sees only its own history.
+    const biology = later('classes', laterDraft()).find((part) => part.id === 'classes:major:Biology')
+    expect(biology?.request.user).toContain('BIO 101 — Cells')
+    expect(biology?.request.user).not.toContain('ART 101')
   })
 
-  it("reads the class call the same before and after the profile reply, a new girl's major spelt as a returning one's", () => {
+  it("reads the catalog the same before and after the profile parts, a new girl's major spelt as a returning one's", () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     let draft = laterDraft()
-    const before = laterRequest('classes', draft).key
+    const before = later('classes', draft).map((part) => part.key)
     expect(majorsOf(draft, LATER, LATER_WORLD)).toEqual({
       anna: 'Biology',
       june: 'Biology',
       liv: 'Physics'
     })
-    draft = bankedLater('profiles', draft, PROFILE_REPLY)
-    expect(laterRequest('classes', draft).key).toBe(before)
+    draft = bankedLater('profiles', draft, PROFILE_ANSWERS)
+    expect(later('classes', draft).map((part) => part.key)).toEqual(before)
     vi.restoreAllMocks()
   })
 
   it('keeps what a returning girl carries and gives her and the graduates only what is new', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     let draft = laterDraft()
-    draft = bankedLater('profiles', draft, PROFILE_REPLY)
-    draft = bankedLater('secrets', draft, {
-      devoted: [{ key: 'anna_bell', devoted: 'Anna ran away once.' }],
-      characters: ['june_cole', 'liv_dunn'].map((key) => ({
-        key,
-        friendly: 'She sings.',
-        trusted: 'She cried.',
-        devoted: 'She ran.'
-      }))
-    })
-    const course = (code: string, category: string, major?: string): Record<string, unknown> => ({
-      code,
-      name: code,
-      description: `${code}.`,
-      category,
-      ...(major ? { major } : {}),
-      kind: 'lecture'
-    })
-    draft = bankedLater('classes', draft, {
-      characters: Object.fromEntries(
-        ['anna_bell', 'june_cole', 'liv_dunn'].map((key, i) => [
-          key,
-          { interestClass: { code: `ART 10${i}`, name: 'Pots', description: 'Pots.', kind: 'project' } }
-        ])
-      ),
-      classes: [
-        course('BIO 201', 'major', 'Biology'),
-        course('BIO 202', 'major', 'Biology'),
-        course('BIO 203', 'major', 'Biology'),
-        course('BIO 204', 'major', 'Biology'),
-        course('BIO 205', 'major', 'Biology'),
-        course('PHY 201', 'major', 'Physics'),
-        course('PHY 202', 'major', 'Physics'),
-        course('PE 201', 'pe'),
-        course('PE 202', 'pe'),
-        course('HIS 201', 'humanities'),
-        course('HIS 202', 'humanities'),
-        course('MUS 201', 'arts'),
-        course('MUS 202', 'arts'),
-        course('GEN 201', 'misc'),
-        course('GEN 202', 'misc')
-      ]
-    })
+    draft = bankedLater('profiles', draft, PROFILE_ANSWERS)
+    const majorCourses = (part: CallPart) => ({ classes: coursesOf(part, 4) })
+    draft = bankedLater(
+      'classes',
+      draft,
+      Object.fromEntries(
+        later('classes', draft)
+          .filter((part) => part.id.startsWith('classes:major:'))
+          .map((part) => [part.id, majorCourses(part)])
+      )
+    )
 
     const semester = composeApplication(draft, LATER, LATER_WORLD)
 
@@ -412,6 +529,11 @@ describe('a later semester', () => {
       grace: 'teaching in Japan'
     })
     expect(semester.secrets.anna).toEqual([{ text: 'Anna ran away once.', tier: 'devoted' }])
+    expect(semester.secrets.june).toEqual([
+      { text: 'She sings.', tier: 'friendly' },
+      { text: 'She cried.', tier: 'trusted' },
+      { text: 'She ran.', tier: 'devoted' }
+    ])
     vi.restoreAllMocks()
   })
 })

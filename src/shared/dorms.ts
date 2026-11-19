@@ -3,7 +3,9 @@
  * printed for each. The two options are the lorebook's own.
  */
 
+import { PRONOUNS } from './gender'
 import { locationDefOf, LOWRISE_LOCATION } from './locations'
+import type { Gender } from './types'
 
 /** Every dorm id the profile call may assign, sorted for a stable schema enum. */
 export const DORM_IDS = [
@@ -49,14 +51,14 @@ export function dormGroupBlurb(dorm: DormId): string {
     : (locationDefOf(LOWRISE_LOCATION)?.blurb ?? '')
 }
 
-/** The ` Dorm: …` tail of a cast block's labeled facts line. */
-export function dormClause(dorm: DormId): string {
-  return ` | She has a single room at ${dormLabel(dorm)}.`
+/** The ` Dorm: …` tail of a cast block's labeled facts line, in the character's own pronoun. */
+export function dormClause(dorm: DormId, g: Gender): string {
+  return ` | ${PRONOUNS[g].They} has a single room at ${dormLabel(dorm)}.`
 }
 
 /** The same fact as lorebook prose. */
-export function dormSentence(dorm: DormId): string {
-  return ` She lives in ${dormLabel(dorm)}.`
+export function dormSentence(dorm: DormId, g: Gender): string {
+  return ` ${PRONOUNS[g].They} lives in ${dormLabel(dorm)}.`
 }
 
 /** Which of the two buildings a room is in: the five Lowrises are one of them. */

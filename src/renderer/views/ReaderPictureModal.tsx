@@ -11,8 +11,7 @@ import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import {
   openPickedPicture,
-  openStoredPicture,
-  savePicture,
+  type PictureHome,
   type ReaderPicture
 } from '../stores/loop/profilePicture'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
@@ -25,8 +24,10 @@ function cropOf(picture: ReaderPicture): ProfileCrop {
 
 export interface ReaderPictureModalProps {
   theme: 'day' | 'night'
-  /** The file the player just picked; null opens on the picture the playthrough keeps. */
+  /** The file the player just picked; null opens on the picture the home keeps. */
   picked: ReaderPicture | null
+  /** Where the picture is read from and kept. */
+  home: Pick<PictureHome, 'openStored' | 'save'>
   onClose: () => void
   /** The crop and the full picture are kept. */
   onSaved: () => void
@@ -34,11 +35,12 @@ export interface ReaderPictureModalProps {
 
 /**
  * The reader's own picture and the archway his crop is cut through, with the whole picture as the
- * stage. Nothing is kept until Save, so every other way out leaves the playthrough as it was.
+ * stage. Nothing is kept until Save, so every other way out leaves the picture as it was.
  */
 export function ReaderPictureModal({
   theme,
   picked,
+  home,
   onClose,
   onSaved
 }: ReaderPictureModalProps): JSX.Element | null {
@@ -53,7 +55,7 @@ export function ReaderPictureModal({
   useEffect(() => {
     if (picked) return
     let live = true
-    void openStoredPicture().then((stored) => {
+    void home.openStored().then((stored) => {
       if (!live) return
       if (!stored) {
         onClose()
@@ -97,7 +99,7 @@ export function ReaderPictureModal({
     if (!picture || !crop || saving.current) return
     saving.current = true
     const frame: ProfileFrame = { x: crop.x, y: crop.y, width: crop.width, height: crop.height }
-    const ok = await savePicture(picture, frame)
+    const ok = await home.save(picture, frame)
     saving.current = false
     if (ok) onSaved()
   }

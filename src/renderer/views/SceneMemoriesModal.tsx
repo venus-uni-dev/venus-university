@@ -8,6 +8,7 @@ import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
+import { genderOf } from '@shared/gender'
 import { CheckField } from '../components/CheckField'
 import { MemoryRow } from '../components/MemoryRow'
 import { useModalShell } from '../components/useModalShell'
@@ -104,6 +105,7 @@ export function SceneMemoriesModal({
                   key={`${row.charId}-${index}`}
                   id={`memedit-${row.charId}-${index}`}
                   name={name}
+                  gender={genderOf(characters[row.charId])}
                   faceOf={row.charId}
                   type={draft.type}
                   desc={draft.desc}

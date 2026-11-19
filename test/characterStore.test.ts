@@ -302,7 +302,7 @@ describe('importCharacter', () => {
     stubApi({
       jobs: { onProgress: () => () => {} },
       chars: {
-        import: () => Promise.resolve({ ok: true, data: arrival }),
+        import: () => Promise.resolve({ ok: true, data: { characters: [arrival], refused: null } }),
         expressions: () =>
           Promise.resolve({ ok: true, data: presentMap(EMOTIONS, true) as Record<Emotion, boolean> }),
         cgs: () =>
@@ -372,21 +372,29 @@ describe('briefRequestOf', () => {
 })
 
 /**
- * The order the Manage grid deals its cards in. The rule is what the player is
- * looking for: the run he is watching, then what he worked on last, then the cast the
- * game came with.
+ * The order the Manage grid deals its cards in by default. The rule is what the player is
+ * looking for: the run he is watching, then what he worked on last, the shipped cast's edited
+ * copies among his own.
  */
 describe('manageOrderOf', () => {
-  /** A roster in `order`, with whatever stamps and progress the test names. */
+  /** A roster in `order`, with whatever stamps, first names and progress the test names. */
   function grid(
     order: string[],
     stamps: Record<string, number> = {},
     progress: Record<string, CharacterProgress> = {},
-    removedDefaults: string[] = []
+    removedDefaults: string[] = [],
+    names: Record<string, string> = {}
   ): Parameters<typeof manageOrderOf>[0] {
     return {
       characters: Object.fromEntries(
-        order.map((charId) => [charId, character({ charId, updatedAt: stamps[charId] })])
+        order.map((charId) => [
+          charId,
+          character({
+            charId,
+            updatedAt: stamps[charId],
+            ...(names[charId] !== undefined ? { firstName: names[charId] } : {})
+          })
+        ])
       ),
       order,
       removedDefaults,
@@ -395,21 +403,28 @@ describe('manageOrderOf', () => {
     }
   }
 
-  it('deals a run in flight first, then the newest write, then the shipped cast', () => {
+  it('deals a run in flight first, then the newest write, an edited shipped copy among them', () => {
     const rendering: CharacterProgress = { phase: 'rendering', tasks: [], current: 0 }
     expect(
-      manageOrderOf(grid(['s1', 'a', 'b', 'c'], { a: 1, b: 3, c: 2 }, { b: rendering }))
+      manageOrderOf(grid(['s1', 'a', 'b', 'c'], { a: 1, b: 3, c: 2 }, { b: rendering }), 'recent')
     ).toEqual(['b', 'c', 'a', 's1'])
+    expect(manageOrderOf(grid(['s1', 'a', 'c'], { a: 1, c: 2, s1: 4 }), 'recent')).toEqual([
+      's1',
+      'c',
+      'a'
+    ])
   })
 
-  it('keeps roster order between equal stamps and reads an unstamped file as oldest', () => {
-    // A character written before the field exists sorts last of the player's own rather
-    // than first: nothing is known about when she was touched.
-    expect(manageOrderOf(grid(['a', 'b', 'c'], { c: 5 }))).toEqual(['c', 'a', 'b'])
+  it('reads an unstamped file as oldest and breaks a tie by first name', () => {
+    // A character written before the field exists sorts last rather than first: nothing is
+    // known about when she was touched.
+    expect(
+      manageOrderOf(grid(['a', 'b', 'c'], { c: 5 }, {}, [], { a: 'Zoe', b: 'Amy' }), 'recent')
+    ).toEqual(['c', 'b', 'a'])
   })
 
   it('leaves out a shipped character the player has removed', () => {
-    expect(manageOrderOf(grid(['s1', 'a'], {}, {}, ['s1']))).toEqual(['a'])
+    expect(manageOrderOf(grid(['s1', 'a'], {}, {}, ['s1']), 'recent')).toEqual(['a'])
   })
 })
 

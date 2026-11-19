@@ -44,8 +44,10 @@ export interface TurnSnapshot {
   answeredReminder?: string
   /** This turn is a Scene Creator scene's opening, so a retry sends it again. */
   created?: boolean
-  /** The curveball and present this turn's scene rolled, so a retry opens on the same. */
-  sceneEvents?: { event: SceneEvent | null; gift: ReceivedGift | null }
+  /**
+   * The curveball, present and redraft this turn's scene rolled, so a retry opens on the same.
+   */
+  sceneEvents?: { event: SceneEvent | null; gift: ReceivedGift | null; redraft: boolean }
 }
 
 /**

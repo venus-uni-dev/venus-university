@@ -15,6 +15,10 @@ import type { ScreenTheme } from './clockTheme'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/CharacterNotes.css'
 
+/** What the notes well says under its label, wherever the player writes her notes. */
+export const NOTES_HINT =
+  "The below text will be injected into the character's info in prompts. Use third person and address yourself as 'the reader'."
+
 export interface CharacterNotesModalProps {
   /** Drawn by the screen that opened this — a portal inherits no palette. */
   theme: ScreenTheme
@@ -71,7 +75,7 @@ export function CharacterNotesModal({
           <TextField
             id="char-notes-text"
             label="Notes"
-            hint="The below text will be injected into the character's info in prompts. Use third person and address yourself as 'the reader'."
+            hint={NOTES_HINT}
             value={text}
             onChange={setText}
             multiline
@@ -112,7 +116,7 @@ export function CharacterNotesModal({
             id="char-notes-discard"
             theme={theme}
             title="Discard changes?"
-            message="Her notes have not been saved."
+            message="Your notes have not been saved."
             confirmText="Discard changes"
             cancelText="Keep editing"
             // Taken down before the panel goes, so the two do not leave as one exiting child

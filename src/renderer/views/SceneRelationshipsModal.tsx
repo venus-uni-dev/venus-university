@@ -6,7 +6,15 @@ import type { JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
-import { relationOf, SCENE_RELATIONS, type SceneRelation } from '@shared/sceneCreator'
+import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import {
+  datingOffered,
+  pairsAsLaid,
+  relationOf,
+  SCENE_RELATIONS,
+  type SceneRelation,
+  type SetupPeople
+} from '@shared/sceneCreator'
 import type { Character } from '@shared/types'
 import { SelectField } from '../components/SelectField'
 import { TitleTab } from '../components/TitleTab'
@@ -17,16 +25,30 @@ import '../vu_styles/SceneCreator.css'
 
 /** Each relation as the picker names it. */
 export const RELATION_LABELS: Record<SceneRelation, string> = {
+  dating: 'Dating',
   friends: 'Friends',
   acquaintances: 'Acquaintances',
   strangers: 'Strangers',
   enemies: 'Enemies'
 }
 
-const RELATION_OPTIONS = SCENE_RELATIONS.map((relation) => ({
-  value: relation,
-  label: RELATION_LABELS[relation]
-}))
+/**
+ * The relations a pair's picker offers: every one, but Dating only where the two may still date
+ * once every other pick is laid over `base`.
+ */
+export function relationOptions(
+  base: Readonly<NpcRelationshipMap>,
+  pairs: Readonly<Record<string, SceneRelation>>,
+  a: string,
+  b: string,
+  people: SetupPeople
+): { value: SceneRelation; label: string }[] {
+  const dating = datingOffered(base, pairs, a, b, people)
+  return SCENE_RELATIONS.filter((relation) => relation !== 'dating' || dating).map((relation) => ({
+    value: relation,
+    label: RELATION_LABELS[relation]
+  }))
+}
 
 export interface SceneRelationshipsModalProps {
   theme: ScreenTheme
@@ -34,6 +56,8 @@ export interface SceneRelationshipsModalProps {
   /** Everybody else in the scene. */
   others: readonly Character[]
   pairs: Readonly<Record<string, SceneRelation>>
+  /** Each of the cast's traits and milestones, which decide who may be set to dating. */
+  people: SetupPeople
   onChange: (other: string, relation: SceneRelation) => void
   onClose: () => void
 }
@@ -44,11 +68,14 @@ export function SceneRelationshipsModal({
   character,
   others,
   pairs,
+  people,
   onChange,
   onClose
 }: SceneRelationshipsModalProps): JSX.Element | null {
   const { host, overlayProps } = useModalShell(onClose)
   if (!host) return null
+  // A pair set to dating that cannot hold, as the scene will play it.
+  const shown = pairsAsLaid({}, pairs, people)
 
   return createPortal(
     <motion.div
@@ -76,8 +103,8 @@ export function SceneRelationshipsModal({
               key={other.charId}
               id={`scene-relation-${other.charId}`}
               label={`${character.firstName} and ${other.firstName}`}
-              value={relationOf(pairs, character.charId, other.charId)}
-              options={RELATION_OPTIONS}
+              value={relationOf(shown, character.charId, other.charId)}
+              options={relationOptions({}, shown, character.charId, other.charId, people)}
               onChange={(value) => onChange(other.charId, value as SceneRelation)}
             />
           ))}

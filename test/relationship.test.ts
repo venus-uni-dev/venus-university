@@ -2,16 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   affectionFor,
   affectionOf,
+  ALL_ROMANCE,
   applyEvent,
+  attractionInPlay,
+  npcAttractionOf,
+  attractionOf,
   breakPenaltyAt,
   crushChance,
   crushHintUpdate,
+  DEFAULT_ROMANCE,
   dispositionOf,
   emptyFlags,
   foldRelationshipEvents,
   initialFlags,
   isNegative,
   isPositive,
+  isRomanceable,
   memoriesFor,
   memoryStatusLine,
   mergedMemories,
@@ -24,6 +30,7 @@ import {
   readerStandingOf,
   refreshedFlags,
   rollsCrush,
+  romanceOf,
   romanceScenesAfter,
   withBreakPenaltiesStepped,
   withMemoryReplaced,
@@ -220,7 +227,7 @@ describe('applyEvent', () => {
     expect(byHer).toMatchObject({ friendZonedBy: true, isLover: false })
   })
 
-  // The only event that clears rather than sets, and the contact info she gave
+  // It clears rather than sets, and the contact info she gave
   // him is deliberately not handed back with it.
   it('clears a block and leaves the contact info she already gave', () => {
     const blocked = { ...emptyFlags(), gaveContactInfo: true, blocked: true }
@@ -291,7 +298,7 @@ describe('the milestone screen', () => {
     }
     // `isLover` is false either side of a set that also broke up, so the lovers line
     // is written from a before that never got there.
-    const lines = milestoneStatusLines('Sarah', { ...before, isLover: false }, after)
+    const lines = milestoneStatusLines('Sarah', { ...before, isLover: false }, after, 'female')
     expect(lines).toHaveLength(9)
 
     const losses: string[] = []
@@ -336,7 +343,7 @@ describe('memoryStatusLine', () => {
   ]
 
   it.each(cases)('paints %s in the colour of which way it went', (type, tone) => {
-    const line = memoryStatusLine('Sarah', { type, desc: 'you walked her home' })
+    const line = memoryStatusLine('Sarah', { type, desc: 'you walked her home' }, 'female', 'he')
 
     expect(line.text).toBe(`Sarah ${type} that you walked her home.`)
     const marks = line.status?.marks ?? []
@@ -346,7 +353,12 @@ describe('memoryStatusLine', () => {
   })
 
   it('marks the verb of a memory that punctuates itself', () => {
-    const line = memoryStatusLine('Mina', { type: 'hated', desc: 'you ignored her all night!' })
+    const line = memoryStatusLine(
+      'Mina',
+      { type: 'hated', desc: 'you ignored her all night!' },
+      'female',
+      'he'
+    )
 
     expect(line.text).toBe('Mina hated that you ignored her all night!')
     const mark = (line.status?.marks ?? [])[0]
@@ -354,7 +366,12 @@ describe('memoryStatusLine', () => {
   })
 
   it('shows a memory filed in the reader’s voice to the player as "you", the verb agreeing', () => {
-    const line = memoryStatusLine('Sarah', { type: 'liked', desc: 'the reader was nice to her' })
+    const line = memoryStatusLine(
+      'Sarah',
+      { type: 'liked', desc: 'the reader was nice to her' },
+      'female',
+      'he'
+    )
 
     expect(line.text).toBe('Sarah liked that you were nice to her.')
     const mark = (line.status?.marks ?? [])[0]
@@ -667,7 +684,7 @@ describe('initialFlags', () => {
 describe('foldRelationshipEvents', () => {
   it('applies the events in order and leaves the rest of her entry alone', () => {
     const info = charInfo({ nameKnown: true, dorm: 'elysium' })
-    const folded = foldRelationshipEvents(info, ['sex', 'became_lovers'], 7)
+    const folded = foldRelationshipEvents(info, ['sex', 'became_lovers'], 7, 'female')
     // `sex` then `became_lovers` must not leave `benefits` set — the whole
     // reason the events are folded as a group rather than one at a time.
     expect(folded.flags).toMatchObject({ hadSex: true, isLover: true, benefits: false })
@@ -676,7 +693,7 @@ describe('foldRelationshipEvents', () => {
   })
 
   it('writes the two biggest milestones their own memory, dated the slot that ran', () => {
-    const folded = foldRelationshipEvents(charInfo(), ['sex'], 7)
+    const folded = foldRelationshipEvents(charInfo(), ['sex'], 7, 'female')
     // Sleeping together implies the kiss, so a first time that is also a first
     // kiss says both — one memory each.
     expect(folded.memories).toEqual([
@@ -687,7 +704,7 @@ describe('foldRelationshipEvents', () => {
 
   it('writes nothing for a milestone she had already reached', () => {
     const info = charInfo({ flags: { ...emptyFlags(), hasKissed: true, hadSex: true } })
-    expect(foldRelationshipEvents(info, ['kissed', 'sex'], 7).memories).toEqual([])
+    expect(foldRelationshipEvents(info, ['kissed', 'sex'], 7, 'female').memories).toEqual([])
   })
 
   it('lets a breakup land on top of the ledger\'s own memory of it', () => {
@@ -695,7 +712,7 @@ describe('foldRelationshipEvents', () => {
       memories: [{ date: 7, type: 'hated', desc: 'he ended it in the middle of dinner' }],
       flags: { ...emptyFlags(), isLover: true }
     })
-    const folded = foldRelationshipEvents(info, ['broke_up'], 7)
+    const folded = foldRelationshipEvents(info, ['broke_up'], 7, 'female')
     // Stacking is the one mechanism the list has for saying a thing mattered
     // more, and ending it has to outweigh whatever she hears afterwards.
     expect(folded.memories).toHaveLength(2)
@@ -715,7 +732,7 @@ describe('foldRelationshipEvents', () => {
         desc: `old ${at}`
       }))
     })
-    const folded = foldRelationshipEvents(info, ['kissed'], 7)
+    const folded = foldRelationshipEvents(info, ['kissed'], 7, 'female')
     expect(folded.memories).toHaveLength(21)
     expect(folded.memories[0].desc).toBe('old 0')
     expect(folded.memories.at(-1)?.desc).toBe('the reader kissed her for the first time')
@@ -724,14 +741,14 @@ describe('foldRelationshipEvents', () => {
   it('dates the breakup, however the dating ended', () => {
     const info = charInfo({ flags: { ...emptyFlags(), isLover: true } })
     for (const event of ['broke_up', 'friendzoned_by_reader', 'friendzoned_reader'] as const) {
-      expect(foldRelationshipEvents(info, [event], 7).brokeUpOn).toBe(7)
+      expect(foldRelationshipEvents(info, [event], 7, 'female').brokeUpOn).toBe(7)
     }
   })
 
   it('dates the start of dating, and keeps it through the breakup for the exes line', () => {
-    const together = foldRelationshipEvents(charInfo(), ['became_lovers'], 9)
+    const together = foldRelationshipEvents(charInfo(), ['became_lovers'], 9, 'female')
     expect(together.datingSince).toBe(9)
-    const apart = foldRelationshipEvents(together, ['broke_up'], 12)
+    const apart = foldRelationshipEvents(together, ['broke_up'], 12, 'female')
     expect(apart.datingSince).toBe(9)
     expect(apart.brokeUpOn).toBe(12)
   })
@@ -740,7 +757,8 @@ describe('foldRelationshipEvents', () => {
     const folded = foldRelationshipEvents(
       charInfo({ brokeUpOn: 5, leftFor: 'other', datingSince: 1 }),
       ['became_lovers'],
-      9
+      9,
+      'female'
     )
     // Gone rather than blanked, which is what the save carries for an absent optional.
     expect('brokeUpOn' in folded).toBe(false)
@@ -750,9 +768,117 @@ describe('foldRelationshipEvents', () => {
 
   it('writes nothing at all, so the projection cannot disturb what it read', () => {
     const info = charInfo()
-    foldRelationshipEvents(info, ['sex'], 7)
+    foldRelationshipEvents(info, ['sex'], 7, 'female')
     expect(info.memories).toEqual([])
     expect(info.flags.hadSex).toBe(false)
+  })
+})
+
+/**
+ * Whether the reader may romance someone is read off the playthrough's setting and the
+ * milestones the two have reached; a wrong answer gates the crush roll and the writer's line for
+ * the rest of the playthrough, and nothing throws.
+ */
+describe('isRomanceable', () => {
+  const guy = { gender: 'male' as const }
+  const nobody = { female: 'none', male: 'none' } as const
+  const lesbian = { ...character(), attractedTo: { female: true, male: false } }
+  const bisexual = { ...character(), attractedTo: { female: true, male: true } }
+
+  it("follows her sexuality against the reader's gender while nothing has happened", () => {
+    expect(isRomanceable(character(), charInfo(), DEFAULT_ROMANCE, 'he')).toBe(true)
+    expect(isRomanceable(character(), charInfo(), DEFAULT_ROMANCE, 'she')).toBe(false)
+    expect(isRomanceable(guy, charInfo(), DEFAULT_ROMANCE, 'he')).toBe(false)
+    expect(isRomanceable(guy, charInfo(), DEFAULT_ROMANCE, 'she')).toBe(true)
+    expect(isRomanceable(lesbian, charInfo(), DEFAULT_ROMANCE, 'she')).toBe(true)
+    expect(isRomanceable(lesbian, charInfo(), DEFAULT_ROMANCE, 'he')).toBe(false)
+  })
+
+  it('takes everyone for a they/them reader unless the level is none', () => {
+    expect(isRomanceable(lesbian, charInfo(), DEFAULT_ROMANCE, 'they')).toBe(true)
+    expect(isRomanceable(guy, charInfo(), DEFAULT_ROMANCE, 'they')).toBe(true)
+    expect(isRomanceable(guy, charInfo(), nobody, 'they')).toBe(false)
+  })
+
+  it('lets all attracted reach past her sexuality, and none bar even a bisexual girl', () => {
+    expect(isRomanceable(lesbian, charInfo(), ALL_ROMANCE, 'he')).toBe(true)
+    expect(isRomanceable(guy, charInfo(), ALL_ROMANCE, 'he')).toBe(true)
+    expect(isRomanceable(bisexual, charInfo(), nobody, 'he')).toBe(false)
+    expect(isRomanceable(bisexual, charInfo(), nobody, 'she')).toBe(false)
+  })
+
+  it('reads the sexuality the playthrough settled ahead of her record', () => {
+    const settledLesbian = charInfo({ attractedTo: { female: true, male: false } })
+    const settledStraight = charInfo({ attractedTo: { female: false, male: true } })
+    expect(isRomanceable(character(), settledLesbian, DEFAULT_ROMANCE, 'he')).toBe(false)
+    expect(isRomanceable(lesbian, settledStraight, DEFAULT_ROMANCE, 'he')).toBe(true)
+  })
+
+  it.each<[string, Partial<CharInfo>]>([
+    ['a kiss', { flags: { ...emptyFlags(), hasKissed: true } }],
+    ['a night together', { flags: { ...emptyFlags(), hadSex: true } }],
+    ['dating', { flags: { ...emptyFlags(), isLover: true } }],
+    ['friends with benefits', { flags: { ...emptyFlags(), benefits: true } }],
+    ['a breakup', { flags: { ...emptyFlags(), brokenUp: 1 } }],
+    ['having dated', { datingSince: 3 }]
+  ])('stays romanceable for good after %s, whatever the setting', (_, over) => {
+    expect(isRomanceable(guy, charInfo(over), nobody, 'he')).toBe(true)
+  })
+})
+
+/** The setting is read off a record that may predate it or have been edited by hand. */
+describe('romanceOf', () => {
+  it('reads a record without one as following her sexuality', () => {
+    expect(romanceOf({})).toEqual(DEFAULT_ROMANCE)
+    expect(romanceOf(undefined)).toEqual(DEFAULT_ROMANCE)
+  })
+
+  it('reads a malformed one field by field, each at its default', () => {
+    expect(romanceOf({ romance: 'yes' })).toEqual(DEFAULT_ROMANCE)
+    expect(romanceOf({ romance: null })).toEqual(DEFAULT_ROMANCE)
+    expect(romanceOf({ romance: { female: 0, male: 'true' } })).toEqual(DEFAULT_ROMANCE)
+    // The on/off switch the levels replaced.
+    expect(romanceOf({ romance: { female: false, male: true } })).toEqual(DEFAULT_ROMANCE)
+  })
+
+  it('keeps exactly what the record says', () => {
+    expect(romanceOf({ romance: { female: 'none', male: 'all' } })).toEqual({
+      female: 'none',
+      male: 'all'
+    })
+  })
+})
+
+/** Who she is attracted to in play, which the crush roll and the writer's line both read. */
+describe('attraction', () => {
+  const straight = { female: false, male: true }
+
+  it('reads an absent or malformed record as the other gender alone', () => {
+    expect(attractionOf(character())).toEqual(straight)
+    expect(attractionOf({ gender: 'male' })).toEqual({ female: true, male: false })
+    expect(attractionOf({ ...character(), attractedTo: { female: false, male: false } })).toEqual(
+      straight
+    )
+    expect(attractionOf({ ...character(), attractedTo: 'both' as never })).toEqual(straight)
+  })
+
+  it("adds the reader's gender only under all attracted, and none for they/them", () => {
+    const lesbian = { ...character(), attractedTo: { female: true, male: false } }
+    const both = { female: true, male: true }
+    expect(attractionInPlay(lesbian, undefined, ALL_ROMANCE, 'he')).toEqual(both)
+    expect(attractionInPlay(lesbian, undefined, DEFAULT_ROMANCE, 'he')).toEqual(lesbian.attractedTo)
+    expect(attractionInPlay(lesbian, undefined, ALL_ROMANCE, 'they')).toEqual(lesbian.attractedTo)
+  })
+
+  it('makes her attracted to both genders under all attracted to all, the reader and the roster', () => {
+    const lesbian = { ...character(), attractedTo: { female: true, male: false } }
+    const both = { female: true, male: true }
+    const everyone = { female: 'everyone', male: 'sexuality' } as const
+    expect(romanceOf({ romance: everyone })).toEqual(everyone)
+    expect(attractionInPlay(lesbian, undefined, everyone, 'they')).toEqual(both)
+    expect(npcAttractionOf(lesbian, undefined, everyone)).toEqual(both)
+    // All attracted is about the reader alone: it adds nothing between two characters.
+    expect(npcAttractionOf(lesbian, undefined, ALL_ROMANCE)).toEqual(lesbian.attractedTo)
   })
 })
 
@@ -878,6 +1004,24 @@ describe('the crush roll', () => {
     // within her bar before she was ever mentioned is simply within it.
     it('says nothing at all to a reader who was never short of her', () => {
       expect(update(ordinary, stats({ brain: GODLY }))).toEqual({ line: null, hint: undefined })
+    })
+
+    // Interest is what the roll is about, and a couple holds that down; a crush settles it.
+    it('keeps the payoff owed while she is taken, and pays it once she has a crush', () => {
+      const held: CrushHint = { stat: 'brain', tier: 1 }
+      const taken = crushHintUpdate('Sarah', ordinary, stats({ brain: GOOD }), held, 'taken')
+      expect(taken.line).toBeNull()
+      expect(taken.hint).toBe(held)
+      expect(crushHintUpdate('Sarah', ordinary, stats({ brain: GOOD }), held, 'crush')).toEqual({
+        line: "Your Brain seems to have caught Sarah's interest...",
+        hint: { met: true }
+      })
+      // Short of her bar again, a girl with a crush is told nothing she is waiting on.
+      expect(crushHintUpdate('Sarah', ordinary, stats(), undefined, 'crush').line).toBeNull()
+      // While what she is waiting on is still said to a taken girl.
+      expect(crushHintUpdate('Sarah', ordinary, stats(), undefined, 'taken').line).toBe(
+        "Your Brain needs to be at least Good to catch Sarah's interest."
+      )
     })
   })
 

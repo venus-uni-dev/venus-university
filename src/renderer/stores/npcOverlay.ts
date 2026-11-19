@@ -1,13 +1,14 @@
 import { ROOM_LOCATION } from '@shared/locations'
 import type { NpcGroup, NpcSlotOverlay } from '@shared/npcRelationships'
-import { PULL_CHANCE } from '@shared/odds'
+import { PULL_CHANCE, TOGETHER_CHANCE } from '@shared/odds'
 import { pick, shuffle } from '@shared/shuffle'
 import type { TimeSlot } from '@shared/types'
 
 /**
  * Who spends one slot with whom. **Pure and randomised — no IO, no store access, rolled once per
- * slot.** Three passes over a shuffled roster (haunt friends, then evening-only friends, then
- * solo) — passes 2-3 need an evening. A place holds one *set*, unlike standing haunts.
+ * slot.** Four passes over a shuffled roster (couples, haunt friends, then evening-only friends,
+ * then solo) — the last two need an evening. No place holds more than {@link MAX_GROUP} people, the
+ * girls standing at their haunts there counted, and an outing goes only where nobody stands.
  */
 
 /** What one character brings into the roll. */
@@ -25,6 +26,8 @@ export interface OverlayCharInput {
   wentOutRecently: boolean
   /** Everyone she counts as a friend, as charIds. */
   friends: readonly string[]
+  /** Everyone on the roster she is dating, as charIds. */
+  partners?: readonly string[]
 }
 
 /**
@@ -63,7 +66,16 @@ export function rollNpcOverlay(
   const isLoose = (charId: string): boolean =>
     eligible(charId) && chars[charId].haunt === null && !grouped.has(charId)
 
-  const takenSpots = new Set<string>()
+  /** How many people stand at each place this slot, rooms aside: its haunters, then the pulled. */
+  const bodies = new Map<string, number>()
+  for (const charId of charIds) {
+    const haunt = chars[charId].haunt
+    if (!eligible(charId) || haunt === null || haunt === ROOM_LOCATION) continue
+    bodies.set(haunt, (bodies.get(haunt) ?? 0) + 1)
+  }
+
+  // A place somebody stands at is never an outing's.
+  const takenSpots = new Set<string>(bodies.keys())
   const openSpots = (): string[] => spots.filter((spot) => !takenSpots.has(spot))
   const record = (group: NpcGroup, out: readonly string[]): void => {
     groups.push(group)
@@ -72,20 +84,54 @@ export function rollNpcOverlay(
     if (outings !== null) for (const member of out) wentOut.add(member)
   }
 
+  // 0. A couple spends the slot together: the one with nowhere to be joins the other where she
+  // is, or, both free, the two keep to one of their rooms.
+  const couples: [string, string][] = []
+  for (const charId of charIds) {
+    for (const partner of chars[charId].partners ?? []) {
+      if (charId < partner && chars[partner] !== undefined) couples.push([charId, partner])
+    }
+  }
+  for (const [a, b] of shuffle(couples, rand)) {
+    if (!eligible(a) || !eligible(b) || grouped.has(a) || grouped.has(b)) continue
+    const freeA = chars[a].haunt === null
+    const freeB = chars[b].haunt === null
+    if (!freeA && !freeB) continue
+    if (rand() >= TOGETHER_CHANCE) continue
+    if (freeA && freeB) {
+      const host = rand() < 0.5 ? a : b
+      record({ location: ROOM_LOCATION, host, members: [host, host === a ? b : a] }, [])
+      continue
+    }
+    const host = freeA ? b : a
+    const haunt = chars[host].haunt as string
+    if (haunt !== ROOM_LOCATION) {
+      if ((bodies.get(haunt) ?? 0) >= MAX_GROUP) continue
+      bodies.set(haunt, (bodies.get(haunt) ?? 0) + 1)
+    }
+    record({ location: haunt, host, members: [host, host === a ? b : a] }, [])
+  }
+
   // 1. Friends pull each other into where they were already going; a room counts.
   for (const host of shuffle(charIds, rand)) {
     if (!eligible(host) || grouped.has(host)) continue
     const haunt = chars[host].haunt
     if (haunt === null) continue
 
+    // A place pulls in only as many as it still has room for beside whoever stands there.
+    const space =
+      haunt === ROOM_LOCATION
+        ? MAX_PULLED
+        : Math.min(MAX_PULLED, MAX_GROUP - (bodies.get(haunt) ?? 0))
     const pulled: string[] = []
     for (const friend of shuffle(chars[host].friends, rand)) {
-      if (pulled.length >= MAX_PULLED) break
+      if (pulled.length >= space) break
       if (!isLoose(friend)) continue
       if (rand() >= PULL_CHANCE) continue
       pulled.push(friend)
     }
     if (pulled.length === 0) continue
+    if (haunt !== ROOM_LOCATION) bodies.set(haunt, (bodies.get(haunt) ?? 0) + pulled.length)
     // Being dragged along is not a night out — no fatigue for either of them.
     record({ location: haunt, host, members: [host, ...pulled] }, [])
   }

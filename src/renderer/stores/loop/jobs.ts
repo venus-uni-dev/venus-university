@@ -1,5 +1,6 @@
 import { kindOf, type ExamPeriod } from '@shared/academics'
 import {
+  bossMessageOf,
   globalSlotOf,
   jobDefOf,
   judgeShiftChange,
@@ -147,11 +148,13 @@ function noticeClosure(): void {
 
   const closure = closureOn(game.date, game.calendar)
   if (!closure || job.holidayNoticeDate === closure.startDate) return
-  const messages = jobDefOf(job.jobId)?.messages
+  const def = jobDefOf(job.jobId)
   const season = game.calendar.season
   const lastClosure = closure.id === endVacationOf(season).id
   const kind: JobMessageKind = !lastClosure ? 'holiday' : season === 'spring' ? 'summer' : 'winter'
-  const text = messages?.[kind] ?? messages?.holiday
+  const text =
+    bossMessageOf(def, kind, game.playerPronouns) ??
+    bossMessageOf(def, 'holiday', game.playerPronouns)
   if (!text || !jobClosedOn(job.jobId, game.date, game.calendar)) return
 
   let rostered = false

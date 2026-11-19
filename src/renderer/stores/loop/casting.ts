@@ -1,4 +1,5 @@
 import { dormBuildingOf } from '@shared/dorms'
+import { pronounsOf } from '@shared/gender'
 import {
   EXTRA_CHARACTER_CHANCE,
   LOCAL_INJECT_CHANCE,
@@ -94,18 +95,25 @@ function pickEncounter(pool: readonly string[]): string {
 }
 
 /**
- * Draws the scene's cast for an action that names nobody and is not about going to class.
+ * Draws the scene's cast for an action that names nobody and is not about going to class, into
+ * whatever seats `seated` leaves and never drawing one of them.
  */
-export function pickCast(inPublic: boolean, location?: string | null): string[] {
+export function pickCast(
+  inPublic: boolean,
+  location?: string | null,
+  seated: readonly string[] = []
+): string[] {
   if (!inPublic) return []
 
-  let pool = freeCharacters(inPublic ? location : null)
+  let pool = freeCharacters(inPublic ? location : null).filter(
+    (charId) => !seated.includes(charId)
+  )
   if (pool.length === 0) return []
   const game = useGameStore.getState()
   const anyUnmet = pool.some((charId) => game.charInfo[charId]?.flags?.hasMet !== true)
 
   const cast: string[] = []
-  while (cast.length < PORTRAIT_SLOTS && pool.length > 0) {
+  while (seated.length + cast.length < PORTRAIT_SLOTS && pool.length > 0) {
     const chance = cast.length === 0 && anyUnmet ? MEET_SOMEBODY_CHANCE : EXTRA_CHARACTER_CHANCE
     if (Math.random() >= chance) break
     const picked = pickEncounter(pool)
@@ -117,25 +125,41 @@ export function pickCast(inPublic: boolean, location?: string | null): string[] 
 
 /**
  * The first night's draw: one stranger, guaranteed; a roster he has somehow already
- * met falls back to the ordinary draw.
+ * met falls back to the ordinary draw. Either fills only the seats `seated` leaves.
  */
-export function pickFirstNightCast(inPublic: boolean, location?: string | null): string[] {
-  if (!inPublic) return []
+export function pickFirstNightCast(
+  inPublic: boolean,
+  location?: string | null,
+  seated: readonly string[] = []
+): string[] {
+  if (!inPublic || seated.length >= PORTRAIT_SLOTS) return []
 
   const game = useGameStore.getState()
   const unmet = freeCharacters(location).filter(
-    (charId) => game.charInfo[charId]?.flags?.hasMet !== true
+    (charId) => game.charInfo[charId]?.flags?.hasMet !== true && !seated.includes(charId)
   )
-  return unmet.length > 0 ? [anyOf(unmet)] : pickCast(inPublic, location)
+  return unmet.length > 0 ? [anyOf(unmet)] : pickCast(inPublic, location, seated)
 }
 
-/** The encounter draw, with the first night's guaranteed stranger. */
-export function drawFreeCast(inPublic: boolean, location?: string | null): string[] {
+/** The encounter draw, with the first night's guaranteed stranger, beside whoever is `seated`. */
+export function drawFreeCast(
+  inPublic: boolean,
+  location?: string | null,
+  seated: readonly string[] = []
+): string[] {
   const game = useGameStore.getState()
   const where = resolveLocationId(location)
   return isTutorialSlot(game.date, game.time, game.semesterIndex)
-    ? pickFirstNightCast(inPublic, where)
-    : pickCast(inPublic, where)
+    ? pickFirstNightCast(inPublic, where, seated)
+    : pickCast(inPublic, where, seated)
+}
+
+/** `ids` with whoever is in `shown` moved to the front, each part keeping its order. */
+export function shownFirst(ids: readonly string[], shown: readonly string[]): string[] {
+  return [
+    ...ids.filter((charId) => shown.includes(charId)),
+    ...ids.filter((charId) => !shown.includes(charId))
+  ]
 }
 
 /**
@@ -216,9 +240,10 @@ export function commitmentNotes(
     if (!attendees.includes(charId) || atCommitment.includes(charId)) continue
     const commitment = charCommitmentAt(charId)
     if (!commitment) continue
+    const { their } = pronounsOf(useGameStore.getState().characters[charId])
     const what =
       commitment.kind === 'class'
-        ? `her ${commitment.name} class`
+        ? `${their} ${commitment.name} class`
         : `a shift at ${commitment.employer}`
     notes.push(
       `${firstNameOf(charId)} either has ${what} after this or is just coming from it. Choose what makes the most sense.`
@@ -339,76 +364,76 @@ export function localsAtLocation(location: string): string[] {
  */
 export function workingHereNote(charId: string, jobId: string): string {
   const employer = jobDefOf(jobId)?.employer ?? 'work'
-  const who = nameIsKnown(charId) ? firstNameOf(charId) : "A girl they don't know"
+  const { noun } = pronounsOf(useGameStore.getState().characters[charId])
+  const who = nameIsKnown(charId) ? firstNameOf(charId) : `A ${noun} they don't know`
   return `${who} is here, working a shift at ${employer}.`
 }
 
 /**
- * Puts whoever is working at the scene's location into it — the last casting step, run
- * after every other body has been drawn.
- */
-export function admitWorkers(
-  cast: readonly string[],
-  location: string
-): { cast: string[]; notes: string[]; jobId: string | null } {
-  const workers = workersAtLocation(location)
-  if (workers.length === 0) return { cast: [...cast], notes: [], jobId: null }
-
-  const next = [...cast]
-  const notes: string[] = []
-  for (const worker of workers) {
-    if (!next.includes(worker.charId)) {
-      if (next.length >= PORTRAIT_SLOTS) continue
-      next.push(worker.charId)
-    }
-    // Said for a worker the classifier named too: the note is what keeps her on the clock.
-    notes.push(workingHereNote(worker.charId, worker.jobId))
-  }
-  return { cast: next, notes, jobId: workers[0].jobId }
-}
-
-/**
- * Puts whoever the scene's location holds into it — the last casting step, where both
- * kinds of "she is already here" are settled together.
+ * Puts whoever the scene's location holds into it after the people called — the workers, then
+ * the locals — with anybody in `shown` seated ahead of everybody else, and `pickUp`'s bodies (the
+ * passerby or the draw, given the seats taken so far) between the two. The workers come with
+ * their notes; the locals come back as `joined`, for the caller to name in its one run-into line.
  */
 export function admitLocals(
   cast: readonly string[],
   location: string,
-  { named, inPublic }: { named: boolean; inPublic: boolean }
-): { cast: string[]; notes: string[]; jobId: string | null } {
-  if (!inPublic) return { cast: [...cast], notes: [], jobId: null }
+  {
+    named,
+    inPublic,
+    shown = [],
+    pickUp
+  }: {
+    named: boolean
+    inPublic: boolean
+    shown?: readonly string[]
+    pickUp?: (seated: readonly string[]) => readonly string[]
+  }
+): { cast: string[]; notes: string[]; joined: string[]; jobId: string | null } {
+  if (!inPublic) {
+    return { cast: [...cast, ...(pickUp?.(cast) ?? [])], notes: [], joined: [], jobId: null }
+  }
 
-  const workers = admitWorkers(cast, location)
-
-  const next = [...workers.cast]
-  const joined: string[] = []
+  const workers = workersAtLocation(location)
+  const workerIds = workers.map((worker) => worker.charId)
 
   // Fixed before a single local is admitted: the pull does not chain, so a crasher who wins her
   // roll does not drag her own group in behind her.
-  const invited = new Set(workers.cast)
+  const invited = new Set([...cast, ...workerIds])
   const pulledIn = (charId: string): boolean => {
     const group = charOverlayGroupNow(charId)
     return group !== null && group.members.some((member) => invited.has(member))
   }
 
-  // Companions first, then crashers, and the cap admits bodies rather than groups: a
-  // crasher cannot win the last slot from a girl the cast was already out with.
-  const locals = localsAtLocation(location).map((charId) => ({
-    charId,
-    pulled: pulledIn(charId)
-  }))
-  for (const local of [...locals.filter((l) => l.pulled), ...locals.filter((l) => !l.pulled)]) {
-    if (next.includes(local.charId)) continue
-    if (next.length >= PORTRAIT_SLOTS) break
-    if (named && !local.pulled && Math.random() >= LOCAL_INJECT_CHANCE) continue
-    next.push(local.charId)
-    joined.push(local.charId)
+  // Companions ahead of crashers, and the cap admits bodies rather than groups: a crasher cannot
+  // win the last slot from a girl the cast was already out with.
+  const locals = localsAtLocation(location).filter((charId) => !workerIds.includes(charId))
+  const crashers = locals.filter((charId) => !pulledIn(charId))
+  const order = [...workerIds, ...locals.filter((charId) => !crashers.includes(charId)), ...crashers]
+
+  const next = [...cast]
+  const joined: string[] = []
+  const seat = (ids: readonly string[]): void => {
+    for (const charId of ids) {
+      if (next.includes(charId)) continue
+      if (next.length >= PORTRAIT_SLOTS) break
+      if (named && crashers.includes(charId) && Math.random() >= LOCAL_INJECT_CHANCE) continue
+      next.push(charId)
+      if (!workerIds.includes(charId)) joined.push(charId)
+    }
   }
 
-  // One line for everybody who turned out to be here, in a random encounter's words.
-  const notes =
-    joined.length > 0 ? [...workers.notes, runIntoNote(joined, location)] : workers.notes
-  return { cast: next, notes, jobId: workers.jobId }
+  seat(order.filter((charId) => shown.includes(charId)))
+  for (const charId of pickUp?.(next) ?? []) {
+    if (!next.includes(charId)) next.push(charId)
+  }
+  seat(order.filter((charId) => !shown.includes(charId)))
+
+  // Said for a worker the classifier named too: the note is what keeps her on the clock.
+  const notes = workers
+    .filter((worker) => next.includes(worker.charId))
+    .map((worker) => workingHereNote(worker.charId, worker.jobId))
+  return { cast: next, notes, joined, jobId: workers[0]?.jobId ?? null }
 }
 
 /**

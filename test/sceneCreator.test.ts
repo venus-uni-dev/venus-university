@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { dispositionOf } from '@shared/relationship'
-import { zoneOf } from '@shared/npcRelationships'
+import { inHoneymoon, zoneOf } from '@shared/npcRelationships'
+import { HONEYMOON_DAYS } from '@shared/odds'
 import {
   affectionsOf,
+  datingOffered,
   defaultMilestones,
   flagsOfEntry,
   lockedMilestones,
   npcRelationshipsOf,
+  pairsAsLaid,
   pairsOver,
   SCENE_DISPOSITIONS,
   validateSavedScene,
   weatherTableOf,
+  withDatingAttraction,
   withMilestone,
   type SavedScene,
   type SceneMilestones
@@ -94,6 +98,54 @@ describe('scene creator setup projects onto what the game reads', () => {
     expect(zoneOf(map['a|b'].affinity)).toBe('enemies')
     expect(map['a|c']).toBeUndefined()
     expect(zoneOf(map['b|c'].affinity)).toBe('friends')
+  })
+
+  it('a pair set to dating starts past its honeymoon, one partner apiece unless open', () => {
+    const people = {
+      a: { character: plain },
+      b: { character: plain },
+      c: { character: plain },
+      d: { character: plain },
+      e: { character: plain },
+      f: { character: plain },
+      p: { character: promiscuous },
+      l: { character: plain, flags: { isLover: true, harem: false } }
+    }
+    const map = pairsOver(
+      // Cleo and Dee are a couple the last semester left.
+      { 'c|d': { affinity: 2, dating: -40 } },
+      { 'a|b': 'dating', 'a|c': 'dating', 'e|p': 'dating', 'f|p': 'dating', 'l|p': 'dating' },
+      10,
+      people
+    )
+    // Ana takes the first in key order, so hers with Cleo, taken already besides, is friends.
+    expect(map['a|b']).toEqual({ affinity: 5, dating: 10 - HONEYMOON_DAYS })
+    expect(inHoneymoon(map['a|b'], 10)).toBe(false)
+    expect(map['a|c']).toEqual({ affinity: 5 })
+    expect(map['c|d']).toEqual({ affinity: 2, dating: -40 })
+    // Pip is open and may date two; the reader's lover who keeps him to herself may date nobody.
+    expect(map['e|p'].dating).toBe(10 - HONEYMOON_DAYS)
+    expect(map['f|p'].dating).toBe(10 - HONEYMOON_DAYS)
+    expect(map['l|p']).toEqual({ affinity: 5 })
+
+    // The picker offers Dating only where it would hold, and shows one that cannot as friends.
+    const picks = { 'a|b': 'dating', 'a|c': 'dating' } as const
+    expect(datingOffered({}, picks, 'a', 'e', people)).toBe(false)
+    expect(datingOffered({}, picks, 'c', 'e', people)).toBe(true)
+    expect(datingOffered({ 'c|d': { affinity: 2, dating: -40 } }, {}, 'c', 'e', people)).toBe(false)
+    expect(datingOffered({}, {}, 'l', 'p', people)).toBe(false)
+    expect(pairsAsLaid({}, picks, people)).toEqual({ 'a|b': 'dating', 'a|c': 'friends' })
+    const held = { 'a|b': 'dating' } as const
+    expect(pairsAsLaid({}, held, people)).toBe(held)
+  })
+
+  it('whoever she is set to date she is attracted to', () => {
+    const girls = { a: character({ charId: 'a' }), b: character({ charId: 'b' }), m: character({ charId: 'm', gender: 'male' }) }
+    const straight = { female: false, male: true }
+    const map = { 'a|b': { affinity: 5, dating: 0 } }
+    expect(withDatingAttraction(straight, 'a', map, girls)).toEqual({ female: true, male: true })
+    // Dating nobody it leaves out, she is the same object.
+    expect(withDatingAttraction(straight, 'm', map, girls)).toBe(straight)
   })
 
   it('the sky is wet in the scene slot alone', () => {

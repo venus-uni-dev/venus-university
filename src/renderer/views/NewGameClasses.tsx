@@ -52,7 +52,7 @@ const INTEREST_WORDS = 'Interest classes'
 const SWIM_LINE = `One PE class you leave blank may become ${SWIM_CLASS.name}.`
 
 /** What the interest classes' pane says. */
-const INTEREST_LINE = 'Each character spawns one one interest class unique to her tastes.'
+const INTEREST_LINE = 'Each character spawns one interest class unique to their tastes.'
 
 /** What every field here shows while it is blank. */
 const BLANK = 'Leave blank to generate'
@@ -112,14 +112,14 @@ function useMajors(): Record<string, string> | null {
   const chars = useApplicationStore((s) => s.application?.chars)
   const skipped = useApplicationStore((s) => s.application?.skipped)
   const dealtMajors = useApplicationStore((s) => s.application?.dealtMajors)
-  const profiles = useApplicationStore((s) => s.application?.replies.profiles)
+  const replies = useApplicationStore((s) => s.application?.replies)
   const resuming = useApplicationStore((s) => s.resuming)
   const characters = useCharacterStore((s) => s.characters)
   const setting = useLorebookStore((s) => s.setting)
   const book = useLorebookStore((s) => s.book)
   return useMemo(
     () => (resuming ? null : majorsNow()),
-    [girls, chars, skipped, dealtMajors, profiles, characters, resuming, setting, book]
+    [girls, chars, skipped, dealtMajors, replies, characters, resuming, setting, book]
   )
 }
 
@@ -341,9 +341,7 @@ function PaneHead({ title, lines }: { title: string; lines: readonly ReactNode[]
  */
 export const NewGameClasses = memo(function NewGameClasses(): JSX.Element | null {
   const draft = useApplicationStore((s) => s.application)
-  const failure = useApplicationStore((s) =>
-    s.calls.profiles.status === 'failed' ? s.calls.profiles.error : null
-  )
+  const failure = useApplicationStore((s) => s.calls.profiles.failed)
   const characters = useCharacterStore((s) => s.characters)
   const masked = useMasked()
   const majors = useMajors()

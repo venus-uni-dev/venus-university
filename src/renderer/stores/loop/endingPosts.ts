@@ -62,7 +62,13 @@ async function fetchEndingPosts(
         secretBudget: secretBudgetNow(),
         season: game.calendar.season,
         readerGraduated: game.semesterIndex === LAST_SEMESTER,
-        posters
+        posters,
+        romance: game.romance,
+        readerPronouns: game.playerPronouns,
+        npcRelationships: game.npcRelationships,
+        people: [...game.chars, ...game.alumni].flatMap((charId) =>
+          game.characters[charId] ? [game.characters[charId]] : []
+        )
       },
       settingNow(),
       reader()

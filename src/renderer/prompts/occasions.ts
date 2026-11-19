@@ -138,7 +138,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'orientation',
     title: 'Freshman Orientation',
     description:
-      'During Freshman Orientation, no classes meet while the first-year intake is paraded around campus in groups to play games and learn about campus resources. The SEB has a welcome mixer running in the Quad until late night for freshmen to mingle with upperclassmen.',
+      'During Freshman Orientation, classes are cancelled for all students while the first-year intake is paraded around campus in groups to play games and learn about campus resources. The SEB has a welcome mixer running in the Quad until late night for freshmen to mingle with upperclassmen.',
     startDate: 0, // Monday, January 19
     endDate: 0,
     time: null,
@@ -215,7 +215,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'thorne-day',
     title: 'Thorne Day',
     description:
-      'Thorne Day is an academic holiday celebrating the university’s founder during which no classes meet. Thorne personally gives a speech from the auditorium stage about the importance of social connection, and SEB hosts a full day of events in the Quad, including a student talent show and speed-dating tables.',
+      'Thorne Day is an academic holiday celebrating the university’s founder during which all classes are cancelled. Thorne personally gives a speech from the auditorium stage about the importance of social connection, and SEB hosts a full day of events in the Quad, including a student talent show and speed-dating tables.',
     startDate: 88, // Friday, April 17
     endDate: 88,
     time: null,
@@ -369,7 +369,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'orientation',
     title: 'Freshman Orientation',
     description:
-      "During Freshman Orientation, no classes meet while the fall's first-year intake is paraded around campus in groups to play games and learn about campus resources. Everyone else takes the time to get settled in after summer vacation. The SEB has a welcome mixer running in the Quad late into the night for freshmen to mingle with upperclassmen.",
+      "During Freshman Orientation, classes are cancelled for all students while the fall's first-year intake is paraded around campus in groups to play games and learn about campus resources. Everyone else takes the time to get settled in after summer vacation. The SEB has a welcome mixer running in the Quad late into the night for freshmen to mingle with upperclassmen.",
     startDate: 0, // Monday, August 17
     endDate: 0,
     time: null,

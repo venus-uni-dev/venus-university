@@ -8,6 +8,7 @@ import type {
   StartResult
 } from '@shared/application'
 import { DORM_IDS, dormLabel, type DormId } from '@shared/dorms'
+import { pronounsOf } from '@shared/gender'
 import { JOB_CATALOG } from '@shared/jobs'
 import { ACTIVITY_LOCATIONS, FUN_LOCATIONS, MEAL_LOCATIONS, STUDY_LOCATIONS } from '@shared/locations'
 import { DISPOSITION_LABELS } from '@shared/relationship'
@@ -68,21 +69,20 @@ const INTEREST_WORDS = 'Interest classes'
 /** What major classes dealt for no major in particular are called on screen. */
 const MAJORLESS_WORDS = 'Major classes'
 
-/** What the Free time section says of the activity's phrase, as Profiles says it. */
-const ACTIVITY_LINE =
-  'Describe the weekly activity as a phrase including a location, like “sketching at the Whitman Greenhouse”.'
+/** What the activity's box shows while no composed phrase stands behind it. */
+const ACTIVITY_EXAMPLE = 'Include the location, like “sketching at the Whitman Greenhouse”'
 
 /** The line under a renamable major's name. */
 const MAJOR_LINE = 'Renaming this major changes it for every character taking it.'
 
 /** What each fault says under the field it is in. */
 const FAULT_NOTES = {
-  repeated: 'This code is already used. The generated code will be kept.',
-  taken: 'This class code was used previously. The generated code will be kept.',
-  major: 'Another major already has this name. The generated name will be kept.',
-  handle: 'Handles need at least one letter. The generated handle will be kept.',
-  job: 'Pick how many shifts she works, or the generated job will be kept.',
-  activity: 'Describe the activity at its new place, or the generated activity will be kept.'
+  repeated: 'This code is already used. It will be overwritten with a generated one.',
+  taken: 'This class code was used in a previous semester. It will be overwritten with a generated one.',
+  major: 'Another major already has this name. It will be overwritten with a generated one.',
+  handle: 'Handles need at least one letter. It will be overwritten with a generated one.',
+  job: 'Please choose the number of shifts per week.',
+  activity: 'Please describe the activity.'
 } as const
 
 /** A course's kind as its select offers it. */
@@ -398,12 +398,13 @@ function PlansField({
  * plans and secrets, each as it will stand over what was composed for her.
  */
 const NewcomerPane = memo(function NewcomerPane({
-  charId,
+  character,
   faults
 }: {
-  charId: string
+  character: Character
   faults: readonly FinalFault[]
 }): JSX.Element | null {
+  const charId = character.charId
   const composed = useApplicationStore((s) => s.application?.composed)
   const changed = useApplicationStore((s) => s.application?.finalEdits?.girls?.[charId])
   const season = useApplicationStore((s) => s.application?.season ?? 'spring')
@@ -426,7 +427,7 @@ const NewcomerPane = memo(function NewcomerPane({
   const activity = changed?.activity !== undefined ? changed.activity : composedActivity
   // The composed phrase stands behind its box only while the activity is at the composed place.
   const samePlace = activity !== null && activity.location === composedActivity?.location
-  const doingPlaceholder = samePlace ? (composedActivity?.doing ?? '') : ''
+  const doingPlaceholder = (samePlace ? composedActivity?.doing : undefined) || ACTIVITY_EXAMPLE
   const lowerYear = (schedule?.year ?? 1) < 3
 
   return (
@@ -484,13 +485,16 @@ const NewcomerPane = memo(function NewcomerPane({
       </PaneSection>
 
       {haunts && (
-        <PaneSection title="Free time" lines={[ACTIVITY_LINE]}>
+        <PaneSection title="Free time">
           <div className="vu-entries-grid">
             <SelectField
               id="final-study"
               label="Studies at"
               value={study ?? 'none'}
-              options={[{ value: 'none', label: 'Her room' }, ...placeOptions(STUDY_LOCATIONS)]}
+              options={[
+                { value: 'none', label: `${pronounsOf(character).Their} room` },
+                ...placeOptions(STUDY_LOCATIONS)
+              ]}
               onChange={(value) => set({ study: value === 'none' ? null : value })}
             />
             <SelectField
@@ -536,18 +540,20 @@ const NewcomerPane = memo(function NewcomerPane({
                 set({ activity: { location: value, ...(written ? { doing: written } : {}) } })
               }}
             />
-            <TextField
-              id="final-activity-doing"
-              label="Describe the activity"
-              value={activity?.doing ?? ''}
-              placeholder={doingPlaceholder}
-              maxLength={120}
-              disabled={activity === null}
-              onChange={(value) => {
-                if (activity === null) return
-                set({ activity: { ...(activity.location ? { location: activity.location } : {}), doing: value } })
-              }}
-            />
+            <div className="vu-entries-wide">
+              <TextField
+                id="final-activity-doing"
+                label="Describe the activity"
+                value={activity?.doing ?? ''}
+                placeholder={doingPlaceholder}
+                maxLength={120}
+                disabled={activity === null}
+                onChange={(value) => {
+                  if (activity === null) return
+                  set({ activity: { ...(activity.location ? { location: activity.location } : {}), doing: value } })
+                }}
+              />
+            </div>
           </div>
           {faulted('activity') && <FaultNote id="final-activity-fault" text={FAULT_NOTES.activity} />}
         </PaneSection>
@@ -590,7 +596,12 @@ const ReturningPane = memo(function ReturningPane({ charId }: { charId: string }
 })
 
 /** A graduate: what she is doing now, and her break posts. */
-const GraduatePane = memo(function GraduatePane({ charId }: { charId: string }): JSX.Element | null {
+const GraduatePane = memo(function GraduatePane({
+  character
+}: {
+  character: Character
+}): JSX.Element | null {
+  const charId = character.charId
   const composed = useApplicationStore((s) => s.application?.composed)
   const changed = useApplicationStore((s) => s.application?.finalEdits?.girls?.[charId])
   const season = useApplicationStore((s) => s.application?.season ?? 'spring')
@@ -601,7 +612,7 @@ const GraduatePane = memo(function GraduatePane({ charId }: { charId: string }):
       <div className="vu-entries-column">
         <TextField
           id="final-pursuit"
-          label="What she's doing now"
+          label={`What ${character.firstName} is doing now`}
           value={changed?.pursuit ?? pursuit}
           placeholder={pursuit}
           maxLength={120}
@@ -677,11 +688,11 @@ function CharactersTab({
   if (hidden) {
     body = <p className="vu-entries-text">Content hidden to avoid spoilers. Click the eye icon to show.</p>
   } else if (kind === 'newcomer') {
-    body = <NewcomerPane charId={charId} faults={faults} />
+    body = <NewcomerPane character={open} faults={faults} />
   } else if (kind === 'returning') {
     body = <ReturningPane charId={charId} />
   } else if (kind === 'graduate') {
-    body = <GraduatePane charId={charId} />
+    body = <GraduatePane character={open} />
   }
   const pane = (
     <>

@@ -22,7 +22,7 @@ import type { TimeSlot } from '@shared/types'
 import { shiftWeekdayOf } from '../prompts/gameDate'
 import { placeClosedOn } from '../prompts/occasions'
 import { useGameStore } from './gameStore'
-import { localsAtLocation, workersAtLocation } from './loop/casting'
+import { localsAtLocation, resolveLocationId, workersAtLocation } from './loop/casting'
 import {
   castableIds,
   charAwayNow,
@@ -270,6 +270,15 @@ export function knownWhereabouts(date?: number, time?: TimeSlot): Whereabouts[] 
     return rank < 0 ? PLACE_ORDER.length : rank
   }
   return rows.sort((a, b) => rankOf(a.placeKey) - rankOf(b.placeKey))
+}
+
+/** Everyone the map shows this slot at the place a scene at `location` is set, told or remembered. */
+export function shownAt(location: string): string[] {
+  const resolved = resolveLocationId(location)
+  if (resolved === null) return []
+  return knownWhereabouts()
+    .filter((row) => placeDestination(row.placeKey) === resolved)
+    .map((row) => row.charId)
 }
 
 /**

@@ -15,8 +15,8 @@ export function endingArtExportName(bytes: Uint8Array): string {
   return `ending.${imageExtensionOf(bytes)}`
 }
 
-/** Nothing this app builds puts more than a full roster on one sheet. */
-const MAX_ENDING_FRIENDS = 12
+/** The most friends one sheet carries: the image model draws more than this unreliably. */
+export const MAX_ENDING_FRIENDS = 12
 
 /** Throws `ENDING_REQUEST_INVALID` unless `friendCount` and `sheet` can be sent to the model. */
 export function assertEndingRequest(friendCount: number, sheet: Uint8Array): void {

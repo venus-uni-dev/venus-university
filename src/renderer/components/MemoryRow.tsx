@@ -1,5 +1,6 @@
 import type { JSX, ReactNode } from 'react'
-import { MEMORY_TYPES, type MemoryType } from '@shared/types'
+import { fillPronouns } from '@shared/gender'
+import { MEMORY_TYPES, type Gender, type MemoryType } from '@shared/types'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { MaskedFace } from './Spoiler'
 import '../vu_styles/MemoryEdit.css'
@@ -9,6 +10,8 @@ export interface MemoryRowProps {
   id: string
   /** Her name as the reader may read it — already masked by the caller. */
   name: string
+  /** The gender of the one who remembers, for the controls' labels. */
+  gender: Gender
   /** Whose portrait opens the row; absent, the row opens on her name. */
   faceOf?: string
   /** Her portrait is behind New Game's mask. */
@@ -31,6 +34,7 @@ export interface MemoryRowProps {
 export function MemoryRow({
   id,
   name,
+  gender,
   faceOf,
   masked = false,
   type,
@@ -60,7 +64,7 @@ export function MemoryRow({
         <select
           id={`${id}-type`}
           className="vu-input vu-select"
-          aria-label="How she remembers it"
+          aria-label={fillPronouns('How {they} remembers it', gender)}
           value={type}
           onChange={(e) => {
             const picked = MEMORY_TYPES.find((memoryType) => memoryType === e.target.value)
@@ -79,7 +83,7 @@ export function MemoryRow({
         id={`${id}-desc`}
         className="vu-input vu-input--multiline vu-memrow-desc"
         rows={3}
-        aria-label="What she remembers"
+        aria-label={fillPronouns('What {they} remembers', gender)}
         value={desc}
         autoFocus={autoFocus}
         // The caret opens at the end of her words, where an edit to a line usually starts.

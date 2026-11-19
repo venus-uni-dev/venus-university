@@ -4,6 +4,7 @@
  * about a stat — the UI labels, the prompt phrasing and the status-message text alike.
  */
 
+import type { ReaderPronouns } from './gender'
 import { andList } from './sentences'
 import type { Polarity } from './types'
 
@@ -152,13 +153,20 @@ export function nextTierPoints(points: number): number {
   return pointsForTier(Math.min(tierOf(points) + 1, MAX_TIER) as StatTier)
 }
 
+/** The subject and verb that open each clause after the first of the reader's description. */
+const REST_CLAUSE: Readonly<Record<ReaderPronouns, string>> = {
+  he: 'he is',
+  she: 'she is',
+  they: 'they are'
+}
+
 /**
  * The `READER` block's description of the player, weakest stat to strongest. `but` separates
  * the stats at or under `Unremarkable` from the rest; a reader bad at nothing or at everything
  * gets none.
  */
-export function describePlayer(stats: PlayerStats): string {
-  return describeStats(stats, 'The reader is', 'he is')
+export function describePlayer(stats: PlayerStats, reader: ReaderPronouns): string {
+  return describeStats(stats, 'The reader is', REST_CLAUSE[reader])
 }
 
 /** The same description addressed to the player — the intro scroll's `"You're …"` line. */

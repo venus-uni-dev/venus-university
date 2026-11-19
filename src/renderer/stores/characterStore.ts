@@ -1,9 +1,10 @@
 import { create } from 'zustand'
+import { poseKeysFor } from '@shared/assetRules'
 import { bytesToBase64 } from '@shared/base64'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
 import { blankSheet, isWritten, withCharacterLora } from '@shared/characterRules'
 import type { DrawnLora } from '@shared/comfyModels'
-import { defaultTagsOf, type DefaultTags } from '@shared/defaultTags'
+import { defaultTagsOf, subjectTagsOf, type DefaultTags } from '@shared/defaultTags'
 import {
   customCgAfterEdit,
   withCustomCg,
@@ -12,6 +13,7 @@ import {
 } from '@shared/customCgs'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, isAppError, messageOf, toAppError } from '@shared/errors'
+import { genderOf } from '@shared/gender'
 import { cardFileName, spritePackFileName } from '@shared/sillyTavern'
 import type { PromptEdit } from '@shared/imagePrompt'
 import {
@@ -32,7 +34,8 @@ import {
   isCustomCgSlot,
   isPosition,
   isStockPosition,
-  STOCK_POSITIONS
+  STOCK_POSITIONS,
+  stockCgsFor
 } from '@shared/positions'
 import { withRegenEdit } from '@shared/regenTags'
 import type {
@@ -47,14 +50,15 @@ import type {
   CustomOutfitSlot,
   Emotion,
   ExpressionTarget,
+  Gender,
   GenerateOptions,
-  HandFixResult,
   OutfitSet,
   Position,
   ProfileCrop,
   ProfileCropInfo,
   ReferenceImage,
   RegenTarget,
+  RegionFixResult,
   RenderTarget,
   Result,
   SeededSet,
@@ -74,7 +78,7 @@ import {
   type CharacterDraft
 } from '../prompts/characterPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
-import { poseKeysOf, useAssetStore } from './assetStore'
+import { useAssetStore } from './assetStore'
 import { useGrabBagStore } from './grabBagStore'
 import { useJobStore } from './jobStore'
 import { imageUrl } from './imageUrl'
@@ -174,6 +178,13 @@ function positionOfTarget(target: RenderTarget): Position | undefined {
   if (!isCgTarget(target)) return undefined
   const position = target.slice(3)
   return isPosition(position) ? position : undefined
+}
+
+/** True for the stock CG set or one of its eight CGs. */
+function isStockCgTarget(target: RenderTarget): boolean {
+  if (target === 'cgs') return true
+  const position = positionOfTarget(target)
+  return position !== undefined && isStockPosition(position)
 }
 
 /** The sprite an {@link ExpressionTarget} names, or `undefined` for any other target. */
@@ -294,24 +305,26 @@ interface CharacterStoreState {
    * returns the records as written.
    */
   saveVoices: (roster: Character[], pitches: Record<string, number>) => Promise<Character[]>
-  /** Runs the whole Generate modal pipeline for a new character. */
+  /** Runs the whole Generate modal pipeline for a new character of `gender`. */
   generate: (
     firstName: string,
     lastName: string,
     prompt: string,
+    gender: Gender,
     namesAreSuggestions?: boolean,
     options?: GenerateOptions,
     reference?: ReferenceImage,
     lora?: CharacterLoraBrief
   ) => Promise<void>
   /**
-   * Creates a character straight from the New Character modal's fields, with no LLM call:
-   * her sheet is the player's own words, and her LoRA's, ready to fill in by hand.
+   * Creates a character of `gender` straight from the New Character modal's fields, with no LLM
+   * call: her sheet is the player's own words, and her LoRA's, ready to fill in by hand.
    */
   createBlank: (
     firstName: string,
     lastName: string,
     personality: string,
+    gender: Gender,
     lora?: CharacterLoraBrief
   ) => Promise<void>
   /**
@@ -377,7 +390,10 @@ interface CharacterStoreState {
   exportCard: (charId: string) => Promise<ExportOutcome>
   /** Composes a SillyTavern sprite pack for one character and saves it where the player picks. */
   exportSpritePack: (charId: string) => Promise<ExportOutcome>
-  /** Adopts a character zip picked through the native open dialog into the roster. */
+  /**
+   * Adopts a character zip, or every member of a pack that passes, picked through the native
+   * open dialog into the roster; true when anyone was added.
+   */
   importCharacter: () => Promise<boolean>
   /** Copies one character under a fresh id and splices the copy into the roster. */
   duplicateCharacter: (charId: string) => Promise<boolean>
@@ -421,9 +437,22 @@ interface CharacterStoreState {
     charId: string,
     set: OutfitSet | null,
     paintLayer: string
-  ) => Promise<HandFixResult | null>
+  ) => Promise<RegionFixResult | null>
   /** Stops a hand fix in flight, leaving the character's other work alone. */
   cancelHandFix: (charId: string, set: OutfitSet | null) => Promise<void>
+  /**
+   * Redraws what was painted or marked over one wardrobe's neutral sprite at `strength`,
+   * answering as `fixHands` does: the cutout and the region, or `null` where the job failed or
+   * was cancelled.
+   */
+  repaint: (
+    charId: string,
+    set: OutfitSet | null,
+    layers: { source: string; paint: string; mask: string },
+    strength: number
+  ) => Promise<RegionFixResult | null>
+  /** Stops a repaint in flight, leaving the character's other work alone. */
+  cancelRepaint: (charId: string, set: OutfitSet | null) => Promise<void>
   /** What the portrait modal opens on, or `null` where her sprite could not be read. */
   readProfileCrop: (charId: string) => Promise<ProfileCropInfo | null>
   /** Which of one character's room backgrounds are rendered, or `null` where that is unknown. */
@@ -618,13 +647,15 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     firstName,
     lastName,
     prompt,
+    gender,
     namesAreSuggestions = false,
     options = {},
     reference,
     lora
   ) => {
     // The folder is created before the LLM call, carrying the brief and the picture it was
-    // submitted with: a write cut short is resumed from her folder alone.
+    // submitted with and the gender on the record: a write cut short is resumed from her
+    // folder alone.
     const brief: CharacterBrief = {
       prompt,
       namesAreSuggestions,
@@ -635,6 +666,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const created = await window.api.chars.create(
       firstName.trim(),
       lastName.trim(),
+      gender,
       brief,
       reference
     )
@@ -663,22 +695,26 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     await runWritePipeline(charId, request, set, get)
   },
 
-  createBlank: async (firstName, lastName, personality, lora) => {
-    const pose = poseKeysOf(useAssetStore.getState().poses)[0]
+  createBlank: async (firstName, lastName, personality, gender, lora) => {
+    // The first of the poses drawn for her gender.
+    const pose = poseKeysFor(useAssetStore.getState().poses, gender)[0]
     if (pose === undefined) {
       useUiStore.getState().showError(NO_POSES)
       return
     }
 
     // No brief, no reference: a blank has nothing an interrupted run could resume from.
-    const created = await window.api.chars.create(firstName.trim(), lastName.trim())
+    const created = await window.api.chars.create(firstName.trim(), lastName.trim(), gender)
     if (!created.ok) {
       useUiStore.getState().showError(created.error)
       return
     }
 
     const sheet = blankSheet(created.data, personality, pose)
-    const { subject } = defaultTagsOf(useSettingsStore.getState().settings)
+    const subject = subjectTagsOf(
+      defaultTagsOf(useSettingsStore.getState().settings),
+      genderOf(created.data)
+    )
     const saved = await window.api.chars.update(
       lora ? withCharacterLora(sheet, lora, subject) : sheet
     )
@@ -907,7 +943,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const character = get().characters[charId]
     let base64: string
     try {
-      base64 = await composeSpritePack(charId)
+      base64 = await composeSpritePack(charId, character)
     } catch (err) {
       useUiStore.getState().showError(exportErrorOf(err))
       return 'failed'
@@ -933,8 +969,11 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     // A dismissed dialog: nothing was added.
     if (result.data === null) return false
 
-    await adoptCharacter(result.data, set)
-    return true
+    const { characters, refused } = result.data
+    for (const character of characters) await adoptCharacter(character, set)
+    // A pack's members that did not pass, the rest already in.
+    if (refused) useUiStore.getState().showError(refused)
+    return characters.length > 0
   },
 
   duplicateCharacter: async (charId) => {
@@ -1022,6 +1061,32 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
 
   cancelHandFix: async (charId, outfitSet) => {
     await window.api.jobs.cancelKeys(charId, [`hands:${outfitSet ?? 'default'}`])
+  },
+
+  repaint: async (charId, outfitSet, layers, strength) => {
+    const character = get().characters[charId]
+    if (!character) return null
+
+    // A fresh seed every press, recorded nowhere, as the hand fix rolls one.
+    const result = await window.api.comfy.repaint(
+      character,
+      outfitSet ?? 'default',
+      layers.source,
+      layers.paint,
+      layers.mask,
+      strength,
+      rerollSeed(character)
+    )
+    if (!result.ok) {
+      // A cancel is the player's own answer, not a failure to report.
+      if (result.error.code !== 'CANCELLED') useUiStore.getState().showError(result.error)
+      return null
+    }
+    return result.data
+  },
+
+  cancelRepaint: async (charId, outfitSet) => {
+    await window.api.jobs.cancelKeys(charId, [`repaint:${outfitSet ?? 'default'}`])
   },
 
   readProfileCrop: async (charId) => {
@@ -1380,7 +1445,10 @@ function rerollSeed(character: Character, chosen?: number): number {
   return seedsFrozen() ? character.generationSeed : (chosen ?? randomSeed())
 }
 
-/** The optional buckets a New Character run adds, in the order they render. */
+/**
+ * The optional buckets a New Character run adds, in the order they render; the stock CGs only
+ * for a character who has them.
+ */
 function optionalSpecs(
   character: Character,
   options: GenerateOptions,
@@ -1403,7 +1471,7 @@ function optionalSpecs(
   if (options.pe) specs.push(outfit('pe'))
   if (options.swim) specs.push(outfit('swim'))
   if (options.nude && !sfwWithholds('nude', noNsfwImages)) specs.push(outfit('nude'))
-  if (options.cgs && !sfwWithholds('cgs', noNsfwImages)) {
+  if (options.cgs && stockCgsFor(character) && !sfwWithholds('cgs', noNsfwImages)) {
     specs.push({ kind: 'cgs', positions: [...STOCK_POSITIONS], staged: true, ...plan('cgs') })
   }
   if (options.room) specs.push({ kind: 'room', variants: [...ROOM_VARIANTS], staged: true })
@@ -1546,17 +1614,21 @@ function specKeys(spec: RenderTaskSpec): readonly string[] {
   return spec.emotions
 }
 
-/** How many images a set would render if it started now — a queued bucket's denominator. */
+/**
+ * How many images a set would render if it started now — a queued bucket's denominator; none
+ * of the stock CGs for a character who has none.
+ */
 function plannedTotal(
   charId: string,
   target: RenderTarget,
   mode: RenderMode,
   get: () => CharacterStoreState
 ): number {
+  const state = get()
+  if (isStockCgTarget(target) && !stockCgsFor(state.characters[charId])) return 0
   // One image whichever mode asked: a re-roll replaces exactly the clicked sprite or CG.
   if (isExpressionTarget(target)) return 1
   if (isCgTarget(target)) return 1
-  const state = get()
   if (isCustomCgSlot(target)) {
     const pair = pairOf(target)
     return mode === 'regenerate' ? pair.length : pair.filter((p) => !state.cgs[charId]?.[p]).length
@@ -1645,7 +1717,7 @@ export function missingContentPlan(
           EMOTIONS.filter((emotion) => !state.outfits[charId]?.[slot]?.[emotion]).length
         )
       }
-      if (!sfwWithholds('cgs', gates.noNsfwImages)) {
+      if (stockCgsFor(character) && !sfwWithholds('cgs', gates.noNsfwImages)) {
         consider('cgs', STOCK_POSITIONS.filter((position) => !state.cgs[charId]?.[position]).length)
       }
       // The same for a CG pair: only a slot her record carries tags for.
@@ -1696,6 +1768,8 @@ async function planSpec(
 ): Promise<RenderTaskSpec | null> {
   const character = get().characters[charId]
   if (!character) return null
+  // The stock CGs, whole or one at a time, are rendered only for a character who has them.
+  if (isStockCgTarget(target) && !stockCgsFor(character)) return null
 
   // The seed the modal settled, a fresh one where it asked for one, and nothing without a modal.
   const chosen = edit === undefined ? undefined : (edit.seed ?? randomSeed())
@@ -1950,8 +2024,13 @@ async function runWritePipeline(
     }))
   }
 
+  // Her gender is read off the record before the prompt is built, so a resumed write keeps it.
+  const pending = get().characters[charId]
+  if (!pending) return
+  const gender = genderOf(pending)
+
   const poses = useAssetStore.getState().poses
-  if (Object.keys(poses).length === 0) {
+  if (poseKeysFor(poses, gender).length === 0) {
     fail(NO_POSES)
     return
   }
@@ -1960,6 +2039,7 @@ async function runWritePipeline(
     request.firstName,
     request.lastName,
     request.prompt,
+    gender,
     poses,
     useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS),
     request.namesAreSuggestions,
@@ -1984,8 +2064,11 @@ async function runWritePipeline(
   const character = get().characters[charId]
   if (!character) return
 
-  // The subject tags in force as her sheet lands.
-  const { subject } = defaultTagsOf(useSettingsStore.getState().settings)
+  // The subject tags in force for her gender as her sheet lands.
+  const subject = subjectTagsOf(
+    defaultTagsOf(useSettingsStore.getState().settings),
+    genderOf(character)
+  )
   const written = draftToCharacter(character, drafted.data, poses, subject)
   const filled = request.lora ? withCharacterLora(written, request.lora, subject) : written
   const missing = missingRequiredFields(filled, subject)
@@ -2748,25 +2831,66 @@ type ManageOrderState = Pick<
   'characters' | 'order' | 'removedDefaults' | 'pregenIds' | 'progress'
 >
 
-/**
- * The Manage grid's order: in-flight run first, newest-write-first own characters, then shipped
- * last. **Both keys turn over only on a run start/end or a file write, never a progress tick**,
- * so nothing shuffles under the cursor mid-render.
- */
-export function manageOrderOf(state: ManageOrderState): string[] {
-  const running: string[] = []
-  const own: string[] = []
-  const shipped: string[] = []
+/** The orders a character grid can be sorted in. */
+export type CharacterSort = 'recent' | 'firstName' | 'girlsFirst' | 'guysFirst' | 'customFirst'
 
+/** Two names compared as a reader would: case and accents aside, digits by value. */
+function compareNames(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+}
+
+/**
+ * `ids` in the order `sort` names. Every order falls back on first name, then surname, then
+ * charId, so equal keys come out the same way every time; a blank first name sorts after every
+ * named character. A file with no `updatedAt` — the shipped cast unedited, or one written before
+ * the field — reads as the oldest.
+ */
+export function sortCharacterIds(
+  ids: readonly string[],
+  characters: Record<string, Character>,
+  pregenIds: readonly string[],
+  sort: CharacterSort
+): string[] {
+  const stampOf = (charId: string): number => characters[charId]?.updatedAt ?? 0
+  const isGuy = (charId: string): number => (genderOf(characters[charId]) === 'male' ? 1 : 0)
+  const isShipped = (charId: string): number => (pregenIds.includes(charId) ? 1 : 0)
+
+  const byName = (a: string, b: string): number => {
+    const first = characters[a]?.firstName.trim() ?? ''
+    const other = characters[b]?.firstName.trim() ?? ''
+    if (!first !== !other) return first ? -1 : 1
+    return (
+      compareNames(first, other) ||
+      compareNames(characters[a]?.lastName.trim() ?? '', characters[b]?.lastName.trim() ?? '') ||
+      (a < b ? -1 : a > b ? 1 : 0)
+    )
+  }
+  const byStamp = (a: string, b: string): number => stampOf(b) - stampOf(a) || byName(a, b)
+
+  const compare: Record<CharacterSort, (a: string, b: string) => number> = {
+    recent: byStamp,
+    firstName: byName,
+    girlsFirst: (a, b) => isGuy(a) - isGuy(b) || byName(a, b),
+    guysFirst: (a, b) => isGuy(b) - isGuy(a) || byName(a, b),
+    customFirst: (a, b) => isShipped(a) - isShipped(b) || byStamp(a, b)
+  }
+  return [...ids].sort(compare[sort])
+}
+
+/**
+ * The Manage grid's order: a run in flight first, in roster order, so a character just started
+ * never lands in the middle of the grid; then everybody else as `sort` names. **The keys turn
+ * over only on a run start/end or a file write, never a progress tick**, so nothing shuffles
+ * under the cursor mid-render.
+ */
+export function manageOrderOf(state: ManageOrderState, sort: CharacterSort): string[] {
+  const running: string[] = []
+  const rest: string[] = []
   for (const charId of visibleOrderOf(state)) {
     if (isInFlight(state.progress[charId])) running.push(charId)
-    else if (isPregenOf(state, charId)) shipped.push(charId)
-    else own.push(charId)
+    else rest.push(charId)
   }
-
-  // Stable, so equal stamps keep roster order; a file written before `updatedAt` is oldest.
-  own.sort((a, b) => (state.characters[b]?.updatedAt ?? 0) - (state.characters[a]?.updatedAt ?? 0))
-  return [...running, ...own, ...shipped]
+  return [...running, ...sortCharacterIds(rest, state.characters, state.pregenIds, sort)]
 }
 
 /** True when every one of a set's seven sprites is on disk — a partial set is none. */

@@ -117,18 +117,51 @@ describe('withFiredEvent', () => {
 })
 
 describe('the present she brings', () => {
-  it('draws only unisex items under her tier’s price, and anything at devoted', () => {
-    const friendly = receivedGiftPool('friendly')
+  it('draws under her tier’s price only what is made for anybody or for the reader’s gender', () => {
+    const friendly = receivedGiftPool('friendly', 'male', false)
     expect(friendly.length).toBeGreaterThan(0)
-    expect(friendly.every((item) => item.unisex === true && item.price < 60)).toBe(true)
-    expect(receivedGiftPool('devoted').some((item) => item.price >= 150)).toBe(true)
-    expect(receivedGiftPool('devoted').map((item) => item.id)).not.toContain('veridan_lingerie_set')
-    expect(itemDefOf('veridan_lingerie_set')).toBeDefined()
+    expect(
+      friendly.every((item) => (item.madeFor ?? 'male') === 'male' && item.price < 60)
+    ).toBe(true)
+    expect(receivedGiftPool('devoted', 'male', false).some((item) => item.price >= 150)).toBe(true)
+
+    const ids = (reader: 'female' | 'male' | null) =>
+      receivedGiftPool('devoted', reader, false).map((item) => item.id)
+    expect(itemDefOf('cedar_noir_cologne')?.madeFor).toBe('male')
+    expect(ids('male')).toContain('cedar_noir_cologne')
+    expect(ids('female')).not.toContain('cedar_noir_cologne')
+    expect(ids(null)).not.toContain('cedar_noir_cologne')
+    expect(ids('female')).toContain('diamond_necklace')
+    expect(receivedGiftPool('devoted', null, true).every((item) => item.madeFor === undefined)).toBe(
+      true
+    )
+  })
+
+  it('brings an intimate item only as his lover', () => {
+    expect(itemDefOf('veridan_lingerie_set')?.intimate).toBe(true)
+    expect(itemDefOf('dreams_satin_boxers')?.intimate).toBe(true)
+    for (const reader of ['female', 'male'] as const) {
+      expect(receivedGiftPool('devoted', reader, false).some((item) => item.intimate)).toBe(false)
+      expect(receivedGiftPool('devoted', reader, true).some((item) => item.intimate)).toBe(true)
+    }
+    expect(receivedGiftPool('devoted', 'female', true).map((item) => item.id)).toContain(
+      'veridan_lingerie_set'
+    )
+    expect(receivedGiftPool('devoted', 'male', true).map((item) => item.id)).not.toContain(
+      'veridan_lingerie_set'
+    )
   })
 
   it('grows with her tier and with being his lover', () => {
-    const base = receivedGiftChance({ invite: 'hisRoom', disposition: 'friendly', lover: false })
-    expect(receivedGiftChance({ invite: 'hisRoom', disposition: 'devoted', lover: true })).toBeCloseTo(
+    const base = receivedGiftChance({
+      invite: 'hisRoom',
+      disposition: 'friendly',
+      lover: false,
+      reader: 'male'
+    })
+    expect(
+      receivedGiftChance({ invite: 'hisRoom', disposition: 'devoted', lover: true, reader: 'male' })
+    ).toBeCloseTo(
       base * 2.5
     )
   })

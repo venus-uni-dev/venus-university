@@ -1,11 +1,13 @@
 import { messageOf } from '@shared/errors'
+import { endingPictureMaxOf } from '@shared/settingsRules'
 import { loadWardrobeImage } from '../characterStore'
 import { stitchLineup } from '../lineupSheet'
 import { useGameStore } from '../gameStore'
 import { retrySilently } from '../silentRetry'
+import { useSettingsStore } from '../settingsStore'
 import { useUiStore } from '../uiStore'
 import { armEndingPosts } from './endingPosts'
-import { friendCharIds } from './farewells'
+import { closestFriendCharIds } from './farewells'
 import { writeEpilogueSave } from './saves'
 import { currentRun, loopState, runStale, LOOP_LLM_GROUP } from './state'
 
@@ -127,7 +129,9 @@ async function fetchEndingArt(charIds: readonly string[], reuse: boolean): Promi
 function armEndingArt(): void {
   if (loopState.endingArt) return
   const game = useGameStore.getState()
-  const friends = friendCharIds()
+  const friends = closestFriendCharIds(
+    endingPictureMaxOf(useSettingsStore.getState().settings ?? {})
+  )
   if (friends.length === 0) return
 
   const reuse = game.endingArtWanted

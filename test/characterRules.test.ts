@@ -6,11 +6,29 @@ import {
   readCharacterRecord,
   withCharacterLora
 } from '@shared/characterRules'
-import { SUBJECT_TAGS } from '@shared/defaultTags'
+import { MALE_SUBJECT_TAGS, SUBJECT_TAGS } from '@shared/defaultTags'
 import { EMOTIONS } from '@shared/emotions'
 import { defaultSpriteScale } from '@shared/spriteScale'
 import type { CharacterLoraBrief } from '@shared/types'
 import { character } from './fixtures'
+
+/**
+ * `newCharacter` writes the gender every later render and prompt reads off her record, and that
+ * nothing ever rewrites: a girl's record carries no key for it, so the shipped cast reads alike.
+ */
+
+describe('newCharacter', () => {
+  it('writes the gender only for a guy, each opening on its own subject tags', () => {
+    const guy = newCharacter('Tom', 'Lee', 'male', MALE_SUBJECT_TAGS)
+    expect(guy.gender).toBe('male')
+    expect(guy.baseAppearance).toEqual([...MALE_SUBJECT_TAGS])
+    expect(readCharacterRecord(guy, 'x').character.gender).toBe('male')
+
+    const girl = newCharacter('Ann', 'Lee', 'female', SUBJECT_TAGS)
+    expect('gender' in girl).toBe(false)
+    expect(girl.baseAppearance).toEqual(['1girl', 'mature_female'])
+  })
+})
 
 /**
  * `blankSheet` is the one place a Skip-LLM character becomes a sheet the player can open and
@@ -19,7 +37,7 @@ import { character } from './fixtures'
 
 describe('blankSheet', () => {
   it('writes a blank, unbriefed sheet the player fills in by hand', () => {
-    const character = newCharacter('Ann', 'Lee', SUBJECT_TAGS, {
+    const character = newCharacter('Ann', 'Lee', 'female', SUBJECT_TAGS, {
       prompt: 'x',
       namesAreSuggestions: false,
       options: {},
@@ -71,7 +89,7 @@ describe('withCharacterLora', () => {
     expect(merged.baseAppearance).toEqual(['1girl', 'mature_female', 'anav2', 'silver_hair'])
     expect(merged.outfit).toEqual(['red_coat'])
     expect(merged.lora).toEqual({ name: 'ana.safetensors', weight: 0.8 })
-    expect(merged.height).toBe(defaultSpriteScale(merged.baseAppearance))
+    expect(merged.height).toBe(defaultSpriteScale(merged.baseAppearance, 'female'))
   })
 
   it('puts the player tags in front of what was written where it adds, without repeats', () => {
@@ -91,6 +109,17 @@ describe('withCharacterLora', () => {
     // The default weight is no weight at all, so a later default reaches her.
     expect(merged.lora).toEqual({ name: 'ana.safetensors' })
   })
+
+  it('strips a guy’s shipped subject tags with the ones in force, opening on the latter', () => {
+    const guy = character({
+      gender: 'male',
+      baseAppearance: ['1boy', 'male_focus', 'black_hair'],
+      outfit: []
+    })
+    const merged = withCharacterLora(guy, brief({ trigger: 'tomv1', replace: false }), ['1boy'])
+    expect(merged.baseAppearance).toEqual(['1boy', 'tomv1', 'black_hair'])
+    expect(merged.height).toBe(defaultSpriteScale(merged.baseAppearance, 'male'))
+  })
 })
 
 /**
@@ -101,7 +130,7 @@ describe('withCharacterLora', () => {
 describe('readCharacterRecord', () => {
   /** A written record at `schemaVersion`, with only the appearance the test gives her. */
   function stored(schemaVersion: number, baseAppearance: string[]): unknown {
-    return { ...newCharacter('Ann', 'Lee', SUBJECT_TAGS), schemaVersion, baseAppearance }
+    return { ...newCharacter('Ann', 'Lee', 'female', SUBJECT_TAGS), schemaVersion, baseAppearance }
   }
 
   it('reads a version-2 record as version 3, the subject tags in front of her appearance', () => {

@@ -2,7 +2,7 @@ import { useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { gestures, quietLift, quietPress } from '../views/motion'
 import { CheckIcon, CopyIcon } from '../views/screenIcons'
-import { ChipListInput } from './ChipListInput'
+import { ChipListInput, tagLabel } from './ChipListInput'
 
 /** One modal's copy marks: which of its wells was copied last, and the copy itself. */
 export interface CopyMark {
@@ -17,8 +17,9 @@ export interface CopyMark {
 export function useCopyMark(): CopyMark {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const copy = (id: string, values: readonly string[]): void => {
-    // Joined as a well splits a paste, so the text lands back as the same tags.
-    void navigator.clipboard.writeText(values.join(', ')).then(
+    // As the well shows them, joined as a well splits a paste, so the text lands back as the
+    // same tags.
+    void navigator.clipboard.writeText(values.map(tagLabel).join(', ')).then(
       () => setCopiedId(id),
       // Clipboard permission can be refused.
       () => setCopiedId(null)

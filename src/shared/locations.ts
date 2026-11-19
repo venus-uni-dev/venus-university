@@ -138,7 +138,7 @@ export const LOCATIONS: readonly LocationDef[] = [
   },
   {
     id: 'lowrise_dorms',
-    label: 'her dorm',
+    label: 'the dorms',
     blurb: 'a multi-building student dorm complex with shared kitchens, lounges and courtyards',
     icon: '🏘️',
     onCampus: true

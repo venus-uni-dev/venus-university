@@ -15,11 +15,15 @@ import {
   MANIFEST_MISSING,
   MANIFEST_NAME,
   MANIFEST_UNREADABLE,
+  memberName,
+  packMembers,
+  packRefusal,
   portableOf,
   readManifestRecord,
-  stripWrapper
+  stripWrapper,
+  type RefusedMember
 } from '@shared/characterTransfer'
-import { appError, messageOf } from '@shared/errors'
+import { appError, messageOf, toAppError } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import { randomId } from '@shared/uuid'
 import {
@@ -27,9 +31,10 @@ import {
   checkZipListing,
   MAX_ZIP_BYTES,
   MAX_ZIP_ENTRIES,
+  PACK_ZIP_LIMITS,
   type ZipEntry
 } from '@shared/zipRules'
-import type { Character } from '@shared/types'
+import type { Character, CharacterImport } from '@shared/types'
 import { imageBlob } from './blob'
 import { getCharacter } from './chars'
 import { adoptCharacter, type FileWrite } from './db/chars'
@@ -95,6 +100,26 @@ function listingOf(bytes: Uint8Array): ZipEntry[] {
   return entries
 }
 
+/** The archive's listing, or the error saying it could not be read. */
+function readListing(bytes: Uint8Array): ZipEntry[] {
+  try {
+    return listingOf(bytes)
+  } catch (err) {
+    throw appError('ZIP_LIST_FAILED', 'That zip could not be read.', messageOf(err))
+  }
+}
+
+/** Refuses a listing by the same rules the desktop's unpacker refuses one by. */
+function checkListing(
+  entries: readonly ZipEntry[],
+  limits: { maxEntries: number; maxTotalBytes: number }
+): void {
+  const reason = checkZipListing(entries, limits)
+  if (reason !== null) {
+    throw appError('ZIP_REFUSED', 'That archive holds something it may not.', reason)
+  }
+}
+
 /** Reads one archive, refusing it by the same rules the desktop's unpacker refuses one by. */
 export function openArchive(
   bytes: Uint8Array,
@@ -103,17 +128,7 @@ export function openArchive(
     maxTotalBytes: MAX_ZIP_BYTES
   }
 ): Record<string, Uint8Array> {
-  let entries: ZipEntry[]
-  try {
-    entries = listingOf(bytes)
-  } catch (err) {
-    throw appError('ZIP_LIST_FAILED', 'That zip could not be read.', messageOf(err))
-  }
-
-  const reason = checkZipListing(entries, limits)
-  if (reason !== null) {
-    throw appError('ZIP_REFUSED', 'That archive holds something it may not.', reason)
-  }
+  checkListing(readListing(bytes), limits)
 
   try {
     return unzipSync(bytes)
@@ -195,8 +210,14 @@ function imagesOf(entries: Record<string, Uint8Array>): FileWrite[] {
   return files
 }
 
-/** Adopts a package's character under a fresh identity and keeps every image it carries. */
-async function adoptPackage(entries: Record<string, Uint8Array>): Promise<Character> {
+/**
+ * Adopts a package's character under a fresh identity, stamped `adoptedAt`, and keeps every
+ * image it carries.
+ */
+async function adoptPackage(
+  entries: Record<string, Uint8Array>,
+  adoptedAt: number
+): Promise<Character> {
   const marker = entries[MANIFEST_NAME]
   readManifestRecord(
     readJsonEntry(marker, marker ? MANIFEST_UNREADABLE : MANIFEST_MISSING, MANIFEST_NAME),
@@ -214,20 +235,61 @@ async function adoptPackage(entries: Record<string, Uint8Array>): Promise<Charac
   ).character
 
   // The id is minted here, never read off the package.
-  const character = adoptStamp({ ...record, charId }, Date.now())
+  const character = adoptStamp({ ...record, charId }, adoptedAt)
   await adoptCharacter(character, imagesOf(entries))
   forgetImages(charId)
   return character
 }
 
-/** Picks a character zip and adopts it; `null` means the picker was dismissed. */
-export async function importCharacter(): Promise<Character | null> {
+/** Adopts one character zip's character, stamped `adoptedAt`. */
+async function importPackage(bytes: Uint8Array, adoptedAt: number): Promise<Character> {
+  const entries = unwrapped(openArchive(bytes))
+  checkArchiveContent(entries, classifyImportEntry, 'export')
+  return adoptPackage(entries, adoptedAt)
+}
+
+/**
+ * Adopts every member of a pack that passes, in name order, and names the rest in one error.
+ * Each member is pulled out of the pack on its own, so only one is held beside the pack at once.
+ */
+async function importPack(
+  bytes: Uint8Array,
+  listing: readonly ZipEntry[],
+  members: readonly string[]
+): Promise<CharacterImport> {
+  checkListing(listing, PACK_ZIP_LIMITS)
+
+  const characters: Character[] = []
+  const refused: RefusedMember[] = []
+  const start = Date.now()
+  for (const [i, member] of members.entries()) {
+    try {
+      const data = unzipSync(bytes, { filter: (file) => file.name === member })[member]
+      characters.push(await importPackage(data, start + i))
+    } catch (err) {
+      const error = toAppError(err, 'IMPORT_FAILED')
+      console.warn(`[transfer] refused ${memberName(member)}: ${error.code} ${error.message}`)
+      refused.push({ name: memberName(member), error })
+    }
+  }
+  return { characters, refused: packRefusal(members.length, refused) }
+}
+
+/**
+ * Picks a character zip, or a pack of them, and adopts what it holds; `null` means the picker
+ * was dismissed.
+ */
+export async function importCharacter(): Promise<CharacterImport | null> {
   const file = await pickFile(`.zip,${ZIP_TYPE}`)
   if (!file) return null
 
-  const entries = unwrapped(openArchive(new Uint8Array(await file.arrayBuffer())))
-  checkArchiveContent(entries, classifyImportEntry, 'export')
-  return adoptPackage(entries)
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const listing = readListing(bytes)
+  const members = packMembers(listing.map((entry) => entry.path))
+  if (members === null) {
+    return { characters: [await importPackage(bytes, Date.now())], refused: null }
+  }
+  return importPack(bytes, listing, members)
 }
 
 /** Copies one character under a fresh identity — the import path with the zip taken out. */

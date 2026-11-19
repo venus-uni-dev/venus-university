@@ -16,9 +16,9 @@ export const BRUSH_NUDGE = 4
 /** How far Zoom in magnifies the stage. */
 export const REPAIR_ZOOM = 3
 
-/** A repair canvas's undo and redo, a whole frame a step. */
+/** A repair's undo and redo, a whole frame of every layer a step. */
 export interface CanvasHistory {
-  /** Remembers the canvas as it is now, so the stroke about to be made can be undone. */
+  /** Remembers the layers as they are now, so the stroke about to be made can be undone. */
   snapshot: () => void
   undo: () => void
   redo: () => void
@@ -28,33 +28,53 @@ export interface CanvasHistory {
   isDirty: () => boolean
 }
 
+/** One layer a repair paints on. */
+type CanvasRef = RefObject<HTMLCanvasElement | null>
+
+/** One step: each layer's frame, in the order the refs were given, or null for one not mounted. */
+type Step = ReadonlyArray<ImageData | null>
+
 /**
- * Undo and redo over one canvas, by snapshot. `onRestore` runs after either has put a frame
- * back, so the caller can redraw or report from it.
+ * Undo and redo over one or more canvases, by snapshot: a stroke on any of them is one step
+ * for all, so a repair that paints two layers takes a stroke back whichever it landed on.
+ * `onRestore` runs after either has put a frame back, so the caller can redraw or report from it.
  */
 export function useCanvasHistory(
-  canvasRef: RefObject<HTMLCanvasElement | null>,
+  canvasRefs: CanvasRef | readonly CanvasRef[],
   onRestore: () => void
 ): CanvasHistory {
-  const undoStack = useRef<ImageData[]>([])
-  const redoStack = useRef<ImageData[]>([])
+  const undoStack = useRef<Step[]>([])
+  const redoStack = useRef<Step[]>([])
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
-  // Re-pointed every render, so a restore reads the caller's latest state.
+  // Re-pointed every render, so a restore reads the caller's latest state and layers.
   const restored = useRef(onRestore)
   restored.current = onRestore
+  const refs = useRef<readonly CanvasRef[]>([])
+  refs.current = Array.isArray(canvasRefs) ? canvasRefs : [canvasRefs]
 
-  const frameOf = (): { ctx: CanvasRenderingContext2D; frame: ImageData } | null => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return null
-    return { ctx, frame: ctx.getImageData(0, 0, canvas.width, canvas.height) }
+  const contexts = (): Array<CanvasRenderingContext2D | null> =>
+    refs.current.map((ref) => ref.current?.getContext('2d') ?? null)
+
+  const capture = (): Step | null => {
+    const ctxs = contexts()
+    if (ctxs.every((ctx) => ctx === null)) return null
+    return ctxs.map((ctx) =>
+      ctx ? ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height) : null
+    )
+  }
+
+  const put = (step: Step): void => {
+    contexts().forEach((ctx, index) => {
+      const frame = step[index]
+      if (ctx && frame) ctx.putImageData(frame, 0, 0)
+    })
   }
 
   const snapshot = (): void => {
-    const now = frameOf()
+    const now = capture()
     if (!now) return
-    undoStack.current.push(now.frame)
+    undoStack.current.push(now)
     if (undoStack.current.length > UNDO_DEPTH) undoStack.current.shift()
     // A new stroke is a new branch: what was undone is not coming back after it.
     redoStack.current = []
@@ -63,23 +83,23 @@ export function useCanvasHistory(
   }
 
   const undo = (): void => {
-    const now = frameOf()
+    const now = capture()
     const back = undoStack.current.pop()
     if (!now || !back) return
-    redoStack.current.push(now.frame)
+    redoStack.current.push(now)
     if (redoStack.current.length > UNDO_DEPTH) redoStack.current.shift()
-    now.ctx.putImageData(back, 0, 0)
+    put(back)
     setCanUndo(undoStack.current.length > 0)
     setCanRedo(true)
     restored.current()
   }
 
   const redo = (): void => {
-    const now = frameOf()
+    const now = capture()
     const forward = redoStack.current.pop()
     if (!now || !forward) return
-    undoStack.current.push(now.frame)
-    now.ctx.putImageData(forward, 0, 0)
+    undoStack.current.push(now)
+    put(forward)
     setCanUndo(true)
     setCanRedo(redoStack.current.length > 0)
     restored.current()

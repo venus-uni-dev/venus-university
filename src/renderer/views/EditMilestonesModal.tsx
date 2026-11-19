@@ -7,6 +7,7 @@ import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
+import { genderOf } from '@shared/gender'
 import { globalSlotOf } from '@shared/jobs'
 import {
   EDIT_MILESTONES,
@@ -103,7 +104,7 @@ export function EditMilestonesModal({
             <CheckField
               key={key}
               id={`edit-milestone-${key}`}
-              label={milestoneLabel(key, name)}
+              label={milestoneLabel(key, name, genderOf(character))}
               checked={picked[key]}
               disabled={key in locked}
               onChange={(checked) => setPicked(withEditMilestone(picked, key, checked, standing))}

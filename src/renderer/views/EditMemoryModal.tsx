@@ -7,7 +7,9 @@ import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 
+import { genderOf } from '@shared/gender'
 import { storedMemoryDesc } from '@shared/readerVoice'
+import { rewordedMemory } from '@shared/relationship'
 import type { CharMemory } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { MemoryRow } from '../components/MemoryRow'
@@ -38,25 +40,27 @@ export function EditMemoryModal({
   memory,
   onClose
 }: EditMemoryModalProps): JSX.Element | null {
+  const holder = genderOf(useGameStore((s) => s.characters[charId]))
+  const pronouns = useGameStore((s) => s.playerPronouns)
   const [type, setType] = useState(memory.type)
   // Opens in the reader's voice, the one it is filed in, whichever voice it was written in.
-  const [desc, setDesc] = useState(() => storedMemoryDesc(memory.desc))
+  const [desc, setDesc] = useState(() => storedMemoryDesc(memory.desc, holder, pronouns))
   const blank = desc.trim() === ''
   // The gate in front of leaving with the verb or the words changed.
   const [closing, setClosing] = useState(false)
 
   /** The gate in front of leaving, asked on Cancel, on Escape and on an outside click alike. */
   function requestClose(): void {
-    if (type !== memory.type || desc !== storedMemoryDesc(memory.desc)) setClosing(true)
-    else onClose()
+    if (type !== memory.type || desc !== storedMemoryDesc(memory.desc, holder, pronouns)) {
+      setClosing(true)
+    } else onClose()
   }
 
-  /** Save: a blank line saves nothing. */
+  /** Save: a blank line saves nothing, and new words leave the ledger's second person behind. */
   function save(): void {
     if (blank) return
-    useGameStore
-      .getState()
-      .replaceMemory(charId, memory, { ...memory, type, desc: storedMemoryDesc(desc) })
+    const next = rewordedMemory(memory, type, storedMemoryDesc(desc, holder, pronouns))
+    useGameStore.getState().replaceMemory(charId, memory, next)
     onClose()
   }
 
@@ -99,6 +103,7 @@ export function EditMemoryModal({
           <MemoryRow
             id="edit-memory-row"
             name={name}
+            gender={holder}
             type={type}
             desc={desc}
             onType={setType}

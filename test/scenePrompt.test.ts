@@ -10,6 +10,7 @@ import {
   shortenSceneSoFar,
   type PromptState
 } from '../src/renderer/prompts/scenePrompt'
+import { DEFAULT_ROMANCE } from '@shared/relationship'
 import { cgAction } from '@shared/sceneActions'
 import { calendarOf } from '@shared/semesters'
 import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
@@ -57,7 +58,9 @@ function promptState() {
     cgReady: {},
     customCgReady: {},
     outfitReady: {},
-    roomReady: {}
+    roomReady: {},
+    romance: DEFAULT_ROMANCE,
+    readerPronouns: 'he' as const
   }
 }
 

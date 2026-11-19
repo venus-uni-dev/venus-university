@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { kindSentenceOf } from '@shared/academics'
 import { FINAL_DATE, TIME_SLOTS } from '@shared/classes'
 import { jobDefOf, shiftSlotOf, WEEK_COLUMNS, WEEK_DAY_HEADERS } from '@shared/jobs'
+import { namedReader } from '@shared/readerVoice'
 import type { GameReplays } from '@shared/replays'
 import {
   semesterCalendarOf,
@@ -285,6 +286,7 @@ export function CalendarModal({
   const chars = useGameStore((s) => s.chars)
   const charInfo = useGameStore((s) => s.charInfo)
   const history = useGameStore((s) => s.history)
+  const readerName = useGameStore((s) => s.playerFirstName)
   const replays = useGameStore((s) => s.replays)
   const characters = useGameStore((s) => s.characters)
   const events = useGameStore((s) => s.events)
@@ -490,13 +492,14 @@ export function CalendarModal({
   function halfOf(time: TimeSlot): JSX.Element {
     const timed = occasionsFor(selected, day).filter((occasion) => occasion.time === time)
 
-    // A day already played reads back what happened in that slot, and offers it again where a
-    // replay of it is kept.
+    // A day already played reads back what happened in that slot, the reader by his name, and
+    // offers it again where a replay of it is kept.
     if (selected < todayOn(day)) {
+      const recap = day.history[selected]?.[time]
       return (
         <>
           {timed.map(occasionCard)}
-          <Quiet>{day.history[selected]?.[time] ?? 'Nothing recorded.'}</Quiet>
+          <Quiet>{recap === undefined ? 'Nothing recorded.' : namedReader(recap, readerName)}</Quiet>
           {replayRow(time)}
         </>
       )

@@ -1,17 +1,26 @@
 import { dormSpotLabel } from '@shared/dorms'
+import { genderOf, PRONOUNS } from '@shared/gender'
 import { locationLabel, ROOM_LOCATION } from '@shared/locations'
 import {
+  isHappyCouple,
+  isNpcMeeting,
   npcBestFriendOf,
+  npcCrushesOf,
   npcPairOf,
+  npcPartnersOf,
   zoneOf,
   type NpcEncounter,
+  type NpcMeeting,
+  type NpcRelationship,
   type NpcRelationshipMap
 } from '@shared/npcRelationships'
+import { andList } from '@shared/sentences'
 import {
   fullNameOf,
   type Character,
   type CharacterBehavior,
   type ClassEntry,
+  type Gender,
   type Haunt,
   type TimeSlot
 } from '@shared/types'
@@ -35,9 +44,12 @@ function whenClause(date: number, today: number): string {
 
 /**
  * `"at the BTB Arcade"`, `"in Chloe's room"`, `"in Western Civ"`, `"in the Lowrise kitchen"`.
+ * A room whose host is not on hand is one of the pair's: "her room" or "his room" when the two
+ * share a pronoun, "one of their rooms" when they don't.
  */
 function whereClause(
-  encounter: NpcEncounter,
+  encounter: NpcMeeting,
+  pair: readonly [Character, Character],
   classes: Record<string, ClassEntry>,
   characters: Record<string, Character>
 ): string {
@@ -49,12 +61,67 @@ function whereClause(
   }
   if (encounter.ref === ROOM_LOCATION) {
     const host = encounter.roomOf ? characters[encounter.roomOf] : undefined
-    return host ? `in ${host.firstName}'s room` : 'in her room'
+    if (host) return `in ${host.firstName}'s room`
+    const [a, b] = pair.map(genderOf)
+    return a === b ? `in ${PRONOUNS[a].their} room` : 'in one of their rooms'
   }
   return `at ${locationLabel(encounter.ref)}`
 }
 
-/** The one sentence about a pair. */
+/** `"Ren and Celest are dating."`, or rocky, in place of the zone while the two are a couple. */
+function datingSentence(names: string, pair: NpcRelationship, today: number): string {
+  return isHappyCouple(pair, today)
+    ? `${names} are dating.`
+    : `${names} are dating, but things are rocky.`
+}
+
+/** The zone sentence alone. */
+function zoneSentence(names: string, pair: NpcRelationship): string {
+  const zone = zoneOf(pair.affinity)
+  if (zone === 'friends') return `${names} are friends.`
+  if (zone === 'enemies') return `${names} are enemies.`
+  return `${names} know each other but aren't close.`
+}
+
+/** One sentence for each of the two who holds a crush on the other, `a` first. */
+function crushSentences(a: Character, b: Character, pair: NpcRelationship): string[] {
+  return [
+    ...(pair.crush?.includes(a.charId) ? [`${a.firstName} has a crush on ${b.firstName}.`] : []),
+    ...(pair.crush?.includes(b.charId) ? [`${b.firstName} has a crush on ${a.firstName}.`] : [])
+  ]
+}
+
+/** One sentence for each of the two found cheating on the other with the reader, `a` first, except `told`. */
+function cheatedSentences(
+  a: Character,
+  b: Character,
+  pair: NpcRelationship,
+  told?: string
+): string[] {
+  const cheated = pair.cheated
+  if (!cheated) return []
+  return [
+    ...(a.charId in cheated && a.charId !== told
+      ? [`${a.firstName} has cheated on ${b.firstName} before.`]
+      : []),
+    ...(b.charId in cheated && b.charId !== told
+      ? [`${b.firstName} has cheated on ${a.firstName} before.`]
+      : [])
+  ]
+}
+
+/**
+ * The pair's last event while it is still worth mentioning, or null. Older than
+ * {@link ENCOUNTER_DAYS} and it is just history.
+ */
+function freshEncounterOf(pair: NpcRelationship, today: number): NpcEncounter | null {
+  const encounter = pair.encounter
+  return encounter && today - encounter.date <= ENCOUNTER_DAYS && today - encounter.date >= 0
+    ? encounter
+    : null
+}
+
+/** The one sentence about a pair: where they stand, what last happened, and who likes whom. */
 function pairLine(
   a: Character,
   b: Character,
@@ -65,52 +132,116 @@ function pairLine(
 ): string {
   const names = `${a.firstName} and ${b.firstName}`
   const pair = npcPairOf(relationships, a.charId, b.charId)
-  if (!pair) return npcStandingLine(a, b, relationships)
+  if (!pair) return npcStandingLine(a, b, relationships, today)
 
-  const zone = zoneOf(pair.affinity)
-  const encounter = pair.encounter
-  const fresh =
-    encounter && today - encounter.date <= ENCOUNTER_DAYS && today - encounter.date >= 0
-      ? encounter
-      : null
-  const event = fresh
-    ? `${fresh.positive ? 'bonded' : 'argued'} ${whereClause(fresh, classes, characters)} ${whenClause(fresh.date, today)}`
+  const fresh = freshEncounterOf(pair, today)
+  const meeting = fresh && isNpcMeeting(fresh) ? fresh : null
+  const event = meeting
+    ? `${meeting.positive ? 'bonded' : 'argued'} ${whereClause(meeting, [a, b], classes, characters)} ${whenClause(meeting.date, today)}`
     : null
 
+  const parts: string[] = []
+  if (pair.dating !== undefined) {
+    parts.push(
+      fresh?.kind === 'together'
+        ? `${names} started dating ${whenClause(fresh.date, today)}.`
+        : datingSentence(names, pair, today)
+    )
+    if (event) parts.push(`They ${event}.`)
+  } else {
+    parts.push(meetingStanding(names, pair, event, meeting, [a, b], today, classes, characters))
+    if (pair.ended !== undefined) {
+      parts.push(
+        fresh?.kind === 'brokeUp'
+          ? `They broke up ${whenClause(fresh.date, today)}.`
+          : 'They used to date.'
+      )
+    }
+  }
+  if (fresh?.kind === 'jealous') {
+    const by = fresh.by === a.charId ? a : b
+    const other = by === a ? b : a
+    const of = characters[fresh.of]
+    if (of) {
+      parts.push(
+        `${by.firstName} disliked seeing ${other.firstName} together with ${of.firstName} ${whenClause(fresh.date, today)}.`
+      )
+    }
+  }
+  if (fresh?.kind === 'foundOut') {
+    const by = fresh.by === a.charId ? a : b
+    const other = by === a ? b : a
+    parts.push(
+      `${by.firstName} found out ${whenClause(fresh.date, today)} that ${other.firstName} cheated on ${PRONOUNS[genderOf(by)].them} with the reader.`
+    )
+  }
+  if (fresh?.kind === 'sided') {
+    const by = fresh.by === a.charId ? a : b
+    const other = by === a ? b : a
+    const of = characters[fresh.of]
+    if (of) {
+      parts.push(
+        `${by.firstName} disliked that ${other.firstName} cheated on ${of.firstName} with the reader ${whenClause(fresh.date, today)}.`
+      )
+    }
+  }
+  if (fresh?.kind === 'turnedDown') {
+    const by = fresh.by === a.charId ? a : b
+    const other = by === a ? b : a
+    parts.push(`${by.firstName} turned ${other.firstName} down ${whenClause(fresh.date, today)}.`)
+  }
+  // The fresh line already says who cheated when it is the one the event is about.
+  const told = fresh?.kind === 'foundOut' ? (fresh.by === a.charId ? b : a).charId : undefined
+  parts.push(...cheatedSentences(a, b, pair, told), ...crushSentences(a, b, pair))
+  return parts.join(' ')
+}
+
+/** Where two who are not a couple stand, with a recent meeting worked into the sentence. */
+function meetingStanding(
+  names: string,
+  pair: NpcRelationship,
+  event: string | null,
+  meeting: NpcMeeting | null,
+  both: readonly [Character, Character],
+  today: number,
+  classes: Record<string, ClassEntry>,
+  characters: Record<string, Character>
+): string {
+  const zone = zoneOf(pair.affinity)
   if (zone === 'neutral') {
-    const base = npcStandingLine(a, b, relationships)
+    const base = zoneSentence(names, pair)
     return event ? `${base} They ${event}.` : base
   }
 
   const standing = zone === 'friends' ? `${names} are friends` : `${names} are enemies`
-  if (!event) return `${standing}.`
+  if (!event || !meeting) return `${standing}.`
 
   if (zone === 'friends') {
-    return fresh?.positive
-      ? `${standing}, and they ${event}.`
-      : `${standing}, but they ${event}.`
+    return meeting.positive ? `${standing}, and they ${event}.` : `${standing}, but they ${event}.`
   }
-  return fresh?.positive
-    ? `${standing} but they got a bit closer ${whereClause(fresh, classes, characters)} ${whenClause(fresh.date, today)}.`
+  return meeting.positive
+    ? `${standing} but they got a bit closer ${whereClause(meeting, both, classes, characters)} ${whenClause(meeting.date, today)}.`
     : `${standing} and they ${event}.`
 }
 
 /**
- * The bare standing between two characters — what {@link pairLine} opens with, and the
- * whole of an absent character's lorebook entry.
+ * The bare standing between two characters on `today` — the dating or zone sentence, whether
+ * they used to date, and who has a crush on whom — as an absent character's entry places her.
  */
 export function npcStandingLine(
   a: Character,
   b: Character,
-  relationships: NpcRelationshipMap
+  relationships: NpcRelationshipMap,
+  today: number
 ): string {
   const names = `${a.firstName} and ${b.firstName}`
   const pair = npcPairOf(relationships, a.charId, b.charId)
   if (!pair) return `${names} don't know each other yet.`
-  const zone = zoneOf(pair.affinity)
-  if (zone === 'friends') return `${names} are friends.`
-  if (zone === 'enemies') return `${names} are enemies.`
-  return `${names} know each other but aren't close.`
+  const parts =
+    pair.dating !== undefined
+      ? [datingSentence(names, pair, today)]
+      : [zoneSentence(names, pair), ...(pair.ended !== undefined ? ['They used to date.'] : [])]
+  return [...parts, ...cheatedSentences(a, b, pair), ...crushSentences(a, b, pair)].join(' ')
 }
 
 /** The one sentence naming a character's closest friend, or nothing at all. */
@@ -127,6 +258,32 @@ export function bestFriendLines(
   )
   const friend = candidates.find((other) => other.charId === best)
   return friend ? [`${character.firstName}'s closest friend is ${fullNameOf(friend)}.`] : []
+}
+
+/**
+ * Who among `people` she is dating, and — once she trusts the reader — who she has a crush on,
+ * a sentence apiece, in `people`'s order.
+ */
+export function loveLines(
+  character: Character,
+  people: readonly Character[],
+  relationships: NpcRelationshipMap,
+  trusted: boolean
+): string[] {
+  const ids = people.map((other) => other.charId)
+  const named = (charIds: readonly string[]): string =>
+    andList(
+      charIds.flatMap((charId) => {
+        const other = people.find((person) => person.charId === charId)
+        return other ? [fullNameOf(other)] : []
+      })
+    )
+  const partners = npcPartnersOf(relationships, character.charId, ids)
+  const crushes = trusted ? npcCrushesOf(relationships, character.charId, ids) : []
+  return [
+    ...(partners.length > 0 ? [`${character.firstName} is dating ${named(partners)}.`] : []),
+    ...(crushes.length > 0 ? [`${character.firstName} has a crush on ${named(crushes)}.`] : [])
+  ]
 }
 
 /** What one cast member is called in a companion clause. */
@@ -167,26 +324,28 @@ export function hauntActivity(
 
 /**
  * `"at the BTB Arcade"`, `"studying at the Kendall Library"`, `"having dinner at Bobby's Diner"`,
- * or the activity phrase itself — what she is doing where she is; a girl somewhere that is not
- * her own haunt, or with nothing to name there, is simply at it.
+ * or the activity phrase itself — what a character is doing where they are; one somewhere that
+ * is not their own haunt, or with nothing to name there, is simply at it, and one in their room
+ * is in it under gender `g`'s pronoun.
  */
 export function hauntClause(
   location: string,
   haunt: Haunt | null | undefined,
-  time: TimeSlot
+  time: TimeSlot,
+  g: Gender
 ): string {
   return (
     hauntActivity(location, haunt, time) ??
-    (location === ROOM_LOCATION ? 'in her room' : `at ${locationLabel(location)}`)
+    (location === ROOM_LOCATION ? `in ${PRONOUNS[g].their} room` : `at ${locationLabel(location)}`)
   )
 }
 
 /**
- * The one sentence saying where a character is this hour and what she is doing there,
+ * The one sentence saying where a character is this hour and what they are doing there,
  * companions included — shared by texts and invitations.
  */
 export function whereaboutsLine(
-  firstName: string,
+  who: Pick<Character, 'firstName' | 'gender'>,
   location: string,
   companions: NpcCompanions,
   haunt?: Haunt | null,
@@ -194,7 +353,7 @@ export function whereaboutsLine(
 ): string {
   const withWhom = companionClause(companions)
   const tail = withWhom ? ` ${withWhom}` : ''
-  return `${firstName} is ${hauntClause(location, haunt, time)}${tail} right now.`
+  return `${who.firstName} is ${hauntClause(location, haunt, time, genderOf(who))}${tail} right now.`
 }
 
 /** What the pair lines need, which is a slice of `PromptState`. */
@@ -233,12 +392,14 @@ export function npcPairLines(
 const NPC_BEHAVIOR_ORDER: ReadonlyArray<keyof CharacterBehavior> = [
   'withStrangers',
   'withFriends',
-  'withEnemy'
+  'withEnemy',
+  'withCrush',
+  'withLover'
 ]
 
 /**
- * How she behaves towards the *rest of the cast*, when that is not how she behaves towards the
- * reader.
+ * How she behaves towards the *rest of the cast* — a partner as a lover, a crush as a crush,
+ * anybody else by their zone — when that is not how she behaves towards the reader.
  */
 export function npcBehaviorLines(
   character: Character,
@@ -252,7 +413,15 @@ export function npcBehaviorLines(
     const pair = npcPairOf(relationships, character.charId, other.charId)
     const zone = pair ? zoneOf(pair.affinity) : 'neutral'
     levels.add(
-      zone === 'friends' ? 'withFriends' : zone === 'enemies' ? 'withEnemy' : 'withStrangers'
+      pair?.dating !== undefined
+        ? 'withLover'
+        : pair?.crush?.includes(character.charId)
+          ? 'withCrush'
+          : zone === 'friends'
+            ? 'withFriends'
+            : zone === 'enemies'
+              ? 'withEnemy'
+              : 'withStrangers'
     )
   }
   const lines: string[] = []

@@ -630,6 +630,56 @@ describe('applyLedger', () => {
     })
   })
 
+  it('files the ledger’s second-person words beside the memory, the texting memory’s too', () => {
+    applyLedger({
+      memories: [
+        {
+          charKey: 'sarah_rose',
+          type: 'liked',
+          desc: 'the reader said they were great friends',
+          youDesc: ' You said the two of you were great friends '
+        }
+      ],
+      textMemories: [
+        {
+          charKey: 'sarah_rose',
+          type: 'loved',
+          desc: 'the reader asked about her recital',
+          youDesc: 'you asked about her recital'
+        }
+      ],
+      events: []
+    })
+    const info = useGameStore.getState().charInfo.a
+    expect(info.memories).toEqual([
+      {
+        date: 7,
+        type: 'liked',
+        desc: 'the reader said they were great friends',
+        youDesc: 'you said the two of you were great friends'
+      }
+    ])
+    expect(info.textMemory).toMatchObject({ youDesc: 'you asked about her recital' })
+  })
+
+  it('files the memory without second-person words that are blank or still say "the reader"', () => {
+    applyLedger({
+      memories: [
+        { charKey: 'sarah_rose', type: 'liked', desc: 'the reader was kind', youDesc: '  ' },
+        {
+          charKey: 'mina_kwon',
+          type: 'liked',
+          desc: 'the reader was kind',
+          youDesc: 'the reader was kind'
+        }
+      ],
+      events: []
+    })
+    const { a, b } = useGameStore.getState().charInfo
+    expect(a.memories).toEqual([{ date: 7, type: 'liked', desc: 'the reader was kind' }])
+    expect(b.memories).toEqual([{ date: 7, type: 'liked', desc: 'the reader was kind' }])
+  })
+
   // JSON Schema cannot say "at most one row per enum value", so the cap is the
   // sanitizer's. First row wins — a second is a mistake, not a correction.
   it('keeps only the first texting memory per character', () => {
@@ -854,6 +904,23 @@ describe('the crush standards line', () => {
     expect(memoryStatusLines(scene, CLEARS, [], [], [])).toHaveLength(2)
     expect(useGameStore.getState().charInfo.a.crushHint).toBeUndefined()
   })
+
+  it('keeps the payoff owed while she is dating somebody, and pays it once she has a crush', () => {
+    memoryStatusLines(scene, NOBODY, [], [], [])
+    const owed = useGameStore.getState().charInfo.a.crushHint
+    // Together since the scene's own day, so in the honeymoon: her odds are nothing.
+    useGameStore.setState({ npcRelationships: { 'a|b': { affinity: 5, dating: 7 } } })
+
+    expect(memoryStatusLines(scene, CLEARS, [], [], [])).toHaveLength(2)
+    expect(useGameStore.getState().charInfo.a.crushHint).toBe(owed)
+
+    const info = useGameStore.getState().charInfo.a
+    useGameStore.setState({
+      charInfo: { a: { ...info, flags: { ...(info.flags ?? emptyFlags()), hasCrush: true } } }
+    })
+    expect(memoryStatusLines(scene, CLEARS, [], [], []).at(-1)?.text).toContain('interest...')
+    expect(useGameStore.getState().charInfo.a.crushHint).toEqual({ met: true })
+  })
 })
 
 /**
@@ -940,7 +1007,7 @@ describe('the threesome fold', () => {
   })
 
   // Idempotent under the boundary replay, like everything else the fold does:
-  // `harem` only ever sets, so a second pass reaches the same flags.
+  // a group act only ever sets `harem`, so a second pass reaches the same flags.
   it('reaches the same flags on a replayed boundary', () => {
     const ledger: LedgerResponse = {
       memories: [],
