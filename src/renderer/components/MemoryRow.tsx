@@ -32,8 +32,7 @@ export interface MemoryRowProps {
  */
 export function memoryNameHint(name: string): string {
   return (
-    `Use past-tense and refer to yourself as “${name}”. Don't use your name as a regular word ` +
-    `anywhere else, since every “${name}” is read as you.`
+    `Use past-tense and refer to yourself as “${name}”. Avoid using your name as a regular word since it will be searched and replaced.`
   )
 }
 
