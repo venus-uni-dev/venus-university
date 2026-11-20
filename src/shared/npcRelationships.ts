@@ -658,6 +658,8 @@ export interface NpcAdviceOutcome {
   charId: string
   about: string
   result: 'together' | 'turnedDown' | 'brokeUp'
+  /** A turn-down given because `about` is dating somebody else and is not open. */
+  taken?: true
 }
 
 /** Everything one settle decided: the map, and what the texts read off it. */
@@ -769,6 +771,8 @@ function loveLifeOf(
 
   /** The couples who argued past their honeymoon and stayed together, by key. */
   const argued = new Set<string>()
+  /** Each holder turned down this slot, beside the pair key of the one who did it. */
+  const refused = new Set<string>()
 
   // Somebody the reader is dating, and not open, has nobody else in mind.
   for (const charId of readerLovers) if (!open(charId)) dropCrushesOf(charId)
@@ -808,12 +812,14 @@ function loveLifeOf(
           next[key] = withCrushHolders(pair, pair.crush.filter((holder) => holder !== charId))
           continue
         }
-        // A yes to somebody who is no longer free to date, either of them, comes to nothing.
-        if (!freeToDate(charId) || !freeToDate(about) || !attracted(charId, about)) continue
+        // A yes from somebody no longer free to date, or to somebody off the roster, comes to nothing.
+        if (!freeToDate(charId) || !roster.has(about) || !attracted(charId, about)) continue
+        // Somebody already dating and not open turns her down for it, whatever she feels.
+        const seeing = !freeToDate(about)
         let odds = CONFESSION_ACCEPT_CHANCE
         if (trait(about, 'Promiscuous')) odds *= ROMANCE_TRAIT_FACTOR
         if (trait(about, 'High Standards')) odds /= ROMANCE_TRAIT_FACTOR
-        if (pair.crush.includes(about) || rand() < odds) {
+        if (!seeing && (pair.crush.includes(about) || rand() < odds)) {
           getTogether(key, charId, about)
           outcomes.push({ charId, about, result: 'together' })
           continue
@@ -824,7 +830,13 @@ function loveLifeOf(
           encounter: { date, kind: 'turnedDown', by: about }
         }
         settleCrushes(key)
-        outcomes.push({ charId, about, result: 'turnedDown' })
+        refused.add(`${charId}@${key}`)
+        outcomes.push({
+          charId,
+          about,
+          result: 'turnedDown',
+          ...(seeing ? { taken: true as const } : {})
+        })
       }
       return outcomes
     },
@@ -839,8 +851,9 @@ function loveLifeOf(
         getTogether(key, a, b)
         return
       }
+      // Nobody falls again in the slot she was turned down by the same one.
       const fell = [a, b].filter((holder) => {
-        if (holders.includes(holder)) return false
+        if (holders.includes(holder) || refused.has(`${holder}@${key}`)) return false
         const odds = crushOdds(holder, holder === a ? b : a)
         return odds > 0 && rand() < odds
       })

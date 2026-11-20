@@ -77,7 +77,7 @@ which is what the feed reads.
   Disagreeable target or a High Standards holder, ×0.1 for a holder who is taken and not open.
 - **Several at once** are allowed and none expires.
 - **It ends** when the pair falls below 0, when its holder enters a relationship (an open
-  holder keeps her others), on "Definitely not", on being turned down, or when either graduates.
+  holder keeps her others), on "Don't do it", on being turned down, or when either graduates.
 
 ### Couples
 
@@ -168,7 +168,7 @@ crush is asked about once.
 |---|---|
 | Yes | A mutual crush becomes a couple. Otherwise the other accepts on 33%, ×1.5 if Promiscuous, ÷1.5 if High Standards. A refusal ends her crush and costs the pair a step |
 | "I don't know..." | Nothing |
-| "Definitely not." | Her crush ends |
+| "Don't do it" | Her crush ends |
 
 **How a button lands.**
 

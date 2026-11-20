@@ -963,21 +963,22 @@ export function answerHangout(charId: string, yes: boolean): void {
 
 /**
  * The three answers under a vent and under a question about a crush, in the order they stand:
- * each the text it sends as his, and what the slot's ending acts on, null for one it does not.
+ * each the text it sends as his, its button's label where that differs from the text, and what
+ * the slot's ending acts on, null for one it does not.
  */
 export const ADVICE_ANSWERS: Record<
   ConversationAdvice['kind'],
-  readonly { answer: ConversationAdvice['answer'] | null; text: string }[]
+  readonly { answer: ConversationAdvice['answer'] | null; text: string; label?: string }[]
 > = {
   vent: [
-    { answer: 'breakUp', text: 'You should break up.' },
-    { answer: 'talk', text: 'You should talk things out.' },
-    { answer: null, text: 'That sucks.' }
+    { answer: 'breakUp', text: 'You should break up' },
+    { answer: 'talk', text: 'You should talk things out' },
+    { answer: null, text: 'That really sucks...' }
   ],
   crush: [
-    { answer: 'yes', text: 'Yes' },
+    { answer: 'yes', label: 'Yes', text: 'I think you should go for it' },
     { answer: null, text: "I don't know..." },
-    { answer: 'no', text: 'Definitely not.' }
+    { answer: 'no', label: "Don't do it", text: "I don't think you should go for it" }
   ]
 }
 
@@ -1511,7 +1512,8 @@ export interface LoveTextInput {
 /**
  * Who texts the reader about her love life as `(date, time)` opens, each by charId with what it is
  * about: a girl saying how his advice went first, then at most one venting about her partner or
- * asking about her crush. None in `taken`, and each a contact of his on the roster.
+ * asking about her crush. None in `taken`, and each a contact of his on the roster. A turn-down
+ * given because her crush is dating somebody else carries its outcome's `taken`.
  */
 export function pickSlotLoveTexts(
   date: number,
@@ -1519,11 +1521,11 @@ export function pickSlotLoveTexts(
   view: SlotAskerView,
   taken: ReadonlySet<string>,
   love: LoveTextInput
-): Array<LoveText & { charId: string }> {
+): Array<LoveText & Pick<NpcAdviceOutcome, 'charId' | 'taken'>> {
   const game = useGameStore.getState()
   const conversations = game.bunnyboard.conversations
   const busy = new Set(taken)
-  const picked: Array<LoveText & { charId: string }> = []
+  const picked: Array<LoveText & Pick<NpcAdviceOutcome, 'charId' | 'taken'>> = []
   /** A contact on the roster nobody has texting him about anything else this slot. */
   const reachable = (charId: string): boolean =>
     !busy.has(charId) &&
@@ -1531,10 +1533,10 @@ export function pickSlotLoveTexts(
     isFeedContact(view.charInfo[charId]) &&
     !conversations[charId]?.pendingHangout
 
-  for (const { charId, about, result } of love.outcomes) {
+  for (const { charId, about, result, taken: seeing } of love.outcomes) {
     if (!reachable(charId)) continue
     busy.add(charId)
-    picked.push({ charId, about, kind: result })
+    picked.push({ charId, about, kind: result, ...(seeing ? { taken: seeing } : {}) })
   }
 
   /** Free to text him about this now: trusted, no plan with him this slot, not in class or at work. */

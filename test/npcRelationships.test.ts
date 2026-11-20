@@ -513,14 +513,38 @@ describe('the settle with love lives', () => {
     expect(refused.relationships[AM]).toEqual({ affinity: 1, encounter: { date: 40, kind: 'turnedDown', by: 'm' } })
     expect(refused.outcomes).toEqual([{ charId: 'a', about: 'm', result: 'turnedDown' }])
 
-    // A yes to somebody no longer free to date comes to nothing, and "Definitely not." ends her crush.
+    // Somebody no longer free to date turns her down for it, a mutual crush and the dice
+    // notwithstanding, and "Don't do it" ends her crush.
     const taken = settle(
       { [AM]: { affinity: 2, crush: ['a', 'm'] }, [pairKeyOf('b', 'm')]: { affinity: 5, dating: 0 } },
       [{ charId: 'a', about: 'm', answer: 'yes' }],
       () => 0
     )
-    expect(taken.relationships[AM]).toEqual({ affinity: 2, crush: ['a', 'm'] })
-    expect(taken.outcomes).toEqual([])
+    expect(taken.relationships[AM]).toEqual({ affinity: 1, crush: ['m'], encounter: { date: 40, kind: 'turnedDown', by: 'm' } })
+    expect(taken.outcomes).toEqual([{ charId: 'a', about: 'm', result: 'turnedDown', taken: true }])
+    // The reader's own lover is taken too.
+    const his = settleNpcPairsFull(
+      {
+        date: 40,
+        relationships: { [AM]: { affinity: 2, crush: ['a'] } },
+        cast: [],
+        groups: [],
+        characters,
+        roster: ids,
+        attraction,
+        readerLovers: ['m'],
+        advice: [{ charId: 'a', about: 'm', answer: 'yes' }]
+      },
+      () => 0
+    )
+    expect(his.outcomes).toEqual([{ charId: 'a', about: 'm', result: 'turnedDown', taken: true }])
+    // Somebody open turns her down only on the dice, so never for being taken.
+    const openRefused = settle(
+      { [pairKeyOf('a', 'c')]: { affinity: 2, crush: ['a'] }, [pairKeyOf('c', 'm')]: { affinity: 5, dating: 0 } },
+      [{ charId: 'a', about: 'c', answer: 'yes' }],
+      () => 0.99
+    )
+    expect(openRefused.outcomes).toEqual([{ charId: 'a', about: 'c', result: 'turnedDown' }])
     expect(settle({ [AM]: { affinity: 2, crush: ['a', 'm'] } }, [{ charId: 'a', about: 'm', answer: 'no' }], () => 0).relationships[AM]).toEqual({ affinity: 2, crush: ['m'] })
 
     // Talking it out is a step up; breaking up a step down that may part a couple below friends.

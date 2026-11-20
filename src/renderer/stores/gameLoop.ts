@@ -13,6 +13,7 @@ import { genderOf } from '@shared/gender'
 import { giftActionLine, itemDefOf, type ItemPick } from '@shared/shop'
 import {
   newCouples,
+  npcPartnersOf,
   withAffairsFound,
   withCouplesFormed,
   withCouplesLeft,
@@ -1093,14 +1094,32 @@ async function fetchSlotIntro(
   // Who texts him about her love life, rolled outside the reach-out's own odds and quiet: a girl
   // saying how his advice went, then one venting or asking about a crush.
   const loveTexts: Record<string, LoveText> = {}
-  for (const { charId, kind, about } of pickSlotLoveTexts(date, time, view, taken, love)) {
+  /** Whom `charId` is dating, as a turn-down she gave for it names them. */
+  const seeingOf = (charId: string): string => {
+    const people = [...game.chars, ...game.alumni]
+    const partner = game.characters[npcPartnersOf(view.npcRelationships, charId, people)[0] ?? '']
+    if (partner) return fullNameOf(partner)
+    return view.charInfo[charId]?.flags?.isLover ? 'the reader' : 'someone else'
+  }
+  for (const { charId, kind, about, taken: dating } of pickSlotLoveTexts(
+    date,
+    time,
+    view,
+    taken,
+    love
+  )) {
     const character = game.characters[charId]
     const info = view.charInfo[charId]
     const other = game.characters[about]
     if (!character || !info || !other) continue
     const charKey = charKeyOf(character.firstName, character.lastName)
     loveTexts[charKey] = { kind, about }
-    const topic = { kind, about: fullNameOf(other) }
+    // Why a turn-down was one: whom her crush is dating, or null where the feelings were not mutual.
+    const topic = {
+      kind,
+      about: fullNameOf(other),
+      ...(kind === 'turnedDown' ? { seeing: dating ? seeingOf(about) : null } : {})
+    }
     reachOuts.push(reachOutOf(charKey, character, info, topic, date, time, npcOverlay, view))
   }
   // The ordinary reach-out, on a slot nobody is texting him about her love life.
@@ -1132,8 +1151,13 @@ async function fetchSlotIntro(
       const character = game.characters[charId]
       return character ? [character] : []
     })
+  // Whoever a love-life text is about is described too, friend, partner or neither.
+  const ambient = new Set(
+    ambientLoreCharacters(absent, present, view.npcRelationships).map(({ charId }) => charId)
+  )
+  for (const { about } of Object.values(loveTexts)) ambient.add(about)
   const backgroundLore = characterLoreForIds(
-    ambientLoreCharacters(absent, present, view.npcRelationships),
+    absent.filter(({ charId }) => ambient.has(charId)),
     view.charInfo,
     date,
     game.calendar.season,

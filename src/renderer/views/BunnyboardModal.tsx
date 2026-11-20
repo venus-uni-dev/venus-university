@@ -945,7 +945,7 @@ function AdviceAnswers({
           dead={dead}
           onClick={() => answerAdvice(charId, nothing)}
         >
-          {answers[nothing].text}
+          {answers[nothing].label ?? answers[nothing].text}
         </CancelButton>
         <motion.button
           id={`bb-advice-${against}`}
@@ -955,10 +955,10 @@ function AdviceAnswers({
           {...gestures(dead, lift, press)}
           onClick={() => answerAdvice(charId, against)}
         >
-          {answers[against].text}
+          {answers[against].label ?? answers[against].text}
         </motion.button>
         <PrimaryButton id={`bb-advice-${loud}`} dead={dead} onClick={() => answerAdvice(charId, loud)}>
-          {answers[loud].text}
+          {answers[loud].label ?? answers[loud].text}
         </PrimaryButton>
       </div>
     </div>
