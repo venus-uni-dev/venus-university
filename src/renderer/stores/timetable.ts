@@ -4,7 +4,7 @@ import type { NpcGroup } from '@shared/npcRelationships'
 import type { DormId } from '@shared/dorms'
 import { globalSlotOf, jobDefOf, shiftSlotOf } from '@shared/jobs'
 import { ROOM_LOCATION } from '@shared/locations'
-import type { SemesterCalendar } from '@shared/semesters'
+import { ageOf, type SemesterCalendar } from '@shared/semesters'
 import { isRainedOut, weatherAt, type Weather } from '@shared/weather'
 import { classSlotOf, hauntClosedOn, jobClosedOn } from '../prompts/occasions'
 import { charJobAt, shiftWeekdayOf } from '../prompts/gameDate'
@@ -138,6 +138,24 @@ export function homecomingVisitorNow(date?: number): string | null {
   const game = useGameStore.getState()
   if (!isHomecomingVisit(game.calendar.season, date ?? game.date)) return null
   return game.homecomingVisitor
+}
+
+/** How old everybody in a Scene Creator scene is, as it gives nobody a class year. */
+const CREATED_SCENE_AGE = 21
+
+/**
+ * How old each of `charIds` is in the store's semester, keyed by charId; anybody with no entry is
+ * left out.
+ */
+export function agesNow(charIds: readonly string[]): Record<string, number> {
+  const game = useGameStore.getState()
+  const ages: Record<string, number> = {}
+  for (const charId of charIds) {
+    const info = game.charInfo[charId]
+    if (game.createdScene) ages[charId] = CREATED_SCENE_AGE
+    else if (info) ages[charId] = ageOf(info, game.semesterIndex, game.graduatedAfter[charId])
+  }
+  return ages
 }
 
 /**

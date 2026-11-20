@@ -69,6 +69,9 @@ export const FINAL_DATE = 123
 /** Class year labels, index 0 = year 1. */
 const YEAR_LABELS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const
 
+/** How old a student of each class year is, index 0 = year 1. */
+const YEAR_AGES = [19, 20, 21, 22] as const
+
 /** The one slot packing in the codebase: `weekday * 2 + time`, off a Monday-zero weekday. */
 export function packSlot(weekday: number, time: TimeSlot): number {
   return weekday * 2 + time
@@ -97,6 +100,11 @@ export function slotFullLabel(slot: ClassSlot): string {
 /** Human-readable class year, e.g. `"Sophomore"`. */
 export function yearLabel(year: number): string {
   return YEAR_LABELS[year - 1] ?? YEAR_LABELS[0]
+}
+
+/** How old a student of class `year` is, read as a freshman where `yearLabel` would. */
+export function yearAge(year: number): number {
+  return YEAR_AGES[year - 1] ?? YEAR_AGES[0]
 }
 
 /** The year that graduates. */

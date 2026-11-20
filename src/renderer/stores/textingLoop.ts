@@ -118,6 +118,7 @@ import { createRetryGate } from './retryGate'
 import { createTextExtractor } from './textingStream'
 import { BOT_REPLY_MS, createTypingPacer, typingDelayFor, type TypingPacer } from './textingPace'
 import {
+  agesNow,
   charAwayNow,
   charBusyNow,
   charHiddenLocationNow,
@@ -613,6 +614,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         springBreakAway: game.springBreakAway,
         // The one day a graduate's thread is from somebody in town.
         ...(visitor ? { homecomingVisitor: visitor } : {}),
+        ages: agesNow([charId]),
         // From this slot on: texting comes before the slot's scene, so its own plan is still ahead.
         upcomingPlans: upcomingPlanLines(
           game.events,

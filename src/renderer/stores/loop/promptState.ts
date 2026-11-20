@@ -61,6 +61,7 @@ import { useGameStore, type SceneKind } from '../gameStore'
 import { stageAsWritten } from '../sceneSanitizer'
 import { cancelAllTexts, expireHangoutInvitations } from '../textingLoop'
 import {
+  agesNow,
   charSickAtHomeNow,
   homecomingVisitorNow,
   playerClassNow,
@@ -593,6 +594,7 @@ export function promptState(): PromptState {
     textedWith,
     ...(backFromBreak.length > 0 ? { backFromBreak } : {}),
     ...(visitor ? { homecomingVisitor: visitor } : {}),
+    ages: agesNow(game.cast),
     // The slots after this one: this slot's plan is the scene itself, or one he is skipping.
     upcomingPlans: upcomingPlanLines(
       game.events,

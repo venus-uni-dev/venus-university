@@ -1,5 +1,5 @@
 import { appError } from './errors'
-import { FINAL_DATE, SENIOR_YEAR, yearLabel } from './classes'
+import { FINAL_DATE, SENIOR_YEAR, yearAge, yearLabel } from './classes'
 import { replayIdsOf } from './replays'
 import type {
   CharInfo,
@@ -58,6 +58,26 @@ export function intakeOf(profile: Pick<CharProfile, 'year' | 'intake'>): Season 
 /** Whether an intake moves up a year at the end of a `season` semester: the one it did not arrive in. */
 export function advancesAfter(intake: Season, season: Season): boolean {
   return intake !== season
+}
+
+/**
+ * How old a character is in semester `semesterIndex`: her class year's age, or for a graduate a
+ * senior's 22 and a year more at each ending since `graduatedAfter` that would have moved her
+ * intake up — 23 where nobody knows which semester she graduated at the end of.
+ */
+export function ageOf(
+  profile: Pick<CharProfile, 'year' | 'intake' | 'pursuing'>,
+  semesterIndex: number,
+  graduatedAfter?: number
+): number {
+  if (profile.pursuing === undefined) return yearAge(profile.year)
+  if (graduatedAfter === undefined) return yearAge(SENIOR_YEAR) + 1
+  const intake = intakeOf(profile)
+  let age = yearAge(SENIOR_YEAR)
+  for (let index = graduatedAfter; index < semesterIndex; index++) {
+    if (advancesAfter(intake, seasonOf(index))) age += 1
+  }
+  return age
 }
 
 /**
@@ -239,6 +259,20 @@ export function semesterChain(record: PlaythroughRecord, id?: string): ChainedSe
     const log = next === undefined ? null : (record.semesters?.[next]?.before ?? null)
     return { view: withTransfers(semesterOf(record, semesterId), log), log }
   })
+}
+
+/**
+ * The semester each graduate in a chain graduated at the end of, keyed by charId: the one before
+ * the first that lists her among its alumni.
+ */
+export function graduatedAfterOf(chain: readonly ChainedSemester[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const { view } of chain) {
+    for (const charId of view.alumni) {
+      if (out[charId] === undefined) out[charId] = view.index - 1
+    }
+  }
+  return out
 }
 
 /**

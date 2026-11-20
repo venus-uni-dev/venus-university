@@ -153,6 +153,7 @@ import {
   revealSlot
 } from './slotCrossing'
 import {
+  agesNow,
   charCommitmentAt,
   charStandingHauntAt,
   homecomingVisitorNow,
@@ -1213,6 +1214,7 @@ async function fetchSlotIntro(
       // The pick being settled, which the store does not hold until the boundary assigns it.
       springBreakAway: springBreakPick ?? game.springBreakAway,
       ...(visitor ? { homecomingVisitor: visitor } : {}),
+      ages: agesNow([...game.chars, ...game.alumni]),
       ...(backgroundLore.length > 0 ? { backgroundLore } : {})
     },
     settingNow(),

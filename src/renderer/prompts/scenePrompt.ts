@@ -380,6 +380,8 @@ export interface PromptState {
   backFromBreak?: readonly string[]
   /** The graduate back in town for Homecoming, as a charId; absent on every other slot. */
   homecomingVisitor?: string
+  /** How old each of the cast is, by charId; a heading with none carries only her pronouns. */
+  ages?: Readonly<Record<string, number>>
   /** The cast when every one of them is off-stage and the scene is still running; absent otherwise. */
   hiddenCast?: readonly Character[]
   /** The player's `lessNsfwText` setting. */
@@ -710,7 +712,8 @@ function castBlock(
     const info = charInfo[character.charId]
     const gender = genderOf(character)
 
-    lines.push('', `${key} — ${fullNameOf(character)} (${pronounTag(gender)}).`)
+    const tag = headingTag(gender, state.ages?.[character.charId])
+    lines.push('', `${key} — ${fullNameOf(character)} (${tag}).`)
 
     if (info?.major) {
       lines.push(yearMajorLine(info, gender))
@@ -938,6 +941,11 @@ export function milestoneCastLines(
 /** A block plus the blank line that separates it from the next, or nothing when the block is empty. */
 export function spaced(lines: readonly string[]): string[] {
   return lines.length > 0 ? [...lines, ''] : []
+}
+
+/** What a character's heading carries in its parentheses: her age where known, then her pronouns. */
+export function headingTag(g: Gender, age?: number): string {
+  return age === undefined ? pronounTag(g) : `age ${age}, ${pronounTag(g)}`
 }
 
 /**

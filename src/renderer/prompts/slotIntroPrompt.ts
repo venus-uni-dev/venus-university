@@ -5,7 +5,6 @@ import { globalSlotOf } from '@shared/jobs'
 import {
   genderOf,
   PRONOUNS,
-  pronounTag,
   readerWords,
   type Pronouns,
   type ReaderPronouns,
@@ -48,6 +47,7 @@ import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
 import {
   graduateLines,
+  headingTag,
   memoryLines,
   secretLines,
   notesLines,
@@ -336,6 +336,8 @@ export interface SlotIntroInput {
   springBreakAway?: readonly string[] | null
   /** The graduate back in town for Homecoming, as a charId; absent on every other slot. */
   homecomingVisitor?: string
+  /** How old each of `people` is, by charId; an entry with none carries only her pronouns. */
+  ages?: Readonly<Record<string, number>>
   /**
    * The place `SOMEWHERE TO GO` invents a rumor about. **Drawn by the loop rather than
    * here**, which is what lets the reply's own sentence about it be banked and carried into the
@@ -666,7 +668,7 @@ function characterBlock(input: SlotIntroInput): string[] {
     const slot = globalSlotOf(input.date, input.time)
     const coldLine = herColdLine(character, info.cold, slot, true)
     entries.push([
-      `${fullNameOf(character)} (${pronounTag(genderOf(character))}) — "char": "${charKey}"`,
+      `${fullNameOf(character)} (${headingTag(genderOf(character), input.ages?.[character.charId])}) — "char": "${charKey}"`,
       ...profileLines(
         character,
         info.flags ?? emptyFlags(),

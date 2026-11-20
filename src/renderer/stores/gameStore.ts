@@ -22,9 +22,11 @@ import { withFiredEvent } from '@shared/sceneEvents'
 import {
   calendarOf,
   charStateOf,
+  graduatedAfterOf,
   graduatesOf,
   rehomedTransfers,
   semesterCalendarOf,
+  semesterChain,
   semesterOf,
   withTransfers,
   type SemesterCalendar
@@ -317,6 +319,8 @@ interface GameStoreState {
    * cast, scheduled or rolled for.
    */
   alumni: string[]
+  /** The semester index each graduate graduated at the end of, read off the record's chain. */
+  graduatedAfter: Record<string, number>
   /** Who graduates at this semester's ceremony, in roster order (`graduatesOf`). */
   graduating: string[]
   /** The reader's own name, chosen at New Game and fixed for the playthrough. */
@@ -1532,6 +1536,7 @@ const initialState = {
   semesterIndex: 0,
   chars: [] as string[],
   alumni: [] as string[],
+  graduatedAfter: {} as Record<string, number>,
   graduating: [] as string[],
   playerFirstName: DEFAULT_PLAYER_FIRST_NAMES.he,
   playerPronouns: 'he' as ReaderPronouns,
@@ -1693,6 +1698,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       chars: semester.chars,
       // A graduate whose character is gone is left out, her save entry kept as it is.
       alumni: semester.alumni.filter((charId) => characters[charId] !== undefined),
+      graduatedAfter: graduatedAfterOf(semesterChain(record, save.semester)),
       graduating: graduatesOf(semester),
       playerFirstName: record.playerFirstName,
       playerLastName: record.playerLastName,
