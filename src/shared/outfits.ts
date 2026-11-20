@@ -302,10 +302,16 @@ export const FIX_IMAGE = 'fix'
 export const BASE_IMAGE = 'base'
 
 /**
- * How far Repaint's strength slider runs and where it opens, as the detailer's denoise: low
- * keeps the painted colours flat, high lets the redraw wander from them.
+ * How far a wardrobe repair's Denoise slider runs, as its detailer's denoise: low keeps close to
+ * what was painted, high lets the redraw wander from it.
  */
-export const REPAINT_STRENGTH = { min: 0.2, max: 0.9, initial: 0.6 } as const
+export const DETAILER_DENOISE = { min: 0.2, max: 0.9 } as const
+
+/** Where Repaint's Denoise slider opens. */
+export const REPAINT_DENOISE_INITIAL = 0.6
+
+/** Where Fix fingers' Denoise slider opens: the value its hand detailer always ran at. */
+export const HANDS_DENOISE_INITIAL = 0.5
 
 /** Every sprite reference for one set — what the scene prompt offers RITA in the enum. */
 export function spriteRefsFor(set: OutfitSet): SpriteRef[] {

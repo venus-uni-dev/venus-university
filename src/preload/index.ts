@@ -196,10 +196,10 @@ const api: VenusUniversityApi = {
       ipcRenderer.invoke('comfy:generateCg', character, position, seed, staged, edit),
     generateOutfit: (character, set, emotion, seed, staged, edit) =>
       ipcRenderer.invoke('comfy:generateOutfit', character, set, emotion, seed, staged, edit),
-    fixHands: (character, target, paintLayer, seed) =>
-      ipcRenderer.invoke('comfy:fixHands', character, target, paintLayer, seed),
-    repaint: (character, target, source, paintLayer, mask, strength, seed) =>
-      ipcRenderer.invoke('comfy:repaint', character, target, source, paintLayer, mask, strength, seed)
+    fixHands: (character, target, paintLayer, denoise, seed) =>
+      ipcRenderer.invoke('comfy:fixHands', character, target, paintLayer, denoise, seed),
+    repaint: (character, target, source, paintLayer, mask, denoise, seed) =>
+      ipcRenderer.invoke('comfy:repaint', character, target, source, paintLayer, mask, denoise, seed)
   },
   jobs: {
     cancelGroup: (group) => ipcRenderer.invoke('jobs:cancelGroup', group),

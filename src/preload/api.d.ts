@@ -570,20 +570,22 @@ export interface VenusUniversityApi {
     ) => Promise<Result<string>>
     /**
      * Redraws the hand the player painted on; `paintLayer` is a base64 PNG with no `data:`
-     * prefix. Answers with the pixels, not a path — nothing is written to disk until the player
-     * accepts it — queued under `hands:{target}` so `jobs:cancelKeys` can stop it alone.
+     * prefix and `denoise` the hand detailer's, inside `DETAILER_DENOISE`. Answers with the
+     * pixels, not a path — nothing is written to disk until the player accepts it — queued under
+     * `hands:{target}` so `jobs:cancelKeys` can stop it alone.
      */
     fixHands: (
       character: Character,
       target: WardrobeTarget,
       paintLayer: string,
+      denoise: number,
       seed: number
     ) => Promise<Result<RegionFixResult>>
     /**
      * Redraws what the player painted or marked over a wardrobe's neutral sprite. `source` is
      * that sprite flattened on white, `paintLayer` the strokes and `mask` everything painted or
-     * marked, each a base64 PNG with no `data:` prefix; `strength` is the detailer's denoise,
-     * inside `REPAINT_STRENGTH`. Answers with pixels as `fixHands` does, queued under
+     * marked, each a base64 PNG with no `data:` prefix; `denoise` is the detailer's, inside
+     * `DETAILER_DENOISE`. Answers with pixels as `fixHands` does, queued under
      * `repaint:{target}`.
      */
     repaint: (
@@ -592,7 +594,7 @@ export interface VenusUniversityApi {
       source: string,
       paintLayer: string,
       mask: string,
-      strength: number,
+      denoise: number,
       seed: number
     ) => Promise<Result<RegionFixResult>>
   }

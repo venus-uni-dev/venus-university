@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, messageOf } from '@shared/errors'
+import { HANDS_DENOISE_INITIAL } from '@shared/outfits'
 import type { Emotion, OutfitSet } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { DENOISE_SCALE, DenoiseField } from '../components/DenoiseField'
 import { LayerPainter, toPngBase64, type PainterStage } from '../components/LayerPainter'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -44,7 +46,9 @@ export function FingerFixModal({
   const [dirty, setDirty] = useState(false)
   const [painted, setPainted] = useState(false)
   const [hasBase, setHasBase] = useState(true)
-  const [previewing, setPreviewing] = useState<string | null>(null)
+  const [denoise, setDenoise] = useState(Math.round(HANDS_DENOISE_INITIAL * DENOISE_SCALE))
+  /** What the press handed the render: the strokes and the denoise as they stood then. */
+  const [previewing, setPreviewing] = useState<{ paint: string; denoise: number } | null>(null)
   const [discarding, setDiscarding] = useState(false)
 
   const swept = useRef(false)
@@ -84,7 +88,7 @@ export function FingerFixModal({
     const canvas = paintRef.current
     if (!canvas || previewing) return
     try {
-      setPreviewing(await toPngBase64(canvas))
+      setPreviewing({ paint: await toPngBase64(canvas), denoise: denoise / DENOISE_SCALE })
     } catch (err) {
       useUiStore
         .getState()
@@ -145,6 +149,14 @@ export function FingerFixModal({
               setDirty(state.dirty)
               setPainted(state.painted)
             }}
+            fields={
+              <DenoiseField
+                id="hands-denoise"
+                value={denoise}
+                disabled={previewing !== null}
+                onChange={setDenoise}
+              />
+            }
           >
             <div className="vu-foot">
               <motion.button
@@ -181,7 +193,7 @@ export function FingerFixModal({
             set={set}
             title={title}
             theme={theme}
-            render={() => fixHands(charId, set, previewing)}
+            render={() => fixHands(charId, set, previewing.paint, previewing.denoise)}
             cancel={() => void cancelHandFix(charId, set)}
             emotions={repairing}
             onCancel={() => setPreviewing(null)}

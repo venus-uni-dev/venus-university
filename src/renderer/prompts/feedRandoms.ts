@@ -258,7 +258,14 @@ export const FEED_MESSAGES: readonly FeedMessage[] = [
   'I pray for the grades of all VU students, even freshmen, but we can\'t expect God to do all the work',
   'you take a sip from your trusty VU store water bottle...',
   'to the town of veridan came a stranger one fine day',
-  'oh well im the type of guy who will never settle down'
+  'oh well im the type of guy who will never settle down',
+  'when life gives you lemons DONT make lemonade!! Make life take the lemons back! I DONT WANT YOUR DAMN LEMONS',
+  'ive seen things you people wouldnt believe. deformed image generations. i saw ai hallucinations on frontier models. all those tokens will be lost in time, like tears in rain',
+  'a system of cells interlinked within cells interlinked within cells interlinked within cells',
+  'now i am become larp, performer of worlds',
+  'nothing is true, everything is permitted',
+  'why is literally EVERYONE dating EXCEPT FOR ME',
+  'IT SHOULD HAVE BEEN ME NOT HIM ITS NOT FAIR'
 ]
 
 /** Faces the campus posts under — an emoji stands in for a photo. */

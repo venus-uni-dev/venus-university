@@ -95,7 +95,7 @@ export interface LayerPainterProps {
   markRef?: RefObject<HTMLCanvasElement | null>
   /** The panel's theme, which the mark layer is tinted from; read again when it changes. */
   theme?: 'day' | 'night'
-  /** The shell's own fields, under the brush size. */
+  /** The shell's own fields, set apart under the brush size. */
   fields?: ReactNode
   /** Nothing may be painted or undone — a job is running over these strokes. */
   disabled?: boolean
@@ -544,7 +544,7 @@ export function LayerPainter({
           <span className="vu-fix-readout">{brushSize} PX</span>
         </div>
 
-        {fields}
+        {fields && <div className="vu-fix-fields">{fields}</div>}
 
         <span className="vu-fix-gap" />
 

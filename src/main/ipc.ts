@@ -133,7 +133,7 @@ import {
   type ComfyTarget,
   stopByHand as stopComfyByHand
 } from './services/comfyService'
-import { REPAINT_STRENGTH } from '@shared/outfits'
+import { DETAILER_DENOISE } from '@shared/outfits'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generatePhoto } from '@shared/llm/cloudImage'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
@@ -280,6 +280,19 @@ async function enqueueComfyJob<T>(
       return run({ signal, onProgress: (step) => report(step), target })
     }
   })
+}
+
+/** A wardrobe repair's denoise as sent, or a throw where it is not a number inside the slider's range. */
+function assertDenoise(denoise: unknown): number {
+  if (
+    typeof denoise !== 'number' ||
+    !Number.isFinite(denoise) ||
+    denoise < DETAILER_DENOISE.min ||
+    denoise > DETAILER_DENOISE.max
+  ) {
+    throw appError('DENOISE_INVALID', 'That denoise is out of range.', String(denoise))
+  }
+  return denoise
 }
 
 /** Registers every IPC channel; keep this, preload and the d.ts in sync. */
@@ -724,12 +737,14 @@ export function registerIpcHandlers(): void {
       character: Character,
       target: WardrobeTarget,
       paintLayer: string,
+      denoise: number,
       seed: number
     ) => {
-      // Decoded before the queue, so bytes that are not a PNG fail now rather than an hour in.
+      // Decoded and checked before the queue, so a bad input fails now rather than an hour in.
       const paint = decodePng(paintLayer, 'the paint layer')
+      const checked = assertDenoise(denoise)
       return enqueueComfyJob(character, `hands:${target}`, (options) =>
-        fixHands(character, target === 'default' ? null : target, paint, seed, options)
+        fixHands(character, target === 'default' ? null : target, paint, checked, seed, options)
       )
     }
   )
@@ -747,25 +762,14 @@ export function registerIpcHandlers(): void {
       source: string,
       paintLayer: string,
       mask: string,
-      strength: number,
+      denoise: number,
       seed: number
     ) => {
       // Decoded and checked before the queue, so a bad input fails now rather than an hour in.
       const sourceBytes = decodePng(source, 'the repaint source')
       const paint = decodePng(paintLayer, 'the paint layer')
       const maskBytes = decodePng(mask, 'the repaint mask')
-      if (
-        typeof strength !== 'number' ||
-        !Number.isFinite(strength) ||
-        strength < REPAINT_STRENGTH.min ||
-        strength > REPAINT_STRENGTH.max
-      ) {
-        throw appError(
-          'REPAINT_STRENGTH_INVALID',
-          'That repaint strength is out of range.',
-          String(strength)
-        )
-      }
+      const checked = assertDenoise(denoise)
       return enqueueComfyJob(character, `repaint:${target}`, (options) =>
         repaintWardrobe(
           character,
@@ -773,7 +777,7 @@ export function registerIpcHandlers(): void {
           sourceBytes,
           paint,
           maskBytes,
-          strength,
+          checked,
           seed,
           options
         )

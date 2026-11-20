@@ -117,8 +117,8 @@ const PERMANENT_CODES = new Set([
   // A wardrobe fix that carries nothing, or bytes that are not the PNG it needs.
   'FIX_EMPTY',
   'FIX_NOT_PNG',
-  // A repaint strength outside the slider's range.
-  'REPAINT_STRENGTH_INVALID',
+  // A wardrobe repair's denoise outside the slider's range.
+  'DENOISE_INVALID',
   // A graduation picture request with a bad reference sheet or character count.
   'ENDING_REQUEST_INVALID',
   // A face-pass job whose set has no base frame yet.

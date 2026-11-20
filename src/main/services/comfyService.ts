@@ -190,6 +190,7 @@ const HANDS_NODE = {
   sourceImage: '10',
   paintImage: '80',
   poseImage: '39',
+  detailer: '20',
   saveImage: '9',
   regionSaveImage: '79'
 } as const
@@ -1144,7 +1145,7 @@ interface GenerationNodes {
   paintImage?: string
   /** The `LoadImage` of everything to redraw; the repaint graph only. */
   maskImage?: string
-  /** The detailer whose denoise a job sets; the repaint graph only. */
+  /** The detailer whose denoise a job sets; the hands and repaint graphs. */
   detailer?: string
   /** Her own LoRA's loader; every graph that samples. */
   characterLora?: string
@@ -1742,6 +1743,7 @@ export async function fixHands(
   character: Character,
   set: OutfitSet | null,
   paint: Buffer,
+  denoise: number,
   seed: number,
   jobOptions: JobOptions = {}
 ): Promise<{ cutout: Buffer; region: Buffer }> {
@@ -1781,11 +1783,12 @@ export async function fixHands(
         poseImageName: skeletonName,
         sourceImageName: sourceName,
         paintImageName: paintName,
+        denoise,
         destPath: join(scratch, 'cutout.png'),
         regionDestPath: join(scratch, 'region.png'),
         format: 'raw',
         label: `${charId} / hands${suffix}`,
-        logContext: `pose=${character.pose}, seed=${seed}${logged}`
+        logContext: `pose=${character.pose}, seed=${seed}, denoise=${denoise}${logged}`
       },
       options
     )

@@ -1,11 +1,12 @@
-import { useRef, useState, type CSSProperties, type JSX } from 'react'
+import { useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, messageOf } from '@shared/errors'
-import { REPAINT_STRENGTH } from '@shared/outfits'
+import { REPAINT_DENOISE_INITIAL } from '@shared/outfits'
 import type { Emotion, OutfitSet } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { DENOISE_SCALE, DenoiseField } from '../components/DenoiseField'
 import { LayerPainter, toPngBase64, type PainterStage } from '../components/LayerPainter'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -25,21 +26,12 @@ export interface RepaintModalProps {
 }
 
 const HINT =
-  'If part of the sprite came out strange, paint over it in the colors it should be and the ' +
-  'image generator will redraw it, or use Mark to have an area redrawn as it is. It is meant ' +
-  'for fixing what the tags already describe, not for adding anything new. Higher strength ' +
-  'strays further from your paint. The face is never redrawn; regenerate the expression instead.'
+  'You can use this to paint over generation errors, like an arm in front of a jacket. You can use the Mark tool without painting to target it for inpainting. Only the painted and marked areas will be regenerated. Please note that this tool is bad at adding new elements: for that it\'s better to change the prompt and regenerate.'
 
-/** The slider's own units: whole percents of the detailer's denoise. */
-const PERCENT = 100
-const STRENGTH_MIN = Math.round(REPAINT_STRENGTH.min * PERCENT)
-const STRENGTH_MAX = Math.round(REPAINT_STRENGTH.max * PERCENT)
-const STRENGTH_STEP = 5
-
-/** What one press of Repaint hands the render: three PNGs and the strength. */
+/** What one press of Repaint hands the render: three PNGs and the denoise. */
 interface RepaintRequest {
   layers: { source: string; paint: string; mask: string }
-  strength: number
+  denoise: number
 }
 
 /** A blank canvas at the stage's size, or a failure the press reports. */
@@ -72,7 +64,7 @@ export function RepaintModal({
   const [stage, setStage] = useState<PainterStage | null>(null)
   const [dirty, setDirty] = useState(false)
   const [painted, setPainted] = useState(false)
-  const [strength, setStrength] = useState(Math.round(REPAINT_STRENGTH.initial * PERCENT))
+  const [denoise, setDenoise] = useState(Math.round(REPAINT_DENOISE_INITIAL * DENOISE_SCALE))
   const [previewing, setPreviewing] = useState<RepaintRequest | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -120,7 +112,7 @@ export function RepaintModal({
       ])
       setPreviewing({
         layers: { source: sourcePng, paint: paintPng, mask: maskPng },
-        strength: strength / PERCENT
+        denoise: denoise / DENOISE_SCALE
       })
     } catch (err) {
       useUiStore
@@ -187,30 +179,12 @@ export function RepaintModal({
               setPainted(state.painted)
             }}
             fields={
-              <div className="vu-fix-field">
-                <span className="vu-range-label">Strength</span>
-                <input
-                  id="repaint-strength"
-                  className="vu-range"
-                  type="range"
-                  min={STRENGTH_MIN}
-                  max={STRENGTH_MAX}
-                  step={STRENGTH_STEP}
-                  value={strength}
-                  disabled={busy}
-                  aria-label="Strength"
-                  aria-valuetext={`${strength} percent`}
-                  style={
-                    {
-                      '--range-fill': `${
-                        ((strength - STRENGTH_MIN) / (STRENGTH_MAX - STRENGTH_MIN)) * 100
-                      }%`
-                    } as CSSProperties
-                  }
-                  onChange={(event) => setStrength(Number(event.target.value))}
-                />
-                <span className="vu-fix-readout">{strength}%</span>
-              </div>
+              <DenoiseField
+                id="repaint-denoise"
+                value={denoise}
+                disabled={busy}
+                onChange={setDenoise}
+              />
             }
           >
             <div className="vu-foot">
@@ -248,7 +222,7 @@ export function RepaintModal({
             set={set}
             title={title}
             theme={theme}
-            render={() => repaint(charId, set, previewing.layers, previewing.strength)}
+            render={() => repaint(charId, set, previewing.layers, previewing.denoise)}
             cancel={() => void cancelRepaint(charId, set)}
             emotions={repairing}
             onCancel={() => setPreviewing(null)}

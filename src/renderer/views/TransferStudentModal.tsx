@@ -7,11 +7,13 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { ROSTER_MAX } from '@shared/application'
 import { firstNameKeyOf } from '@shared/characterRules'
 import { EMOTIONS } from '@shared/emotions'
 import { fullNameOf, type Character } from '@shared/types'
 import { CardCaption } from '../components/CardCaption'
 import { CheckField } from '../components/CheckField'
+import { DeadNote } from '../components/DeadNote'
 import { LlmFailureModal } from '../components/LlmFailureModal'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
@@ -25,6 +27,7 @@ import {
   abandonTransfer,
   cancelPendingTransfer,
   firstFailedTransfer,
+  offerNoteOf,
   retryTransfer,
   startTransfer,
   transferCharacterOf,
@@ -94,9 +97,14 @@ export function TransferStudentModal({
     void useCharacterStore.getState().load()
   }, [])
 
-  const open = transferOffer() === 'open'
+  const offer = transferOffer()
+  const open = offer === 'open'
   // Redrawn as a generation starts or is given up, the jobs being subscribed above.
-  const addDead = !open || transferRoom() <= 0
+  const full = transferRoom() <= 0
+  const addDead = !open || full
+  const fullNote = `Roster maximum reached (${ROSTER_MAX} characters)`
+  // A full roster stays full after the scene or the call ends, so it is the reason named first.
+  const addNote = full ? fullNote : offerNoteOf(offer)
 
   // Everyone waiting, then everyone being generated in the order picked, each one's row becoming
   // her waiting one as she lands.
@@ -174,7 +182,7 @@ export function TransferStudentModal({
           <TitleTab>Transfer students</TitleTab>
 
           {rows.length === 0 ? (
-            <p className="vu-empty">No transfer students waiting.</p>
+            <p className="vu-empty">{full ? fullNote : 'No transfer students waiting.'}</p>
           ) : (
             <div className="vu-scroll-box">
               <motion.ul className="vu-rows vu-transfer-rows" variants={ROW_DEAL}>
@@ -208,16 +216,19 @@ export function TransferStudentModal({
             >
               Close
             </motion.button>
-            <motion.button
-              id="transfer-add"
-              className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
-              type="button"
-              disabled={addDead}
-              {...gestures(addDead, lift, press)}
-              onClick={() => setStep({ kind: 'picking' })}
-            >
-              Add a transfer student
-            </motion.button>
+            {/* Raised under the button, where it covers no row's Cancel. */}
+            <DeadNote note={addDead ? addNote : null} align="center" below>
+              <motion.button
+                id="transfer-add"
+                className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
+                type="button"
+                disabled={addDead}
+                {...gestures(addDead, lift, press)}
+                onClick={() => setStep({ kind: 'picking' })}
+              >
+                Add a transfer student
+              </motion.button>
+            </DeadNote>
           </div>
         </motion.div>
       </motion.div>
@@ -360,7 +371,7 @@ function TransferRow({
             ? 'Generating…'
             : state === 'failed'
               ? 'Generation failed'
-              : 'Arrives next timeslot'}
+              : 'Arriving soon'}
         </span>
       </span>
       <motion.button

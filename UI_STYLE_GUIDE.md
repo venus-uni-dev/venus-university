@@ -171,7 +171,7 @@
 - `.vu-check-meta` is the mono aside after a label — what a box costs, or which call it stands for.
 - `.vu-check-note` is the prose a checkbox carries instead of a count: `.vu-check--noted` aligns the box to the label's first line rather than centring it on the paragraph, and the prose is said at rest and in full.
 - A checkbox switched off deals its whole row `fieldDim`, as an input does, and says nothing.
-- A slider is for an approximate value, and it carries the exact reading beside it rather than under it, where the hand would cover it; where the value has no unit anyone could read, a word at each end of the track stands in for the reading and no figure is shown at all.
+- A slider is for an approximate value, and it carries the exact reading beside it rather than under it, where the hand would cover it; where the value has no unit anyone could read, a word at each end of the track stands in for the reading and no figure is shown at all — unless the figure is one the player knows by name from the tool it drives, as a wardrobe repair's Denoise is ComfyUI's, which reads as that tool writes it, to two decimals.
 - `.vu-range-row` is the labelled slider every screen builds from: the mono label, the track, and either the reading or the two end words.
 - A select's caret is a pseudo on the box around it, the native one having been removed.
 - A colour input is dressed as a field and keeps the native picker behind it, which is where the system eyedropper lives.

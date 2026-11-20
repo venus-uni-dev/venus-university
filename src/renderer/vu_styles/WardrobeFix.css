@@ -176,6 +176,14 @@
   color: var(--vu-accent-ink);
 }
 
+/* The render's own settings, held apart from the brush's so they read as a separate group. */
+.vu-fix-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
 .vu-fix-gap {
   flex: 1;
 }
