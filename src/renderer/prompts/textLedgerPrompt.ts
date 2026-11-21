@@ -137,7 +137,7 @@ export function buildTextLedgerPrompt(
     schema: textLedgerSchema(textedKeys, rosterKeys),
     // Constant: everything save-varying sits below the seam.
     cacheKey: 'text-ledger',
-    thinking: 'history',
+    thinking: 'ledger',
     logFrom: preamble.length + 1
   }
 }

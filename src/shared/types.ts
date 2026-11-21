@@ -74,15 +74,8 @@ export interface StructuredRequest {
    * Absent on every call that is never routed, which is most of them.
    */
   kind?: PromptKind
-  /** Which Settings row this call takes its level from; absent is Scenes. */
-  thinking?: ThinkingRow
-  /**
-   * The least effort this call runs at — a stored level below it is raised to it; absent on
-   * every call that takes the setting as it is.
-   */
-  minThinking?: ThinkingLevel
-  /** Runs this call one level above the one it would otherwise send; absent on every other call. */
-  raiseThinking?: boolean
+  /** The Settings row this call takes its level from, or the level it always runs at. */
+  thinking: ThinkingRow | ThinkingLevel
   /** Images attached to the user turn, base64 without the `data:` prefix. */
   images?: ReferenceImage[]
   /**
@@ -2379,11 +2372,14 @@ export interface Settings {
    */
   apiKey: string
   /**
-   * How hard the model reasons on the Scenes row, and on every call no other row names; resolved
-   * against the model at call time. Gemini's alone.
+   * How hard the model reasons on the Scenes row; resolved against the model at call time.
+   * Gemini's alone.
    */
   thinkingLevel: ThinkingLevel
-  /** Gemini's level for each other row; an absent row reads as its default. Gemini's alone. */
+  /**
+   * Gemini's level for each other row; an absent row reads as its default. Absent altogether on
+   * a file from before the rows, which the upgrade puts every row back to its default for.
+   */
   thinkingLevels?: ThinkingRowLevels
   /**
    * The custom endpoint's API root, up to and including the version segment and without
@@ -2398,11 +2394,14 @@ export interface Settings {
    */
   endpointSecondaryModel?: string
   /**
-   * How hard a custom endpoint's model reasons on the Scenes row and every call no other row
-   * names, sent as `reasoning_effort`. Absent reads as minimal. Read only under `openai`.
+   * How hard a custom endpoint's model reasons on the Scenes row, sent as `reasoning_effort`.
+   * Absent reads as the row's default. Read only under `openai`.
    */
   reasoningEffort?: ThinkingLevel
-  /** A custom endpoint's effort for each other row; an absent row reads as its default. */
+  /**
+   * A custom endpoint's effort for each other row; an absent row reads as its default. Absent
+   * altogether on a file from before the rows, as {@link thinkingLevels} is.
+   */
   reasoningEfforts?: ThinkingRowLevels
   /**
    * The queue a custom endpoint is asked to serve on, sent as `service_tier`. Absent is not sent.

@@ -68,6 +68,8 @@ export function buildQuizPrompt(className: string, facts: readonly string[]): St
       }
     }),
     cacheKey: 'quiz',
+    // The exam has no row of its own and always runs at low.
+    thinking: 'low',
     kind: 'examQuiz'
   }
 }

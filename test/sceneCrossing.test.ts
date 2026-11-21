@@ -50,7 +50,7 @@ function queuedLines(): SceneLine[] {
   return [...useGameStore.getState().pendingLines]
 }
 
-const request = { system: 's', user: 'u', schema: { name: 'n', schema: {} } }
+const request = { system: 's', user: 'u', schema: { name: 'n', schema: {} }, thinking: 'scenes' as const }
 
 beforeEach(() => {
   vi.useFakeTimers()

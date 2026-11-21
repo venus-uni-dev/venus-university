@@ -208,17 +208,9 @@ export async function completeStructured<T>(
 
   const provider = providerToRun(settings)
   const model = modelToRun(settings, request.kind)
-  // The Settings row the level is read from, an untagged call reading Scenes.
-  const row = request.thinking ?? 'scenes'
   // Against the model that will actually run, so a secondary that takes fewer levels than the
   // primary falls to its own default rather than 400ing.
-  const thinkingLevel = reasoningToSend(
-    settings,
-    model.id,
-    row,
-    request.minThinking,
-    request.raiseThinking
-  )
+  const thinkingLevel = reasoningToSend(settings, model.id, request.thinking)
   // Absent is `priority` under Gemini, and none at all for a custom endpoint.
   const serviceTier = serviceTierToSend(settings)
   // The player's own cap where a custom endpoint names one, else the pinned ceiling.
@@ -253,7 +245,7 @@ export async function completeStructured<T>(
       .map(([wire, value]) => `${wire}=${value}`)
       .join(',')
     console.log(
-      `[llm] → ${log.what} (thinking=${thinkingLevel}, row=${row}, tier=${serviceTier ?? 'none'}` +
+      `[llm] → ${log.what} (thinking=${thinkingLevel}, row=${request.thinking}, tier=${serviceTier ?? 'none'}` +
         `, maxTokens=${maxOutputTokens}` +
         `, schema=${request.schema.name}` +
         `${request.cacheKey ? `, cacheKey=${request.cacheKey}` : ''}` +

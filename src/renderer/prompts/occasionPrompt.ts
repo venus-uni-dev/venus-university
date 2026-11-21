@@ -485,7 +485,8 @@ export function buildOccasionPrompt(input: OccasionPromptInput): StructuredReque
     system,
     user,
     schema,
-    cacheKey: 'venus-university-occasion-generation'
+    cacheKey: 'venus-university-occasion-generation',
+    thinking: 'newGame'
   }
 }
 

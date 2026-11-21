@@ -274,6 +274,7 @@ export function buildMajorPrompt(input: MajorPromptInput): StructuredRequest | n
       characters: keyedArray(keys, { major: { type: 'string' } })
     }),
     cacheKey: 'venus-university-major-generation',
+    thinking: 'newGame',
     logFrom: preamble.length + 1
   }
 }
@@ -514,6 +515,7 @@ export function buildStudentPrompt(input: StudentPromptInput): StructuredRequest
     user: `${preamble}\n${rest}`,
     schema: objectSchema('student_profile', Object.keys(properties), properties),
     cacheKey: 'venus-university-student-generation',
+    thinking: 'newGame',
     logFrom: preamble.length + 1
   }
 }
@@ -557,6 +559,7 @@ export function buildReturningPrompt(input: ReturningPromptInput): StructuredReq
     user: `${preamble}\n${rest}`,
     schema: objectSchema('returning_student', Object.keys(properties), properties),
     cacheKey: `venus-university-returning-generation-${input.season}`,
+    thinking: 'newGame',
     logFrom: preamble.length + 1
   }
 }
@@ -606,6 +609,7 @@ export function buildGraduatePrompt(input: GraduatePromptInput): StructuredReque
       breakPosts: { type: 'array', maxItems: MAX_WINTER_POSTS, items: { type: 'string' } }
     }),
     cacheKey: `venus-university-graduate-generation-${input.season}`,
+    thinking: 'newGame',
     logFrom: preamble.length + 1
   }
 }

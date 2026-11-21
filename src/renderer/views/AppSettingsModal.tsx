@@ -107,9 +107,20 @@ const TABS: readonly { id: SettingsTab; word: string; Mark: () => JSX.Element }[
   { id: 'advanced', word: 'Advanced', Mark: SlidersIcon }
 ]
 
-/** What the thinking rows' hint says on both pages, after the page's own first words. */
-const THINKING_ROWS_HINT =
-  'History updates memories, stats and money after scenes and texts. Classifiers work out where your actions take you, who comes along, and whether a text is an invite.'
+/** What the Thinking note says on both pages, before the page's own last words. */
+const THINKING_NOTE =
+  "Higher thinking levels do better on logical tasks, but take longer and spend more tokens. It's recommended to leave these as they are."
+
+/** What each thinking row is for, under its name. */
+const THINKING_ROW_HINTS: Record<ThinkingRow, string> = {
+  scenes: 'Prose/expression setting etc. in scenes',
+  ledger: 'Memory, money, stats recording after scenes',
+  intros: 'Opening narration, hangout texts, status updates',
+  texts: 'Text message replies',
+  classifiers: 'Classifies start-of-day decisions into action types and identifies hangout requests',
+  characters: 'Expands new character prompts into full profiles',
+  newGame: 'Creates occasions, classes, character profiles, etc.'
+}
 
 /** A page arriving as its tab is picked; leaving, it is simply hidden. */
 const PAGE_IN = fadeIn(0, 0.25)
@@ -672,39 +683,29 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   )
 
   /**
-   * One page's thinking rows under their heading: a select per row on the levels `accepted`, and
-   * the page's own hint before what the rows are for.
+   * One page's thinking rows under their heading and its note, which ends on the page's own
+   * words: a select per row on the levels `accepted`, each with what it is for.
    */
   const thinkingRowsBlock = (
-    hint: string,
+    pageNote: string,
     levels: Record<ThinkingRow, ThinkingLevel>,
     accepted: readonly ThinkingLevel[],
     onChange: (row: ThinkingRow, value: string) => void
   ): JSX.Element => (
     <>
-      <span className="vu-settings-heading vu-settings-group-heading">Thinking/Reasoning</span>
-      <span className="vu-field-hint">{`${hint} ${THINKING_ROWS_HINT}`}</span>
-      <div className="vu-settings-levels">
-        {THINKING_ROWS.map((row) => (
-          <label key={row} className="vu-settings-level" htmlFor={`settings-thinking-${row}`}>
-            <span className="vu-field-label vu-settings-level-label">{THINKING_ROW_LABELS[row]}</span>
-            <span className="vu-field vu-settings-level-pick">
-              <select
-                id={`settings-thinking-${row}`}
-                className="vu-input vu-select"
-                value={levels[row]}
-                onChange={(e) => onChange(row, e.target.value)}
-              >
-                {accepted.map((level) => (
-                  <option key={level} value={level}>
-                    {THINKING_LEVEL_LABELS[level]}
-                  </option>
-                ))}
-              </select>
-            </span>
-          </label>
-        ))}
-      </div>
+      <span className="vu-settings-heading vu-settings-group-heading">Thinking</span>
+      <p className="vu-settings-note">{`${THINKING_NOTE} ${pageNote}`}</p>
+      {THINKING_ROWS.map((row) => (
+        <SelectField
+          key={row}
+          id={`settings-thinking-${row}`}
+          label={THINKING_ROW_LABELS[row]}
+          hint={THINKING_ROW_HINTS[row]}
+          value={levels[row]}
+          onChange={(value) => onChange(row, value)}
+          options={accepted.map((level) => ({ value: level, label: THINKING_LEVEL_LABELS[level] }))}
+        />
+      ))}
     </>
   )
 
@@ -1013,7 +1014,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       </div>
 
                       {thinkingRowsBlock(
-                        'Sent with every call. Some servers reject the field outright, and only some models accept Minimal.',
+                        'Some servers reject the field outright, and only some models accept Minimal.',
                         efforts,
                         THINKING_LEVELS,
                         handleEffortChange
@@ -1126,7 +1127,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       />
 
                       {thinkingRowsBlock(
-                        'Higher levels write better but take longer. Only 3.6 and older models support Minimal effort.',
+                        'Only 3.6 and older models support Minimal.',
                         thinking,
                         thinkingLevels,
                         handleThinkingChange

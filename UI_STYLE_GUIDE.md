@@ -174,7 +174,6 @@
 - A slider is for an approximate value, and it carries the exact reading beside it rather than under it, where the hand would cover it; where the value has no unit anyone could read, a word at each end of the track stands in for the reading and no figure is shown at all — unless the figure is one the player knows by name from the tool it drives, as a wardrobe repair's Denoise is ComfyUI's, which reads as that tool writes it, to two decimals.
 - `.vu-range-row` is the labelled slider every screen builds from: the mono label, the track, and either the reading or the two end words.
 - A select's caret is a pseudo on the box around it, the native one having been removed.
-- `.vu-settings-level` is the select that stands on one line with its label, the mono label at a fixed width and a short select beside it, so a set of them reads as one column of choices: Settings' thinking rows, under a group heading and one hint.
 - A colour input is dressed as a field and keeps the native picker behind it, which is where the system eyedropper lives.
 - A chip well is the one field the chip inputs share, and a select at chip size is its dropdown.
 - A tag well's label carries a copy mark after its words while the well holds a tag, the bare mark in the label's muted ink; pressed, it turns to a check in the good role until its modal closes or another of that modal's marks is pressed.
@@ -269,6 +268,7 @@
 
 - The app draws its own cursor as *the system's* cursor, through one `--vu-cursor` property `window.css` hands to `cursor`, composited by the OS; no file in `vu_styles` writes `cursor:`.
 - What a cursor means is `data-cursor` on the element the click is aimed at, read off the element rather than off its CSS: dead first, then what it says, then what it is.
+- A label is not a target: its words — a field's title and hint, a checkbox's words — wear the arrow, and only the control inside it asks for the hand or the bar.
 - The theme is read from under the pointer, then from the screen, and night otherwise.
 - Nothing about it is animated, and it falls back to the system cursor wherever it is not drawing.
 

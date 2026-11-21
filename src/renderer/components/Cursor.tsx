@@ -21,14 +21,15 @@ const LINES: ReadonlySet<Shape> = new Set<Shape>(['text', 'crosshair', 'move', '
 /**
  * What the pointer might be over that is not the ground. **Intent is read off the element, not
  * off its CSS**, so a screen's own control gets the same cursor a primitive does without naming
- * itself; `data-cursor` says otherwise, and the nearest match wins.
+ * itself; `data-cursor` says otherwise, and the nearest match wins. A label is not among them:
+ * its words, a field's title and hint or a checkbox's, wear the arrow, and only the control
+ * inside it asks for anything else.
  */
 const INTENT = [
   '[data-cursor]',
   'button',
   'a[href]',
   'select',
-  'label',
   'summary',
   '[role="button"]',
   'input',
@@ -46,9 +47,7 @@ const PRESSED = new Set(['range', 'checkbox', 'radio', 'color', 'file', 'submit'
  */
 function dead(el: Element): boolean {
   if (el.closest('[inert]')) return true
-  if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') return true
-  const control = el instanceof HTMLLabelElement ? el.control : null
-  return Boolean(control && 'disabled' in control && control.disabled)
+  return el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true'
 }
 
 /** The shape the element under the pointer asks for; the ground asks for the arrow. */

@@ -136,6 +136,7 @@ export async function testWriter(candidate: Settings): Promise<void> {
     {
       system: 'Answer with ok true.',
       user: 'Ping.',
+      thinking: 'scenes',
       schema: {
         name: 'connection_test',
         schema: {

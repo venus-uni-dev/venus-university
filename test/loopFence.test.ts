@@ -194,7 +194,7 @@ function deltaHarness(): {
 describe('a scene call abandoned mid-stream', () => {
   it('drops its deltas and leaves the new run’s streaming flag alone', async () => {
     const { emit, stream, resolve } = deltaHarness()
-    const pending = streamScene({ system: 's', user: 'u', schema: { name: 'n', schema: {} } })
+    const pending = streamScene({ system: 's', user: 'u', schema: { name: 'n', schema: {} }, thinking: 'scenes' })
 
     leaveAndLoad()
     // An abandoned call keeps streaming until the invoke settles.
@@ -214,7 +214,7 @@ describe('a scene call abandoned mid-stream', () => {
 
   it('cannot feed the call that took its place', async () => {
     const { emit, stream, resolve } = deltaHarness()
-    const pending = streamScene({ system: 's', user: 'u', schema: { name: 'n', schema: {} } })
+    const pending = streamScene({ system: 's', user: 'u', schema: { name: 'n', schema: {} }, thinking: 'scenes' })
 
     // The opening of a goodbye an interjection cut short, landing after the next call subscribed.
     emit('scene-0', '{"lines":[{"speaker":"","text":"A goodbye line."}')

@@ -143,31 +143,6 @@
   text-transform: uppercase;
 }
 
-/* The thinking rows: one set under their heading and hint, each row its label at a fixed
-   width and a select at a short one beside it, so the four selects stand in one column. */
-.vu-settings-levels {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: -4px;
-}
-
-.vu-settings-level {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.vu-settings-level-label {
-  flex: none;
-  width: 112px;
-}
-
-.vu-settings-level-pick {
-  flex: 0 1 200px;
-  min-width: 0;
-}
-
 /* A field the player types a secret into; the space above it separates it from the pickers
    it follows. */
 .vu-settings-key {

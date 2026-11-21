@@ -260,7 +260,7 @@ describe('openaiAdapter.buildCall sampling', () => {
     defaultThinkingLevel: 'minimal'
   }
   const context = (sampling: Record<string, number>): BuildCallContext => ({
-    request: { system: '', user: '', schema: { name: 'scene', schema: {} } },
+    request: { system: '', user: '', schema: { name: 'scene', schema: {} }, thinking: 'scenes' },
     provider,
     model,
     apiKey: '',

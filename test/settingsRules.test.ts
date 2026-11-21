@@ -47,6 +47,7 @@ function settingsPatch(over: Partial<SettingsPatch> = {}): SettingsPatch {
     apiModel: 'gemini-3.7-flash',
     thinkingLevel: 'low',
     thinkingLevels: {},
+    reasoningEfforts: {},
     comfyDeferred: false,
     noNsfwImages: false,
     lessNsfwText: false,
@@ -154,8 +155,8 @@ describe("mergePatch — each provider's model picks", () => {
       endpointModel: 'local-7b',
       endpointSecondaryModel: 'local-1b',
       reasoningEffort: 'medium',
-      thinkingLevels: { history: 'high' },
-      reasoningEfforts: { texts: 'low', classifiers: 'minimal' }
+      thinkingLevels: { ledger: 'high' },
+      reasoningEfforts: { texts: 'low', newGame: 'minimal' }
     } as const
     const gemini = settings({ apiProvider: 'gemini', ...picks })
 
@@ -214,20 +215,33 @@ describe('upgradeSettings', () => {
     expect(upgradeSettings(blank).settings).toBe(blank)
   })
 
-  it("carries each provider's one level onto its Texts row where it has no rows yet", () => {
-    const old = { ...settings({ thinkingLevel: 'low', reasoningEffort: 'high' }) }
+  it('starts every row of a file from before the rows at its default, under each provider', () => {
+    const old: Settings = settings({ thinkingLevel: 'minimal', reasoningEffort: 'high' })
     delete old.thinkingLevels
+    delete old.reasoningEfforts
     const { settings: read, upgraded } = upgradeSettings(old)
     expect(upgraded).toBe(true)
-    expect(read.thinkingLevels).toEqual({ texts: 'low' })
-    expect(read.reasoningEfforts).toEqual({ texts: 'high' })
+    expect(read.thinkingLevel).toBe('low')
+    expect(read.thinkingLevels).toEqual({})
+    expect(read.reasoningEfforts).toEqual({})
+    expect('reasoningEffort' in read).toBe(false)
+  })
 
-    const noEffort = { ...settings() }
-    delete noEffort.thinkingLevels
-    expect(upgradeSettings(noEffort).settings.reasoningEfforts).toBeUndefined()
+  it('moves a stored History row to Ledger and drops what is no row or level', () => {
+    const rows = settings({
+      thinkingLevel: 'high',
+      thinkingLevels: { texts: 'minimal', history: 'high', classifiers: 'medium' } as never,
+      reasoningEfforts: { ledger: 'low', history: 'high', bogus: 'high', texts: 'ultra' } as never
+    })
+    const { settings: read, upgraded } = upgradeSettings(rows)
+    expect(upgraded).toBe(true)
+    expect(read.thinkingLevel).toBe('high')
+    expect(read.thinkingLevels).toEqual({ texts: 'minimal', ledger: 'high', classifiers: 'medium' })
+    expect(read.reasoningEfforts).toEqual({ ledger: 'low' })
 
-    const stored = settings({ thinkingLevels: { history: 'high' }, reasoningEfforts: {} })
-    expect(upgradeSettings(stored)).toEqual({ settings: stored, upgraded: false })
+    const current = settings({ thinkingLevels: { ledger: 'high' }, reasoningEfforts: {} })
+    expect(upgradeSettings(current)).toEqual({ settings: current, upgraded: false })
+    expect(upgradeSettings(settings()).upgraded).toBe(false)
   })
 
   it('drops the retired NSFW sound switch, a switched-on one putting the NSFW slider at 0', () => {

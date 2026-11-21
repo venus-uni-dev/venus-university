@@ -6,7 +6,6 @@ import {
   imageApiFor,
   modelFor,
   providerFor,
-  thinkingLevelFor,
   thinkingRowsFor
 } from '@shared/providers'
 import {
@@ -812,14 +811,14 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
   const custom = apiProvider === 'openai'
   const modelId = modelIdText.trim()
 
-  // The two questions the custom page asks its endpoint, at the effort already stored; an absent
-  // effort reads as minimal.
+  // The two questions the custom page asks its endpoint, at the Scenes effort already stored; an
+  // absent one reads as the row's default.
   const probe = useEndpointProbe({
     enabled: custom,
     endpointUrl,
     endpointKey,
     modelId,
-    reasoningEffort: thinkingLevelFor('openai', '', settings?.reasoningEffort ?? '')
+    reasoningEffort: thinkingRowsFor(settings ?? {}, 'openai', '').scenes
   })
 
   // Which image models the images URL serves and whether it draws at all, asked on the staged

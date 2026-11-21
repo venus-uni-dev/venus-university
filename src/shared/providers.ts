@@ -10,7 +10,7 @@ export type ProviderApi = 'gemini' | 'openai'
 export const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'] as const
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number]
 
-function isThinkingLevel(value: unknown): value is ThinkingLevel {
+export function isThinkingLevel(value: unknown): value is ThinkingLevel {
   return THINKING_LEVELS.includes(value as ThinkingLevel)
 }
 
@@ -22,25 +22,46 @@ export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   high: 'High'
 }
 
-/** The groups of calls the player sets a level for, in the order Settings lists them. */
-export const THINKING_ROWS = ['scenes', 'texts', 'history', 'classifiers'] as const
+/** The groups of calls the player sets a level for, most important first, as Settings lists them. */
+export const THINKING_ROWS = [
+  'scenes',
+  'ledger',
+  'intros',
+  'texts',
+  'classifiers',
+  'characters',
+  'newGame'
+] as const
 export type ThinkingRow = (typeof THINKING_ROWS)[number]
+
+/** Type guard for a row read off a hand-editable record. */
+export function isThinkingRow(value: unknown): value is ThinkingRow {
+  return THINKING_ROWS.includes(value as ThinkingRow)
+}
 
 /** The rows stored beside the provider's own level, which is the Scenes row. */
 export type ThinkingRowLevels = Partial<Record<Exclude<ThinkingRow, 'scenes'>, ThinkingLevel>>
 
-/** Shown beside each row's select. */
+/** Shown over each row's select. */
 export const THINKING_ROW_LABELS: Record<ThinkingRow, string> = {
   scenes: 'Scenes',
+  ledger: 'Ledger',
+  intros: 'Intros',
   texts: 'Texts',
-  history: 'History',
-  classifiers: 'Classifiers'
+  classifiers: 'Classifiers',
+  characters: 'Character creation',
+  newGame: 'New game setup'
 }
 
-/** What an absent row reads as; a row not named here takes the model's own default. */
-const THINKING_ROW_DEFAULTS: Partial<Record<ThinkingRow, ThinkingLevel>> = {
-  history: 'medium',
-  classifiers: 'low'
+/** What a row reads as while nothing is stored for it. */
+export const THINKING_ROW_DEFAULTS: Record<ThinkingRow, ThinkingLevel> = {
+  scenes: 'low',
+  ledger: 'medium',
+  intros: 'low',
+  texts: 'low',
+  classifiers: 'low',
+  characters: 'medium',
+  newGame: 'medium'
 }
 
 /** Which inference queue serves a request, in the order Settings lists them, the default first. */
@@ -340,48 +361,23 @@ export function modelFor(apiProvider: ProviderApi, modelId: string): ModelConfig
 
 /**
  * Resolves a stored thinking level against the model that will run, falling back to its default
- * the way `modelFor` falls back to the provider's. An optional `floor` raises the result to the
- * lowest accepted level at or above it, or leaves it if the model accepts none such.
+ * the way `modelFor` falls back to the provider's.
  */
 export function thinkingLevelFor(
   apiProvider: ProviderApi,
   modelId: string,
-  stored: string,
-  floor?: ThinkingLevel
+  stored: string
 ): ThinkingLevel {
   const model = modelFor(apiProvider, modelId)
-  const resolved = isThinkingLevel(stored) && model.thinkingLevels.includes(stored)
+  return isThinkingLevel(stored) && model.thinkingLevels.includes(stored)
     ? stored
     : model.defaultThinkingLevel
-  return raiseTo(resolved, floor, model.thinkingLevels)
-}
-
-/**
- * `level` raised to the lowest of `accepted` at or above `floor`, or left where it is when it
- * already clears the floor, there is no floor, or nothing accepted clears it.
- */
-export function raiseTo(
-  level: ThinkingLevel,
-  floor: ThinkingLevel | undefined,
-  accepted: readonly ThinkingLevel[]
-): ThinkingLevel {
-  if (!floor) return level
-  const floorIndex = THINKING_LEVELS.indexOf(floor)
-  if (THINKING_LEVELS.indexOf(level) >= floorIndex) return level
-  return THINKING_LEVELS.slice(floorIndex).find((candidate) => accepted.includes(candidate)) ?? level
-}
-
-/** The next of `accepted` above `level`, or `level` itself where none is. */
-export function stepUp(level: ThinkingLevel, accepted: readonly ThinkingLevel[]): ThinkingLevel {
-  const above = THINKING_LEVELS.slice(THINKING_LEVELS.indexOf(level) + 1)
-  return above.find((candidate) => accepted.includes(candidate)) ?? level
 }
 
 /**
  * One row's level as `provider` stores it, unresolved: the Scenes row is the provider's own
  * level — Gemini's `thinkingLevel`, a custom endpoint's `reasoningEffort` — and every other row
- * is read off that provider's record, an absent one reading as the row's default or, where it has
- * none, as blank, which resolves to the model's default.
+ * is read off that provider's record, any row with nothing stored reading as its default.
  */
 export function storedLevelFor(
   settings: Partial<
@@ -391,9 +387,13 @@ export function storedLevelFor(
   row: ThinkingRow
 ): string {
   const custom = provider === 'openai'
-  if (row === 'scenes') return (custom ? settings.reasoningEffort : settings.thinkingLevel) ?? ''
-  const record = custom ? settings.reasoningEfforts : settings.thinkingLevels
-  return record?.[row] ?? THINKING_ROW_DEFAULTS[row] ?? ''
+  const stored =
+    row === 'scenes'
+      ? custom
+        ? settings.reasoningEffort
+        : settings.thinkingLevel
+      : (custom ? settings.reasoningEfforts : settings.thinkingLevels)?.[row]
+  return stored ?? THINKING_ROW_DEFAULTS[row]
 }
 
 /** Every row resolved against `modelId` on `provider`, as Settings shows them. */
@@ -411,19 +411,18 @@ export function thinkingRowsFor(
 }
 
 /**
- * The level a call names: its row as the active provider stores it, resolved against the model
- * that will run, with a floor raising it and `raise` then taking it one accepted level higher.
+ * The level a call names, resolved against the model that will run: its row as the active
+ * provider stores it, or the level itself for a call that always runs at one.
  */
 export function reasoningToSend(
   settings: Settings,
   modelId: string,
-  row: ThinkingRow,
-  floor?: ThinkingLevel,
-  raise?: boolean
+  thinking: ThinkingRow | ThinkingLevel
 ): ThinkingLevel {
-  const stored = storedLevelFor(settings, settings.apiProvider, row)
-  const level = thinkingLevelFor(settings.apiProvider, modelId, stored, floor)
-  return raise ? stepUp(level, modelFor(settings.apiProvider, modelId).thinkingLevels) : level
+  const stored = isThinkingRow(thinking)
+    ? storedLevelFor(settings, settings.apiProvider, thinking)
+    : thinking
+  return thinkingLevelFor(settings.apiProvider, modelId, stored)
 }
 
 /**

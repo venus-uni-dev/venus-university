@@ -9,7 +9,10 @@ import {
   defaultSecondaryModelFor,
   IMAGE_MODEL_ID,
   imageApiFor,
+  isThinkingLevel,
+  isThinkingRow,
   storedLevelFor,
+  THINKING_ROW_DEFAULTS,
   THINKING_ROWS,
   type ProviderApi,
   type ThinkingLevel,
@@ -178,21 +181,51 @@ function upgradeCastSwitch<T extends UpgradeFields>(settings: T): T {
 }
 
 /**
- * Each provider's one level carried onto its Texts row where it has no rows stored yet, so
- * texting runs where it ran before the rows; History and Classifiers are left to their defaults.
- * A provider with rows stored, or with no level to carry, is left as it came.
+ * Each provider's thinking rows brought up to this build. A provider with no rows stored, as
+ * every file from before them has, starts every row at its default, its one level included; a
+ * record that named the ledgers' row History names it Ledger, and anything else it holds that is
+ * no row and level of this build is dropped. Rows already as this build writes them are left.
  */
 function upgradeThinkingRows<T extends UpgradeFields>(settings: T): T {
-  const gemini =
-    settings.thinkingLevels === undefined && settings.thinkingLevel !== undefined
-      ? { thinkingLevels: { texts: settings.thinkingLevel } }
-      : {}
-  const custom =
-    settings.reasoningEfforts === undefined && settings.reasoningEffort !== undefined
-      ? { reasoningEfforts: { texts: settings.reasoningEffort } }
-      : {}
-  if (Object.keys(gemini).length === 0 && Object.keys(custom).length === 0) return settings
-  return { ...settings, ...gemini, ...custom }
+  const gemini = settings.thinkingLevels
+  const custom = settings.reasoningEfforts
+  const next: Partial<UpgradeFields> = {}
+  if (gemini === undefined) {
+    next.thinkingLevel = THINKING_ROW_DEFAULTS.scenes
+    next.thinkingLevels = {}
+  } else {
+    const rows = rowsOf(gemini)
+    if (rows !== gemini) next.thinkingLevels = rows
+  }
+  if (custom === undefined) {
+    next.reasoningEfforts = {}
+  } else {
+    const rows = rowsOf(custom)
+    if (rows !== custom) next.reasoningEfforts = rows
+  }
+  if (Object.keys(next).length === 0) return settings
+  if (custom !== undefined) return { ...settings, ...next }
+  const { reasoningEffort: _single, ...rest } = settings
+  return { ...rest, ...next } as T
+}
+
+/**
+ * A stored record as this build's rows, the History row moved to Ledger and anything else that is
+ * not one of its rows at one of its levels left out; the record itself where nothing changes.
+ */
+function rowsOf(record: unknown): ThinkingRowLevels {
+  const entries = typeof record === 'object' && record !== null ? Object.entries(record) : []
+  const rows: ThinkingRowLevels = {}
+  for (const [key, level] of entries) {
+    const row = key === 'history' ? 'ledger' : key
+    if (!isThinkingRow(row) || row === 'scenes' || !isThinkingLevel(level)) continue
+    if (key === 'history' && entries.some(([other]) => other === 'ledger')) continue
+    rows[row] = level
+  }
+  const same =
+    entries.length === Object.keys(rows).length &&
+    entries.every(([key, level]) => rows[key as keyof ThinkingRowLevels] === level)
+  return same ? (record as ThinkingRowLevels) : rows
 }
 
 /**
@@ -233,10 +266,11 @@ export function defaultSettings(): Settings {
     // From the provider table.
     apiModel: defaultModelFor('gemini').id,
     apiKey: '',
-    thinkingLevel: defaultModelFor('gemini').defaultThinkingLevel,
-    // Every row but Scenes at its default, written empty so the file is never taken for one
-    // to upgrade.
+    thinkingLevel: THINKING_ROW_DEFAULTS.scenes,
+    // Every other row at its default, under each provider, written empty so the file is never
+    // taken for one from before the rows.
     thinkingLevels: {},
+    reasoningEfforts: {},
     // The cheaper model the routable kinds run on. `secondaryModelFor` stays
     // absent beside it, which is what routes the default set (`DEFAULT_SECONDARY_KINDS`)
     // until the panel says otherwise.

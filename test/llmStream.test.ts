@@ -133,7 +133,8 @@ describe('completeStructured', () => {
   const request: StructuredRequest = {
     system: 'be brief',
     user: 'say something',
-    schema: { name: 'scene', schema: { type: 'object' } }
+    schema: { name: 'scene', schema: { type: 'object' } },
+    thinking: 'scenes'
   }
 
   /** One structured call with a preview channel attached. */
