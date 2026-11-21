@@ -1,7 +1,9 @@
 /**
  * A memory is kept and prompted in the third person ("the reader was late"), the verb agreeing
  * with "the reader", and shown to the player with the reader's first name in his place, as a recap
- * is; one the player types with that name is filed with "the reader" back in its place.
+ * is; one the player types with that name is filed with "the reader" back in its place. The
+ * scene's status lines read the ledger's own second-person words instead ("you were late"),
+ * which are never filed.
  */
 
 import { PRONOUNS, readerWords, type ReaderPronouns } from './gender'
@@ -105,6 +107,17 @@ export function storedMemoryDesc(
   reader: ReaderPronouns
 ): string {
   return readerize(text.trim(), holder, reader).replace(/^The reader\b/, 'the reader')
+}
+
+/**
+ * The ledger's second-person wording of a memory as the status lines read it: trimmed and opening
+ * lower-case like {@link storedMemoryDesc}, or absent where it is blank or still says "the
+ * reader", which leaves the line to the reader's name.
+ */
+export function storedYouDesc(text: string | undefined): string | undefined {
+  const trimmed = typeof text === 'string' ? text.trim() : ''
+  if (!trimmed || /\bthe reader\b/i.test(trimmed)) return undefined
+  return trimmed.replace(/^You\b/, 'you')
 }
 
 /**

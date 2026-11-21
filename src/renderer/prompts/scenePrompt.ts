@@ -2126,12 +2126,16 @@ const MEMORY_VOICE_EXAMPLE: Record<ReaderPronouns, { whom: string; wrong: string
   they: { whom: 'her', wrong: 'they lent her their notes' }
 }
 
-/** The two ledger rules on how a memory names the reader and the character it belongs to. */
+/**
+ * The three ledger rules on how a memory names the reader and the character it belongs to: its
+ * `desc` in the third person, and its `youDesc` the same memory spoken to the reader.
+ */
 export function memoryVoiceLines(reader: ReaderPronouns): string[] {
   const example = MEMORY_VOICE_EXAMPLE[reader]
   return [
-    `Call the reader "the reader" every time, never "you", ${readerWords(reader).list}: "the reader lent ${example.whom} the reader's notes", not "${example.wrong}".`,
-    'Only use "he", "she", "him", "her" or "his" for the character the memory belongs to, and call anybody else by name: "the reader left the party with Mina", not "the reader left the party with her".'
+    `In "desc", call the reader "the reader" every time, never "you", ${readerWords(reader).list}: "the reader lent ${example.whom} the reader's notes", not "${example.wrong}".`,
+    'Only use "he", "she", "him", "her" or "his" for the character the memory belongs to, and call anybody else by name: "the reader left the party with Mina", not "the reader left the party with her".',
+    `Then write the same memory again in "youDesc", this time talking to the reader as "you": "you lent ${example.whom} your notes".`
   ]
 }
 
@@ -2256,11 +2260,12 @@ function ledgerSchema(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['charKey', 'type', 'desc'],
+          required: ['charKey', 'type', 'desc', 'youDesc'],
           properties: {
             charKey,
             type: memoryType,
-            desc: { type: 'string' }
+            desc: { type: 'string' },
+            youDesc: { type: 'string' }
           }
         }
       },

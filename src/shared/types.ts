@@ -2707,8 +2707,12 @@ export interface SceneResponse {
  * which milestones were passed, what the hour did for the reader, and what he agreed to later.
  */
 export interface LedgerResponse {
-  /** Both cast-scoped arrays are absent for a solo scene, whose schema omits them. */
-  memories?: Array<{ charKey: string; type: MemoryType; desc: string }>
+  /**
+   * Both cast-scoped arrays are absent for a solo scene, whose schema omits them. Each row's
+   * `youDesc` is its `desc` spoken to the reader as "you", for the scene's status lines alone;
+   * an older save's banked reply has none.
+   */
+  memories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
   events?: Array<{ charKey: string; event: RelationshipEvent }>
   /**
    * Every kiss and every night the hour held, one row per kind per set of girls; absent for a
@@ -2719,7 +2723,7 @@ export interface LedgerResponse {
    * What this slot's texting left each girl with — one per character, at most. The texting
    * ledger's field, scoped to whoever actually texted this slot.
    */
-  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string }>
+  textMemories?: Array<{ charKey: string; type: MemoryType; desc: string; youDesc?: string }>
   /**
    * The plans the slot settled on — the scene's from the scene ledger, the texts'
    * from the texting ledger, deduped by the merge.

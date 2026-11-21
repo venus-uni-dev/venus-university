@@ -97,6 +97,9 @@ function missingPositionLorasLine(cgs: readonly string[]): string {
     : `Position LoRAs for ${namesPhrase(cgs)} are missing. Generation will proceed without them.`
 }
 
+/** The order the grid was last sorted in this launch, which every visit opens on. */
+let lastSort: CharacterSort = 'recent'
+
 /**
  * Manage Characters: one grid for existing and in-flight characters, plus
  * local per-character modal state.
@@ -164,10 +167,9 @@ export function ManageCharactersView(): JSX.Element {
   // Drawn once per visit, from the dev switch or the machine clock.
   const [theme] = useState(heldScreenTheme)
 
-  // Every visit opens on the newest write: what he last worked on is what he is likely to want
-  // next, and a character who has just finished generating is first, having been written a
-  // moment ago. `sorted` is whether he has changed it since, which deals the grid at once.
-  const [sort, setSort] = useState<CharacterSort>('recent')
+  // Every visit opens on the order he last picked this launch, and on the newest write before
+  // he has picked one. `sorted` is whether he has changed it since, which deals the grid at once.
+  const [sort, setSort] = useState<CharacterSort>(() => lastSort)
   const [sorted, setSorted] = useState(false)
   const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
 
@@ -430,6 +432,7 @@ export function ManageCharactersView(): JSX.Element {
               value={sort}
               popupHost={popupHost}
               onChange={(next) => {
+                lastSort = next
                 setSort(next)
                 setSorted(true)
               }}

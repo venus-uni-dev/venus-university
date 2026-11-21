@@ -42,6 +42,12 @@ export interface LoadCharacterModalProps {
  */
 const PICK_DEAL = dealt(0, 0.03)
 
+/**
+ * The order the picker was last sorted in this launch, which every opening starts on, from
+ * whichever screen opens it.
+ */
+let lastSort: CharacterSort = 'recent'
+
 /** Picks a fully rendered character into an empty New Game slot. */
 export function LoadCharacterModal({
   taken,
@@ -53,8 +59,7 @@ export function LoadCharacterModal({
   const allOrder = useCharacterStore((s) => s.order)
   const removedDefaults = useCharacterStore((s) => s.removedDefaults)
   const pregenIds = useCharacterStore((s) => s.pregenIds)
-  // Every opening starts on the newest write, as Manage Characters does.
-  const [sort, setSort] = useState<CharacterSort>('recent')
+  const [sort, setSort] = useState<CharacterSort>(() => lastSort)
   const order = useMemo(
     () =>
       sortCharacterIds(
@@ -135,6 +140,7 @@ export function LoadCharacterModal({
                 value={sort}
                 popupHost={popupHost}
                 onChange={(next) => {
+                  lastSort = next
                   setSort(next)
                   scroller.current?.scrollTo({ top: 0 })
                 }}

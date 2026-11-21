@@ -211,18 +211,21 @@ export function affectionFor(
   )
 }
 
+/** A memory as a status line reads it: its desc, and the ledger's second-person words if kept. */
+export type SpokenMemory = Pick<CharMemory, 'type' | 'desc'> & { youDesc?: string }
+
 /**
  * The three parts of a memory sentence, cut where the word it is coloured by begins and ends:
- * its desc with the reader called `readerName`.
+ * its second-person words where it has them, else its desc with the reader called `readerName`.
  */
 function memoryParts(
   name: string,
-  entry: Pick<CharMemory, 'type' | 'desc'>,
+  entry: SpokenMemory,
   readerName: string,
   holder: Gender,
   reader: ReaderPronouns
 ): { before: string; run: string; after: string } {
-  const desc = sentence(shownMemoryDesc(entry.desc, readerName, holder, reader))
+  const desc = sentence(entry.youDesc ?? shownMemoryDesc(entry.desc, readerName, holder, reader))
   return { before: `${name} `, run: entry.type, after: ` that ${desc}` }
 }
 
@@ -237,7 +240,14 @@ export function memorySentence(
   holder: Gender,
   reader: ReaderPronouns
 ): string {
-  const { before, run, after } = memoryParts(name, entry, readerName, holder, reader)
+  // Only its two fields: an older save's memory may still carry second-person words on disk.
+  const { before, run, after } = memoryParts(
+    name,
+    { type: entry.type, desc: entry.desc },
+    readerName,
+    holder,
+    reader
+  )
   return `${before}${run}${after}`
 }
 
@@ -246,9 +256,11 @@ export function overTextDesc(desc: string): string {
   return `${desc.replace(/[.!?…]+$/, '')} over text.`
 }
 
-/** A texting memory with the clause that says where it came from. */
-export function overTextMemory<T extends Pick<CharMemory, 'desc'>>(entry: T): T {
-  return { ...entry, desc: overTextDesc(entry.desc) }
+/** A texting memory with the clause that says where it came from, in both of its voices. */
+export function overTextMemory<T extends Pick<SpokenMemory, 'desc' | 'youDesc'>>(entry: T): T {
+  const said = { ...entry, desc: overTextDesc(entry.desc) }
+  if (entry.youDesc !== undefined) said.youDesc = overTextDesc(entry.youDesc)
+  return said
 }
 
 /** Which way each of the four verbs went, for the run the status box paints. */
@@ -260,12 +272,12 @@ const MEMORY_TONES: Record<MemoryType, TextMark['tone']> = {
 }
 
 /**
- * {@link memorySentence} as the status box draws it: the verb she remembers him by in the
- * colour of which way it went.
+ * {@link memorySentence} as the status box draws it, spoken to the reader where the ledger's
+ * second-person words were kept: the verb she remembers him by in the colour of which way it went.
  */
 export function memoryStatusLine(
   name: string,
-  entry: Pick<CharMemory, 'type' | 'desc'>,
+  entry: SpokenMemory,
   readerName: string,
   holder: Gender,
   reader: ReaderPronouns
@@ -746,26 +758,26 @@ export function foldRelationshipEvents(
 
 /**
  * What an unanswered invitation costs her, in the reader's voice: completes
- * "{Name} disliked that ..." in the memory and in the ending's status line alike.
+ * "{Name} disliked that ..." in the memory, and with `who` "you" in the ending's status line.
  */
-export function ignoredTextDesc(g: Gender): string {
-  return `the reader ignored ${PRONOUNS[g].their} text`
+export function ignoredTextDesc(g: Gender, who = 'the reader'): string {
+  return `${who} ignored ${PRONOUNS[g].their} text`
 }
 
 /**
  * What leaving her vent unanswered costs her, in the same voice, kept as her texting memory:
  * completes "{Name} disliked that ..." before the clause saying it was over text.
  */
-export function ignoredVentDesc(g: Gender): string {
-  return `the reader ignored ${PRONOUNS[g].them} when ${PRONOUNS[g].they} wanted to vent`
+export function ignoredVentDesc(g: Gender, who = 'the reader'): string {
+  return `${who} ignored ${PRONOUNS[g].them} when ${PRONOUNS[g].they} wanted to vent`
 }
 
 /**
  * What answering an invitation with a no costs a lover, in the same voice: completes
- * "{Name} disliked that ..." in the memory and in the ending's status line alike.
+ * "{Name} disliked that ..." in the memory, and with `who` "you" in the ending's status line.
  */
-export function turnedDownDesc(g: Gender): string {
-  return `the reader turned down ${PRONOUNS[g].their} request to hang out`
+export function turnedDownDesc(g: Gender, who = 'the reader'): string {
+  return `${who} turned down ${PRONOUNS[g].their} request to hang out`
 }
 
 /**

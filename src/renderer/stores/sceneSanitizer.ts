@@ -23,12 +23,11 @@ import {
   milestoneEmotionOf,
   milestoneSoured,
   milestoneStatusLines as milestoneLinesFor,
-  overTextDesc,
   overTextMemory,
   turnedDownDesc,
   type CrushStanding
 } from '@shared/relationship'
-import { storedMemoryDesc } from '@shared/readerVoice'
+import { storedMemoryDesc, storedYouDesc } from '@shared/readerVoice'
 import { customCgSlotOf, stockCgsInPlay } from '@shared/positions'
 import { cgAction, parseAction, showAction, spriteAction } from '@shared/sceneActions'
 import { splitSentences } from '@shared/sentences'
@@ -378,19 +377,28 @@ export interface ValidMemory {
   charId: string
   type: MemoryType
   desc: string
+  /** The ledger's second-person words for it, where they could be kept: the status lines' alone. */
+  youDesc?: string
 }
 
-/** One ledger row as it is filed, in the reader's voice. */
+/** One ledger row as it is filed, in the reader's voice, and the second person beside it if kept. */
 function validMemory(
   charId: string,
-  entry: { type: MemoryType; desc: string },
+  entry: { type: MemoryType; desc: string; youDesc?: string },
   holder: Gender,
   reader: ReaderPronouns
 ): ValidMemory {
-  return { charId, type: entry.type, desc: storedMemoryDesc(entry.desc, holder, reader) }
+  const kept: ValidMemory = {
+    charId,
+    type: entry.type,
+    desc: storedMemoryDesc(entry.desc, holder, reader)
+  }
+  const youDesc = storedYouDesc(entry.youDesc)
+  if (youDesc !== undefined) kept.youDesc = youDesc
+  return kept
 }
 
-/** A filed memory as it is kept on her entry, dated `date`. */
+/** A filed memory as it is kept on her entry, dated `date`; the second person stays behind. */
 function memoryOn(date: number, entry: Omit<ValidMemory, 'charId'>): CharMemory {
   return { date, type: entry.type, desc: entry.desc }
 }
@@ -617,19 +625,31 @@ export function memoryStatusLines(
   // The invitation he spent the slot not answering, said in the same words it was recorded in.
   for (const charId of ignored) {
     const holder = genderOf(characters[charId])
-    const entry = { type: 'disliked', desc: ignoredTextDesc(holder) } as const
+    const entry = {
+      type: 'disliked',
+      desc: ignoredTextDesc(holder),
+      youDesc: ignoredTextDesc(holder, 'you')
+    } as const
     lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // The invitation he did answer, and said no to.
   for (const charId of turnedDown) {
     const holder = genderOf(characters[charId])
-    const entry = { type: 'disliked', desc: turnedDownDesc(holder) } as const
+    const entry = {
+      type: 'disliked',
+      desc: turnedDownDesc(holder),
+      youDesc: turnedDownDesc(holder, 'you')
+    } as const
     lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // The vent he left unanswered, in the texting memory's own words.
   for (const charId of ignoredVents) {
     const holder = genderOf(characters[charId])
-    const entry = { type: 'disliked', desc: overTextDesc(ignoredVentDesc(holder)) } as const
+    const entry = overTextMemory({
+      type: 'disliked' as const,
+      desc: ignoredVentDesc(holder),
+      youDesc: ignoredVentDesc(holder, 'you')
+    })
     lines.push(memoryLineOf(statusNameOf(charId), entry, readerName, holder, playerPronouns))
   }
   // A present to a girl the ledger left nothing about still lands, at the end.
