@@ -1581,8 +1581,7 @@ export function EditCharacterModal({
                       }
                     />
                     <p className="vu-field-hint">
-                      Changing who {pronounsOf(character).they}&apos;s attracted to won&apos;t
-                      affect playthroughs already in progress.
+                      Changes to sexuality will only take effect in a new playthrough.
                     </p>
                   </div>
 
