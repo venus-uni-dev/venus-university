@@ -114,8 +114,7 @@ export function buildHangoutClassifierPrompt(
     user,
     schema: hangoutClassifierSchema(),
     cacheKey: 'hangout-classifier',
-    // The classifier is judged better at a floor of low.
-    minThinking: 'low'
+    thinking: 'classifiers'
   }
 }
 

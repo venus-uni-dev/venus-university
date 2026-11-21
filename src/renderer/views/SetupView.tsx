@@ -6,7 +6,8 @@ import {
   imageApiFor,
   modelFor,
   providerFor,
-  thinkingLevelFor
+  thinkingLevelFor,
+  thinkingRowsFor
 } from '@shared/providers'
 import {
   imageEndpointOf,
@@ -14,6 +15,7 @@ import {
   imageFieldsToStore,
   imageKeyStays,
   imageModelOf,
+  thinkingRowsPatch,
   writerReady
 } from '@shared/settingsRules'
 import { modelForComponentId, PINNED_NODES } from '@shared/setupManifest'
@@ -897,7 +899,7 @@ function ApiKeyStage({ onDone }: { onDone: () => void }): JSX.Element {
           apiKey: geminiKey.trim(),
           rememberKey: remember,
           apiModel,
-          thinkingLevel: thinkingLevelFor('gemini', apiModel, settings.thinkingLevel)
+          ...thinkingRowsPatch(settings, 'gemini', thinkingRowsFor(settings, 'gemini', apiModel))
         }
     const ok = await save(patch)
     // A failed write leaves the stage up; the store has already raised the error.

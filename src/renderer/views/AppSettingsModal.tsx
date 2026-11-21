@@ -9,13 +9,15 @@ import {
   SERVICE_TIER_LABELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
-  defaultModelFor,
+  THINKING_ROWS,
+  THINKING_ROW_LABELS,
   endpointServiceTierFor,
   imageApiFor,
   modelFor,
   providerFor,
   serviceTierFor,
-  thinkingLevelFor
+  thinkingLevelFor,
+  thinkingRowsFor
 } from '@shared/providers'
 import {
   endpointKeyStays,
@@ -23,14 +25,16 @@ import {
   imageFieldsProblem,
   imageFieldsToStore,
   imageKeyStays,
-  imageModelOf
+  imageModelOf,
+  thinkingRowsPatch
 } from '@shared/settingsRules'
 
 import type {
   EndpointServiceTier,
   ProviderApi,
   ServiceTier,
-  ThinkingLevel
+  ThinkingLevel,
+  ThinkingRow
 } from '@shared/providers'
 import type { PromptKind } from '@shared/promptKinds'
 import type { RendererSettings, SettingsPatch } from '@shared/types'
@@ -103,6 +107,10 @@ const TABS: readonly { id: SettingsTab; word: string; Mark: () => JSX.Element }[
   { id: 'advanced', word: 'Advanced', Mark: SlidersIcon }
 ]
 
+/** What the thinking rows' hint says on both pages, after the page's own first words. */
+const THINKING_ROWS_HINT =
+  'History updates memories, stats and money after scenes and texts. Classifiers work out where your actions take you, who comes along, and whether a text is an invite.'
+
 /** A page arriving as its tab is picked; leaving, it is simply hidden. */
 const PAGE_IN = fadeIn(0, 0.25)
 
@@ -162,19 +170,18 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [apiModel, setApiModel] = useState(() =>
     settings ? modelFor('gemini', settings.apiModel).id : ''
   )
-  const [thinkingLevel, setThinkingLevel] = useState(() =>
-    settings
-      ? thinkingLevelFor('gemini', settings.apiModel, settings.thinkingLevel)
-      : defaultModelFor('gemini').defaultThinkingLevel
+  // Gemini's rows, each resolved against its model, so every select opens on one of its options.
+  const [thinking, setThinking] = useState<Record<ThinkingRow, ThinkingLevel>>(() =>
+    thinkingRowsFor(settings ?? {}, 'gemini', settings?.apiModel ?? '')
   )
   const [secondaryModel, setSecondaryModel] = useState(() => settings?.secondaryModel ?? '')
   // Resolved through Gemini's table, so an absent one opens on priority.
   const [serviceTier, setServiceTier] = useState<ServiceTier>(() =>
     serviceTierFor('gemini', settings?.serviceTier)
   )
-  // A custom endpoint always names an effort: an absent one reads as minimal.
-  const [reasoningEffort, setReasoningEffort] = useState<ThinkingLevel>(() =>
-    thinkingLevelFor('openai', '', settings?.reasoningEffort ?? '')
+  // A custom endpoint's rows always name an effort: an absent one reads as its default.
+  const [efforts, setEfforts] = useState<Record<ThinkingRow, ThinkingLevel>>(() =>
+    thinkingRowsFor(settings ?? {}, 'openai', '')
   )
   // Its own tier, held blank for None: absent sends none.
   const [endpointTier, setEndpointTier] = useState<EndpointServiceTier | ''>(
@@ -269,7 +276,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     endpointUrl,
     endpointKey,
     modelId,
-    reasoningEffort,
+    reasoningEffort: efforts.scenes,
     endpointServiceTier: endpointTier || undefined
   })
 
@@ -421,6 +428,14 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     return ok
   }
 
+  // The settings this render was drawn on, which the guard above has made sure of.
+  const drawn = settings
+
+  /** The settings as the store holds them this moment, which a patch is reckoned against. */
+  function storedNow(): RendererSettings {
+    return useSettingsStore.getState().settings ?? drawn
+  }
+
   /** Puts a control back where the store stands, for a write that did not land. */
   function reseed(apply: (stored: RendererSettings) => void): (ok: boolean) => void {
     return (ok) => {
@@ -442,27 +457,27 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     void write({ apiProvider: next }).then(reseed((stored) => setApiProvider(stored.apiProvider)))
   }
 
-  /** Gemini's model, with the level re-resolved against what the new model accepts. */
+  /** Gemini's model, with every row re-resolved against what the new model accepts. */
   function handleModelChange(value: string): void {
-    const level = thinkingLevelFor('gemini', value, thinkingLevel)
+    const levels = Object.fromEntries(
+      THINKING_ROWS.map((row) => [row, thinkingLevelFor('gemini', value, thinking[row])])
+    ) as Record<ThinkingRow, ThinkingLevel>
     setApiModel(value)
-    setThinkingLevel(level)
-    void write({ apiModel: value, thinkingLevel: level }).then(
+    setThinking(levels)
+    void write({ apiModel: value, ...thinkingRowsPatch(storedNow(), 'gemini', levels) }).then(
       reseed((stored) => {
         setApiModel(modelFor('gemini', stored.apiModel).id)
-        setThinkingLevel(thinkingLevelFor('gemini', stored.apiModel, stored.thinkingLevel))
+        setThinking(thinkingRowsFor(stored, 'gemini', stored.apiModel))
       })
     )
   }
 
-  /** How hard Gemini thinks, on the levels the model above accepts. */
-  function handleThinkingChange(value: string): void {
-    const level = value as ThinkingLevel
-    setThinkingLevel(level)
-    void write({ thinkingLevel: level }).then(
-      reseed((stored) =>
-        setThinkingLevel(thinkingLevelFor('gemini', stored.apiModel, stored.thinkingLevel))
-      )
+  /** How hard Gemini thinks on one row, on the levels the model above accepts. */
+  function handleThinkingChange(row: ThinkingRow, value: string): void {
+    const levels = { ...thinking, [row]: value as ThinkingLevel }
+    setThinking(levels)
+    void write(thinkingRowsPatch(storedNow(), 'gemini', levels)).then(
+      reseed((stored) => setThinking(thinkingRowsFor(stored, 'gemini', stored.apiModel)))
     )
   }
 
@@ -483,14 +498,12 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     )
   }
 
-  /** The effort a custom endpoint is asked for on every call. */
-  function handleReasoningChange(value: string): void {
-    const level = value as ThinkingLevel
-    setReasoningEffort(level)
-    void write({ reasoningEffort: level }).then(
-      reseed((stored) =>
-        setReasoningEffort(thinkingLevelFor('openai', '', stored.reasoningEffort ?? ''))
-      )
+  /** The effort a custom endpoint is asked for on one row's calls. */
+  function handleEffortChange(row: ThinkingRow, value: string): void {
+    const levels = { ...efforts, [row]: value as ThinkingLevel }
+    setEfforts(levels)
+    void write(thinkingRowsPatch(storedNow(), 'openai', levels)).then(
+      reseed((stored) => setEfforts(thinkingRowsFor(stored, 'openai', '')))
     )
   }
 
@@ -656,6 +669,43 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
         />
       ))}
     </div>
+  )
+
+  /**
+   * One page's thinking rows under their heading: a select per row on the levels `accepted`, and
+   * the page's own hint before what the rows are for.
+   */
+  const thinkingRowsBlock = (
+    hint: string,
+    levels: Record<ThinkingRow, ThinkingLevel>,
+    accepted: readonly ThinkingLevel[],
+    onChange: (row: ThinkingRow, value: string) => void
+  ): JSX.Element => (
+    <>
+      <span className="vu-settings-heading vu-settings-group-heading">Thinking/Reasoning</span>
+      <span className="vu-field-hint">{`${hint} ${THINKING_ROWS_HINT}`}</span>
+      <div className="vu-settings-levels">
+        {THINKING_ROWS.map((row) => (
+          <label key={row} className="vu-settings-level" htmlFor={`settings-thinking-${row}`}>
+            <span className="vu-field-label vu-settings-level-label">{THINKING_ROW_LABELS[row]}</span>
+            <span className="vu-field vu-settings-level-pick">
+              <select
+                id={`settings-thinking-${row}`}
+                className="vu-input vu-select"
+                value={levels[row]}
+                onChange={(e) => onChange(row, e.target.value)}
+              >
+                {accepted.map((level) => (
+                  <option key={level} value={level}>
+                    {THINKING_LEVEL_LABELS[level]}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+        ))}
+      </div>
+    </>
   )
 
   // Only the browser keeps a key anywhere the player might not want it kept; it covers every
@@ -916,18 +966,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       />
 
                       <SelectField
-                        id="settings-reasoning-effort"
-                        label="Reasoning effort"
-                        hint="Sent with every call. Some servers reject the field outright, and only some models accept Minimal."
-                        value={reasoningEffort}
-                        onChange={handleReasoningChange}
-                        options={THINKING_LEVELS.map((level) => ({
-                          value: level,
-                          label: THINKING_LEVEL_LABELS[level]
-                        }))}
-                      />
-
-                      <SelectField
                         id="settings-endpoint-service-tier"
                         label="Service tier"
                         hint="Leave at None unless your provider offers service tiers. The regular tier is called Default on OpenAI and Standard on Google. Some servers reject tiers they don't recognize."
@@ -973,6 +1011,13 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                           <span className="vu-test-note">{probe.test.error.message}</span>
                         )}
                       </div>
+
+                      {thinkingRowsBlock(
+                        'Sent with every call. Some servers reject the field outright, and only some models accept Minimal.',
+                        efforts,
+                        THINKING_LEVELS,
+                        handleEffortChange
+                      )}
                     </>
                   )}
                   {column(
@@ -1069,18 +1114,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       />
 
                       <SelectField
-                        id="settings-thinking-level"
-                        label="Thinking"
-                        hint="Recommended to be left at Low. Only 3.6 and older models support Minimal effort. Certain calls run with High thinking level no matter what is set here."
-                        value={thinkingLevel}
-                        onChange={handleThinkingChange}
-                        options={thinkingLevels.map((level) => ({
-                          value: level,
-                          label: THINKING_LEVEL_LABELS[level]
-                        }))}
-                      />
-
-                      <SelectField
                         id="settings-service-tier"
                         label="Service tier"
                         hint="Priority offers the highest quality at double the price of Standard. Flex is half the price of standard but you may experience long wait times."
@@ -1091,6 +1124,13 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                           label: SERVICE_TIER_LABELS[tier]
                         }))}
                       />
+
+                      {thinkingRowsBlock(
+                        'Higher levels write better but take longer. Only 3.6 and older models support Minimal effort.',
+                        thinking,
+                        thinkingLevels,
+                        handleThinkingChange
+                      )}
                     </>
                   )}
                   {column(

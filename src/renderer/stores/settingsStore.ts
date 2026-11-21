@@ -151,13 +151,17 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     apiProvider: settings.apiProvider,
     apiModel: settings.apiModel,
     thinkingLevel: settings.thinkingLevel,
+    // Carried, or a save made from anywhere else would put Gemini's other rows back to their
+    // defaults.
+    thinkingLevels: settings.thinkingLevels,
     // Carried, or a save made from anywhere else would drop the custom endpoint the writer
-    // runs on, the endpoint's models, the effort and tier it runs at, the reply cap it is sent
+    // runs on, the endpoint's models, the efforts and tier it runs at, the reply cap it is sent
     // and where its pictures are drawn.
     endpointUrl: settings.endpointUrl,
     endpointModel: settings.endpointModel,
     endpointSecondaryModel: settings.endpointSecondaryModel,
     reasoningEffort: settings.reasoningEffort,
+    reasoningEfforts: settings.reasoningEfforts,
     endpointServiceTier: settings.endpointServiceTier,
     maxOutputTokens: settings.maxOutputTokens,
     imageEndpointUrl: settings.imageEndpointUrl,

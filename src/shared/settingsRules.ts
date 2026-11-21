@@ -8,7 +8,13 @@ import {
   defaultModelFor,
   defaultSecondaryModelFor,
   IMAGE_MODEL_ID,
-  imageApiFor
+  imageApiFor,
+  storedLevelFor,
+  THINKING_ROWS,
+  type ProviderApi,
+  type ThinkingLevel,
+  type ThinkingRow,
+  type ThinkingRowLevels
 } from './providers'
 import type { MemoryBudgets, RendererSettings, Settings, SettingsPatch } from './types'
 
@@ -18,12 +24,13 @@ import type { MemoryBudgets, RendererSettings, Settings, SettingsPatch } from '.
 export const SETTINGS_SCHEMA_VERSION = 1
 
 /**
- * What the settings must carry; the three keys, the custom endpoint's URL, model ids, effort,
- * tier and reply cap, its images URL and model, the two dev switches, the service tier, the
- * hand-edited stream switch, the hand-edited ComfyUI build, which ComfyUI draws with its URL
- * and both sources' model picks and LoRA weights, the default tags, Gemini's secondary model,
- * the group volumes, the browser build's key-remembering, the sampling fields, the memory and
- * secret budgets, the graduation picture's cap and the custom scene persona are all optional.
+ * What the settings must carry; the three keys, Gemini's other thinking rows, the custom
+ * endpoint's URL, model ids, efforts, tier and reply cap, its images URL and model, the two dev
+ * switches, the service tier, the hand-edited stream switch, the hand-edited ComfyUI build,
+ * which ComfyUI draws with its URL and both sources' model picks and LoRA weights, the default
+ * tags, Gemini's secondary model, the group volumes, the browser build's key-remembering, the
+ * sampling fields, the memory and secret budgets, the graduation picture's cap and the custom
+ * scene persona are all optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -35,6 +42,8 @@ const SETTINGS_REQUIRED: Record<
     | 'endpointModel'
     | 'endpointSecondaryModel'
     | 'reasoningEffort'
+    | 'reasoningEfforts'
+    | 'thinkingLevels'
     | 'endpointServiceTier'
     | 'maxOutputTokens'
     | 'imageEndpointUrl'
@@ -99,10 +108,17 @@ export const SETTINGS_READ: ValidateRecordOptions<Settings> = {
   required: SETTINGS_REQUIRED
 }
 
-/** The fields the upgrade reads and moves: which model each provider runs on, and the volumes. */
+/**
+ * The fields the upgrade reads and moves: which model each provider runs on, the levels each
+ * runs at, and the volumes.
+ */
 type UpgradeFields = Pick<
   Settings,
   | 'apiProvider'
+  | 'thinkingLevel'
+  | 'thinkingLevels'
+  | 'reasoningEffort'
+  | 'reasoningEfforts'
   | 'apiModel'
   | 'secondaryModel'
   | 'endpointModel'
@@ -120,7 +136,8 @@ export function upgradeSettings<T extends UpgradeFields>(
   const endpoint = upgradeEndpointModels(settings)
   const sound = upgradeNsfwSound(endpoint)
   const cast = upgradeCastSwitch(sound)
-  return { settings: cast, upgraded: cast !== settings }
+  const rows = upgradeThinkingRows(cast)
+  return { settings: rows, upgraded: rows !== settings }
 }
 
 /**
@@ -160,6 +177,48 @@ function upgradeCastSwitch<T extends UpgradeFields>(settings: T): T {
   return rest as T
 }
 
+/**
+ * Each provider's one level carried onto its Texts row where it has no rows stored yet, so
+ * texting runs where it ran before the rows; History and Classifiers are left to their defaults.
+ * A provider with rows stored, or with no level to carry, is left as it came.
+ */
+function upgradeThinkingRows<T extends UpgradeFields>(settings: T): T {
+  const gemini =
+    settings.thinkingLevels === undefined && settings.thinkingLevel !== undefined
+      ? { thinkingLevels: { texts: settings.thinkingLevel } }
+      : {}
+  const custom =
+    settings.reasoningEfforts === undefined && settings.reasoningEffort !== undefined
+      ? { reasoningEfforts: { texts: settings.reasoningEffort } }
+      : {}
+  if (Object.keys(gemini).length === 0 && Object.keys(custom).length === 0) return settings
+  return { ...settings, ...gemini, ...custom }
+}
+
+/**
+ * The fields that store `levels` as `provider`'s rows: the Scenes row as its own level, and
+ * each other row written into its record only where it differs from what that row reads as now,
+ * so a row left at its default stays absent and follows the default.
+ */
+export function thinkingRowsPatch(
+  stored: Parameters<typeof storedLevelFor>[0],
+  provider: ProviderApi,
+  levels: Record<ThinkingRow, ThinkingLevel>
+): Partial<
+  Pick<SettingsPatch, 'thinkingLevel' | 'thinkingLevels' | 'reasoningEffort' | 'reasoningEfforts'>
+> {
+  const custom = provider === 'openai'
+  const record: ThinkingRowLevels = { ...(custom ? stored.reasoningEfforts : stored.thinkingLevels) }
+  for (const row of THINKING_ROWS) {
+    if (row !== 'scenes' && levels[row] !== storedLevelFor(stored, provider, row)) {
+      record[row] = levels[row]
+    }
+  }
+  return custom
+    ? { reasoningEffort: levels.scenes, reasoningEfforts: record }
+    : { thinkingLevel: levels.scenes, thinkingLevels: record }
+}
+
 /** Raised when the settings are there but cannot be read. */
 export const SETTINGS_UNREADABLE = {
   code: 'SETTINGS_UNREADABLE',
@@ -175,6 +234,9 @@ export function defaultSettings(): Settings {
     apiModel: defaultModelFor('gemini').id,
     apiKey: '',
     thinkingLevel: defaultModelFor('gemini').defaultThinkingLevel,
+    // Every row but Scenes at its default, written empty so the file is never taken for one
+    // to upgrade.
+    thinkingLevels: {},
     // The cheaper model the routable kinds run on. `secondaryModelFor` stays
     // absent beside it, which is what routes the default set (`DEFAULT_SECONDARY_KINDS`)
     // until the panel says otherwise.
@@ -399,6 +461,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     apiProvider: patch.apiProvider,
     apiModel: patch.apiModel,
     thinkingLevel: patch.thinkingLevel,
+    // Absent stays absent, and an absent row is its default.
+    thinkingLevels: patch.thinkingLevels,
     secondaryModel: patch.secondaryModel,
     secondaryModelFor: patch.secondaryModelFor,
     // Every custom-endpoint field rides every patch, so a provider switched away and back finds
@@ -408,6 +472,7 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     endpointModel: patch.endpointModel ?? '',
     endpointSecondaryModel: patch.endpointSecondaryModel,
     reasoningEffort: patch.reasoningEffort,
+    reasoningEfforts: patch.reasoningEfforts,
     // Absent stays absent, and absent is not sent.
     endpointServiceTier: patch.endpointServiceTier,
     maxOutputTokens: patch.maxOutputTokens,

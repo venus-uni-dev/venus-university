@@ -2470,8 +2470,7 @@ export function buildLedgerPrompt(
     schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats, recap),
     // Constant, not the playthrough: nothing above the seam varies by save.
     cacheKey: 'ledger',
-    logFrom: preamble.length + 1,
-    // The bookkeeping is judged better at high, whatever the setting says.
-    minThinking: 'high'
+    thinking: 'history',
+    logFrom: preamble.length + 1
   }
 }

@@ -22,6 +22,27 @@ export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   high: 'High'
 }
 
+/** The groups of calls the player sets a level for, in the order Settings lists them. */
+export const THINKING_ROWS = ['scenes', 'texts', 'history', 'classifiers'] as const
+export type ThinkingRow = (typeof THINKING_ROWS)[number]
+
+/** The rows stored beside the provider's own level, which is the Scenes row. */
+export type ThinkingRowLevels = Partial<Record<Exclude<ThinkingRow, 'scenes'>, ThinkingLevel>>
+
+/** Shown beside each row's select. */
+export const THINKING_ROW_LABELS: Record<ThinkingRow, string> = {
+  scenes: 'Scenes',
+  texts: 'Texts',
+  history: 'History',
+  classifiers: 'Classifiers'
+}
+
+/** What an absent row reads as; a row not named here takes the model's own default. */
+const THINKING_ROW_DEFAULTS: Partial<Record<ThinkingRow, ThinkingLevel>> = {
+  history: 'medium',
+  classifiers: 'low'
+}
+
 /** Which inference queue serves a request, in the order Settings lists them, the default first. */
 const SERVICE_TIERS = ['priority', 'standard', 'flex'] as const
 export type ServiceTier = (typeof SERVICE_TIERS)[number]
@@ -357,18 +378,50 @@ export function stepUp(level: ThinkingLevel, accepted: readonly ThinkingLevel[])
 }
 
 /**
- * The level a call names. Gemini reads its own setting, a custom endpoint the reasoning effort
- * beside it — an absent one reading as minimal — and either is resolved against the model that
- * will run, with a floor raising it and `raise` then taking it one accepted level higher.
+ * One row's level as `provider` stores it, unresolved: the Scenes row is the provider's own
+ * level — Gemini's `thinkingLevel`, a custom endpoint's `reasoningEffort` — and every other row
+ * is read off that provider's record, an absent one reading as the row's default or, where it has
+ * none, as blank, which resolves to the model's default.
+ */
+export function storedLevelFor(
+  settings: Partial<
+    Pick<Settings, 'thinkingLevel' | 'thinkingLevels' | 'reasoningEffort' | 'reasoningEfforts'>
+  >,
+  provider: ProviderApi,
+  row: ThinkingRow
+): string {
+  const custom = provider === 'openai'
+  if (row === 'scenes') return (custom ? settings.reasoningEffort : settings.thinkingLevel) ?? ''
+  const record = custom ? settings.reasoningEfforts : settings.thinkingLevels
+  return record?.[row] ?? THINKING_ROW_DEFAULTS[row] ?? ''
+}
+
+/** Every row resolved against `modelId` on `provider`, as Settings shows them. */
+export function thinkingRowsFor(
+  settings: Parameters<typeof storedLevelFor>[0],
+  provider: ProviderApi,
+  modelId: string
+): Record<ThinkingRow, ThinkingLevel> {
+  return Object.fromEntries(
+    THINKING_ROWS.map((row) => [
+      row,
+      thinkingLevelFor(provider, modelId, storedLevelFor(settings, provider, row))
+    ])
+  ) as Record<ThinkingRow, ThinkingLevel>
+}
+
+/**
+ * The level a call names: its row as the active provider stores it, resolved against the model
+ * that will run, with a floor raising it and `raise` then taking it one accepted level higher.
  */
 export function reasoningToSend(
   settings: Settings,
   modelId: string,
+  row: ThinkingRow,
   floor?: ThinkingLevel,
   raise?: boolean
 ): ThinkingLevel {
-  const stored =
-    settings.apiProvider === 'openai' ? (settings.reasoningEffort ?? '') : settings.thinkingLevel
+  const stored = storedLevelFor(settings, settings.apiProvider, row)
   const level = thinkingLevelFor(settings.apiProvider, modelId, stored, floor)
   return raise ? stepUp(level, modelFor(settings.apiProvider, modelId).thinkingLevels) : level
 }

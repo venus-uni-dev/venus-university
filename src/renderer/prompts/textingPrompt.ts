@@ -585,6 +585,7 @@ export function buildTextingPrompt(
     schema: textingSchema(),
     // Constant, like the ledger's: nothing above the seam varies by save.
     cacheKey: 'texting',
+    thinking: 'texts',
     kind: 'texting'
   }
 }
