@@ -306,7 +306,7 @@ export const TRAIT_PERCENT = 10
 // ─── The roster's love lives ───────────────────────────────────────────────────
 
 /** Odds one character falls for another after a good meeting; rolled per side as the slot's pairs settle. */
-export const CRUSH_CHANCE = 0.05
+export const CRUSH_CHANCE = 0.1
 
 /** What a trait multiplies a love-life roll by where it tilts one, or divides it by. */
 export const ROMANCE_TRAIT_FACTOR = 1.5
